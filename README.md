@@ -95,4 +95,28 @@ npm run build
 
 ## Deployment
 
-Build the frontend and deploy both frontend and backend to your preferred hosting platform. Make sure to set environment variables for production.
+### Quick Deploy to Vercel + Render
+
+**Frontend (Vercel):**
+```
+Build Command: npm run build:prod
+Output Directory: dist
+Environment Variable: VITE_API_URL=https://your-backend.onrender.com/api
+```
+
+**Backend (Render):**
+```
+Root Directory: backend
+Build Command: npm install
+Start Command: npm start
+Environment Variables: MONGODB_URI, JWT_SECRET, CLIENT_URL, ALLOWED_ORIGINS
+```
+
+📚 **Complete Guide**: See [VERCEL_RENDER_DEPLOYMENT.md](VERCEL_RENDER_DEPLOYMENT.md) for detailed step-by-step instructions.
+
+### Alternative Deployment Options
+
+- **Full Guide**: [DEPLOYMENT.md](DEPLOYMENT.md) - Covers VPS, Docker, Heroku, Netlify, and more
+- **Quick Start**: [QUICKSTART.md](QUICKSTART.md) - Development and deployment quick reference
+- **Checklist**: [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) - Pre-deployment checklist
+

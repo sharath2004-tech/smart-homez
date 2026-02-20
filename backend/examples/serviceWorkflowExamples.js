@@ -443,13 +443,6 @@ async function errorHandlingExamples() {
 // ==================== EXPORT FOR TESTING ====================
 
 export {
-  completeServiceWorkflow,
-  overtimeScenarioExample,
-  workDocumentationExample,
-  errorHandlingExamples,
-  uploadPhoto,
-  generateStartQR,
-  scanStartQR,
-  generateEndQR,
-  scanEndQR
+    completeServiceWorkflow, errorHandlingExamples, generateEndQR, generateStartQR, overtimeScenarioExample, scanEndQR, scanStartQR, uploadPhoto, workDocumentationExample
 };
+
