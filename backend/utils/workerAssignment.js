@@ -276,6 +276,11 @@ export const assignWorkerToBooking = async (bookingId) => {
     booking.worker = bestWorkers[0].workerId;
     booking.assignedAt = new Date();
     booking.assignmentMethod = 'auto';
+    
+    // Auto-confirm booking when worker is assigned
+    if (booking.status === 'pending') {
+      booking.status = 'confirmed';
+    }
 
     // Assign backup workers
     if (bestWorkers.length > 1) {

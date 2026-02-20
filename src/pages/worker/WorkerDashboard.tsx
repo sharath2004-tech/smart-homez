@@ -3,6 +3,7 @@ import { authAPI, bookingsAPI, workersAPI } from "@/lib/api";
 import { Bell, CheckCircle, ChevronRight, Clock, MapPin, QrCode, Star, ToggleLeft, ToggleRight, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import TaskDetailModal from "./TaskDetailModal";
 
 interface Stats {
   today: number;
@@ -47,6 +48,7 @@ const WorkerDashboard = () => {
   const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [taskTimer, setTaskTimer] = useState<number>(0);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDashboardData();
@@ -284,7 +286,11 @@ const WorkerDashboard = () => {
             </div>
             <div className="space-y-3">
               {upcomingTasks.map((task) => (
-                <div key={task._id} className="card-elevated p-4 flex items-center gap-4">
+                <div 
+                  key={task._id} 
+                  className="card-elevated p-4 flex items-center gap-4 hover:shadow-lg transition-all cursor-pointer"
+                  onClick={() => setSelectedTaskId(task._id)}
+                >
                   <div className="w-11 h-11 bg-accent rounded-xl flex items-center justify-center text-xl shrink-0">
                     {getServiceEmoji(task.service.name)}
                   </div>
@@ -332,6 +338,15 @@ const WorkerDashboard = () => {
           </button>
         </div>
       </div>
+
+      {/* Task Detail Modal */}
+      {selectedTaskId && (
+        <TaskDetailModal
+          taskId={selectedTaskId}
+          onClose={() => setSelectedTaskId(null)}
+          onRefresh={fetchDashboardData}
+        />
+      )}
     </AppLayout>
   );
 };

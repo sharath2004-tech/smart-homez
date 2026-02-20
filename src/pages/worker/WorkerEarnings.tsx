@@ -206,11 +206,11 @@ const WorkerEarnings = () => {
             </div>
           ) : (
             <div className="space-y-3">
-              {getRecentEarnings().map((earning) => (
+              {getRecentEarnings().filter(earning => earning.service && earning.customer).map((earning) => (
                 <div key={earning._id} className="card-elevated p-4 flex items-center gap-4">
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-foreground truncate">{earning.service.name}</p>
-                    <p className="text-sm text-muted-foreground truncate">{earning.customer.name}</p>
+                    <p className="font-semibold text-foreground truncate">{earning.service?.name || 'Service'}</p>
+                    <p className="text-sm text-muted-foreground truncate">{earning.customer?.name || 'Customer'}</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       {formatDate(earning.completedAt)} • {formatTime(earning.startTime)}
                     </p>
