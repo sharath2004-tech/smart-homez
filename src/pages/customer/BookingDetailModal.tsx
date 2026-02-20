@@ -1,7 +1,7 @@
 import { bookingsAPI } from "@/lib/api";
-import { ArrowLeft, Calendar, CheckCircle, Clock, DollarSign, MapPin, Phone, QrCode, Timer, User } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
 import { Html5QrcodeScanner } from "html5-qrcode";
+import { ArrowLeft, Calendar, DollarSign, Phone, QrCode, Timer, User } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
 interface Worker {
   _id: string;
