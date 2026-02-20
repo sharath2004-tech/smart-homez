@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { Badge } from "@/components/ui/badge";
 import { bookingsAPI } from "@/lib/api";
-import { Calendar, Clock, MapPin, Phone, RefreshCw, Star } from "lucide-react";
+import { Calendar, Clock, MapPin, Phone, QrCode, RefreshCw, Star } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import BookingDetailModal from "./BookingDetailModal";
 
@@ -45,6 +45,8 @@ interface Booking {
   location?: Location;
   paymentStatus?: string;
   createdAt: string;
+  serviceStartQRCode?: string;
+  actualStartTime?: string;
 }
 
 const statusConfig: Record<string, { label: string; bg: string; text: string }> = {
@@ -215,6 +217,17 @@ const BookingsPage = () => {
           ))}
         </div>
 
+        {/* Helpful instruction for upcoming bookings */}
+        {activeTab === 'upcoming' && bookings.length > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+            <QrCode className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-blue-900">Tap any booking to view details and scan QR code</p>
+              <p className="text-xs text-blue-700 mt-1">When your worker arrives, tap the booking and scan their QR code to start the service timer.</p>
+            </div>
+          </div>
+        )}
+
         {/* Bookings List */}
         <div className="space-y-4">
           {loading ? (
@@ -242,9 +255,16 @@ const BookingsPage = () => {
               return (
                 <div 
                   key={booking._id} 
-                  className="card-elevated p-5 space-y-4 cursor-pointer hover:shadow-lg transition-shadow"
+                  className="card-elevated p-5 space-y-4 cursor-pointer hover:shadow-lg transition-shadow relative"
                   onClick={() => setSelectedBookingId(booking._id)}
                 >
+                  {/* Ready to Start Indicator */}
+                  {booking.status === 'confirmed' && booking.serviceStartQRCode && !booking.actualStartTime && (
+                    <div className="absolute top-3 right-3 px-3 py-1 bg-teal-500 text-white text-xs font-semibold rounded-full animate-pulse">
+                      👆 Tap to scan QR
+                    </div>
+                  )}
+                  
                   {/* Header */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">

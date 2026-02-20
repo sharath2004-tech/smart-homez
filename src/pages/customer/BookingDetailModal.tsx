@@ -80,14 +80,20 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
     } catch (error) {
       console.error('Error fetching booking detail:', error);
       alert('Failed to load booking details');
-      onClose();
     } finally {
       setLoading(false);
     }
-  }, [bookingId, onClose]);
+  }, [bookingId]);
 
   useEffect(() => {
     fetchBookingDetail();
+    
+    // Auto-refresh every 5 seconds for real-time updates
+    const interval = setInterval(() => {
+      fetchBookingDetail();
+    }, 5000);
+    
+    return () => clearInterval(interval);
   }, [fetchBookingDetail]);
 
   // Timer for active bookings

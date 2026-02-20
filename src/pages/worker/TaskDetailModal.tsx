@@ -59,7 +59,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isScanning, setIsScanning] = useState(false);
 
-  const fetchTaskDetail = useCallback(async () => {
+  const fetchTaskDetail = async () => {
     try {
       setLoading(true);
       const response = await bookingsAPI.getById(taskId);
@@ -72,15 +72,22 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
     } catch (error) {
       console.error('Error fetching task detail:', error);
       alert('Failed to load task details');
-      onClose();
     } finally {
       setLoading(false);
     }
-  }, [taskId, onClose]);
+  };
 
   useEffect(() => {
     fetchTaskDetail();
-  }, [fetchTaskDetail]);
+    
+    // Auto-refresh every 5 seconds for real-time updates
+    const interval = setInterval(() => {
+      fetchTaskDetail();
+    }, 5000);
+    
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskId]);
 
   // Timer for active tasks
   useEffect(() => {
