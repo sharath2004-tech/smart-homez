@@ -114,7 +114,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
 
   const handleGenerateStartQR = async () => {
     try {
-      const response = await bookingsAPI.generateStartQR(taskId);
+      const response = await bookingsAPI.generateStartQR(taskId, true);
       setTask({ ...task!, serviceStartQRCode: response.qrCode });
       generateQRCode(response.qrCode);
       alert('QR Code generated! Show this to customer to start service.');

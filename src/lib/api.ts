@@ -195,9 +195,10 @@ export const bookingsAPI = {
     return apiCall('/bookings?status=completed,cancelled');
   },
 
-  generateStartQR: async (id: string) => {
+  generateStartQR: async (id: string, jobDescriptionAcknowledged: boolean = true) => {
     return apiCall(`/bookings/${id}/generate-start-qr`, {
-      method: 'POST'
+      method: 'POST',
+      body: JSON.stringify({ jobDescriptionAcknowledged })
     });
   },
 

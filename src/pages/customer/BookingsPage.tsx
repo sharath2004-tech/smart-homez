@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { bookingsAPI } from "@/lib/api";
 import { Calendar, Clock, MapPin, Phone, RefreshCw, Star } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import BookingDetailModal from "./BookingDetailModal";
 
 interface Worker {
   _id: string;
@@ -60,6 +61,7 @@ const BookingsPage = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
 
   const fetchBookings = useCallback(async (silent = false) => {
     try {
@@ -238,7 +240,11 @@ const BookingsPage = () => {
               const isPast = activeTab === "past";
 
               return (
-                <div key={booking._id} className="card-elevated p-5 space-y-4">
+                <div 
+                  key={booking._id} 
+                  className="card-elevated p-5 space-y-4 cursor-pointer hover:shadow-lg transition-shadow"
+                  onClick={() => setSelectedBookingId(booking._id)}
+                >
                   {/* Header */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
@@ -399,6 +405,15 @@ const BookingsPage = () => {
           )}
         </div>
       </div>
+
+      {/* Booking Detail Modal */}
+      {selectedBookingId && (
+        <BookingDetailModal
+          bookingId={selectedBookingId}
+          onClose={() => setSelectedBookingId(null)}
+          onRefresh={fetchBookings}
+        />
+      )}
     </AppLayout>
   );
 };

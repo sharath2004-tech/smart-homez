@@ -227,13 +227,45 @@ router.put('/:id', authenticate, async (req, res) => {
       });
     }
 
-    const { status, notes, rating, review, cancellationReason } = req.body;
+    const { status, notes, rating, review, cancellationReason, actualEndTime } = req.body;
 
     if (status) booking.status = status;
     if (notes) booking.notes = notes;
     if (rating) booking.rating = rating;
     if (review) booking.review = review;
     if (cancellationReason) booking.cancellationReason = cancellationReason;
+    if (actualEndTime) booking.actualEndTime = actualEndTime;
+
+    // Calculate overtime charges when completing the booking
+    if (status === 'completed' && booking.actualStartTime) {
+      const endTime = actualEndTime ? new Date(actualEndTime) : new Date();
+      booking.actualEndTime = endTime;
+
+      // Calculate actual duration
+      const actualDurationMs = endTime - new Date(booking.actualStartTime);
+      const actualDurationMinutes = Math.floor(actualDurationMs / 60000);
+      booking.actualDurationMinutes = actualDurationMinutes;
+
+      // Calculate scheduled end time
+      const scheduledEndDate = new Date(booking.bookingDate);
+      const [endHours, endMinutes] = booking.endTime.split(':');
+      scheduledEndDate.setHours(parseInt(endHours), parseInt(endMinutes), 0, 0);
+
+      // Calculate overtime
+      const overtimeMs = endTime - scheduledEndDate;
+      if (overtimeMs > 0) {
+        const overtimeMinutes = Math.ceil(overtimeMs / 60000);
+        booking.overtimeMinutes = overtimeMinutes;
+        
+        // ₹2.5 per minute overtime charge
+        const OVERTIME_RATE = 2.5;
+        const overtimeCharges = overtimeMinutes * OVERTIME_RATE;
+        booking.overtimeCharges = overtimeCharges;
+        
+        // Update total amount
+        booking.totalAmount = (booking.totalAmount || 0) + overtimeCharges;
+      }
+    }
 
     await booking.save();
 
