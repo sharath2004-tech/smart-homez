@@ -9,7 +9,7 @@ import {
     QrCode, Timer, User
 } from "lucide-react";
 import QRCode from "qrcode";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 interface Task {
   _id: string;
