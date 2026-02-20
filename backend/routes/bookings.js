@@ -40,7 +40,7 @@ router.get('/', authenticate, async (req, res) => {
 
     const bookings = await Booking.find(query)
       .populate('customer', 'name email phone')
-      .populate('worker', 'name email phone workerProfile')
+      .populate('worker', 'name email phone gender religion workerProfile')
       .populate('service', 'name description price duration')
       .limit(limit * 1)
       .skip((page - 1) * limit)
@@ -67,7 +67,7 @@ router.get('/:id', authenticate, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id)
       .populate('customer', 'name email phone')
-      .populate('worker', 'name email phone workerProfile')
+      .populate('worker', 'name email phone gender religion workerProfile')
       .populate('service', 'name description price duration');
     
     if (!booking) {
@@ -186,7 +186,7 @@ router.post('/',
       } else {
         populatedBooking = await Booking.findById(booking._id)
           .populate('customer', 'name email phone')
-          .populate('worker', 'name email phone workerProfile')
+          .populate('worker', 'name email phone gender religion workerProfile')
           .populate('service', 'name description price duration');
       }
 
@@ -238,7 +238,7 @@ router.put('/:id', authenticate, async (req, res) => {
 
     const updatedBooking = await Booking.findById(booking._id)
       .populate('customer', 'name email phone')
-      .populate('worker', 'name email phone workerProfile')
+      .populate('worker', 'name email phone gender religion workerProfile')
       .populate('service', 'name description price duration');
 
     res.json({ message: 'Booking updated successfully', booking: updatedBooking });
@@ -442,7 +442,7 @@ router.post('/:id/scan-start-qr',
 
       const booking = await Booking.findById(req.params.id)
         .populate('service', 'name description price duration')
-        .populate('worker', 'name email phone');
+        .populate('worker', 'name email phone gender religion workerProfile');
       
       if (!booking) {
         return res.status(404).json({ 
@@ -583,7 +583,7 @@ router.post('/:id/scan-end-qr',
 
       const booking = await Booking.findById(req.params.id)
         .populate('service', 'name description price duration')
-        .populate('worker', 'name email phone');
+        .populate('worker', 'name email phone gender religion workerProfile');
       
       if (!booking) {
         return res.status(404).json({ 
@@ -759,7 +759,7 @@ router.get('/:id/work-documentation', authenticate, async (req, res) => {
     const booking = await Booking.findById(req.params.id)
       .populate('workDocumentation.photos.uploadedBy', 'name email')
       .populate('service', 'name')
-      .populate('worker', 'name email');
+      .populate('worker', 'name email gender religion workerProfile');
     
     if (!booking) {
       return res.status(404).json({ 

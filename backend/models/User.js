@@ -142,6 +142,7 @@ const userSchema = new mongoose.Schema({
   workerProfile: {
     specialization: [String],
     experience: Number,
+    languages: [String],
     rating: {
       type: Number,
       default: 0,
@@ -236,6 +237,10 @@ const userSchema = new mongoose.Schema({
       ref: 'User'
     }],
     languagePreference: {
+      type: String,
+      default: 'any'
+    },
+    religionPreference: {
       type: String,
       default: 'any'
     },

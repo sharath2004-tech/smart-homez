@@ -7,8 +7,16 @@ import { useCallback, useEffect, useState } from "react";
 interface Worker {
   _id: string;
   name: string;
+  email?: string;
   phone?: string;
   rating?: number;
+  gender?: string;
+  religion?: string;
+  workerProfile?: {
+    experience?: number;
+    languages?: string[];
+    rating?: number;
+  };
 }
 
 interface Service {
@@ -272,29 +280,67 @@ const BookingsPage = () => {
 
                   {/* Worker Info */}
                   {booking.worker ? (
-                    <div className="flex items-center justify-between p-3 bg-primary-light rounded-xl">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold">
-                          {booking.worker.name.split(' ').map(n => n[0]).join('')}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 bg-primary-light rounded-xl">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold">
+                            {booking.worker.name.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">{booking.worker.name}</p>
+                            {(booking.worker.rating || booking.worker.workerProfile?.rating) && (
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <Star className="w-3 h-3 fill-warning text-warning" />
+                                <span className="text-xs text-muted-foreground">
+                                  {(booking.worker.workerProfile?.rating || booking.worker.rating)?.toFixed(1)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">{booking.worker.name}</p>
-                          {booking.worker.rating && (
-                            <div className="flex items-center gap-1 mt-0.5">
-                              <Star className="w-3 h-3 fill-warning text-warning" />
-                              <span className="text-xs text-muted-foreground">{booking.worker.rating.toFixed(1)}</span>
-                            </div>
-                          )}
-                        </div>
+                        {isOngoing && booking.worker.phone && (
+                          <button
+                            onClick={() => handleContactWorker(booking.worker!)}
+                            className="p-2 bg-primary rounded-lg text-primary-foreground hover:bg-primary/90 transition-colors"
+                          >
+                            <Phone className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
-                      {isOngoing && booking.worker.phone && (
-                        <button
-                          onClick={() => handleContactWorker(booking.worker!)}
-                          className="p-2 bg-primary rounded-lg text-primary-foreground hover:bg-primary/90 transition-colors"
-                        >
-                          <Phone className="w-4 h-4" />
-                        </button>
-                      )}
+                      
+                      {/* Worker Details */}
+                      <div className="p-3 bg-muted/50 rounded-xl space-y-2 text-xs">
+                        {booking.worker.email && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Email:</span>
+                            <span className="text-foreground font-medium">{booking.worker.email}</span>
+                          </div>
+                        )}
+                        {booking.worker.phone && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Phone:</span>
+                            <span className="text-foreground font-medium">{booking.worker.phone}</span>
+                          </div>
+                        )}
+                        {booking.worker.workerProfile?.experience && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Experience:</span>
+                            <span className="text-foreground font-medium">{booking.worker.workerProfile.experience} years</span>
+                          </div>
+                        )}
+                        {booking.worker.workerProfile?.languages && booking.worker.workerProfile.languages.length > 0 && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Languages:</span>
+                            <span className="text-foreground font-medium">{booking.worker.workerProfile.languages.join(', ')}</span>
+                          </div>
+                        )}
+                        {booking.worker.religion && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Religion:</span>
+                            <span className="text-foreground font-medium capitalize">{booking.worker.religion}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div className="p-3 bg-muted rounded-xl text-sm text-muted-foreground text-center">
@@ -320,7 +366,9 @@ const BookingsPage = () => {
                         </button>
                         <button
                           onClick={() => handleCancelBooking(booking._id)}
-                          className="flex-1 py-2.5 bg-destructive text-destructive-foreground rounded-lg text-sm font-medium hover:bg-destructive/90 transition-colors"
+                          disabled={booking.status === 'confirmed' || booking.status === 'in-progress'}
+                          className="flex-1 py-2.5 bg-destructive text-destructive-foreground rounded-lg text-sm font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title={booking.status === 'confirmed' || booking.status === 'in-progress' ? 'Cannot cancel confirmed or ongoing services' : ''}
                         >
                           Cancel
                         </button>

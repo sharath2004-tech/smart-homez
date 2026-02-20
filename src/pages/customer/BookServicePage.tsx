@@ -45,6 +45,7 @@ interface Preferences {
   workerGenderPreference?: string;
   preferredWorkers?: string[];
   languagePreference?: string;
+  religionPreference?: string;
   specialInstructions?: string;
 }
 
@@ -72,6 +73,7 @@ const BookServicePage = () => {
   const [preferences, setPreferences] = useState<Preferences>({
     workerGenderPreference: 'any',
     languagePreference: 'any',
+    religionPreference: 'any',
     specialInstructions: ''
   });
 
@@ -94,6 +96,7 @@ const BookServicePage = () => {
         setPreferences({
           workerGenderPreference: profileData.user.preferences.workerGenderPreference || 'any',
           languagePreference: profileData.user.preferences.languagePreference || 'any',
+          religionPreference: profileData.user.preferences.religionPreference || 'any',
           specialInstructions: profileData.user.preferences.specialInstructions || ''
         });
       }
@@ -654,6 +657,26 @@ const BookServicePage = () => {
                   <option value="malayalam">Malayalam</option>
                   <option value="bengali">Bengali</option>
                   <option value="marathi">Marathi</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Religion Preference
+                </label>
+                <select
+                  value={preferences.religionPreference}
+                  onChange={(e) => setPreferences({ ...preferences, religionPreference: e.target.value })}
+                  className="input-clean"
+                >
+                  <option value="any">No Preference</option>
+                  <option value="hindu">Hindu</option>
+                  <option value="muslim">Muslim</option>
+                  <option value="christian">Christian</option>
+                  <option value="sikh">Sikh</option>
+                  <option value="buddhist">Buddhist</option>
+                  <option value="jain">Jain</option>
+                  <option value="other">Other</option>
                 </select>
               </div>
 

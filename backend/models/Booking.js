@@ -93,6 +93,7 @@ const bookingSchema = new mongoose.Schema({
       default: 'any'
     },
     languagePreference: String,
+    religionPreference: String,
     specialInstructions: {
       type: String,
       maxlength: 500
