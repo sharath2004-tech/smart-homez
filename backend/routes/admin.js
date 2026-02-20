@@ -1,0 +1,911 @@
+import express from 'express';
+import { body, validationResult } from 'express-validator';
+import { authenticate, authorize } from '../middleware/auth.js';
+import Booking from '../models/Booking.js';
+import Location from '../models/Location.js';
+import ServiceArea from '../models/ServiceArea.js';
+import User from '../models/User.js';
+import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/emailService.js';
+
+const router = express.Router();
+
+// ============== SUPER ADMIN ROUTES ==============
+
+// @route   POST /api/admin/locations
+// @desc    Create a new location (area) - Super Admin only
+// @access  Private/Super Admin
+router.post('/locations',
+  authenticate,
+  authorize('super_admin'),
+  [
+    body('apartmentName').notEmpty().withMessage('Apartment name is required'),
+    body('area').notEmpty().withMessage('Area is required'),
+    body('city').notEmpty().withMessage('City is required'),
+    body('coordinates').isArray().withMessage('Coordinates must be an array [longitude, latitude]')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: { message: errors.array()[0].msg, status: 400 } });
+      }
+
+      const { apartmentName, building, area, city, state, zipCode, coordinates, maxServiceRadius } = req.body;
+
+      const location = new Location({
+        apartmentName,
+        building,
+        area,
+        city,
+        state: state || 'Maharashtra',
+        zipCode,
+        location: {
+          type: 'Point',
+          coordinates: coordinates // [longitude, latitude]
+        },
+        maxServiceRadius: maxServiceRadius || 500,
+        createdBy: req.user._id
+      });
+
+      await location.save();
+
+      res.status(201).json({
+        success: true,
+        message: 'Location created successfully',
+        location
+      });
+    } catch (error) {
+      console.error('Create location error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   POST /api/admin/create-admin
+// @desc    Create a new admin and assign to location - Super Admin only
+// @access  Private/Super Admin
+router.post('/create-admin',
+  authenticate,
+  authorize('super_admin'),
+  [
+    body('name').notEmpty().withMessage('Name is required'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+    body('phone').notEmpty().withMessage('Phone is required'),
+    body('assignedLocationIds').optional().isArray().withMessage('Assigned locations must be an array')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: { message: errors.array()[0].msg, status: 400 } });
+      }
+
+      const { name, email, password, phone, assignedLocationIds } = req.body;
+
+      // Check if email exists
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(400).json({ error: { message: 'Email already exists', status: 400 } });
+      }
+
+      // Get location details if provided
+      let assignedLocations = [];
+      if (assignedLocationIds && assignedLocationIds.length > 0) {
+        const locations = await Location.find({ _id: { $in: assignedLocationIds } });
+        assignedLocations = locations.map(loc => ({
+          locationId: loc._id,
+          locationName: loc.apartmentName,
+          area: loc.area,
+          city: loc.city
+        }));
+
+        // Update locations with assigned admin
+        await Location.updateMany(
+          { _id: { $in: assignedLocationIds } },
+          { $set: { assignedAdmin: null } } // Will be set after user creation
+        );
+      }
+
+      // Create admin user
+      const admin = new User({
+        name,
+        email,
+        password,
+        phone,
+        role: 'admin',
+        adminProfile: {
+          assignedLocations,
+          permissions: {
+            canCreateWorkers: true,
+            canDeleteWorkers: true,
+            canManageApartments: true,
+            canViewReports: true
+          },
+          createdBy: req.user._id
+        }
+      });
+
+      await admin.save();
+
+      // Update locations with the new admin
+      if (assignedLocationIds && assignedLocationIds.length > 0) {
+        await Location.updateMany(
+          { _id: { $in: assignedLocationIds } },
+          { $set: { assignedAdmin: admin._id } }
+        );
+      }
+
+      res.status(201).json({
+        success: true,
+        message: 'Admin created successfully',
+        admin: {
+          _id: admin._id,
+          name: admin.name,
+          email: admin.email,
+          role: admin.role,
+          assignedLocations: admin.adminProfile.assignedLocations
+        }
+      });
+    } catch (error) {
+      console.error('Create admin error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   GET /api/admin/locations
+// @desc    Get all locations - Super Admin sees all, Admin sees assigned
+// @access  Private/Admin
+router.get('/locations', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    let query = { isActive: true };
+
+    // If admin (not super_admin), only show assigned locations
+    if (req.user.role === 'admin') {
+      query.assignedAdmin = req.user._id;
+    }
+
+    const locations = await Location.find(query)
+      .populate('assignedAdmin', 'name email')
+      .populate('assignedWorkers.worker', 'name email phone')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      locations
+    });
+  } catch (error) {
+    console.error('Get locations error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   GET /api/admin/admins
+// @desc    Get all admins - Super Admin only
+// @access  Private/Super Admin
+router.get('/admins', authenticate, authorize('super_admin'), async (req, res) => {
+  try {
+    const { city } = req.query;
+    
+    let query = { role: 'admin', isActive: true };
+
+    const admins = await User.find(query)
+      .select('-password')
+      .sort({ createdAt: -1 });
+
+    // Filter by city if provided
+    let filteredAdmins = admins;
+    if (city) {
+      filteredAdmins = admins.filter(admin => 
+        admin.adminProfile?.assignedLocations?.some(loc => 
+          loc.city.toLowerCase().includes(city.toLowerCase())
+        )
+      );
+    }
+
+    // Get location counts for each admin
+    const adminsWithStats = await Promise.all(filteredAdmins.map(async (admin) => {
+      const locationIds = admin.adminProfile?.assignedLocations?.map(loc => loc.locationId) || [];
+      const workerCount = await User.countDocuments({
+        role: 'worker',
+        isActive: true,
+        'workerProfile.assignedApartments.locationId': { $in: locationIds }
+      });
+
+      return {
+        _id: admin._id,
+        name: admin.name,
+        email: admin.email,
+        phone: admin.phone,
+        role: admin.role,
+        assignedLocations: admin.adminProfile?.assignedLocations || [],
+        permissions: admin.adminProfile?.permissions,
+        workerCount,
+        createdAt: admin.createdAt
+      };
+    }));
+
+    res.json({
+      success: true,
+      admins: adminsWithStats
+    });
+  } catch (error) {
+    console.error('Get admins error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// ============== ADMIN ROUTES ==============
+
+// @route   POST /api/admin/workers
+// @desc    Create a new worker - Admin only (sends temporary password via email)
+// @access  Private/Admin
+router.post('/workers',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  [
+    body('name').notEmpty().withMessage('Name is required'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('phone').notEmpty().withMessage('Phone is required'),
+    body('gender').optional().isIn(['male', 'female', 'other', 'prefer_not_to_say']).withMessage('Invalid gender'),
+    body('religion').optional().isString(),
+    body('experience').optional().isNumeric().withMessage('Experience must be a number'),
+    body('specialization').isArray().withMessage('Specialization must be an array'),
+    body('assignedApartmentIds').optional().isArray().withMessage('Assigned apartments must be an array')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: { message: errors.array()[0].msg, status: 400 } });
+      }
+
+      const { name, email, phone, gender, religion, experience, specialization, hourlyRate, assignedApartmentIds } = req.body;
+
+      // Check if email exists
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(400).json({ error: { message: 'Email already exists', status: 400 } });
+      }
+
+      // Check if admin has permission (only if role is admin, not super_admin)
+      if (req.user.role === 'admin' && !req.user.adminProfile?.permissions?.canCreateWorkers) {
+        return res.status(403).json({ error: { message: 'No permission to create workers', status: 403 } });
+      }
+
+      // Generate temporary password
+      const temporaryPassword = generateTemporaryPassword();
+
+      // Get apartment assignments
+      let assignedApartments = [];
+      if (assignedApartmentIds && assignedApartmentIds.length > 0) {
+        const locations = await Location.find({ _id: { $in: assignedApartmentIds } });
+        
+        // Verify admin has access to these locations
+        if (req.user.role === 'admin') {
+          const userLocationIds = req.user.adminProfile.assignedLocations.map(loc => loc.locationId.toString());
+          const unauthorizedLocations = locations.filter(loc => !userLocationIds.includes(loc._id.toString()));
+          if (unauthorizedLocations.length > 0) {
+            return res.status(403).json({ error: { message: 'Cannot assign worker to locations you don\'t manage', status: 403 } });
+          }
+        }
+
+        assignedApartments = locations.map(loc => ({
+          apartmentName: loc.apartmentName,
+          building: loc.building,
+          area: loc.area,
+          city: loc.city,
+          location: loc.location,
+          maxWalkingDistance: loc.maxServiceRadius
+        }));
+      }
+
+      // Create worker
+      const worker = new User({
+        name,
+        email,
+        password: temporaryPassword, // Will be hashed by pre-save hook
+        temporaryPassword: temporaryPassword, // Store for verification (will also be hashed)
+        isFirstLogin: true, // Force password change on first login
+        phone,
+        gender: gender || 'prefer_not_to_say',
+        religion: religion || undefined,
+        role: 'worker',
+        workerProfile: {
+          specialization,
+          experience: experience || 0,
+          hourlyRate: hourlyRate || 0,
+          assignedApartments,
+          availability: true,
+          serviceRadius: 500 // 500 meters walking distance
+        }
+      });
+
+      await worker.save();
+
+      // Add worker to location's assignedWorkers
+      if (assignedApartmentIds && assignedApartmentIds.length > 0) {
+        await Location.updateMany(
+          { _id: { $in: assignedApartmentIds } },
+          { $push: { assignedWorkers: { worker: worker._id, assignedAt: new Date() } } }
+        );
+      }
+
+      // Send temporary password email
+      let emailSent = false;
+      let emailMessage = '';
+      try {
+        const emailResult = await sendTemporaryPasswordEmail(email, name, temporaryPassword);
+        emailSent = emailResult.success;
+        if (emailResult.success) {
+          emailMessage = 'Temporary password sent to email.';
+          console.log('✅ Email sent successfully to:', email);
+        } else {
+          emailMessage = `Email not sent (${emailResult.reason}). Please provide the password manually.`;
+          console.log('⚠️ Email not sent:', emailResult.reason);
+        }
+      } catch (emailError) {
+        console.error('❌ Failed to send email:', emailError.message);
+        emailMessage = 'Failed to send email. Please provide the password manually.';
+      }
+
+      res.status(201).json({
+        success: true,
+        message: `Worker created successfully. ${emailMessage}`,
+        emailSent,
+        worker: {
+          _id: worker._id,
+          name: worker.name,
+          email: worker.email,
+          phone: worker.phone,
+          role: worker.role,
+          gender: worker.gender,
+          religion: worker.religion,
+          experience: worker.workerProfile.experience,
+          specialization: worker.workerProfile.specialization,
+          assignedApartments: worker.workerProfile.assignedApartments.map(apt => apt.apartmentName)
+        },
+        temporaryPassword: temporaryPassword // Send back to admin as backup (in case email fails)
+      });
+    } catch (error) {
+      console.error('Create worker error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   DELETE /api/admin/workers/:workerId
+// @desc    Delete a worker - Admin only
+// @access  Private/Admin
+router.delete('/workers/:workerId', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { workerId } = req.params;
+
+    // Check if admin has permission
+    if (req.user.role === 'admin' && !req.user.adminProfile?.permissions?.canDeleteWorkers) {
+      return res.status(403).json({ error: { message: 'No permission to delete workers', status: 403 } });
+    }
+
+    const worker = await User.findById(workerId);
+    if (!worker || worker.role !== 'worker') {
+      return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
+    }
+
+    // Check for active bookings
+    const activeBookings = await Booking.countDocuments({
+      worker: workerId,
+      status: { $in: ['pending', 'confirmed', 'in-progress'] }
+    });
+
+    if (activeBookings > 0) {
+      return res.status(400).json({ 
+        error: { 
+          message: `Cannot delete worker with ${activeBookings} active booking(s). Please reassign or complete them first.`,
+          status: 400 
+        } 
+      });
+    }
+
+    // Permanently delete worker from database
+    await User.findByIdAndDelete(workerId);
+
+    // Remove from location assignments
+    await Location.updateMany(
+      { 'assignedWorkers.worker': workerId },
+      { $pull: { assignedWorkers: { worker: workerId } } }
+    );
+
+    // Note: Past bookings will remain in history but with worker reference
+    // This maintains booking history for auditing purposes
+
+    console.log(`✅ Worker ${worker.name} (${workerId}) permanently deleted from database`);
+
+    res.json({
+      success: true,
+      message: 'Worker permanently deleted from database'
+    });
+  } catch (error) {
+    console.error('Delete worker error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   GET /api/admin/workers
+// @desc    Get all workers in admin's assigned locations
+// @access  Private/Admin
+router.get('/workers', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    let query = { role: 'worker', isActive: true };
+
+    // For both admin and super_admin, show all workers
+    // This includes both admin-created workers (with assignedApartments)
+    // and self-registered workers (with currentLocation from registration)
+    
+    const workers = await User.find(query)
+      .select('name email phone workerProfile.specialization workerProfile.assignedApartments workerProfile.rating workerProfile.availability currentLocation addresses')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      workers
+    });
+  } catch (error) {
+    console.error('Get workers error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   PATCH /api/admin/workers/:workerId/assign-location
+// @desc    Assign worker to apartment/location
+// @access  Private/Admin
+router.patch('/workers/:workerId/assign-location',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  [
+    body('locationId').notEmpty().withMessage('Location ID is required')
+  ],
+  async (req, res) => {
+    try {
+      const { workerId } = req.params;
+      const { locationId } = req.body;
+
+      const worker = await User.findById(workerId);
+      if (!worker || worker.role !== 'worker') {
+        return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
+      }
+
+      const location = await Location.findById(locationId);
+      if (!location) {
+        return res.status(404).json({ error: { message: 'Location not found', status: 404 } });
+      }
+
+      // Verify admin has access to this location
+      if (req.user.role === 'admin') {
+        const hasAccess = req.user.adminProfile.assignedLocations.some(
+          loc => loc.locationId.toString() === locationId
+        );
+        if (!hasAccess) {
+          return res.status(403).json({ error: { message: 'No access to this location', status: 403 } });
+        }
+      }
+
+      // Check if already assigned
+      const alreadyAssigned = worker.workerProfile.assignedApartments.some(
+        apt => apt.apartmentName === location.apartmentName && apt.area === location.area
+      );
+
+      if (!alreadyAssigned) {
+        worker.workerProfile.assignedApartments.push({
+          apartmentName: location.apartmentName,
+          building: location.building,
+          area: location.area,
+          city: location.city,
+          location: location.location,
+          maxWalkingDistance: location.maxServiceRadius
+        });
+        await worker.save();
+
+        // Add to location's assigned workers
+        const workerAlreadyInLocation = location.assignedWorkers.some(
+          w => w.worker.toString() === workerId
+        );
+        if (!workerAlreadyInLocation) {
+          location.assignedWorkers.push({ worker: workerId, assignedAt: new Date() });
+          await location.save();
+        }
+      }
+
+      res.json({
+        success: true,
+        message: 'Worker assigned to location successfully',
+        worker: {
+          _id: worker._id,
+          name: worker.name,
+          assignedApartments: worker.workerProfile.assignedApartments
+        }
+      });
+    } catch (error) {
+      console.error('Assign worker to location error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   GET /api/admin/dashboard-stats
+// @desc    Get admin dashboard statistics
+// @access  Private/Admin
+router.get('/dashboard-stats', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let locationQuery = { isActive: true };
+    if (req.user.role === 'admin') {
+      locationQuery.assignedAdmin = req.user._id;
+    }
+
+    const locations = await Location.find(locationQuery);
+    const locationIds = locations.map(loc => loc._id);
+
+    // Get workers in these locations
+    const workers = await User.find({
+      role: 'worker',
+      isActive: true,
+      'workerProfile.assignedApartments': { $exists: true, $ne: [] }
+    });
+
+    const workersInLocations = workers.filter(w => 
+      w.workerProfile.assignedApartments.some(apt => 
+        locations.some(loc => loc.apartmentName === apt.apartmentName && loc.area === apt.area)
+      )
+    );
+
+    // Get bookings for these locations (based on address matching)
+    const todayBookings = await Booking.countDocuments({
+      createdAt: { $gte: today },
+      status: { $in: ['pending', 'confirmed', 'in-progress'] }
+    });
+
+    const completedToday = await Booking.countDocuments({
+      completedAt: { $gte: today },
+      status: 'completed'
+    });
+
+    const todayRevenue = await Booking.aggregate([
+      { $match: { completedAt: { $gte: today }, status: 'completed' } },
+      { $group: { _id: null, total: { $sum: '$totalPrice' } } }
+    ]);
+
+    // Count online workers
+    const onlineWorkers = workersInLocations.filter(w => w.workerProfile.availability).length;
+
+    // Calculate fulfillment rate
+    const totalBookingsToday = todayBookings + completedToday;
+    const fulfillmentRate = totalBookingsToday > 0 
+      ? ((completedToday / totalBookingsToday) * 100).toFixed(1)
+      : 100;
+
+    res.json({
+      success: true,
+      stats: {
+        todayBookings,
+        bookingsChange: '+0%', // TODO: Calculate vs yesterday
+        activeWorkers: workersInLocations.length,
+        workersOnlineInfo: `${onlineWorkers} online`,
+        todayRevenue: todayRevenue[0]?.total || 0,
+        revenueChange: '+0%', // TODO: Calculate vs yesterday
+        fulfillmentRate: parseFloat(fulfillmentRate),
+        fulfillmentChange: '+0%' // TODO: Calculate vs yesterday
+      }
+    });
+  } catch (error) {
+    console.error('Get admin dashboard stats error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   GET /api/admin/recent-bookings
+// @desc    Get recent bookings for admin's locations
+// @access  Private/Admin
+router.get('/recent-bookings', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { limit = 10 } = req.query;
+
+    const bookings = await Booking.find()
+      .populate('customer', 'name')
+      .populate('worker', 'name')
+      .populate('service', 'name')
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit));
+
+    res.json({
+      success: true,
+      bookings
+    });
+  } catch (error) {
+    console.error('Get recent bookings error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   GET /api/admin/alerts
+// @desc    Get system alerts for admin
+// @access  Private/Admin
+router.get('/alerts', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const alerts = [];
+
+    // Check for unassigned bookings
+    const unassignedBookings = await Booking.countDocuments({
+      worker: null,
+      status: 'pending'
+    });
+
+    if (unassignedBookings > 0) {
+      alerts.push({
+        type: 'warning',
+        message: `${unassignedBookings} booking(s) have no worker assigned — auto-reassignment in progress`,
+        action: 'assign-workers',
+        count: unassignedBookings
+      });
+    }
+
+    // Check for offline workers during active shift
+    const now = new Date();
+    const currentHour = now.getHours();
+    if (currentHour >= 8 && currentHour <= 20) { // During working hours
+      const offlineWorkers = await User.find({
+        role: 'worker',
+        isActive: true,
+        'workerProfile.availability': false
+      }).select('name');
+
+      if (offlineWorkers.length > 0) {
+        alerts.push({
+          type: 'error',
+          message: `${offlineWorkers.length} worker(s) have been offline for 2+ hours during active shift`,
+          action: 'contact-workers',
+          workers: offlineWorkers
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      alerts
+    });
+  } catch (error) {
+    console.error('Get alerts error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// ============== SERVICE AREAS MANAGEMENT ==============
+
+// @route   GET /api/admin/service-areas
+// @desc    Get all service areas
+// @access  Private/Admin
+router.get('/service-areas',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  async (req, res) => {
+    try {
+      const { city, isActive } = req.query;
+      
+      const query = {};
+      if (city) query.city = city;
+      if (isActive !== undefined) query.isActive = isActive === 'true';
+      
+      const serviceAreas = await ServiceArea.find(query)
+        .populate('createdBy', 'name email')
+        .sort({ createdAt: -1 });
+      
+      res.json({
+        success: true,
+        count: serviceAreas.length,
+        serviceAreas
+      });
+    } catch (error) {
+      console.error('Get service areas error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   GET /api/admin/service-areas/:id
+// @desc    Get single service area
+// @access  Private/Admin
+router.get('/service-areas/:id',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  async (req, res) => {
+    try {
+      const serviceArea = await ServiceArea.findById(req.params.id)
+        .populate('createdBy', 'name email');
+      
+      if (!serviceArea) {
+        return res.status(404).json({ 
+          error: { message: 'Service area not found', status: 404 } 
+        });
+      }
+      
+      res.json({
+        success: true,
+        serviceArea
+      });
+    } catch (error) {
+      console.error('Get service area error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   POST /api/admin/service-areas
+// @desc    Create new service area
+// @access  Private/Admin
+router.post('/service-areas',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  [
+    body('name').notEmpty().withMessage('Service area name is required'),
+    body('city').notEmpty().withMessage('City is required'),
+    body('coordinates.lat').isFloat({ min: -90, max: 90 }).withMessage('Valid latitude required'),
+    body('coordinates.lng').isFloat({ min: -180, max: 180 }).withMessage('Valid longitude required'),
+    body('radiusKm').isFloat({ min: 0.5, max: 50 }).withMessage('Radius must be between 0.5 and 50 km')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ 
+          error: { message: errors.array()[0].msg, status: 400 } 
+        });
+      }
+      
+      const { name, description, city, coordinates, radiusKm, isActive, color } = req.body;
+      
+      // Check if service area with same name and city already exists
+      const existing = await ServiceArea.findOne({ name, city });
+      if (existing) {
+        return res.status(400).json({ 
+          error: { message: 'Service area with this name already exists in this city', status: 400 } 
+        });
+      }
+      
+      const serviceArea = new ServiceArea({
+        name,
+        description,
+        city,
+        coordinates,
+        radiusKm,
+        isActive: isActive !== undefined ? isActive : true,
+        color: color || '#10b981',
+        createdBy: req.user._id
+      });
+      
+      await serviceArea.save();
+      
+      res.status(201).json({
+        success: true,
+        message: 'Service area created successfully',
+        serviceArea
+      });
+    } catch (error) {
+      console.error('Create service area error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   PUT /api/admin/service-areas/:id
+// @desc    Update service area
+// @access  Private/Admin
+router.put('/service-areas/:id',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  async (req, res) => {
+    try {
+      const { name, description, city, coordinates, radiusKm, isActive, color } = req.body;
+      
+      const serviceArea = await ServiceArea.findById(req.params.id);
+      
+      if (!serviceArea) {
+        return res.status(404).json({ 
+          error: { message: 'Service area not found', status: 404 } 
+        });
+      }
+      
+      // Update fields
+      if (name) serviceArea.name = name;
+      if (description !== undefined) serviceArea.description = description;
+      if (city) serviceArea.city = city;
+      if (coordinates) serviceArea.coordinates = coordinates;
+      if (radiusKm) serviceArea.radiusKm = radiusKm;
+      if (isActive !== undefined) serviceArea.isActive = isActive;
+      if (color) serviceArea.color = color;
+      
+      await serviceArea.save();
+      
+      res.json({
+        success: true,
+        message: 'Service area updated successfully',
+        serviceArea
+      });
+    } catch (error) {
+      console.error('Update service area error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   DELETE /api/admin/service-areas/:id
+// @desc    Delete service area
+// @access  Private/Admin
+router.delete('/service-areas/:id',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  async (req, res) => {
+    try {
+      const serviceArea = await ServiceArea.findById(req.params.id);
+      
+      if (!serviceArea) {
+        return res.status(404).json({ 
+          error: { message: 'Service area not found', status: 404 } 
+        });
+      }
+      
+      await ServiceArea.findByIdAndDelete(req.params.id);
+      
+      res.json({
+        success: true,
+        message: 'Service area deleted successfully'
+      });
+    } catch (error) {
+      console.error('Delete service area error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   POST /api/admin/service-areas/check
+// @desc    Check if coordinates are in any service area
+// @access  Private/Admin
+router.post('/service-areas/check',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  [
+    body('lat').isFloat({ min: -90, max: 90 }).withMessage('Valid latitude required'),
+    body('lng').isFloat({ min: -180, max: 180 }).withMessage('Valid longitude required')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ 
+          error: { message: errors.array()[0].msg, status: 400 } 
+        });
+      }
+      
+      const { lat, lng } = req.body;
+      
+      const containingAreas = await ServiceArea.findContainingPoint(lat, lng);
+      const nearest = await ServiceArea.findNearest(lat, lng);
+      
+      res.json({
+        success: true,
+        isAvailable: containingAreas.length > 0,
+        serviceAreas: containingAreas,
+        nearest: nearest ? {
+          area: nearest.area,
+          distance: nearest.distance
+        } : null
+      });
+    } catch (error) {
+      console.error('Check service area error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+export default router;

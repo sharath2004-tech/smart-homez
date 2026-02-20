@@ -1,0 +1,300 @@
+import AppLayout from "@/components/AppLayout";
+import { authAPI, bookingsAPI, workersAPI } from "@/lib/api";
+import { Calendar, CheckCircle, Clock, MapPin, Package, PlayCircle, User } from "lucide-react";
+import { useEffect, useState } from "react";
+
+interface Task {
+  _id: string;
+  service: {
+    _id: string;
+    name: string;
+    price: number;
+  };
+  customer: {
+    _id: string;
+    name: string;
+    phone?: string;
+  };
+  location?: {
+    address?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+  };
+  bookingDate: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+  totalAmount: number;
+  actualStartTime?: string;
+  actualEndTime?: string;
+}
+
+interface Profile {
+  name: string;
+  email: string;
+  role: string;
+}
+
+const WorkerTasks = () => {
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [currentTask, setCurrentTask] = useState<Task | null>(null);
+  const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
+  const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"current" | "upcoming" | "completed">("current");
+
+  useEffect(() => {
+    fetchTasks();
+  }, []);
+
+  const fetchTasks = async () => {
+    try {
+      setLoading(true);
+      const [profileData, currentTaskData, upcomingTasksData] = await Promise.all([
+        authAPI.getProfile(),
+        workersAPI.getCurrentTask(),
+        workersAPI.getUpcomingTasks(10)
+      ]);
+
+      setProfile(profileData.user || profileData);
+      setCurrentTask(currentTaskData.task || null);
+      setUpcomingTasks(upcomingTasksData.tasks || []);
+      
+      // Fetch completed tasks
+      try {
+        const completedData = await bookingsAPI.getAll({ status: 'completed' });
+        setCompletedTasks(completedData.bookings || []);
+      } catch (error) {
+        console.error('Error fetching completed tasks:', error);
+      }
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStartTask = async (taskId: string) => {
+    try {
+      await bookingsAPI.update(taskId, { status: 'in-progress', startedAt: new Date().toISOString() });
+      await fetchTasks();
+    } catch (error) {
+      console.error('Error starting task:', error);
+      alert('Failed to start task');
+    }
+  };
+
+  const handleCompleteTask = async (taskId: string) => {
+    if (confirm('Mark this task as completed?')) {
+      try {
+        await bookingsAPI.update(taskId, { status: 'completed', completedAt: new Date().toISOString() });
+        await fetchTasks();
+        setActiveTab('completed');
+      } catch (error) {
+        console.error('Error completing task:', error);
+        alert('Failed to complete task');
+      }
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  const formatTime = (timeString: string) => {
+    if (!timeString) return '';
+    const [hours, minutes] = timeString.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
+  };
+
+  const getServiceEmoji = (serviceName: string) => {
+    const name = serviceName.toLowerCase();
+    if (name.includes('kitchen')) return '🍳';
+    if (name.includes('bathroom')) return '🚿';
+    if (name.includes('deep clean') || name.includes('house')) return '✨';
+    if (name.includes('sofa')) return '🛋️';
+    if (name.includes('carpet')) return '🧺';
+    if (name.includes('ac')) return '❄️';
+    if (name.includes('plumb')) return '🔧';
+    if (name.includes('electric')) return '⚡';
+    return '🧹';
+  };
+
+  if (loading) {
+    return (
+      <AppLayout userType="worker" userName="Loading...">
+        <div className="max-w-3xl mx-auto flex items-center justify-center py-20">
+          <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full"></div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  const renderTaskCard = (task: Task, isCurrent: boolean = false) => (
+    <div key={task._id} className="card-elevated p-5 hover:shadow-lg transition-shadow">
+      <div className="flex items-start gap-4">
+        <div className="w-12 h-12 bg-primary-light rounded-xl flex items-center justify-center text-2xl shrink-0">
+          {getServiceEmoji(task.service.name)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-bold text-foreground truncate">{task.service.name}</h3>
+              <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-1">
+                <User className="w-3.5 h-3.5" />
+                {task.customer.name}
+              </p>
+            </div>
+            <span className={`text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap ${
+              task.status === 'completed' ? 'bg-success-light text-success' :
+              task.status === 'in-progress' ? 'bg-primary-light text-primary' :
+              'bg-warning-light text-warning'
+            }`}>
+              {task.status === 'completed' ? 'Completed' :
+               task.status === 'in-progress' ? 'In Progress' : 'Scheduled'}
+            </span>
+          </div>
+
+          <div className="space-y-1.5 mb-3">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <MapPin className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">
+                {task.location ? [task.location.address, task.location.city, task.location.state].filter(Boolean).join(', ') : 'Location TBD'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Calendar className="w-3.5 h-3.5 shrink-0" />
+              <span>{formatDate(task.bookingDate)}</span>
+              <Clock className="w-3.5 h-3.5 ml-2 shrink-0" />
+              <span>{task.startTime} - {task.endTime}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Package className="w-3.5 h-3.5 shrink-0" />
+              <span>₹{task.totalAmount}</span>
+            </div>
+          </div>
+
+          {isCurrent && task.status !== 'completed' && (
+            <div className="flex gap-2">
+              {task.status === 'scheduled' && (
+                <button
+                  onClick={() => handleStartTask(task._id)}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-all"
+                >
+                  <PlayCircle className="w-4 h-4" />
+                  Start Task
+                </button>
+              )}
+              {task.status === 'in-progress' && (
+                <button
+                  onClick={() => handleCompleteTask(task._id)}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-success text-white rounded-lg text-sm font-medium hover:opacity-90 transition-all"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Complete Task
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderContent = () => {
+    if (activeTab === "current") {
+      if (!currentTask) {
+        return (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+              <Calendar className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="font-bold text-foreground mb-2">No Active Task</h3>
+            <p className="text-muted-foreground text-sm">You don't have any task in progress right now.</p>
+          </div>
+        );
+      }
+      return renderTaskCard(currentTask, true);
+    }
+
+    if (activeTab === "upcoming") {
+      if (upcomingTasks.length === 0) {
+        return (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+              <Calendar className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="font-bold text-foreground mb-2">No Upcoming Tasks</h3>
+            <p className="text-muted-foreground text-sm">You don't have any scheduled tasks yet.</p>
+          </div>
+        );
+      }
+      return (
+        <div className="space-y-4">
+          {upcomingTasks.map(task => renderTaskCard(task))}
+        </div>
+      );
+    }
+
+    if (activeTab === "completed") {
+      if (completedTasks.length === 0) {
+        return (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="font-bold text-foreground mb-2">No Completed Tasks</h3>
+            <p className="text-muted-foreground text-sm">You haven't completed any tasks yet.</p>
+          </div>
+        );
+      }
+      return (
+        <div className="space-y-4">
+          {completedTasks.map(task => renderTaskCard(task))}
+        </div>
+      );
+    }
+  };
+
+  return (
+    <AppLayout userType="worker" userName={profile?.name || "Worker"}>
+      <div className="max-w-3xl mx-auto space-y-6 animate-fade-in pb-20 md:pb-0">
+        <div>
+          <h1 className="text-2xl font-bold font-heading text-foreground mb-1">My Tasks</h1>
+          <p className="text-muted-foreground text-sm">Manage and track your assigned work</p>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 p-1 bg-muted rounded-xl">
+          {[
+            { key: "current", label: "Current" },
+            { key: "upcoming", label: "Upcoming" },
+            { key: "completed", label: "Completed" }
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key as typeof activeTab)}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === tab.key
+                  ? "bg-card text-foreground shadow-card"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        {renderContent()}
+      </div>
+    </AppLayout>
+  );
+};
+
+export default WorkerTasks;

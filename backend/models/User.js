@@ -1,0 +1,307 @@
+import bcrypt from 'bcryptjs';
+import mongoose from 'mongoose';
+
+const userSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: [true, 'Name is required'],
+    trim: true
+  },
+  email: {
+    type: String,
+    required: [true, 'Email is required'],
+    unique: true,
+    lowercase: true,
+    trim: true,
+    match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email']
+  },
+  password: {
+    type: String,
+    required: [true, 'Password is required'],
+    minlength: [6, 'Password must be at least 6 characters'],
+    select: false
+  },
+  role: {
+    type: String,
+    enum: ['customer', 'worker', 'admin', 'super_admin'],
+    default: 'customer'
+  },
+  // Admin-specific fields
+  adminProfile: {
+    assignedLocations: [{
+      locationId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Location'
+      },
+      locationName: String,
+      area: String,
+      city: String
+    }],
+    permissions: {
+      canCreateWorkers: {
+        type: Boolean,
+        default: true
+      },
+      canDeleteWorkers: {
+        type: Boolean,
+        default: true
+      },
+      canManageApartments: {
+        type: Boolean,
+        default: true
+      },
+      canViewReports: {
+        type: Boolean,
+        default: true
+      }
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User' // Reference to super_admin who created this admin
+    }
+  },
+  phone: {
+    type: String,
+    trim: true
+  },
+  gender: {
+    type: String,
+    enum: ['male', 'female', 'other', 'prefer_not_to_say'],
+    default: 'prefer_not_to_say'
+  },
+  religion: {
+    type: String,
+    trim: true
+  },
+  // Temporary password for first-time login
+  temporaryPassword: {
+    type: String,
+    select: false
+  },
+  isFirstLogin: {
+    type: Boolean,
+    default: false // Only true for admin-created workers with temporary passwords
+  },
+  // Address with geolocation support
+  addresses: [{
+    label: {
+      type: String,
+      default: 'Home'
+    },
+    street: String,
+    apartment: String, // Apartment name/number
+    building: String,
+    area: String,
+    city: String,
+    state: String,
+    zipCode: String,
+    country: {
+      type: String,
+      default: 'India'
+    },
+    location: {
+      type: {
+        type: String,
+        enum: ['Point'],
+        default: 'Point'
+      },
+      coordinates: {
+        type: [Number], // [longitude, latitude]
+        index: '2dsphere'
+      }
+    },
+    isDefault: {
+      type: Boolean,
+      default: false
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  currentLocation: {
+    type: {
+      type: String,
+      enum: ['Point'],
+      default: 'Point'
+    },
+    coordinates: {
+      type: [Number], // [longitude, latitude]
+      index: '2dsphere'
+    },
+    lastUpdated: {
+      type: Date,
+      default: Date.now
+    }
+  },
+  profileImage: {
+    type: String,
+    default: null
+  },
+  // Worker-specific fields
+  workerProfile: {
+    specialization: [String],
+    experience: Number,
+    rating: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5
+    },
+    totalReviews: {
+      type: Number,
+      default: 0
+    },
+    availability: {
+      type: Boolean,
+      default: true
+    },
+    hourlyRate: Number,
+    // Location-based assignment
+    assignedApartments: [{
+      apartmentName: String,
+      building: String,
+      area: String,
+      city: String,
+      location: {
+        type: {
+          type: String,
+          enum: ['Point'],
+          default: 'Point'
+        },
+        coordinates: [Number] // [longitude, latitude]
+      },
+      maxWalkingDistance: {
+        type: Number,
+        default: 500 // meters (walking distance only)
+      }
+    }],
+    serviceRadius: {
+      type: Number,
+      default: 500 // meters - maximum walking distance for work
+    },
+    // Leave management
+    monthlyLeaveQuota: {
+      type: Number,
+      default: 2 // 2 leaves per month as per BRD
+    },
+    leavesUsedThisMonth: {
+      type: Number,
+      default: 0
+    },
+    lastLeaveReset: {
+      type: Date,
+      default: Date.now
+    },
+    // Working hours tracking
+    dailyWorkingHoursTarget: {
+      type: Number,
+      default: 7 // 7 hours minimum as per BRD
+    },
+    workingHoursToday: {
+      type: Number,
+      default: 0
+    },
+    lastWorkingHoursReset: {
+      type: Date,
+      default: Date.now
+    },
+    // Assignment priority factors
+    onTimeArrivalRate: {
+      type: Number,
+      default: 100,
+      min: 0,
+      max: 100
+    },
+    completionRate: {
+      type: Number,
+      default: 100,
+      min: 0,
+      max: 100
+    },
+    totalBookingsCompleted: {
+      type: Number,
+      default: 0
+    }
+  },
+  // Customer preferences
+  preferences: {
+    workerGenderPreference: {
+      type: String,
+      enum: ['any', 'male', 'female'],
+      default: 'any'
+    },
+    preferredWorkers: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }],
+    languagePreference: {
+      type: String,
+      default: 'any'
+    },
+    specialInstructions: {
+      type: String,
+      maxlength: 500,
+      default: ''
+    },
+    serviceCustomizations: {
+      type: Map,
+      of: {
+        instructions: String,
+        preferences: [String]
+      },
+      default: new Map()
+    }
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  isVerified: {
+    type: Boolean,
+    default: false
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+}, {
+  timestamps: true
+});
+
+// Hash password before saving
+userSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Method to compare passwords
+userSchema.methods.comparePassword = async function(candidatePassword) {
+  try {
+    return await bcrypt.compare(candidatePassword, this.password);
+  } catch (error) {
+    throw new Error(error);
+  }
+};
+
+// Remove password from JSON response
+userSchema.methods.toJSON = function() {
+  const user = this.toObject();
+  delete user.password;
+  return user;
+};
+
+const User = mongoose.model('User', userSchema);
+
+export default User;

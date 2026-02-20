@@ -1,0 +1,143 @@
+import { Bell, Calendar, CreditCard, Home, LayoutDashboard, LogOut, MapPin, Settings, User, Wrench } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+
+interface AppLayoutProps {
+  children: React.ReactNode;
+  userType?: "customer" | "worker" | "admin";
+  userName?: string;
+}
+
+const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLayoutProps) => {
+  const location = useLocation();
+
+  const customerNav = [
+    { to: "/customer/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+    { to: "/customer/services", icon: Wrench, label: "Services" },
+    { to: "/customer/bookings", icon: Calendar, label: "My Bookings" },
+    { to: "/customer/payments", icon: CreditCard, label: "Payments" },
+    { to: "/customer/preferences", icon: Settings, label: "Preferences" },
+    { to: "/customer/profile", icon: User, label: "Profile" },
+  ];
+
+  const workerNav = [
+    { to: "/worker/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+    { to: "/worker/tasks", icon: Calendar, label: "My Tasks" },
+    { to: "/worker/earnings", icon: CreditCard, label: "Earnings" },
+    { to: "/worker/profile", icon: User, label: "Profile" },
+  ];
+
+  const adminNav = [
+    { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+    { to: "/admin/bookings", icon: Calendar, label: "Bookings" },
+    { to: "/admin/services", icon: Wrench, label: "Services" },
+    { to: "/admin/workers", icon: User, label: "Workers" },
+    { to: "/admin/locations", icon: MapPin, label: "Locations" },
+  ];
+
+  const navItems = userType === "admin" ? adminNav : userType === "worker" ? workerNav : customerNav;
+  const initials = userName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+
+  return (
+    <div className="min-h-screen flex bg-background">
+      {/* Sidebar */}
+      <aside className="hidden md:flex w-64 flex-col bg-sidebar border-r border-sidebar-border fixed inset-y-0 left-0 z-40">
+        {/* Logo */}
+        <div className="p-5 border-b border-sidebar-border">
+          <Link to="/" className="flex items-center gap-2.5">
+            <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center">
+              <Home className="w-4 h-4 text-primary-foreground" />
+            </div>
+            <span className="text-base font-bold font-heading text-foreground">Healthy Homez</span>
+          </Link>
+        </div>
+
+        {/* User info */}
+        <div className="p-4 border-b border-sidebar-border">
+          <div className="flex items-center gap-3 p-3 bg-sidebar-accent rounded-xl">
+            <div className="w-9 h-9 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold shrink-0">
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-foreground truncate">{userName}</p>
+              <p className="text-xs text-muted-foreground capitalize">{userType}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Nav items */}
+        <nav className="flex-1 p-4 space-y-1">
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.to;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  isActive
+                    ? "bg-primary text-primary-foreground shadow-brand"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground"
+                }`}
+              >
+                <item.icon className="w-4 h-4 shrink-0" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Bottom actions */}
+        <div className="p-4 border-t border-sidebar-border space-y-1">
+          <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent transition-all">
+            <Bell className="w-4 h-4" />
+            Notifications
+          </button>
+          <Link to="/login" className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10 transition-all">
+            <LogOut className="w-4 h-4" />
+            Sign out
+          </Link>
+        </div>
+      </aside>
+
+      {/* Mobile top bar */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b border-border px-4 py-3 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+            <Home className="w-4 h-4 text-primary-foreground" />
+          </div>
+          <span className="font-bold text-foreground text-sm">Healthy Homez</span>
+        </Link>
+        <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-bold">
+          {initials}
+        </div>
+      </div>
+
+      {/* Main content */}
+      <main className="flex-1 md:ml-64 pt-16 md:pt-0">
+        <div className="p-6 md:p-8">
+          {children}
+        </div>
+      </main>
+
+      {/* Mobile bottom nav */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card border-t border-border px-2 py-2 flex">
+        {navItems.slice(0, 5).map((item) => {
+          const isActive = location.pathname === item.to;
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={`flex-1 flex flex-col items-center gap-1 py-2 px-1 rounded-lg transition-all ${
+                isActive ? "text-primary" : "text-muted-foreground"
+              }`}
+            >
+              <item.icon className="w-5 h-5" />
+              <span className="text-xs font-medium">{item.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+export default AppLayout;

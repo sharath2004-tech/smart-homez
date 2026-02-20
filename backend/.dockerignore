@@ -1,0 +1,22 @@
+# Dockerignore for Backend
+node_modules
+npm-debug.log
+.env
+.env.local
+.env.production
+.env.*.local
+*.log
+logs
+dist
+build
+.git
+.gitignore
+README.md
+.vscode
+.idea
+.DS_Store
+*.md
+test
+tests
+*.test.js
+coverage
