@@ -9,8 +9,8 @@ interface Booking {
   _id: string;
   service: { name: string };
   worker?: { name: string; workerProfile: { rating: number } };
-  scheduledDate: string;
-  scheduledTime: string;
+  bookingDate: string;
+  startTime: string;
   status: string;
 }
 
@@ -206,7 +206,7 @@ const CustomerDashboard = () => {
                     </p>
                     <div className="flex items-center gap-3 mt-1.5">
                       <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Clock className="w-3 h-3" /> {formatDate(b.scheduledDate, b.scheduledTime)}
+                        <Clock className="w-3 h-3" /> {formatDate(b.bookingDate, b.startTime)}
                       </span>
                       {b.worker && (
                         <span className="flex items-center gap-1 text-xs text-muted-foreground">

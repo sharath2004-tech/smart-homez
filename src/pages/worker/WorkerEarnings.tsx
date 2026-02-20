@@ -12,8 +12,8 @@ interface Earning {
     name: string;
   };
   completedAt: string;
-  scheduledTime: string;
-  totalPrice: number;
+  startTime: string;
+  totalAmount: number;
 }
 
 interface Stats {
@@ -65,7 +65,7 @@ const WorkerEarnings = () => {
       
       (earningsData.earnings || []).forEach((earning: Earning) => {
         const earnDate = new Date(earning.completedAt);
-        const amount = earning.totalPrice;
+        const amount = earning.totalAmount;
         
         if (earnDate.toDateString() === today) todayTotal += amount;
         if (earnDate >= weekAgo) weekTotal += amount;
@@ -208,11 +208,11 @@ const WorkerEarnings = () => {
                     <p className="font-semibold text-foreground truncate">{earning.service.name}</p>
                     <p className="text-sm text-muted-foreground truncate">{earning.customer.name}</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {formatDate(earning.completedAt)} • {formatTime(earning.scheduledTime)}
+                      {formatDate(earning.completedAt)} • {formatTime(earning.startTime)}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-foreground">₹{earning.totalPrice}</p>
+                    <p className="font-bold text-foreground">₹{earning.totalAmount}</p>
                     <span className="text-xs px-2 py-0.5 bg-success-light text-success rounded-full font-medium">
                       Settled
                     </span>

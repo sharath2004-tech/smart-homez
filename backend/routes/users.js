@@ -455,7 +455,7 @@ router.get('/worker/dashboard-stats', authenticate, authorize('worker'), async (
       status: 'completed',
       completedAt: { $gte: today }
     });
-    const todayEarnings = todayBookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+    const todayEarnings = todayBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
     
     // This week's earnings
     const weekBookings = await Booking.find({
@@ -463,7 +463,7 @@ router.get('/worker/dashboard-stats', authenticate, authorize('worker'), async (
       status: 'completed',
       completedAt: { $gte: startOfWeek }
     });
-    const weekEarnings = weekBookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+    const weekEarnings = weekBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
     
     // This month's earnings
     const monthBookings = await Booking.find({
@@ -471,7 +471,7 @@ router.get('/worker/dashboard-stats', authenticate, authorize('worker'), async (
       status: 'completed',
       completedAt: { $gte: startOfMonth }
     });
-    const monthEarnings = monthBookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+    const monthEarnings = monthBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
     
     res.json({
       success: true,
@@ -501,7 +501,7 @@ router.get('/worker/current-task', authenticate, authorize('worker'), async (req
     })
     .populate('customer', 'name email phone')
     .populate('service', 'name description price duration')
-    .sort({ scheduledDate: -1 });
+    .sort({ bookingDate: -1 });
     
     res.json({
       success: true,
@@ -530,17 +530,17 @@ router.get('/worker/upcoming-tasks', authenticate, authorize('worker'), async (r
     const upcomingTasks = await Booking.find({
       worker: workerId,
       status: { $in: ['confirmed', 'pending'] },
-      scheduledDate: { $gte: now.toISOString().split('T')[0] }
+      bookingDate: { $gte: now.toISOString().split('T')[0] }
     })
     .populate('customer', 'name email phone')
     .populate('service', 'name description price duration')
-    .sort({ scheduledDate: 1, scheduledTime: 1 })
+    .sort({ bookingDate: 1, startTime: 1 })
     .limit(parseInt(limit));
     
     console.log(`✅ Found ${upcomingTasks.length} upcoming tasks`);
     if (upcomingTasks.length > 0) {
       upcomingTasks.forEach(task => {
-        console.log(`   - ${task.service.name} on ${task.scheduledDate} at ${task.scheduledTime} (${task.status})`);
+        console.log(`   - ${task.service.name} on ${task.bookingDate} at ${task.startTime} (${task.status})`);
       });
     }
     
@@ -577,14 +577,14 @@ router.get('/worker/earnings', authenticate, authorize('worker'), async (req, re
     const earnings = await Booking.find(query)
       .populate('customer', 'name')
       .populate('service', 'name')
-      .select('service customer completedAt totalPrice scheduledDate scheduledTime')
+      .select('service customer completedAt totalAmount bookingDate startTime')
       .sort({ completedAt: -1 })
       .limit(parseInt(limit))
       .skip((parseInt(page) - 1) * parseInt(limit));
     
     const totalEarnings = await Booking.aggregate([
       { $match: query },
-      { $group: { _id: null, total: { $sum: '$totalPrice' } } }
+      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
     ]);
     
     const count = await Booking.countDocuments(query);
@@ -631,7 +631,7 @@ router.get('/admin/dashboard-stats', authenticate, authorize('admin'), async (re
       $or: [
         { 'workerProfile.availability': true },
         { _id: { $in: await Booking.distinct('worker', { 
-          scheduledDate: today.toISOString().split('T')[0],
+          bookingDate: today.toISOString().split('T')[0],
           status: { $in: ['confirmed', 'in-progress'] }
         }) } }
       ]
@@ -651,7 +651,7 @@ router.get('/admin/dashboard-stats', authenticate, authorize('admin'), async (re
       {
         $group: {
           _id: null,
-          total: { $sum: '$totalPrice' }
+          total: { $sum: '$totalAmount' }
         }
       }
     ]);
@@ -667,7 +667,7 @@ router.get('/admin/dashboard-stats', authenticate, authorize('admin'), async (re
       {
         $group: {
           _id: null,
-          total: { $sum: '$totalPrice' }
+          total: { $sum: '$totalAmount' }
         }
       }
     ]);

@@ -9,7 +9,7 @@ interface Payment {
     service: {
       name: string;
     };
-    totalPrice: number;
+    totalAmount: number;
   };
   paymentDate: string;
   paymentMethod: string;
@@ -56,7 +56,7 @@ const PaymentsPage = () => {
         return bookingDate.getMonth() === currentMonth && bookingDate.getFullYear() === currentYear;
       });
 
-      const thisMonthTotal = thisMonthBookings.reduce((sum: number, b: any) => sum + (b.totalPrice || 0), 0);
+      const thisMonthTotal = thisMonthBookings.reduce((sum: number, b: any) => sum + (b.totalAmount || 0), 0);
       const totalServices = completedBookings.length;
 
       setStats({
@@ -186,7 +186,7 @@ const PaymentsPage = () => {
                     <p className="text-sm font-medium text-foreground truncate">{t.service?.name || 'Service'}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-xs text-muted-foreground">
-                        {formatDate(t.completedAt || t.scheduledDate)}
+                        {formatDate(t.completedAt || t.bookingDate)}
                       </span>
                       <span className="text-xs text-muted-foreground">·</span>
                       <span className="text-xs text-muted-foreground">
@@ -195,7 +195,7 @@ const PaymentsPage = () => {
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-foreground">₹{t.totalPrice}</p>
+                    <p className="text-sm font-bold text-foreground">₹{t.totalAmount}</p>
                     <span className="badge-success text-xs">Paid</span>
                   </div>
                 </div>
