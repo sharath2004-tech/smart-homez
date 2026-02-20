@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { authAPI, bookingsAPI, workersAPI } from "@/lib/api";
-import { Calendar, CheckCircle, Clock, MapPin, Package, PlayCircle, User } from "lucide-react";
+import { Calendar, CheckCircle, Clock, MapPin, Package, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import TaskDetailModal from "./TaskDetailModal";
 

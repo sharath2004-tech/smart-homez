@@ -1,10 +1,15 @@
 import { bookingsAPI } from "@/lib/api";
-import { 
-  ArrowLeft, Calendar, CheckCircle, Clock, MapPin, Phone, 
-  QrCode, Timer, User, DollarSign, Navigation, Home
+import {
+    ArrowLeft, Calendar, CheckCircle,
+    DollarSign,
+    Home,
+    MapPin,
+    Navigation,
+    Phone,
+    QrCode, Timer, User
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
 import QRCode from "qrcode";
+import { useCallback, useEffect, useState } from "react";
 
 interface Task {
   _id: string;
