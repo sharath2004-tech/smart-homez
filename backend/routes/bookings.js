@@ -218,7 +218,7 @@ router.put('/:id', authenticate, async (req, res) => {
     const isAuthorized = 
       req.user.role === 'admin' ||
       booking.customer.toString() === req.user._id.toString() ||
-      booking.worker.toString() === req.user._id.toString();
+      (booking.worker && booking.worker.toString() === req.user._id.toString());
 
     if (!isAuthorized) {
       return res.status(403).json({ 

@@ -171,7 +171,7 @@ export const bookingsAPI = {
 
   update: async (id: string, bookingData: any) => {
     return apiCall(`/bookings/${id}`, {
-      method: 'PATCH',
+      method: 'PUT',
       body: JSON.stringify(bookingData)
     });
   },
