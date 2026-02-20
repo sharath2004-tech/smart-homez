@@ -9,7 +9,8 @@ import {
     QrCode, Timer, User
 } from "lucide-react";
 import QRCode from "qrcode";
-import { useEffect, useState } from "react";import PaymentModal from "./PaymentModal";
+import { useEffect, useState } from "react";
+import PaymentModal from "./PaymentModal";
 interface Task {
   _id: string;
   service: {

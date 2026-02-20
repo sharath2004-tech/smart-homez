@@ -1,7 +1,7 @@
 import { bookingsAPI, qrPaymentsAPI } from "@/lib/api";
 import { ArrowLeft, Camera, CheckCircle, DollarSign, QrCode, Upload } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
 import QRCodeLib from "qrcode";
+import { useCallback, useEffect, useState } from "react";
 
 interface QRPayment {
   _id: string;
