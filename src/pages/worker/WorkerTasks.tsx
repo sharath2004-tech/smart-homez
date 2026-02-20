@@ -2,6 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { authAPI, bookingsAPI, workersAPI } from "@/lib/api";
 import { Calendar, CheckCircle, Clock, MapPin, Package, PlayCircle, User } from "lucide-react";
 import { useEffect, useState } from "react";
+import TaskDetailModal from "./TaskDetailModal";
 
 interface Task {
   _id: string;
@@ -43,6 +44,7 @@ const WorkerTasks = () => {
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"current" | "upcoming" | "completed">("current");
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTasks();
@@ -136,7 +138,11 @@ const WorkerTasks = () => {
   }
 
   const renderTaskCard = (task: Task, isCurrent: boolean = false) => (
-    <div key={task._id} className="card-elevated p-5 hover:shadow-lg transition-shadow">
+    <div 
+      key={task._id} 
+      className="card-elevated p-5 hover:shadow-lg transition-all cursor-pointer"
+      onClick={() => setSelectedTaskId(task._id)}
+    >
       <div className="flex items-start gap-4">
         <div className="w-12 h-12 bg-primary-light rounded-xl flex items-center justify-center text-2xl shrink-0">
           {getServiceEmoji(task.service.name)}
@@ -179,28 +185,11 @@ const WorkerTasks = () => {
             </div>
           </div>
 
-          {isCurrent && task.status !== 'completed' && (
-            <div className="flex gap-2">
-              {task.status === 'scheduled' && (
-                <button
-                  onClick={() => handleStartTask(task._id)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-all"
-                >
-                  <PlayCircle className="w-4 h-4" />
-                  Start Task
-                </button>
-              )}
-              {task.status === 'in-progress' && (
-                <button
-                  onClick={() => handleCompleteTask(task._id)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-success text-white rounded-lg text-sm font-medium hover:opacity-90 transition-all"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  Complete Task
-                </button>
-              )}
-            </div>
-          )}
+          <div className="pt-2 border-t border-border">
+            <p className="text-xs text-primary font-medium">
+              👆 Tap to view full details and navigation
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -293,6 +282,15 @@ const WorkerTasks = () => {
         {/* Content */}
         {renderContent()}
       </div>
+
+      {/* Task Detail Modal */}
+      {selectedTaskId && (
+        <TaskDetailModal
+          taskId={selectedTaskId}
+          onClose={() => setSelectedTaskId(null)}
+          onRefresh={fetchTasks}
+        />
+      )}
     </AppLayout>
   );
 };

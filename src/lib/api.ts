@@ -193,6 +193,32 @@ export const bookingsAPI = {
 
   getPast: async () => {
     return apiCall('/bookings?status=completed,cancelled');
+  },
+
+  generateStartQR: async (id: string) => {
+    return apiCall(`/bookings/${id}/generate-start-qr`, {
+      method: 'POST'
+    });
+  },
+
+  scanStartQR: async (id: string, qrCode: string, termsAccepted: boolean) => {
+    return apiCall(`/bookings/${id}/scan-start-qr`, {
+      method: 'POST',
+      body: JSON.stringify({ qrCode, termsAccepted })
+    });
+  },
+
+  generateEndQR: async (id: string) => {
+    return apiCall(`/bookings/${id}/generate-end-qr`, {
+      method: 'POST'
+    });
+  },
+
+  scanEndQR: async (id: string, qrCode: string) => {
+    return apiCall(`/bookings/${id}/scan-end-qr`, {
+      method: 'POST',
+      body: JSON.stringify({ qrCode })
+    });
   }
 };
 

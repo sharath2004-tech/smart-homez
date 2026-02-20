@@ -68,7 +68,8 @@ router.get('/:id', authenticate, async (req, res) => {
     const booking = await Booking.findById(req.params.id)
       .populate('customer', 'name email phone')
       .populate('worker', 'name email phone gender religion workerProfile')
-      .populate('service', 'name description price duration');
+      .populate('service', 'name description price duration')
+      .populate('location');
     
     if (!booking) {
       return res.status(404).json({ 
