@@ -2,6 +2,7 @@ import { bookingsAPI } from "@/lib/api";
 import { Html5QrcodeScanner } from "html5-qrcode";
 import { ArrowLeft, Calendar, DollarSign, Phone, QrCode, Timer, User } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import ReviewModal from "./ReviewModal";
 
 interface Worker {
   _id: string;
@@ -56,6 +57,9 @@ interface Booking {
   serviceStartQRCode?: string;
   serviceEndQRCode?: string;
   overtimeCharges?: number;
+  rating?: number;
+  review?: string;
+  paymentStatus?: string;
 }
 
 interface BookingDetailModalProps {
@@ -69,8 +73,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
   const [loading, setLoading] = useState(true);
   const [showScanner, setShowScanner] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [overtimeMinutes, setOvertimeMinutes] = useState(0);
-  const OVERTIME_RATE = 2.5; // ₹2.5 per minute
+  const [overtimeMinutes, setOvertimeMinutes] = useState(0);  const [showReviewModal, setShowReviewModal] = useState(false);  const OVERTIME_RATE = 2.5; // ₹2.5 per minute
 
   const fetchBookingDetail = useCallback(async () => {
     try {
@@ -383,6 +386,42 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
               </div>
             </div>
 
+            {/* Review Section - Show for completed bookings without rating */}
+            {booking.status === 'completed' && !booking.rating && booking.worker && (
+              <div className="space-y-3">
+                <div className="bg-purple-50 border-2 border-purple-200 p-4 rounded-xl text-center">
+                  <p className="text-sm text-purple-800 mb-3">
+                    How was your experience with {booking.worker.name}?
+                  </p>
+                  <button
+                    onClick={() => setShowReviewModal(true)}
+                    className="btn-brand w-full py-3"
+                  >
+                    ⭐ Write a Review
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Show Rating if already reviewed */}
+            {booking.rating && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-foreground">Your Review</h3>
+                <div className="bg-muted p-4 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <span key={star} className={star <= booking.rating! ? 'text-yellow-400' : 'text-gray-300'}>
+                        ⭐
+                      </span>
+                    ))}
+                  </div>
+                  {booking.review && (
+                    <p className="text-sm text-foreground mt-2">{booking.review}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Close Button */}
             <button
               onClick={onClose}
@@ -393,6 +432,20 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
           </div>
         </div>
       </div>
+
+      {/* Review Modal */}
+      {showReviewModal && booking.worker && (
+        <ReviewModal
+          bookingId={bookingId}
+          workerName={booking.worker.name}
+          onClose={() => setShowReviewModal(false)}
+          onReviewSubmitted={() => {
+            setShowReviewModal(false);
+            fetchBookingDetail();
+            onRefresh();
+          }}
+        />
+      )}
     </div>
   );
 };

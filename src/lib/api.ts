@@ -400,7 +400,7 @@ export const qrPaymentsAPI = {
   workerConfirm: async (paymentId: string, transactionId: string, screenshot: string) => {
     return apiCall(`/qr-payments/${paymentId}/worker-confirm`, {
       method: 'POST',
-      body: JSON.stringify({ transactionId, screenshot })
+      body: JSON.stringify({ transactionId, transactionScreenshot: screenshot })
     });
   },
 

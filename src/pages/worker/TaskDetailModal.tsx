@@ -9,8 +9,7 @@ import {
     QrCode, Timer, User
 } from "lucide-react";
 import QRCode from "qrcode";
-import { useEffect, useState } from "react";
-
+import { useEffect, useState } from "react";import PaymentModal from "./PaymentModal";
 interface Task {
   _id: string;
   service: {
@@ -58,6 +57,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   const [qrCodeImage, setQrCodeImage] = useState<string>("");
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isScanning, setIsScanning] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   const fetchTaskDetail = async () => {
     try {
@@ -132,7 +132,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   };
 
   const handleCompleteTask = async () => {
-    if (!confirm('Mark this task as completed? Customer will need to confirm payment.')) {
+    if (!confirm('Mark this task as completed and collect payment?')) {
       return;
     }
 
@@ -141,13 +141,17 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
         status: 'completed', 
         actualEndTime: new Date().toISOString() 
       });
-      alert('Task marked as completed!');
-      onRefresh();
-      onClose();
+      setShowPaymentModal(true);
     } catch (error) {
       console.error('Error completing task:', error);
       alert('Failed to complete task');
     }
+  };
+
+  const handlePaymentConfirmed = () => {
+    setShowPaymentModal(false);
+    alert('Payment submitted successfully! You can now close this screen.');
+    onRefresh();
   };
 
   const openMapsNavigation = () => {
@@ -430,6 +434,18 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
           </div>
         </div>
       </div>
+
+      {/* Payment Modal */}
+      {showPaymentModal && (
+        <PaymentModal
+          bookingId={taskId}
+          onClose={() => {
+            setShowPaymentModal(false);
+            onClose();
+          }}
+          onPaymentConfirmed={handlePaymentConfirmed}
+        />
+      )}
     </div>
   );
 };

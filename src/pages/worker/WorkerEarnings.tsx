@@ -49,6 +49,10 @@ const WorkerEarnings = () => {
         workersAPI.getEarnings()
       ]);
 
+      console.log('Earnings Data:', earningsData);
+      console.log('Earnings Array:', earningsData.earnings);
+      console.log('Stats Data:', statsData);
+
       setProfile(profileData.user || profileData);
       setStats(statsData.stats || { today: 0, thisWeek: 0, thisMonth: 0 });
       setEarnings(earningsData.earnings || []);

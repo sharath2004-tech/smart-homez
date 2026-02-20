@@ -449,36 +449,33 @@ router.get('/worker/dashboard-stats', authenticate, authorize('worker'), async (
     
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     
-    // Today's earnings
-    const todayBookings = await Booking.find({
+    // Today's jobs count
+    const todayCount = await Booking.countDocuments({
       worker: workerId,
       status: 'completed',
       completedAt: { $gte: today }
     });
-    const todayEarnings = todayBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
     
-    // This week's earnings
-    const weekBookings = await Booking.find({
+    // This week's jobs count
+    const weekCount = await Booking.countDocuments({
       worker: workerId,
       status: 'completed',
       completedAt: { $gte: startOfWeek }
     });
-    const weekEarnings = weekBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
     
-    // This month's earnings
-    const monthBookings = await Booking.find({
+    // This month's jobs count
+    const monthCount = await Booking.countDocuments({
       worker: workerId,
       status: 'completed',
       completedAt: { $gte: startOfMonth }
     });
-    const monthEarnings = monthBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
     
     res.json({
       success: true,
       stats: {
-        today: todayEarnings,
-        thisWeek: weekEarnings,
-        thisMonth: monthEarnings
+        today: todayCount,
+        thisWeek: weekCount,
+        thisMonth: monthCount
       }
     });
   } catch (error) {
