@@ -562,7 +562,9 @@ router.get('/worker/earnings', authenticate, authorize('worker'), async (req, re
     
     const query = {
       worker: workerId,
-      status: 'completed'
+      status: 'completed',
+      customer: { $ne: null },
+      service: { $ne: null }
     };
     
     if (startDate || endDate) {

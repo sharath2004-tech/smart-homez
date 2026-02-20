@@ -68,7 +68,11 @@ const WorkerEarnings = () => {
       let todayTotal = 0, weekTotal = 0, monthTotal = 0;
       
       (earningsData.earnings || []).forEach((earning: Earning) => {
+        if (!earning.completedAt || !earning.totalAmount) return;
+        
         const earnDate = new Date(earning.completedAt);
+        if (isNaN(earnDate.getTime())) return; // Skip invalid dates
+        
         const amount = earning.totalAmount;
         
         if (earnDate.toDateString() === today) todayTotal += amount;
@@ -99,17 +103,25 @@ const WorkerEarnings = () => {
   };
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid Date';
     return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
   };
 
   const formatTime = (timeString: string) => {
-    if (!timeString) return '';
-    const [hours, minutes] = timeString.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
+    if (!timeString) return 'N/A';
+    try {
+      const [hours, minutes] = timeString.split(':');
+      if (!hours || !minutes) return 'N/A';
+      const hour = parseInt(hours);
+      if (isNaN(hour)) return 'N/A';
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour % 12 || 12;
+      return `${displayHour}:${minutes} ${ampm}`;
+    } catch {
+      return 'N/A';
+    }
   };
 
   const getRecentEarnings = () => {
