@@ -102,7 +102,17 @@ const CustomerDashboard = () => {
       dateText = date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
     }
 
-    return timeString ? `${dateText}, ${timeString}` : dateText;
+    if (timeString) {
+      // Format time from 24-hour to 12-hour format
+      const [hours, minutes] = timeString.split(':');
+      const hour = parseInt(hours);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour % 12 || 12;
+      const formattedTime = `${displayHour}:${minutes} ${ampm}`;
+      return `${dateText}, ${formattedTime}`;
+    }
+    
+    return dateText;
   };
 
   return (

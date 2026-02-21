@@ -288,7 +288,7 @@ const BookingsPage = () => {
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <Clock className="w-4 h-4 text-primary" />
-                      <span className="text-foreground">{booking.startTime} - {booking.endTime}</span>
+                      <span className="text-foreground">{formatTime(booking.startTime)} - {formatTime(booking.endTime)}</span>
                     </div>
                   </div>
 

@@ -442,10 +442,10 @@ const BookServicePage = () => {
                             : 'border-border hover:border-primary/50 text-muted-foreground'
                         }`}
                       >
-                        {slot === 'morning' && '🌅 Morning (9 AM - 12 PM)'}
-                        {slot === 'afternoon' && '☀️ Afternoon (2 PM - 4 PM)'}
-                        {slot === 'evening' && '🌆 Evening (6 PM - 8 PM)'}
-                        {slot === 'night' && '🌙 Night (8 PM - 10 PM)'}
+                        {slot === 'morning' && '🌅 Morning (9:00 AM)'}
+                        {slot === 'afternoon' && '☀️ Afternoon (2:00 PM)'}
+                        {slot === 'evening' && '🌆 Evening (6:00 PM)'}
+                        {slot === 'night' && '🌙 Night (8:00 PM)'}
                       </button>
                     ))}
                   </div>
