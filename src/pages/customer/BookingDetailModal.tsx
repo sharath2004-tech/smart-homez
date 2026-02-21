@@ -1,7 +1,7 @@
 import { bookingsAPI } from "@/lib/api";
 import { Html5QrcodeScanner } from "html5-qrcode";
 import { ArrowLeft, Calendar, DollarSign, Phone, QrCode, Timer, User } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ReviewModal from "./ReviewModal";
 
 interface Worker {
@@ -75,25 +75,30 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
   const [elapsedTime, setElapsedTime] = useState(0);
   const [overtimeMinutes, setOvertimeMinutes] = useState(0);  const [showReviewModal, setShowReviewModal] = useState(false);  const OVERTIME_RATE = 2.5; // ₹2.5 per minute
 
-  const fetchBookingDetail = useCallback(async () => {
+  // Use refs to persist values across renders
+  const timeOffsetRef = useRef<number>(0);
+  const offsetCalculatedRef = useRef<boolean>(false);
+  const actualStartTimeRef = useRef<string | null>(null);
+
+  const fetchBookingDetail = useCallback(async (silent: boolean = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await bookingsAPI.getById(bookingId);
       setBooking(response.booking);
     } catch (error) {
       console.error('Error fetching booking detail:', error);
-      alert('Failed to load booking details');
+      if (!silent) alert('Failed to load booking details');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [bookingId]);
 
   useEffect(() => {
-    fetchBookingDetail();
+    fetchBookingDetail(false); // Initial load with loading spinner
     
-    // Auto-refresh every 5 seconds for real-time updates
+    // Auto-refresh every 5 seconds for real-time updates (silent refresh)
     const interval = setInterval(() => {
-      fetchBookingDetail();
+      fetchBookingDetail(true); // Silent refresh without loading spinner
     }, 5000);
     
     return () => clearInterval(interval);
@@ -102,23 +107,31 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
   // Timer for active bookings
   useEffect(() => {
     if (booking?.status === 'in-progress' && booking.actualStartTime) {
-      // Initial calculation to handle timezone/sync issues
-      const startTime = new Date(booking.actualStartTime!).getTime();
-      const initialNow = Date.now();
-      const initialElapsed = Math.floor((initialNow - startTime) / 1000);
+      // Only calculate offset once when actualStartTime first appears or changes
+      if (booking.actualStartTime !== actualStartTimeRef.current) {
+        actualStartTimeRef.current = booking.actualStartTime;
+        offsetCalculatedRef.current = false;
+      }
       
-      // If time is significantly negative (more than 5 minutes), likely a timezone issue
-      const timeOffset = initialElapsed < -300 ? -initialElapsed : 0;
-      
-      if (timeOffset > 0) {
-        console.warn('⚠️ Time sync issue detected. Adjusting for timezone offset:', timeOffset, 'seconds');
+      if (!offsetCalculatedRef.current) {
+        const startTime = new Date(booking.actualStartTime!).getTime();
+        const initialNow = Date.now();
+        const initialElapsed = Math.floor((initialNow - startTime) / 1000);
+        
+        // If time is significantly negative (more than 5 minutes), likely a timezone issue
+        timeOffsetRef.current = initialElapsed < -300 ? -initialElapsed : 0;
+        offsetCalculatedRef.current = true;
+        
+        if (timeOffsetRef.current > 0) {
+          console.warn('⚠️ Time sync issue detected. Adjusting for timezone offset:', timeOffsetRef.current, 'seconds');
+        }
       }
       
       const interval = setInterval(() => {
         const start = new Date(booking.actualStartTime!).getTime();
         const now = Date.now();
         const rawElapsed = Math.floor((now - start) / 1000);
-        const elapsed = Math.max(0, rawElapsed + timeOffset);
+        const elapsed = Math.max(0, rawElapsed + timeOffsetRef.current);
         
         setElapsedTime(elapsed);
 
@@ -138,8 +151,11 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
       // Reset timers when booking is not in progress
       setElapsedTime(0);
       setOvertimeMinutes(0);
+      actualStartTimeRef.current = null;
+      offsetCalculatedRef.current = false;
+      timeOffsetRef.current = 0;
     }
-  }, [booking]);
+  }, [booking?.status, booking?.actualStartTime, booking?.bookingDate, booking?.endTime]);
 
   const handleScanStartQR = useCallback(async (qrCode: string) => {
     try {

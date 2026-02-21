@@ -9,7 +9,7 @@ import {
     QrCode, Timer, User
 } from "lucide-react";
 import QRCode from "qrcode";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import PaymentModal from "./PaymentModal";
 interface Task {
   _id: string;
@@ -60,10 +60,15 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   const [isScanning, setIsScanning] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [hasTimeOffset, setHasTimeOffset] = useState(false);
+  
+  // Use refs to persist values across renders
+  const timeOffsetRef = useRef<number>(0);
+  const offsetCalculatedRef = useRef<boolean>(false);
+  const actualStartTimeRef = useRef<string | null>(null);
 
-  const fetchTaskDetail = async () => {
+  const fetchTaskDetail = async (silent: boolean = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await bookingsAPI.getById(taskId);
       setTask(response.booking);
       
@@ -73,18 +78,18 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       }
     } catch (error) {
       console.error('Error fetching task detail:', error);
-      alert('Failed to load task details');
+      if (!silent) alert('Failed to load task details');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchTaskDetail();
+    fetchTaskDetail(false); // Initial load with loading spinner
     
-    // Auto-refresh every 5 seconds for real-time updates
+    // Auto-refresh every 5 seconds for real-time updates (silent refresh)
     const interval = setInterval(() => {
-      fetchTaskDetail();
+      fetchTaskDetail(true); // Silent refresh without loading spinner
     }, 5000);
     
     return () => clearInterval(interval);
@@ -94,38 +99,48 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   // Timer for active tasks
   useEffect(() => {
     if (task?.status === 'in-progress' && task.actualStartTime) {
-      // Initial calculation to handle timezone/sync issues
-      const startTime = new Date(task.actualStartTime!).getTime();
-      const initialNow = Date.now();
-      const initialElapsed = Math.floor((initialNow - startTime) / 1000);
+      // Only calculate offset once when actualStartTime first appears or changes
+      if (task.actualStartTime !== actualStartTimeRef.current) {
+        actualStartTimeRef.current = task.actualStartTime;
+        offsetCalculatedRef.current = false;
+      }
       
-      // If time is significantly negative (more than 5 minutes), likely a timezone issue
-      // Store the offset and use server-relative time
-      const timeOffset = initialElapsed < -300 ? -initialElapsed : 0;
-      
-      if (timeOffset > 0) {
-        console.warn('⚠️ Time sync issue detected. Adjusting for timezone offset:', timeOffset, 'seconds');
-        setHasTimeOffset(true);
-      } else {
-        setHasTimeOffset(false);
+      if (!offsetCalculatedRef.current) {
+        const startTime = new Date(task.actualStartTime!).getTime();
+        const initialNow = Date.now();
+        const initialElapsed = Math.floor((initialNow - startTime) / 1000);
+        
+        // If time is significantly negative (more than 5 minutes), likely a timezone issue
+        timeOffsetRef.current = initialElapsed < -300 ? -initialElapsed : 0;
+        offsetCalculatedRef.current = true;
+        
+        if (timeOffsetRef.current > 0) {
+          console.warn('⚠️ Time sync issue detected. Adjusting for timezone offset:', timeOffsetRef.current, 'seconds');
+          setHasTimeOffset(true);
+        } else {
+          setHasTimeOffset(false);
+        }
       }
       
       const interval = setInterval(() => {
         const start = new Date(task.actualStartTime!).getTime();
         const now = Date.now();
         const rawElapsed = Math.floor((now - start) / 1000);
-        const elapsed = Math.max(0, rawElapsed + timeOffset);
+        const elapsed = Math.max(0, rawElapsed + timeOffsetRef.current);
         
         setElapsedTime(elapsed);
       }, 1000);
 
       return () => clearInterval(interval);
     } else {
-      // Reset elapsed time when task is not in progress
+      // Reset when task is not in progress
       setElapsedTime(0);
       setHasTimeOffset(false);
+      actualStartTimeRef.current = null;
+      offsetCalculatedRef.current = false;
+      timeOffsetRef.current = 0;
     }
-  }, [task]);
+  }, [task?.status, task?.actualStartTime]);
 
   const generateQRCode = async (code: string) => {
     try {
