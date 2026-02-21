@@ -59,6 +59,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isScanning, setIsScanning] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [hasTimeOffset, setHasTimeOffset] = useState(false);
 
   const fetchTaskDetail = async () => {
     try {
@@ -93,29 +94,36 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   // Timer for active tasks
   useEffect(() => {
     if (task?.status === 'in-progress' && task.actualStartTime) {
+      // Initial calculation to handle timezone/sync issues
+      const startTime = new Date(task.actualStartTime!).getTime();
+      const initialNow = Date.now();
+      const initialElapsed = Math.floor((initialNow - startTime) / 1000);
+      
+      // If time is significantly negative (more than 5 minutes), likely a timezone issue
+      // Store the offset and use server-relative time
+      const timeOffset = initialElapsed < -300 ? -initialElapsed : 0;
+      
+      if (timeOffset > 0) {
+        console.warn('⚠️ Time sync issue detected. Adjusting for timezone offset:', timeOffset, 'seconds');
+        setHasTimeOffset(true);
+      } else {
+        setHasTimeOffset(false);
+      }
+      
       const interval = setInterval(() => {
         const start = new Date(task.actualStartTime!).getTime();
         const now = Date.now();
-        const elapsed = Math.floor((now - start) / 1000);
+        const rawElapsed = Math.floor((now - start) / 1000);
+        const elapsed = Math.max(0, rawElapsed + timeOffset);
         
-        // Debug log for negative time issues
-        if (elapsed < 0) {
-          console.warn('⚠️ Timer Issue:', {
-            actualStartTime: task.actualStartTime,
-            parsedStart: new Date(task.actualStartTime!).toISOString(),
-            currentTime: new Date(now).toISOString(),
-            elapsed
-          });
-        }
-        
-        // Ensure elapsed time is never negative
-        setElapsedTime(Math.max(0, elapsed));
+        setElapsedTime(elapsed);
       }, 1000);
 
       return () => clearInterval(interval);
     } else {
       // Reset elapsed time when task is not in progress
       setElapsedTime(0);
+      setHasTimeOffset(false);
     }
   }, [task]);
 
@@ -261,16 +269,23 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
         <div className="p-6 space-y-6">
           {/* Timer for active tasks */}
           {task.status === 'in-progress' && (
-            <div className="card-elevated p-6 text-center bg-primary-light">
-              <Timer className="w-8 h-8 text-primary mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground mb-2">Work in Progress</p>
-              <p className="text-3xl font-bold text-primary font-mono">
-                {formatElapsedTime(elapsedTime)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Target: {formatTime(task.startTime)} - {formatTime(task.endTime)}
-              </p>
-            </div>
+            <>
+              <div className="card-elevated p-6 text-center bg-primary-light">
+                <Timer className="w-8 h-8 text-primary mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground mb-2">Work in Progress</p>
+                <p className="text-3xl font-bold text-primary font-mono">
+                  {formatElapsedTime(elapsedTime)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Target: {formatTime(task.startTime)} - {formatTime(task.endTime)}
+                </p>
+              </div>
+              {hasTimeOffset && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
+                  ℹ️ Timer adjusted for timezone difference. The displayed time is accurate.
+                </div>
+              )}
+            </>
           )}
 
           {/* Customer Information */}

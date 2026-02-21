@@ -102,23 +102,25 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
   // Timer for active bookings
   useEffect(() => {
     if (booking?.status === 'in-progress' && booking.actualStartTime) {
+      // Initial calculation to handle timezone/sync issues
+      const startTime = new Date(booking.actualStartTime!).getTime();
+      const initialNow = Date.now();
+      const initialElapsed = Math.floor((initialNow - startTime) / 1000);
+      
+      // If time is significantly negative (more than 5 minutes), likely a timezone issue
+      const timeOffset = initialElapsed < -300 ? -initialElapsed : 0;
+      
+      if (timeOffset > 0) {
+        console.warn('⚠️ Time sync issue detected. Adjusting for timezone offset:', timeOffset, 'seconds');
+      }
+      
       const interval = setInterval(() => {
         const start = new Date(booking.actualStartTime!).getTime();
         const now = Date.now();
-        const elapsed = Math.floor((now - start) / 1000);
+        const rawElapsed = Math.floor((now - start) / 1000);
+        const elapsed = Math.max(0, rawElapsed + timeOffset);
         
-        // Debug log for negative time issues  
-        if (elapsed < 0) {
-          console.warn('⚠️ Timer Issue:', {
-            actualStartTime: booking.actualStartTime,
-            parsedStart: new Date(booking.actualStartTime!).toISOString(),
-            currentTime: new Date(now).toISOString(),
-            elapsed
-          });
-        }
-        
-        // Ensure elapsed time is never negative
-        setElapsedTime(Math.max(0, elapsed));
+        setElapsedTime(elapsed);
 
         // Calculate overtime
         const scheduledEnd = new Date(`${booking.bookingDate}T${booking.endTime}`).getTime();

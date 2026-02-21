@@ -62,6 +62,18 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Health check route with server time
+app.get('/health', (req, res) => {
+  const now = new Date();
+  res.json({
+    status: 'healthy',
+    serverTime: now.toISOString(),
+    serverTimeLocal: now.toString(),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timestamp: now.getTime()
+  });
+});
+
 // API Routes
 app.use('/api/admin', adminRoutes);
 app.use('/api/auth', authRoutes);

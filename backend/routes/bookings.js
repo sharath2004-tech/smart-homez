@@ -512,6 +512,15 @@ router.post('/:id/scan-start-qr',
 
       // Start the service
       const now = new Date();
+      
+      // Log for debugging timezone issues
+      console.log('🕐 Service Starting:', {
+        bookingId: booking._id,
+        serverTime: now.toISOString(),
+        serverTimeLocal: now.toString(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      });
+      
       booking.actualStartTime = now;
       booking.termsAccepted = termsAccepted;
       booking.termsAcceptedAt = now;
