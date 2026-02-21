@@ -115,7 +115,7 @@ const BookServicePage = () => {
     try {
       setLoadingWorkers(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/users/workers/available?specialization=${category || ''}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/users/workers/available?specialization=${category || ''}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

@@ -3,6 +3,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Edit2, MapPin, Plus, Save, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { API_BASE_URL } from "@/lib/api";
 
 // Fix Leaflet default marker icon issue
 // @ts-expect-error - Modifying Leaflet internals for marker icon fix
@@ -166,7 +167,7 @@ const AdminServiceAreas = () => {
 
   const fetchServiceAreas = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/admin/service-areas', {
+      const response = await fetch(`${API_BASE_URL}/admin/service-areas`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -215,8 +216,8 @@ const AdminServiceAreas = () => {
 
     try {
       const url = editingId 
-        ? `http://localhost:5000/api/admin/service-areas/${editingId}`
-        : 'http://localhost:5000/api/admin/service-areas';
+        ? `${API_BASE_URL}/admin/service-areas/${editingId}`
+        : `${API_BASE_URL}/admin/service-areas`;
       
       const method = editingId ? 'PUT' : 'POST';
 
@@ -258,7 +259,7 @@ const AdminServiceAreas = () => {
     if (!confirm('Are you sure you want to delete this service area?')) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/service-areas/${areaId}`, {
+      const response = await fetch(`${API_BASE_URL}/admin/service-areas/${areaId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -278,7 +279,7 @@ const AdminServiceAreas = () => {
 
   const handleToggleActive = async (area: ServiceArea) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/service-areas/${area._id}`, {
+      const response = await fetch(`${API_BASE_URL}/admin/service-areas/${area._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

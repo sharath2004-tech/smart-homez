@@ -2,6 +2,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { MapPin, Navigation, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { API_BASE_URL } from "@/lib/api";
 
 // Fix Leaflet default marker icon issue
 // @ts-expect-error - Modifying Leaflet internals for marker icon fix
@@ -64,7 +65,7 @@ const LocationSelector = ({ onLocationConfirmed, onClose, defaultLocation, showC
 
   const fetchServiceAreas = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/service-areas/map-data');
+      const response = await fetch(`${API_BASE_URL}/service-areas/map-data`);
       if (response.ok) {
         const data = await response.json();
         setServiceAreas(data.areas.map((area: any) => ({
@@ -180,7 +181,7 @@ const LocationSelector = ({ onLocationConfirmed, onClose, defaultLocation, showC
 
   const checkAvailability = async (lat: number, lng: number) => {
     try {
-      const response = await fetch('http://localhost:5000/api/service-areas/validate', {
+      const response = await fetch(`${API_BASE_URL}/service-areas/validate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
