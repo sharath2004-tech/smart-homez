@@ -57,9 +57,12 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   const [loading, setLoading] = useState(true);
   const [qrCodeImage, setQrCodeImage] = useState<string>("");
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [overtimeMinutes, setOvertimeMinutes] = useState(0);
   const [isScanning, setIsScanning] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [hasTimeOffset, setHasTimeOffset] = useState(false);
+  
+  const OVERTIME_RATE = 2.5; // ₹2.5 per minute
   
   // Use refs to persist values across renders
   const timeOffsetRef = useRef<number>(0);
@@ -128,18 +131,29 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
         const elapsed = Math.max(0, rawElapsed + timeOffsetRef.current);
         
         setElapsedTime(elapsed);
+
+        // Calculate overtime
+        const scheduledEnd = new Date(`${task.bookingDate}T${task.endTime}`).getTime();
+        if (now > scheduledEnd) {
+          const overtimeMs = now - scheduledEnd;
+          const overtimeMins = Math.ceil(overtimeMs / 60000);
+          setOvertimeMinutes(Math.max(0, overtimeMins));
+        } else {
+          setOvertimeMinutes(0);
+        }
       }, 1000);
 
       return () => clearInterval(interval);
     } else {
       // Reset when task is not in progress
       setElapsedTime(0);
+      setOvertimeMinutes(0);
       setHasTimeOffset(false);
       actualStartTimeRef.current = null;
       offsetCalculatedRef.current = false;
       timeOffsetRef.current = 0;
     }
-  }, [task?.status, task?.actualStartTime]);
+  }, [task?.status, task?.actualStartTime, task?.bookingDate, task?.endTime]);
 
   const generateQRCode = async (code: string) => {
     try {
@@ -236,6 +250,13 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
     });
   };
 
+  const calculateTotalAmount = () => {
+    if (!task) return 0;
+    const baseAmount = task.totalAmount;
+    const overtimeAmount = overtimeMinutes > 0 ? overtimeMinutes * OVERTIME_RATE : 0;
+    return baseAmount + overtimeAmount;
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'in-progress': return 'bg-primary-light text-primary';
@@ -293,6 +314,16 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                 <p className="text-xs text-muted-foreground mt-2">
                   Target: {formatTime(task.startTime)} - {formatTime(task.endTime)}
                 </p>
+                {overtimeMinutes > 0 && (
+                  <div className="mt-4 p-3 bg-orange-100 border border-orange-300 rounded-lg">
+                    <p className="text-sm font-semibold text-orange-800">
+                      ⚠️ Overtime: {overtimeMinutes} minutes
+                    </p>
+                    <p className="text-xs text-orange-700 mt-1">
+                      Additional ₹{(overtimeMinutes * OVERTIME_RATE).toFixed(2)} will be charged
+                    </p>
+                  </div>
+                )}
               </div>
               {hasTimeOffset && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
@@ -414,9 +445,24 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
               <DollarSign className="w-5 h-5 text-primary" />
               Payment
             </h3>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Total Amount</span>
-              <span className="text-2xl font-bold text-primary">₹{task.totalAmount}</span>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Base Amount</span>
+                <span className="font-medium text-foreground">₹{task.totalAmount}</span>
+              </div>
+              {overtimeMinutes > 0 && (
+                <>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-orange-600">Overtime ({overtimeMinutes} min × ₹{OVERTIME_RATE})</span>
+                    <span className="font-medium text-orange-600">₹{(overtimeMinutes * OVERTIME_RATE).toFixed(2)}</span>
+                  </div>
+                  <div className="border-t border-border pt-2"></div>
+                </>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-foreground">Total Amount</span>
+                <span className="text-2xl font-bold text-primary">₹{calculateTotalAmount().toFixed(2)}</span>
+              </div>
             </div>
           </div>
 
