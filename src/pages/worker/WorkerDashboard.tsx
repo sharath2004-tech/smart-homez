@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { authAPI, bookingsAPI, workersAPI } from "@/lib/api";
 import { Bell, CheckCircle, ChevronRight, Clock, MapPin, QrCode, Star, ToggleLeft, ToggleRight, TrendingUp } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import TaskDetailModal from "./TaskDetailModal";
 
@@ -50,23 +50,53 @@ const WorkerDashboard = () => {
   const [taskTimer, setTaskTimer] = useState<number>(0);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
+  // Use refs to persist timer offset across renders
+  const timeOffsetRef = useRef<number>(0);
+  const offsetCalculatedRef = useRef<boolean>(false);
+  const actualStartTimeRef = useRef<string | null>(null);
+
   useEffect(() => {
     fetchDashboardData();
   }, []);
 
-  // Timer for current task
+  // Timer for current task with timezone offset persistence
   useEffect(() => {
     if (currentTask && currentTask.actualStartTime) {
+      // Only calculate offset once when actualStartTime first appears or changes
+      if (currentTask.actualStartTime !== actualStartTimeRef.current) {
+        actualStartTimeRef.current = currentTask.actualStartTime;
+        offsetCalculatedRef.current = false;
+      }
+      
+      if (!offsetCalculatedRef.current) {
+        const startTime = new Date(currentTask.actualStartTime!).getTime();
+        const initialNow = Date.now();
+        const initialElapsed = Math.floor((initialNow - startTime) / 1000);
+        
+        // If time is significantly negative (more than 5 minutes), likely a timezone issue
+        timeOffsetRef.current = initialElapsed < -300 ? -initialElapsed : 0;
+        offsetCalculatedRef.current = true;
+        
+        if (timeOffsetRef.current > 0 && import.meta.env.DEV) {
+          console.info('Dashboard timer adjusted for timezone offset:', timeOffsetRef.current, 'seconds');
+        }
+      }
+      
       const interval = setInterval(() => {
         const startTime = new Date(currentTask.actualStartTime!).getTime();
         const now = Date.now();
-        const elapsedMinutes = Math.floor(Math.max(0, (now - startTime)) / 1000 / 60); // Prevent negative values
+        const rawElapsed = Math.floor((now - startTime) / 1000);
+        const elapsed = Math.max(0, rawElapsed + timeOffsetRef.current);
+        const elapsedMinutes = Math.floor(elapsed / 60);
         setTaskTimer(elapsedMinutes);
       }, 1000);
 
       return () => clearInterval(interval);
     } else {
       setTaskTimer(0);
+      actualStartTimeRef.current = null;
+      offsetCalculatedRef.current = false;
+      timeOffsetRef.current = 0;
     }
   }, [currentTask]);
 
