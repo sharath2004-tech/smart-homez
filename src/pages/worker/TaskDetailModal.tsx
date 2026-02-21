@@ -114,12 +114,11 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
         timeOffsetRef.current = initialElapsed < -300 ? -initialElapsed : 0;
         offsetCalculatedRef.current = true;
         
-        if (timeOffsetRef.current > 0) {
-          console.warn('⚠️ Time sync issue detected. Adjusting for timezone offset:', timeOffsetRef.current, 'seconds');
-          setHasTimeOffset(true);
-        } else {
-          setHasTimeOffset(false);
+        // Only show info in development
+        if (timeOffsetRef.current > 0 && import.meta.env.DEV) {
+          console.info('Timer adjusted for timezone offset:', timeOffsetRef.current, 'seconds');
         }
+        setHasTimeOffset(timeOffsetRef.current > 0);
       }
       
       const interval = setInterval(() => {

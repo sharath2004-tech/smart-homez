@@ -122,8 +122,9 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
         timeOffsetRef.current = initialElapsed < -300 ? -initialElapsed : 0;
         offsetCalculatedRef.current = true;
         
-        if (timeOffsetRef.current > 0) {
-          console.warn('⚠️ Time sync issue detected. Adjusting for timezone offset:', timeOffsetRef.current, 'seconds');
+        // Only show info in development
+        if (timeOffsetRef.current > 0 && import.meta.env.DEV) {
+          console.info('Timer adjusted for timezone offset:', timeOffsetRef.current, 'seconds');
         }
       }
       

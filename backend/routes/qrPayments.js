@@ -8,10 +8,10 @@ const router = express.Router();
 
 // @route   POST /api/qr-payments/generate
 // @desc    Generate QR code for payment
-// @access  Private/Customer
+// @access  Private/Customer/Worker
 router.post('/generate',
   authenticate,
-  authorize('customer', 'admin'),
+  authorize('customer', 'worker', 'admin'),
   [
     body('bookingId').notEmpty().withMessage('Booking ID is required')
   ],
@@ -24,7 +24,7 @@ router.post('/generate',
 
       const { bookingId } = req.body;
 
-      // Verify booking exists and belongs to customer
+      // Verify booking exists and belongs to customer or worker
       const booking = await Booking.findById(bookingId)
         .populate('worker', 'name email')
         .populate('service', 'name price');
@@ -35,7 +35,12 @@ router.post('/generate',
         });
       }
 
-      if (booking.customer.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      // Allow access for customer, assigned worker, or admin
+      const isCustomer = booking.customer.toString() === req.user._id.toString();
+      const isWorker = booking.worker && booking.worker._id.toString() === req.user._id.toString();
+      const isAdmin = req.user.role === 'admin';
+      
+      if (!isCustomer && !isWorker && !isAdmin) {
         return res.status(403).json({ 
           error: { message: 'Forbidden', status: 403 } 
         });
