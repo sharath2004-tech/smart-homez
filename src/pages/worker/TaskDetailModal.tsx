@@ -9,7 +9,7 @@ import {
     QrCode, Timer, User
 } from "lucide-react";
 import QRCode from "qrcode";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import PaymentModal from "./PaymentModal";
 interface Task {
   _id: string;
@@ -63,11 +63,6 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   const [hasTimeOffset, setHasTimeOffset] = useState(false);
   
   const OVERTIME_RATE = 2.5; // ₹2.5 per minute
-  
-  // Use refs to persist values across renders
-  const timeOffsetRef = useRef<number>(0);
-  const offsetCalculatedRef = useRef<boolean>(false);
-  const actualStartTimeRef = useRef<string | null>(null);
 
   const fetchTaskDetail = async (silent: boolean = false) => {
     try {
@@ -102,33 +97,26 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   // Timer for active tasks
   useEffect(() => {
     if (task?.status === 'in-progress' && task.actualStartTime) {
-      // Only calculate offset once when actualStartTime first appears or changes
-      if (task.actualStartTime !== actualStartTimeRef.current) {
-        actualStartTimeRef.current = task.actualStartTime;
-        offsetCalculatedRef.current = false;
-      }
-      
-      if (!offsetCalculatedRef.current) {
+      console.log('🔄 Worker Timer Starting:', {
+        taskId: task._id,
+        actualStartTime: task.actualStartTime,
+        browserTime: new Date().toISOString(),
+        difference: Math.floor((Date.now() - new Date(task.actualStartTime).getTime()) / 1000) + ' seconds'
+      });
+
+      // Calculate real elapsed time immediately and update
+      const updateElapsedTime = () => {
         const startTime = new Date(task.actualStartTime!).getTime();
-        const initialNow = Date.now();
-        const initialElapsed = Math.floor((initialNow - startTime) / 1000);
-        
-        // If time is significantly negative (more than 5 minutes), likely a timezone issue
-        timeOffsetRef.current = initialElapsed < -300 ? -initialElapsed : 0;
-        offsetCalculatedRef.current = true;
-        
-        // Only show info in development
-        if (timeOffsetRef.current > 0 && import.meta.env.DEV) {
-          console.info('Timer adjusted for timezone offset:', timeOffsetRef.current, 'seconds');
-        }
-        setHasTimeOffset(timeOffsetRef.current > 0);
-      }
-      
-      const interval = setInterval(() => {
-        const start = new Date(task.actualStartTime!).getTime();
         const now = Date.now();
-        const rawElapsed = Math.floor((now - start) / 1000);
-        const elapsed = Math.max(0, rawElapsed + timeOffsetRef.current);
+        const elapsedSeconds = Math.floor((now - startTime) / 1000);
+        const elapsed = Math.max(0, elapsedSeconds);
+        
+        console.log('⏱️ Timer Update:', {
+          start: new Date(task.actualStartTime!).toISOString(),
+          now: new Date().toISOString(),
+          elapsed: elapsed + 's',
+          formatted: Math.floor(elapsed / 60) + 'm ' + (elapsed % 60) + 's'
+        });
         
         setElapsedTime(elapsed);
 
@@ -141,7 +129,13 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
         } else {
           setOvertimeMinutes(0);
         }
-      }, 1000);
+      };
+
+      // Update immediately
+      updateElapsedTime();
+
+      // Then update every second
+      const interval = setInterval(updateElapsedTime, 1000);
 
       return () => clearInterval(interval);
     } else {
@@ -149,9 +143,6 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       setElapsedTime(0);
       setOvertimeMinutes(0);
       setHasTimeOffset(false);
-      actualStartTimeRef.current = null;
-      offsetCalculatedRef.current = false;
-      timeOffsetRef.current = 0;
     }
   }, [task?.status, task?.actualStartTime, task?.bookingDate, task?.endTime]);
 
