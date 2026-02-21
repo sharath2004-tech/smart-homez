@@ -29,10 +29,11 @@ export const updateBookingStatuses = async () => {
       }
     }
 
-    // 2. Start confirmed bookings (in-progress)
+    // 2. Start confirmed bookings (only if NOT using QR code workflow)
     const confirmedBookings = await Booking.find({
       status: 'confirmed',
-      bookingDate: today
+      bookingDate: today,
+      serviceStartQRCode: { $exists: false } // Only auto-start if no QR code workflow
     });
 
     for (const booking of confirmedBookings) {
@@ -51,6 +52,13 @@ export const updateBookingStatuses = async () => {
 
     for (const booking of inProgressBookings) {
       const bookingDate = booking.bookingDate.toISOString().split('T')[0];
+      
+      // If booking was manually started (actualStartTime exists), don't auto-complete
+      // Let worker/customer complete it manually or based on actual elapsed time
+      if (booking.actualStartTime) {
+        console.log(`Booking ${booking._id} manually started - skipping auto-completion`);
+        continue;
+      }
       
       // If booking is today, check if end time has passed
       if (bookingDate === today) {
