@@ -106,18 +106,36 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
         const start = new Date(booking.actualStartTime!).getTime();
         const now = Date.now();
         const elapsed = Math.floor((now - start) / 1000);
-        setElapsedTime(elapsed);
+        
+        // Debug log for negative time issues  
+        if (elapsed < 0) {
+          console.warn('⚠️ Timer Issue:', {
+            actualStartTime: booking.actualStartTime,
+            parsedStart: new Date(booking.actualStartTime!).toISOString(),
+            currentTime: new Date(now).toISOString(),
+            elapsed
+          });
+        }
+        
+        // Ensure elapsed time is never negative
+        setElapsedTime(Math.max(0, elapsed));
 
         // Calculate overtime
         const scheduledEnd = new Date(`${booking.bookingDate}T${booking.endTime}`).getTime();
         if (now > scheduledEnd) {
           const overtimeMs = now - scheduledEnd;
           const overtimeMins = Math.ceil(overtimeMs / 60000);
-          setOvertimeMinutes(overtimeMins);
+          setOvertimeMinutes(Math.max(0, overtimeMins));
+        } else {
+          setOvertimeMinutes(0);
         }
       }, 1000);
 
       return () => clearInterval(interval);
+    } else {
+      // Reset timers when booking is not in progress
+      setElapsedTime(0);
+      setOvertimeMinutes(0);
     }
   }, [booking]);
 

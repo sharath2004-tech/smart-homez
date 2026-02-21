@@ -177,7 +177,7 @@ const WorkerTasks = () => {
               <Calendar className="w-3.5 h-3.5 shrink-0" />
               <span>{formatDate(task.bookingDate)}</span>
               <Clock className="w-3.5 h-3.5 ml-2 shrink-0" />
-              <span>{task.startTime} - {task.endTime}</span>
+              <span>{formatTime(task.startTime)} - {formatTime(task.endTime)}</span>
             </div>
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <Package className="w-3.5 h-3.5 shrink-0" />

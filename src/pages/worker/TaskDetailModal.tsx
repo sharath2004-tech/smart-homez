@@ -97,10 +97,25 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
         const start = new Date(task.actualStartTime!).getTime();
         const now = Date.now();
         const elapsed = Math.floor((now - start) / 1000);
-        setElapsedTime(elapsed);
+        
+        // Debug log for negative time issues
+        if (elapsed < 0) {
+          console.warn('⚠️ Timer Issue:', {
+            actualStartTime: task.actualStartTime,
+            parsedStart: new Date(task.actualStartTime!).toISOString(),
+            currentTime: new Date(now).toISOString(),
+            elapsed
+          });
+        }
+        
+        // Ensure elapsed time is never negative
+        setElapsedTime(Math.max(0, elapsed));
       }, 1000);
 
       return () => clearInterval(interval);
+    } else {
+      // Reset elapsed time when task is not in progress
+      setElapsedTime(0);
     }
   }, [task]);
 
@@ -253,7 +268,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                 {formatElapsedTime(elapsedTime)}
               </p>
               <p className="text-xs text-muted-foreground mt-2">
-                Target: {task.startTime} - {task.endTime}
+                Target: {formatTime(task.startTime)} - {formatTime(task.endTime)}
               </p>
             </div>
           )}

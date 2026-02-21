@@ -60,11 +60,13 @@ const WorkerDashboard = () => {
       const interval = setInterval(() => {
         const startTime = new Date(currentTask.actualStartTime!).getTime();
         const now = Date.now();
-        const elapsedMinutes = Math.floor((now - startTime) / 1000 / 60);
+        const elapsedMinutes = Math.floor(Math.max(0, (now - startTime)) / 1000 / 60); // Prevent negative values
         setTaskTimer(elapsedMinutes);
       }, 1000);
 
       return () => clearInterval(interval);
+    } else {
+      setTaskTimer(0);
     }
   }, [currentTask]);
 
@@ -209,7 +211,7 @@ const WorkerDashboard = () => {
               </div>
               <div className="flex items-center gap-3 p-3 bg-muted rounded-xl mb-4 text-sm">
                 <Clock className="w-4 h-4 text-muted-foreground" />
-                <span className="text-foreground font-medium">{currentTask.startTime} - {currentTask.endTime}</span>
+                <span className="text-foreground font-medium">{formatTime(currentTask.startTime)} - {formatTime(currentTask.endTime)}</span>
                 {taskTimer > 0 && (
                   <div className="ml-auto flex items-center gap-1.5">
                     <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
@@ -299,7 +301,7 @@ const WorkerDashboard = () => {
                     <p className="text-xs text-muted-foreground">{task.customer.name}</p>
                     <div className="flex items-center gap-3 mt-1">
                       <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> {task.startTime}
+                        <Clock className="w-3 h-3" /> {formatTime(task.startTime)}
                       </span>
                       <span className="text-xs text-muted-foreground flex items-center gap-1">
                         <MapPin className="w-3 h-3" /> {task.location?.city || 'Location TBD'}
