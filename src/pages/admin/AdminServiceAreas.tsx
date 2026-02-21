@@ -1,9 +1,9 @@
 import AppLayout from "@/components/AppLayout";
+import { API_BASE_URL } from "@/lib/api";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Edit2, MapPin, Plus, Save, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { API_BASE_URL } from "@/lib/api";
 
 // Fix Leaflet default marker icon issue
 // @ts-expect-error - Modifying Leaflet internals for marker icon fix
