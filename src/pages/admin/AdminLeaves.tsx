@@ -3,7 +3,6 @@ import { toast } from "@/hooks/use-toast";
 import { leavesAPI } from "@/lib/api";
 import { Calendar, CheckCircle, Clock, User, Users, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 
 interface Leave {
   _id: string;

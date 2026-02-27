@@ -3,18 +3,18 @@ import { body, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
 import Booking from '../models/Booking.js';
 import User from '../models/User.js';
+import {
+    activateBackupWorker,
+    assignWorkersWithBackup,
+    checkBackupActivationNeeded
+} from '../utils/advancedWorkerAssignment.js';
 import { updateBookingStatuses } from '../utils/bookingStatusUpdater.js';
 import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
 import { assignWorkerToBooking, reassignWorker } from '../utils/workerAssignment.js';
-import { 
-  assignWorkersWithBackup, 
-  activateBackupWorker, 
-  checkBackupActivationNeeded 
-} from '../utils/advancedWorkerAssignment.js';
-import { 
-  getWorkerCapacityStatus, 
-  monitorWorkerPool,
-  getWorkerAvailabilityForecast
+import {
+    getWorkerAvailabilityForecast,
+    getWorkerCapacityStatus,
+    monitorWorkerPool
 } from '../utils/workerPoolManager.js';
 
 const router = express.Router();

@@ -1,10 +1,10 @@
 import AppLayout from "@/components/AppLayout";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { authAPI, bookingsAPI, locationsAPI } from "@/lib/api";
+import { motion } from "framer-motion";
 import { ArrowRight, Bell, ChevronRight, Clock, Heart, MapPin, Settings, Sparkles, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
 
 interface Booking {
   _id: string;

@@ -1,10 +1,10 @@
 import AppLayout from "@/components/AppLayout";
 import LocationSelector, { LocationData } from "@/components/LocationSelector";
 import { authAPI, servicesAPI } from "@/lib/api";
+import { motion } from "framer-motion";
 import { ChevronRight, Clock, Filter, MapPin, Search, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
 
 interface Service {
   _id: string;

@@ -11,8 +11,8 @@
  * - Real-time worker capacity monitoring
  */
 
-import User from '../models/User.js';
 import Booking from '../models/Booking.js';
+import User from '../models/User.js';
 
 /**
  * Get current hour and determine peak time

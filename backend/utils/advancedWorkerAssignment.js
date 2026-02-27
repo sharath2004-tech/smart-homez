@@ -23,9 +23,8 @@
  *   - Primary worker running late (>15 minutes)
  */
 
-import User from '../models/User.js';
 import Booking from '../models/Booking.js';
-import { checkSlotAvailability } from './slotManagement.js';
+import User from '../models/User.js';
 
 /**
  * Calculate distance between two points using Haversine formula
