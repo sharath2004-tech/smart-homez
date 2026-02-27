@@ -356,10 +356,7 @@ const WorkerDashboard = () => {
               <p className="text-xs text-muted-foreground">View & withdraw</p>
             </div>
           </Link>
-          <button
-            onClick={() => alert('Leave application feature coming soon!')}
-            className="card-elevated-hover p-4 flex items-center gap-3 text-left"
-          >
+          <Link to="/worker/leaves" className="card-elevated-hover p-4 flex items-center gap-3">
             <div className="w-10 h-10 bg-primary-light rounded-xl flex items-center justify-center">
               <Bell className="w-5 h-5 text-primary" />
             </div>
@@ -367,7 +364,7 @@ const WorkerDashboard = () => {
               <p className="text-sm font-semibold text-foreground">Apply Leave</p>
               <p className="text-xs text-muted-foreground">Request time off</p>
             </div>
-          </button>
+          </Link>
         </div>
       </div>
 

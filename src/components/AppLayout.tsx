@@ -23,6 +23,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
     { to: "/worker/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/worker/tasks", icon: Calendar, label: "My Tasks" },
     { to: "/worker/earnings", icon: CreditCard, label: "Earnings" },
+    { to: "/worker/leaves", icon: Bell, label: "My Leaves" },
     { to: "/worker/profile", icon: User, label: "Profile" },
   ];
 

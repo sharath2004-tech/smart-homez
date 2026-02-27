@@ -27,6 +27,7 @@ import ServicesPage from "./pages/customer/ServicesPage";
 // Worker pages
 import WorkerDashboard from "./pages/worker/WorkerDashboard";
 import WorkerEarnings from "./pages/worker/WorkerEarnings";
+import WorkerLeaves from "./pages/worker/WorkerLeaves";
 import WorkerProfile from "./pages/worker/WorkerProfile";
 import WorkerTasks from "./pages/worker/WorkerTasks";
 
@@ -70,6 +71,7 @@ const App = () => (
           <Route path="/worker/dashboard" element={<WorkerDashboard />} />
           <Route path="/worker/tasks" element={<WorkerTasks />} />
           <Route path="/worker/earnings" element={<WorkerEarnings />} />
+          <Route path="/worker/leaves" element={<WorkerLeaves />} />
           <Route path="/worker/profile" element={<WorkerProfile />} />
 
           {/* Admin */}
