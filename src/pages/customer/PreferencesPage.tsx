@@ -391,7 +391,7 @@ const PreferencesPage = () => {
 
   if (loading) {
     return (
-      <AppLayout>
+      <AppLayout userType="customer" userName="Loading...">
         <div className="flex items-center justify-center h-96">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
@@ -400,7 +400,7 @@ const PreferencesPage = () => {
   }
 
   return (
-    <AppLayout>
+    <AppLayout userType="customer" userName={profile?.name || "Customer"}>
       <div className="max-w-5xl mx-auto space-y-6 p-4 pb-24">
         {/* Header */}
         <div className="flex items-center justify-between">

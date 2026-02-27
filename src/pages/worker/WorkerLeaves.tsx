@@ -132,7 +132,7 @@ const WorkerLeaves = () => {
   const remainingLeaves = profile.monthlyLeaveQuota - profile.leavesUsedThisMonth;
 
   return (
-    <AppLayout>
+    <AppLayout userType="worker" userName="Worker">
       <div className="container max-w-6xl mx-auto py-6 space-y-6">
         {/* Leave Quota Info */}
         <Alert>
