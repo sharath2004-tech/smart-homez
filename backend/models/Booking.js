@@ -29,6 +29,28 @@ const bookingSchema = new mongoose.Schema({
     assignedAt: Date,
     priority: Number
   }],
+  // Track backup worker activations
+  backupActivations: [{
+    previousWorker: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    backupWorker: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    activatedAt: {
+      type: Date,
+      default: Date.now
+    },
+    reason: String,
+    backupPriority: Number
+  }],
+  // Worker arrival tracking
+  workerArrivalTime: {
+    type: Date,
+    default: null
+  },
   service: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Service',

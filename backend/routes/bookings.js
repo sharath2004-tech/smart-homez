@@ -6,6 +6,16 @@ import User from '../models/User.js';
 import { updateBookingStatuses } from '../utils/bookingStatusUpdater.js';
 import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
 import { assignWorkerToBooking, reassignWorker } from '../utils/workerAssignment.js';
+import { 
+  assignWorkersWithBackup, 
+  activateBackupWorker, 
+  checkBackupActivationNeeded 
+} from '../utils/advancedWorkerAssignment.js';
+import { 
+  getWorkerCapacityStatus, 
+  monitorWorkerPool,
+  getWorkerAvailabilityForecast
+} from '../utils/workerPoolManager.js';
 
 const router = express.Router();
 
@@ -174,26 +184,30 @@ router.post('/',
 
       // Always attempt auto-assignment unless explicitly disabled (autoAssign !== false)
       // This ensures workers are automatically assigned when available nearby
+      // Uses advanced assignment system with primary + 2 backup workers
       let populatedBooking;
       const shouldAutoAssign = autoAssign !== false; // Default to true unless explicitly disabled
       
       if (!worker && shouldAutoAssign) {
         try {
-          // Use preference-based assignment to respect customer preferences
-          const assignmentResult = await findWorkerWithPreferences({
+          console.log('🚀 Using advanced worker assignment (primary + backups)...');
+          
+          // Use advanced assignment system for primary + 2 backup workers
+          const assignmentResult = await assignWorkersWithBackup({
             customerId: req.user._id,
+            service: bookingData.service,
             bookingDate: bookingData.bookingDate,
             startTime: bookingData.startTime,
             endTime: bookingData.endTime,
             location: bookingData.location,
-            radius: 5000, // 5km radius
-            genderPreference: bookingData.preferences?.workerGenderPreference || 'any',
-            religionPreference: bookingData.preferences?.religionPreference
-          }, Booking);
+            bookingType: bookingData.bookingType,
+            preferences: bookingData.preferences
+          });
 
           if (assignmentResult.success) {
-            // Assign the worker from preference-based assignment
-            booking.worker = assignmentResult.worker._id;
+            // Assign primary worker and backup workers
+            booking.worker = assignmentResult.primaryWorker;
+            booking.backupWorkers = assignmentResult.backupWorkers || [];
             booking.assignmentMethod = assignmentResult.assignmentMethod;
             booking.assignedAt = new Date();
             
@@ -205,17 +219,49 @@ router.post('/',
             
             await booking.save();
 
-            console.log(`✅ Worker auto-assigned via ${assignmentResult.assignmentMethod}: ${assignmentResult.worker.name}`);
+            console.log(`✅ Primary worker assigned via ${assignmentResult.assignmentMethod}`);
+            console.log(`✅ ${assignmentResult.backupWorkers.length} backup workers assigned`);
+            console.log(`⏱️ Assignment completed in ${assignmentResult.assignmentDetails.assignmentTime}ms`);
           } else {
-            console.log(`⚠️ No worker auto-assigned: ${assignmentResult.reason}. Booking remains pending for manual assignment.`);
+            console.log(`⚠️ Advanced assignment failed: ${assignmentResult.error}`);
+            
+            // Fallback to preference-based assignment
+            console.log('🔄 Falling back to preference-based assignment...');
+            const fallbackResult = await findWorkerWithPreferences({
+              customerId: req.user._id,
+              bookingDate: bookingData.bookingDate,
+              startTime: bookingData.startTime,
+              endTime: bookingData.endTime,
+              location: bookingData.location,
+              radius: 5000, // 5km radius
+              genderPreference: bookingData.preferences?.workerGenderPreference || 'any',
+              religionPreference: bookingData.preferences?.religionPreference
+            }, Booking);
+            
+            if (fallbackResult.success) {
+              booking.worker = fallbackResult.worker._id;
+              booking.assignmentMethod = fallbackResult.assignmentMethod;
+              booking.assignedAt = new Date();
+              
+              if (booking.status === 'pending') {
+                booking.status = 'confirmed';
+                booking.confirmedAt = new Date();
+              }
+              
+              await booking.save();
+              console.log(`✅ Fallback worker assigned: ${fallbackResult.worker.name}`);
+            } else {
+              console.log(`⚠️ No worker assigned. Booking remains pending for manual assignment.`);
+            }
           }
           
           populatedBooking = await Booking.findById(booking._id)
             .populate('customer', 'name email phone')
             .populate('worker', 'name email phone gender religion workerProfile')
+            .populate('backupWorkers.worker', 'name email phone workerProfile')
             .populate('service', 'name description price duration');
         } catch (assignError) {
-          console.error('Worker auto-assignment error:', assignError);
+          console.error('Worker assignment error:', assignError);
           // Booking created but no worker assigned yet - will need manual assignment
           populatedBooking = await Booking.findById(booking._id)
             .populate('customer', 'name email phone')
@@ -233,6 +279,7 @@ router.post('/',
         populatedBooking = await Booking.findById(booking._id)
           .populate('customer', 'name email phone')
           .populate('worker', 'name email phone gender religion workerProfile')
+          .populate('backupWorkers.worker', 'name email phone workerProfile')
           .populate('service', 'name description price duration');
       }
 
@@ -982,6 +1029,186 @@ router.delete('/:id/work-documentation/photos/:photoId',
 
     } catch (error) {
       console.error('Delete photo error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// ==================== ADVANCED WORKER ASSIGNMENT ROUTES ====================
+
+// @route   POST /api/bookings/:id/activate-backup
+// @desc    Activate backup worker for a booking
+// @access  Private/Admin/Worker
+router.post('/:id/activate-backup',
+  authenticate,
+  authorize('admin', 'worker'),
+  [
+    body('reason').notEmpty().withMessage('Reason is required')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { reason } = req.body;
+
+      const booking = await Booking.findById(req.params.id)
+        .populate('worker', 'name email phone')
+        .populate('backupWorkers.worker', 'name email phone workerProfile');
+
+      if (!booking) {
+        return res.status(404).json({ 
+          error: { message: 'Booking not found', status: 404 } 
+        });
+      }
+
+      // Check if backup activation is needed
+      const checkResult = await checkBackupActivationNeeded(booking);
+      
+      console.log(`🔍 Backup activation check:`, checkResult);
+
+      // Activate backup worker
+      const activationResult = await activateBackupWorker(booking, reason);
+
+      if (!activationResult.success) {
+        return res.status(400).json({ 
+          error: { 
+            message: activationResult.error || 'Backup activation failed', 
+            status: 400 
+          } 
+        });
+      }
+
+      // Get updated booking
+      const updatedBooking = await Booking.findById(req.params.id)
+        .populate('customer', 'name email phone')
+        .populate('worker', 'name email phone workerProfile')
+        .populate('backupWorkers.worker', 'name email phone workerProfile')
+        .populate('service', 'name description price duration');
+
+      res.json({ 
+        message: 'Backup worker activated successfully',
+        booking: updatedBooking,
+        activation: activationResult
+      });
+
+    } catch (error) {
+      console.error('Backup activation error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   GET /api/bookings/:id/check-backup
+// @desc    Check if backup activation is needed for a booking
+// @access  Private
+router.get('/:id/check-backup',
+  authenticate,
+  async (req, res) => {
+    try {
+      const booking = await Booking.findById(req.params.id)
+        .populate('worker', 'name email phone workerProfile');
+
+      if (!booking) {
+        return res.status(404).json({ 
+          error: { message: 'Booking not found', status: 404 } 
+        });
+      }
+
+      const checkResult = await checkBackupActivationNeeded(booking);
+
+      res.json({ 
+        bookingId: booking._id,
+        needsActivation: checkResult.needsActivation,
+        reasons: checkResult.reasons,
+        backupWorkersAvailable: booking.backupWorkers?.length || 0
+      });
+
+    } catch (error) {
+      console.error('Check backup error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   GET /api/bookings/worker-pool/capacity
+// @desc    Get real-time worker pool capacity status
+// @access  Private/Admin
+router.get('/worker-pool/capacity',
+  authenticate,
+  authorize('admin'),
+  async (req, res) => {
+    try {
+      const capacityStatus = await getWorkerCapacityStatus();
+
+      res.json({ 
+        message: 'Worker pool capacity status',
+        ...capacityStatus
+      });
+
+    } catch (error) {
+      console.error('Get capacity status error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   GET /api/bookings/worker-pool/monitor
+// @desc    Monitor worker pool and get alerts
+// @access  Private/Admin
+router.get('/worker-pool/monitor',
+  authenticate,
+  authorize('admin'),
+  async (req, res) => {
+    try {
+      const monitoringResult = await monitorWorkerPool();
+
+      res.json({ 
+        message: 'Worker pool monitoring result',
+        ...monitoringResult
+      });
+
+    } catch (error) {
+      console.error('Monitor worker pool error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   GET /api/bookings/worker-pool/forecast
+// @desc    Get worker availability forecast for a specific date
+// @access  Private/Admin
+router.get('/worker-pool/forecast',
+  authenticate,
+  authorize('admin'),
+  async (req, res) => {
+    try {
+      const { date } = req.query;
+
+      if (!date) {
+        return res.status(400).json({ 
+          error: { message: 'Date parameter is required', status: 400 } 
+        });
+      }
+
+      const forecastDate = new Date(date);
+      if (isNaN(forecastDate.getTime())) {
+        return res.status(400).json({ 
+          error: { message: 'Invalid date format', status: 400 } 
+        });
+      }
+
+      const forecast = await getWorkerAvailabilityForecast(forecastDate);
+
+      res.json({ 
+        message: 'Worker availability forecast',
+        ...forecast
+      });
+
+    } catch (error) {
+      console.error('Get forecast error:', error);
       res.status(500).json({ error: { message: 'Server error', status: 500 } });
     }
   }

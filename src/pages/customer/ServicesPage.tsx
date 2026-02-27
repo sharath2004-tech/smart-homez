@@ -4,6 +4,7 @@ import { authAPI, servicesAPI } from "@/lib/api";
 import { ChevronRight, Clock, Filter, MapPin, Search, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
 
 interface Service {
   _id: string;
@@ -122,6 +123,29 @@ const ServicesPage = () => {
     return '🏠';
   };
 
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.08
+      }
+    }
+  } as const;
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: {
+        type: "spring" as const,
+        stiffness: 100
+      }
+    }
+  } as const;
+
   return (
     <>
       {showLocationSelector && (
@@ -133,12 +157,26 @@ const ServicesPage = () => {
       
       {!showLocationSelector && (
         <AppLayout userType="customer" userName={profile?.name || "Loading..."}>
-          <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-20 md:pb-0">
-          <div>
+          <motion.div 
+            className="max-w-4xl mx-auto space-y-6 pb-20 md:pb-0"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+          <motion.div
+            initial={{ x: -20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ delay: 0.2 }}
+          >
             <h1 className="text-2xl font-bold font-heading text-foreground mb-1">Our Services</h1>
             <p className="text-muted-foreground text-sm">Choose from a wide range of home services</p>
             {selectedLocation && (
-              <div className="mt-2 flex items-center justify-between">
+              <motion.div 
+                className="mt-2 flex items-center justify-between"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+              >
                 <p className="text-xs text-primary flex items-center gap-1">
                   <MapPin className="w-3 h-3" />
                   {selectedLocation.area && selectedLocation.city 
@@ -151,12 +189,17 @@ const ServicesPage = () => {
                 >
                   Change Location
                 </button>
-              </div>
+              </motion.div>
             )}
-          </div>
+          </motion.div>
 
         {/* Search */}
-        <div className="flex gap-3">
+        <motion.div 
+          className="flex gap-3"
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.4 }}
+        >
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
@@ -166,31 +209,70 @@ const ServicesPage = () => {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <button className="p-3 bg-card border border-border rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+          <motion.button 
+            className="p-3 bg-card border border-border rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            whileHover={{ scale: 1.05, rotate: 15 }}
+            whileTap={{ scale: 0.95 }}
+          >
             <Filter className="w-4 h-4" />
-          </button>
-        </div>
+          </motion.button>
+        </motion.div>
 
         {/* Loading State */}
         {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full mx-auto mb-3"></div>
+          <motion.div 
+            className="text-center py-12"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <motion.div 
+              className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full mx-auto mb-3"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            />
             <p className="text-sm text-muted-foreground">Loading services...</p>
-          </div>
+          </motion.div>
         ) : services.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-5xl mb-3">🔍</div>
+          <motion.div 
+            className="text-center py-12"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 200 }}
+          >
+            <motion.div 
+              className="text-5xl mb-3"
+              animate={{ scale: [1, 1.1, 1] }}
+              transition={{ repeat: Infinity, duration: 2 }}
+            >
+              🔍
+            </motion.div>
             <p className="font-medium text-foreground">No services found</p>
             <p className="text-sm text-muted-foreground mt-1">Try adjusting your search or check back later</p>
-          </div>
+          </motion.div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {services.map((service) => (
-              <div key={service._id} className="card-elevated-hover p-5 group">
+          <motion.div 
+            className="grid gap-4 sm:grid-cols-2"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            {services.map((service, index) => (
+              <motion.div 
+                key={service._id} 
+                className="card-elevated-hover p-5 group"
+                variants={itemVariants}
+                custom={index}
+                whileHover={{ scale: 1.03, y: -5 }}
+                transition={{ type: "spring", stiffness: 300 }}
+              >
                 <div className="flex items-start gap-4">
-                  <div className="w-14 h-14 bg-accent rounded-2xl flex items-center justify-center text-3xl shrink-0 group-hover:scale-105 transition-transform">
+                  <motion.div 
+                    className="w-14 h-14 bg-accent rounded-2xl flex items-center justify-center text-3xl shrink-0"
+                    whileHover={{ scale: 1.15, rotate: 5 }}
+                    transition={{ type: "spring", stiffness: 300 }}
+                  >
                     {getCategoryEmoji(service.category, service.name)}
-                  </div>
+                  </motion.div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <h3 className="font-bold font-heading text-foreground text-sm">{service.name}</h3>
@@ -224,22 +306,24 @@ const ServicesPage = () => {
                       <span className="text-xs text-muted-foreground">{service.duration} min</span>
                     </div>
                   </div>
-                  <Link
-                    to={`/customer/book/${service._id}`}
-                    className={`text-xs py-2 px-4 flex items-center gap-1 rounded-xl transition-colors ${
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Link
+                      to={`/customer/book/${service._id}`}
+                      className={`text-xs py-2 px-4 flex items-center gap-1 rounded-xl transition-colors ${
                       service.availability?.available 
                         ? 'btn-brand'
                         : 'bg-muted text-muted-foreground hover:bg-border'
                     }`}
                   >
                     {service.availability?.available ? 'Book' : 'View'} <ChevronRight className="w-3 h-3" />
-                  </Link>
+                    </Link>
+                  </motion.div>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         )}
-      </div>
+      </motion.div>
     </AppLayout>
       )}
     </>
