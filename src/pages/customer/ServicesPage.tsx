@@ -216,6 +216,7 @@ const ServicesPage = () => {
         </motion.div>
 
         {/* Loading State */}
+        {console.log('Rendering - Loading:', loading, 'Services count:', services.length)}
         {loading ? (
           <motion.div 
             className="text-center py-12"
@@ -247,20 +248,13 @@ const ServicesPage = () => {
             <p className="text-sm text-muted-foreground mt-1">Try adjusting your search or check back later</p>
           </motion.div>
         ) : (
-          <motion.div 
+          <div 
             className="grid gap-4 sm:grid-cols-2"
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
           >
             {services.map((service, index) => (
-              <motion.div 
+              <div 
                 key={service._id} 
                 className="card-elevated-hover p-5 group"
-                variants={itemVariants}
-                custom={index}
-                whileHover={{ scale: 1.03, y: -5 }}
-                transition={{ type: "spring", stiffness: 300 }}
               >
                 <div className="flex items-start gap-4">
                   <motion.div 
@@ -316,9 +310,9 @@ const ServicesPage = () => {
                     </Link>
                   </motion.div>
                 </div>
-              </motion.div>
+              </div>
             ))}
-          </motion.div>
+          </div>
         )}
       </div>
     </AppLayout>
