@@ -250,6 +250,8 @@ const BookServicePage = () => {
         endTime: calculateEndTime(selectedTime, service?.duration || 60),
         totalAmount: calculatePrice(),
         bookingType,
+        // If worker manually selected, assign directly; otherwise auto-assign
+        ...(selectedWorker && { worker: selectedWorker }),
         preferences: {
           ...preferences,
           ...(selectedWorker && { preferredWorkers: [selectedWorker] })
@@ -260,15 +262,28 @@ const BookServicePage = () => {
           area: location.area,
           city: location.city
         },
-        autoAssign: !selectedWorker // Auto-assign if no worker selected
+        // Enable auto-assignment only when no worker manually selected
+        autoAssign: !selectedWorker
       };
 
       const response = await bookingsAPI.create(bookingData);
       
-      toast.success(bookingMode === 'now' 
-        ? `Booking confirmed! Worker arriving in ${workers.find(w => w._id === selectedWorker) ? getWorkerDistanceETA(workers.find(w => w._id === selectedWorker)!).eta : '30-45 mins'}`
-        : 'Booking created successfully!'
-      );
+      // Check if worker was auto-assigned
+      const wasAssigned = response.booking?.worker;
+      const workerName = response.booking?.worker?.name;
+      
+      if (wasAssigned) {
+        toast.success(
+          bookingMode === 'now' 
+            ? `Booking confirmed! ${workerName} is on the way.`
+            : `Booking confirmed! ${workerName} assigned to your service.`
+        );
+      } else {
+        toast.success(
+          'Booking created! We are finding the best available worker for you.'
+        );
+      }
+      
       navigate('/customer/bookings');
     } catch (error: unknown) {
       console.error('Booking error:', error);

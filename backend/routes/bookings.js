@@ -172,9 +172,12 @@ router.post('/',
 
       await booking.save();
 
-      // Auto-assign worker if requested or no worker provided
+      // Always attempt auto-assignment unless explicitly disabled (autoAssign !== false)
+      // This ensures workers are automatically assigned when available nearby
       let populatedBooking;
-      if (!worker || autoAssign === true) {
+      const shouldAutoAssign = autoAssign !== false; // Default to true unless explicitly disabled
+      
+      if (!worker && shouldAutoAssign) {
         try {
           // Use preference-based assignment to respect customer preferences
           const assignmentResult = await findWorkerWithPreferences({
@@ -197,13 +200,14 @@ router.post('/',
             // Auto-confirm booking when worker is assigned
             if (booking.status === 'pending') {
               booking.status = 'confirmed';
+              booking.confirmedAt = new Date();
             }
             
             await booking.save();
 
-            console.log(`✅ Worker assigned via ${assignmentResult.assignmentMethod}: ${assignmentResult.worker.name}`);
+            console.log(`✅ Worker auto-assigned via ${assignmentResult.assignmentMethod}: ${assignmentResult.worker.name}`);
           } else {
-            console.log(`⚠️ No worker assigned: ${assignmentResult.reason}`);
+            console.log(`⚠️ No worker auto-assigned: ${assignmentResult.reason}. Booking remains pending for manual assignment.`);
           }
           
           populatedBooking = await Booking.findById(booking._id)
@@ -211,13 +215,21 @@ router.post('/',
             .populate('worker', 'name email phone gender religion workerProfile')
             .populate('service', 'name description price duration');
         } catch (assignError) {
-          console.error('Worker assignment error:', assignError);
-          // Booking created but no worker assigned yet
+          console.error('Worker auto-assignment error:', assignError);
+          // Booking created but no worker assigned yet - will need manual assignment
           populatedBooking = await Booking.findById(booking._id)
             .populate('customer', 'name email phone')
             .populate('service', 'name description price duration');
         }
       } else {
+        // Manual worker selection or auto-assign disabled
+        if (worker) {
+          booking.status = 'confirmed';
+          booking.assignedAt = new Date();
+          booking.confirmedAt = new Date();
+          await booking.save();
+        }
+        
         populatedBooking = await Booking.findById(booking._id)
           .populate('customer', 'name email phone')
           .populate('worker', 'name email phone gender religion workerProfile')
