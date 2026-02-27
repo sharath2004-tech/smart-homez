@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { authAPI, bookingsAPI, locationsAPI } from "@/lib/api";
-import { ArrowRight, Bell, ChevronRight, Clock, MapPin, Sparkles, Star } from "lucide-react";
+import { ArrowRight, Bell, ChevronRight, Clock, Heart, MapPin, Settings, Sparkles, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -232,6 +232,37 @@ const CustomerDashboard = () => {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Worker Preferences */}
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Link 
+            to="/customer/preferences" 
+            className="card-elevated-hover p-4 flex items-center gap-4 group"
+          >
+            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+              <Heart className="w-6 h-6 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-foreground">Worker Preferences</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Set your preferred workers</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+          </Link>
+
+          <Link 
+            to="/customer/profile" 
+            className="card-elevated-hover p-4 flex items-center gap-4 group"
+          >
+            <div className="w-12 h-12 bg-secondary rounded-xl flex items-center justify-center shrink-0 group-hover:bg-secondary/80 transition-colors">
+              <Settings className="w-6 h-6 text-foreground" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-foreground">Account Settings</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Manage your profile & addresses</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+          </Link>
         </div>
 
         {/* Subscription banner */}
