@@ -1,9 +1,9 @@
 import AppLayout from "@/components/AppLayout";
-import { adminAPI, bookingsAPI } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "@/hooks/use-toast";
+import { adminAPI, bookingsAPI } from "@/lib/api";
 import { Calendar, Clock, MapPin, Search, Star, User, UserCheck, UserX, Users } from "lucide-react";
 import { useEffect, useState } from "react";
-import { toast } from "@/hooks/use-toast";
 
 interface Location {
   apartmentName: string;

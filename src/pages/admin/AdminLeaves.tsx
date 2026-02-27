@@ -1,8 +1,8 @@
 import AppLayout from "@/components/AppLayout";
-import { leavesAPI, adminAPI } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
+import { leavesAPI } from "@/lib/api";
 import { Calendar, CheckCircle, Clock, User, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
-import { toast } from "@/hooks/use-toast";
 
 interface Leave {
   _id: string;
