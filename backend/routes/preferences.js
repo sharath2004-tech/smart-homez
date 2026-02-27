@@ -7,10 +7,10 @@ const router = express.Router();
 
 // @route   GET /api/preferences
 // @desc    Get customer preferences
-// @access  Private/Customer
+// @access  Private/Customer/Admin
 router.get('/',
   authenticate,
-  authorize('customer'),
+  authorize('customer', 'admin'),
   async (req, res) => {
     try {
       const user = await User.findById(req.user._id)
@@ -35,10 +35,10 @@ router.get('/',
 
 // @route   PUT /api/preferences
 // @desc    Update customer preferences
-// @access  Private/Customer
+// @access  Private/Customer/Admin
 router.put('/',
   authenticate,
-  authorize('customer'),
+  authorize('customer', 'admin'),
   [
     body('workerGenderPreference').optional().isIn(['any', 'male', 'female']),
     body('preferredWorkerP1').optional().isMongoId(),
@@ -131,10 +131,10 @@ router.put('/',
 
 // @route   POST /api/preferences/exception
 // @desc    Add worker to exception list (blacklist)
-// @access  Private/Customer
+// @access  Private/Customer/Admin
 router.post('/exception',
   authenticate,
-  authorize('customer'),
+  authorize('customer', 'admin'),
   [
     body('workerId').notEmpty().isMongoId().withMessage('Worker ID is required'),
     body('reason').optional().isString().isLength({ max: 500 })
@@ -211,10 +211,10 @@ router.post('/exception',
 
 // @route   DELETE /api/preferences/exception/:workerId
 // @desc    Remove worker from exception list
-// @access  Private/Customer
+// @access  Private/Customer/Admin
 router.delete('/exception/:workerId',
   authenticate,
-  authorize('customer'),
+  authorize('customer', 'admin'),
   async (req, res) => {
     try {
       const { workerId } = req.params;
@@ -246,10 +246,10 @@ router.delete('/exception/:workerId',
 
 // @route   GET /api/preferences/available-workers
 // @desc    Get available workers for preference selection
-// @access  Private/Customer
+// @access  Private/Customer/Admin
 router.get('/available-workers',
   authenticate,
-  authorize('customer'),
+  authorize('customer', 'admin'),
   async (req, res) => {
     try {
       const { latitude, longitude, radius = 500 } = req.query;
