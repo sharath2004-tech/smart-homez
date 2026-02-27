@@ -1,6 +1,6 @@
-import { Navigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
 import { authAPI } from '@/lib/api';
+import { useEffect, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 
 interface User {
   _id: string;
