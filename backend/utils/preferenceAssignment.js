@@ -96,6 +96,7 @@ export const findWorkerWithPreferences = async (params, Booking) => {
           location,
           radius,
           genderPreference,
+          params.religionPreference || 'any',
           Booking
         );
 
@@ -124,6 +125,7 @@ export const findWorkerWithPreferences = async (params, Booking) => {
           location,
           radius,
           genderPreference,
+          params.religionPreference || 'any',
           Booking
         );
 
@@ -152,6 +154,7 @@ export const findWorkerWithPreferences = async (params, Booking) => {
           location,
           radius,
           genderPreference,
+          params.religionPreference || 'any',
           Booking
         );
 
@@ -175,6 +178,7 @@ export const findWorkerWithPreferences = async (params, Booking) => {
       endTime,
       radius,
       genderPreference,
+      params.religionPreference || 'any',
       exceptionWorkerIds,
       Booking
     );
@@ -218,6 +222,7 @@ export const findWorkerWithPreferences = async (params, Booking) => {
  * @param {Object} location - Location {latitude, longitude}
  * @param {number} radius - Search radius
  * @param {string} genderPreference - Gender preference
+ * @param {string} religionPreference - Religion preference
  * @param {Object} Booking - Booking model
  * @returns {Promise<Object>} Availability result
  */
@@ -229,6 +234,7 @@ const checkWorkerAvailability = async (
   location,
   radius,
   genderPreference,
+  religionPreference,
   Booking
 ) => {
   // Check if worker is active and available
@@ -252,6 +258,14 @@ const checkWorkerAvailability = async (
     return {
       available: false,
       reason: 'Gender preference not matched'
+    };
+  }
+
+  // Check religion preference
+  if (religionPreference && religionPreference !== 'any' && worker.religion !== religionPreference) {
+    return {
+      available: false,
+      reason: 'Religion preference not matched'
     };
   }
 
@@ -289,6 +303,7 @@ const findNearestAvailableWorker = async (
   endTime,
   radius,
   genderPreference,
+  religionPreference,
   exceptionWorkerIds,
   Booking
 ) => {
@@ -304,6 +319,11 @@ const findNearestAvailableWorker = async (
     // Add gender filter if specified
     if (genderPreference !== 'any') {
       query.gender = genderPreference;
+    }
+
+    // Add religion filter if specified
+    if (religionPreference && religionPreference !== 'any') {
+      query.religion = religionPreference;
     }
 
     // Add location filter if provided
@@ -330,6 +350,11 @@ const findNearestAvailableWorker = async (
 
     // Check availability for each worker
     for (const worker of workers) {
+      // Check if worker is on leave for this date
+      if (isWorkerOnLeave(worker, bookingDate)) {
+        continue; // Skip this worker
+      }
+
       const availability = await checkSlotAvailability(
         worker._id,
         bookingDate,

@@ -4,6 +4,7 @@ import { authenticate, authorize } from '../middleware/auth.js';
 import Booking from '../models/Booking.js';
 import User from '../models/User.js';
 import { updateBookingStatuses } from '../utils/bookingStatusUpdater.js';
+import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
 import { assignWorkerToBooking, reassignWorker } from '../utils/workerAssignment.js';
 
 const router = express.Router();
@@ -175,7 +176,40 @@ router.post('/',
       let populatedBooking;
       if (!worker || autoAssign === true) {
         try {
-          populatedBooking = await assignWorkerToBooking(booking._id);
+          // Use preference-based assignment to respect customer preferences
+          const assignmentResult = await findWorkerWithPreferences({
+            customerId: req.user._id,
+            bookingDate: bookingData.bookingDate,
+            startTime: bookingData.startTime,
+            endTime: bookingData.endTime,
+            location: bookingData.location,
+            radius: 5000, // 5km radius
+            genderPreference: bookingData.preferences?.workerGenderPreference || 'any',
+            religionPreference: bookingData.preferences?.religionPreference
+          }, Booking);
+
+          if (assignmentResult.success) {
+            // Assign the worker from preference-based assignment
+            booking.worker = assignmentResult.worker._id;
+            booking.assignmentMethod = assignmentResult.assignmentMethod;
+            booking.assignedAt = new Date();
+            
+            // Auto-confirm booking when worker is assigned
+            if (booking.status === 'pending') {
+              booking.status = 'confirmed';
+            }
+            
+            await booking.save();
+
+            console.log(`✅ Worker assigned via ${assignmentResult.assignmentMethod}: ${assignmentResult.worker.name}`);
+          } else {
+            console.log(`⚠️ No worker assigned: ${assignmentResult.reason}`);
+          }
+          
+          populatedBooking = await Booking.findById(booking._id)
+            .populate('customer', 'name email phone')
+            .populate('worker', 'name email phone gender religion workerProfile')
+            .populate('service', 'name description price duration');
         } catch (assignError) {
           console.error('Worker assignment error:', assignError);
           // Booking created but no worker assigned yet
