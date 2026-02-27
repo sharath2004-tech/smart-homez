@@ -94,6 +94,7 @@ const ServicesPage = () => {
       }
 
       const data = await servicesAPI.getAll(params);
+      console.log('Services fetched:', data.services);
       setServices(data.services || []);
     } catch (error) {
       console.error('Error fetching services:', error);
