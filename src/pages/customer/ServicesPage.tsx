@@ -158,49 +158,44 @@ const ServicesPage = () => {
       
       {!showLocationSelector && (
         <AppLayout userType="customer" userName={profile?.name || "Loading..."}>
-          <motion.div 
-            className="max-w-4xl mx-auto space-y-6 pb-20 md:pb-0"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-          <motion.div
-            initial={{ x: -20, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            transition={{ delay: 0.2 }}
-          >
-            <h1 className="text-2xl font-bold font-heading text-foreground mb-1">Our Services</h1>
-            <p className="text-muted-foreground text-sm">Choose from a wide range of home services</p>
-            {selectedLocation && (
-              <motion.div 
-                className="mt-2 flex items-center justify-between"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-              >
-                <p className="text-xs text-primary flex items-center gap-1">
-                  <MapPin className="w-3 h-3" />
-                  {selectedLocation.area && selectedLocation.city 
-                    ? `${selectedLocation.area}, ${selectedLocation.city}` 
-                    : 'Location set'}
-                </p>
-                <button 
-                  onClick={handleChangeLocation}
-                  className="text-xs text-primary hover:underline"
+          <div className="max-w-4xl mx-auto space-y-6 pb-20 md:pb-0">
+            <motion.div
+              initial={{ x: -20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+            >
+              <h1 className="text-2xl font-bold font-heading text-foreground mb-1">Our Services</h1>
+              <p className="text-muted-foreground text-sm">Choose from a wide range of home services</p>
+              {selectedLocation && (
+                <motion.div 
+                  className="mt-2 flex items-center justify-between"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3 }}
                 >
-                  Change Location
-                </button>
-              </motion.div>
-            )}
-          </motion.div>
+                  <p className="text-xs text-primary flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    {selectedLocation.area && selectedLocation.city 
+                      ? `${selectedLocation.area}, ${selectedLocation.city}` 
+                      : 'Location set'}
+                  </p>
+                  <button 
+                    onClick={handleChangeLocation}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Change Location
+                  </button>
+                </motion.div>
+              )}
+            </motion.div>
 
-        {/* Search */}
-        <motion.div 
-          className="flex gap-3"
-          initial={{ y: -20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.4 }}
-        >
+            {/* Search */}
+            <motion.div 
+              className="flex gap-3"
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.4 }}
+            >
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
@@ -324,7 +319,7 @@ const ServicesPage = () => {
             ))}
           </motion.div>
         )}
-      </motion.div>
+      </div>
     </AppLayout>
       )}
     </>
