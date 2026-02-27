@@ -15,7 +15,6 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
     { to: "/customer/services", icon: Wrench, label: "Services" },
     { to: "/customer/bookings", icon: Calendar, label: "My Bookings" },
     { to: "/customer/payments", icon: CreditCard, label: "Payments" },
-    { to: "/customer/preferences", icon: Settings, label: "Preferences" },
     { to: "/customer/profile", icon: User, label: "Profile" },
   ];
 
