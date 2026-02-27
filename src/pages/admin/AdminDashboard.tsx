@@ -25,9 +25,9 @@ interface SystemAlert {
 
 interface Booking {
   _id: string;
-  customer: { name: string };
+  customer: { name: string } | null;
   worker: { name: string } | null;
-  service: { name: string };
+  service: { name: string } | null;
   startTime: string;
   endTime: string;
   status: string;
@@ -258,9 +258,9 @@ const AdminDashboard = () => {
                     {recentBookings.map((b, i) => (
                       <tr key={b._id} className={`border-b border-border last:border-0 hover:bg-muted/30 transition-colors ${i % 2 === 0 ? "" : "bg-muted/10"}`}>
                         <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{b._id.slice(-8)}</td>
-                        <td className="px-4 py-3 text-sm font-medium text-foreground">{b.customer.name}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-foreground">{b.customer?.name || 'Unknown'}</td>
                         <td className="px-4 py-3 text-sm text-muted-foreground">{b.worker?.name || '—'}</td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">{b.service.name}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{b.service?.name || 'Unknown'}</td>
                         <td className="px-4 py-3 text-sm text-muted-foreground">{b.startTime} - {b.endTime}</td>
                         <td className="px-4 py-3 text-sm font-semibold text-foreground">₹{b.totalAmount}</td>
                         <td className="px-4 py-3">

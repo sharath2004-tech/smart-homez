@@ -5,10 +5,10 @@ import { useEffect, useState } from "react";
 
 interface Booking {
   _id: string;
-  customer: { _id: string; name: string; email: string };
-  worker?: { _id: string; name: string; email: string };
-  service: { _id: string; name: string; category: string };
-  location?: { address?: string; city?: string; state?: string; zipCode?: string };
+  customer: { _id: string; name: string; email: string } | null;
+  worker?: { _id: string; name: string; email: string } | null;
+  service: { _id: string; name: string; category: string } | null;
+  location?: { address?: string; city?: string; state?: string; zipCode?: string } | null;
   bookingDate: string;
   startTime: string;
   endTime: string;
@@ -49,9 +49,9 @@ const AdminBookings = () => {
 
   const filtered = bookings.filter((b) => {
     const matchSearch =
-      b.customer.name.toLowerCase().includes(search.toLowerCase()) ||
+      (b.customer?.name || '').toLowerCase().includes(search.toLowerCase()) ||
       b._id.toLowerCase().includes(search.toLowerCase()) ||
-      b.service.name.toLowerCase().includes(search.toLowerCase());
+      (b.service?.name || '').toLowerCase().includes(search.toLowerCase());
     const matchFilter = filter === "all" || b.status === filter;
     return matchSearch && matchFilter;
   });
@@ -125,9 +125,9 @@ const AdminBookings = () => {
                 {filtered.map((b) => (
                   <tr key={b._id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{b._id.slice(-6).toUpperCase()}</td>
-                    <td className="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">{b.customer.name}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">{b.customer?.name || 'Unknown'}</td>
                     <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{b.worker?.name || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{b.service.name}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{b.service?.name || 'Unknown'}</td>
                     <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
                       {formatDate(b.bookingDate)} · {b.startTime}
                     </td>
