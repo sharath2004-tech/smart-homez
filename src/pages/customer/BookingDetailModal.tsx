@@ -1,5 +1,5 @@
+import EmbeddedQRScanner from "@/components/EmbeddedQRScanner";
 import { bookingsAPI } from "@/lib/api";
-import { Html5QrcodeScanner } from "html5-qrcode";
 import { ArrowLeft, Calendar, DollarSign, Phone, QrCode, Timer, User } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReviewModal from "./ReviewModal";
@@ -162,6 +162,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
     try {
       const response = await bookingsAPI.scanStartQR(bookingId, qrCode, true);
       alert('Service started successfully! Timer has begun.');
+      setShowScanner(false);
       fetchBookingDetail();
       onRefresh();
     } catch (error) {
@@ -171,32 +172,6 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
       setShowScanner(false);
     }
   }, [bookingId, fetchBookingDetail, onRefresh]);
-
-  // Initialize QR Scanner
-  useEffect(() => {
-    if (showScanner && booking?.serviceStartQRCode && !booking.actualStartTime) {
-      const scanner = new Html5QrcodeScanner(
-        "qr-reader",
-        { fps: 10, qrbox: 250 },
-        false
-      );
-
-      scanner.render(
-        async (decodedText) => {
-          scanner.clear();
-          setShowScanner(false);
-          await handleScanStartQR(decodedText);
-        },
-        (error) => {
-          console.log("QR Scan error:", error);
-        }
-      );
-
-      return () => {
-        scanner.clear().catch(console.error);
-      };
-    }
-  }, [showScanner, booking, handleScanStartQR]);
 
   const formatTime = (timeString: string) => {
     if (!timeString) return '';
@@ -342,30 +317,16 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                   Service Start QR Code
                 </h3>
                 <div className="bg-teal-50 border-2 border-teal-200 p-4 rounded-xl text-center space-y-3">
-                  {!showScanner ? (
-                    <>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        When worker arrives, scan their QR code to start the service and timer
-                      </p>
-                      <button
-                        onClick={() => setShowScanner(true)}
-                        className="btn-brand w-full py-3 flex items-center justify-center gap-2"
-                      >
-                        <QrCode className="w-5 h-5" />
-                        Scan Worker's QR Code
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <div id="qr-reader" className="w-full"></div>
-                      <button
-                        onClick={() => setShowScanner(false)}
-                        className="btn-secondary w-full py-2 text-sm"
-                      >
-                        Cancel Scanning
-                      </button>
-                    </>
-                  )}
+                  <p className="text-sm text-muted-foreground mb-3">
+                    When worker arrives, scan their QR code to start the service and timer
+                  </p>
+                  <button
+                    onClick={() => setShowScanner(true)}
+                    className="btn-brand w-full py-3 flex items-center justify-center gap-2"
+                  >
+                    <QrCode className="w-5 h-5" />
+                    Scan Worker's QR Code
+                  </button>
                 </div>
               </div>
             )}
@@ -481,6 +442,14 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
             fetchBookingDetail();
             onRefresh();
           }}
+        />
+      )}
+
+      {/* Embedded QR Scanner */}
+      {showScanner && (
+        <EmbeddedQRScanner
+          onScanSuccess={handleScanStartQR}
+          onClose={() => setShowScanner(false)}
         />
       )}
     </div>

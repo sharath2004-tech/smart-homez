@@ -59,8 +59,8 @@ const bookingSchema = new mongoose.Schema({
   // Recurring booking details
   bookingType: {
     type: String,
-    enum: ['oneTime', 'daily', 'weekly', 'monthly'],
-    default: 'oneTime'
+    enum: ['adhoc', 'recurring-short', 'monthly-subscription', 'oneTime', 'daily', 'weekly', 'monthly'],
+    default: 'adhoc'
   },
   isRecurring: {
     type: Boolean,
@@ -69,7 +69,11 @@ const bookingSchema = new mongoose.Schema({
   recurringSchedule: {
     frequency: {
       type: String,
-      enum: ['daily', 'weekly', 'monthly']
+      enum: ['daily', 'custom-days', '3-days', '4-days', '7-days', 'weekly', 'monthly']
+    },
+    customDays: {
+      type: Number, // For custom day intervals
+      default: null
     },
     startDate: Date,
     endDate: Date,
@@ -80,10 +84,47 @@ const bookingSchema = new mongoose.Schema({
     },
     totalOccurrences: Number
   },
+  // Monthly subscription specific
+  subscription: {
+    isSubscription: {
+      type: Boolean,
+      default: false
+    },
+    subscriptionId: String,
+    subscriptionStartDate: Date,
+    subscriptionEndDate: Date,
+    discountPercent: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100
+    },
+    originalAmount: Number, // Amount before discount
+    isPrepaid: {
+      type: Boolean,
+      default: false
+    },
+    prepaidAmount: Number
+  },
   parentBooking: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Booking',
     default: null // For recurring bookings, links to the original booking
+  },
+  // 15-minute slot system
+  slotDetails: {
+    slotDuration: {
+      type: Number,
+      default: 15 // minutes
+    },
+    minimumBookingDuration: {
+      type: Number,
+      default: 60 // 1 hour minimum
+    },
+    bufferTime: {
+      type: Number,
+      default: 15 // 15-minute buffer between bookings
+    }
   },
   // Customer preferences for this booking
   preferences: {
@@ -92,11 +133,106 @@ const bookingSchema = new mongoose.Schema({
       enum: ['any', 'male', 'female'],
       default: 'any'
     },
+    // Preference priorities for this booking
+    preferenceP1: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    preferenceP2: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    preferenceP3: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
     languagePreference: String,
     religionPreference: String,
     specialInstructions: {
       type: String,
       maxlength: 500
+    }
+  },
+  // Service extension
+  extensionRequests: [{
+    requestedAt: {
+      type: Date,
+      default: Date.now
+    },
+    additionalMinutes: {
+      type: Number,
+      required: true
+    },
+    status: {
+      type: String,
+      enum: ['approved', 'denied'],
+      default: 'approved'
+    },
+    denialReason: String, // If next booking exists
+    additionalCharge: {
+      type: Number,
+      default: 0
+    }
+  }],
+  // Auto-reassignment tracking
+  reassignmentHistory: [{
+    previousWorker: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    newWorker: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    reason: {
+      type: String,
+      enum: ['worker-delayed', 'worker-unavailable', 'worker-on-leave', 'customer-exception', 'system-auto'],
+      required: true
+    },
+    reassignedAt: {
+      type: Date,
+      default: Date.now
+    },
+    delayMinutes: Number,
+    customerNotified: {
+      type: Boolean,
+      default: false
+    }
+  }],
+  // Delay tracking
+  delayNotifications: [{
+    notifiedAt: {
+      type: Date,
+      default: Date.now
+    },
+    delayReason: String,
+    estimatedDelayMinutes: Number,
+    updatedETA: Date
+  }],
+  // Time rounding for billing
+  billing: {
+    roundedDurationMinutes: {
+      type: Number,
+      default: null
+    },
+    billingSlots: {
+      type: Number,
+      default: 0 // Number of 15-minute slots
+    },
+    roundingApplied: {
+      type: Boolean,
+      default: false
+    },
+    roundingDetails: {
+      originalMinutes: Number,
+      extraMinutes: Number,
+      roundedUp: {
+        type: Boolean,
+        default: false
+      }
     }
   },
   paymentStatus: {

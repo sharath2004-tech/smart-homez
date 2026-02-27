@@ -194,6 +194,29 @@ const userSchema = new mongoose.Schema({
       type: Date,
       default: Date.now
     },
+    leaves: [{
+      date: {
+        type: Date,
+        required: true
+      },
+      reason: {
+        type: String,
+        maxlength: 200
+      },
+      status: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected'],
+        default: 'pending'
+      },
+      requestedAt: {
+        type: Date,
+        default: Date.now
+      },
+      approvedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      }
+    }],
     // Working hours tracking
     dailyWorkingHoursTarget: {
       type: Number,
@@ -232,9 +255,47 @@ const userSchema = new mongoose.Schema({
       enum: ['any', 'male', 'female'],
       default: 'any'
     },
+    // Preference Priority: P1, P2, P3
+    preferredWorkerP1: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    preferredWorkerP2: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    preferredWorkerP3: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    // Legacy preferred workers list (kept for backward compatibility)
     preferredWorkers: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
+    }],
+    // Exception List - Workers to NEVER assign
+    exceptionWorkers: [{
+      workerId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+      },
+      reason: {
+        type: String,
+        maxlength: 500
+      },
+      addedBy: {
+        type: String,
+        enum: ['customer', 'admin'],
+        default: 'customer'
+      },
+      addedAt: {
+        type: Date,
+        default: Date.now
+      }
     }],
     languagePreference: {
       type: String,

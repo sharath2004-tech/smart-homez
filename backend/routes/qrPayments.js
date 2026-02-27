@@ -3,6 +3,7 @@ import { body, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
 import Booking from '../models/Booking.js';
 import QRPayment from '../models/QRPayment.js';
+import Settings from '../models/Settings.js';
 
 const router = express.Router();
 
@@ -49,9 +50,14 @@ router.post('/generate',
       // Check if QR payment already exists
       let qrPayment = await QRPayment.findOne({ booking: bookingId });
       
+      // Get UPI settings
+      const settings = await Settings.getSettings();
+      const upiId = settings.payment.upiId || 'healthyhomez@upi';
+      
       if (qrPayment) {
         // Update existing QR payment
         qrPayment.amount = booking.totalAmount;
+        qrPayment.upiId = upiId;
         qrPayment.qrCodeData = qrPayment.generateQRData();
         await qrPayment.save();
       } else {
@@ -60,7 +66,8 @@ router.post('/generate',
           booking: bookingId,
           customer: booking.customer,
           worker: booking.worker,
-          amount: booking.totalAmount
+          amount: booking.totalAmount,
+          upiId: upiId
         });
         
         qrPayment.qrCodeData = qrPayment.generateQRData();

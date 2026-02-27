@@ -9,9 +9,11 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import locationRoutes from './routes/locations.js';
 import paymentRoutes from './routes/payments.js';
+import preferencesRoutes from './routes/preferences.js';
 import qrPaymentRoutes from './routes/qrPayments.js';
 import serviceAreaRoutes from './routes/serviceAreas.js';
 import serviceRoutes from './routes/services.js';
+import settingsRoutes from './routes/settings.js';
 import userRoutes from './routes/users.js';
 
 // Import utilities
@@ -84,6 +86,8 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/qr-payments', qrPaymentRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/service-areas', serviceAreaRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/preferences', preferencesRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { adminAPI } from "@/lib/api";
-import { AlertCircle, BarChart2, Calendar, CheckCircle, ChevronRight, TrendingUp, Users } from "lucide-react";
+import { AlertCircle, BarChart2, Calendar, CheckCircle, ChevronRight, Settings, TrendingUp, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -216,7 +216,7 @@ const AdminDashboard = () => {
           {[
             { to: "/admin/bookings", icon: Calendar, label: "All Bookings", value: `${stats.todayBookings} today` },
             { to: "/admin/workers", icon: Users, label: "Workers", value: stats.workersOnlineInfo },
-            { to: "/admin/customers", icon: Users, label: "Customers", value: "View all" },
+            { to: "/admin/settings", icon: Settings, label: "Settings", value: "Configure QR/UPI" },
             { to: "/admin/payments", icon: BarChart2, label: "Revenue", value: `₹${stats.todayRevenue.toLocaleString()} today` },
           ].map((item) => (
             <Link key={item.to} to={item.to} className="card-elevated-hover p-4 group">

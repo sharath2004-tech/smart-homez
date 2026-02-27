@@ -573,6 +573,94 @@ export const adminAPI = {
   }
 };
 
+// ====== Settings APIs ======
+
+export const settingsAPI = {
+  getSettings: async () => {
+    return apiCall('/settings');
+  },
+
+  getAdminSettings: async () => {
+    return apiCall('/settings/admin');
+  },
+
+  updateSettings: async (settings: {
+    payment?: {
+      upiId?: string;
+      upiName?: string;
+      qrCodeImage?: string;
+    };
+    company?: {
+      name?: string;
+      phone?: string;
+      email?: string;
+      address?: string;
+    };
+    booking?: {
+      overtimeRate?: number;
+      cancellationHours?: number;
+    };
+  }) => {
+    return apiCall('/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings)
+    });
+  }
+};
+
+// ====== Preferences APIs ======
+
+export const preferencesAPI = {
+  getPreferences: async () => {
+    return apiCall('/preferences');
+  },
+
+  updatePreferences: async (preferences: {
+    workerGenderPreference?: 'any' | 'male' | 'female';
+    preferredWorkerP1?: string;
+    preferredWorkerP2?: string;
+    preferredWorkerP3?: string;
+    languagePreference?: string;
+    religionPreference?: string;
+    specialInstructions?: string;
+  }) => {
+    return apiCall('/preferences', {
+      method: 'PUT',
+      body: JSON.stringify(preferences)
+    });
+  },
+
+  addException: async (workerId: string, reason?: string) => {
+    return apiCall('/preferences/exception', {
+      method: 'POST',
+      body: JSON.stringify({ workerId, reason })
+    });
+  },
+
+  removeException: async (workerId: string) => {
+    return apiCall(`/preferences/exception/${workerId}`, {
+      method: 'DELETE'
+    });
+  },
+
+  getAvailableWorkers: async (params?: {
+    latitude?: number;
+    longitude?: number;
+    radius?: number;
+  }) => {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, String(value));
+        }
+      });
+    }
+    const queryString = queryParams.toString();
+    return apiCall(`/preferences/available-workers${queryString ? `?${queryString}` : ''}`);
+  }
+};
+
 // Export all
 export default {
   auth: authAPI,
@@ -582,5 +670,7 @@ export default {
   users: usersAPI,
   qrPayments: qrPaymentsAPI,
   workers: workersAPI,
-  admin: adminAPI
+  admin: adminAPI,
+  settings: settingsAPI,
+  preferences: preferencesAPI
 };

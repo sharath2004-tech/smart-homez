@@ -50,11 +50,13 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
     } finally {
       setLoading(false);
     }
-  }, [bookingId, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookingId]); // Removed onClose from dependencies to prevent re-render loop
 
   useEffect(() => {
     fetchOrGeneratePayment();
-  }, [fetchOrGeneratePayment]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
   const generateQRCodeImage = async (qrData: string) => {
     try {
