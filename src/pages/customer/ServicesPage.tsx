@@ -3,7 +3,7 @@ import LocationSelector, { LocationData } from "@/components/LocationSelector";
 import { authAPI, servicesAPI } from "@/lib/api";
 import { motion } from "framer-motion";
 import { ChevronRight, Clock, Filter, MapPin, Search, Users } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 interface Service {
@@ -44,12 +44,6 @@ const ServicesPage = () => {
     }
   }, []);
 
-  useEffect(() => {
-    if (selectedLocation && !showLocationSelector) {
-      fetchServices();
-    }
-  }, [selectedLocation, search]);
-
   const fetchProfile = async () => {
     try {
       const data = await authAPI.getProfile();
@@ -76,7 +70,7 @@ const ServicesPage = () => {
     setShowLocationSelector(true);
   };
 
-  const fetchServices = async () => {
+  const fetchServices = useCallback(async () => {
     try {
       setLoading(true);
       const defaultAddress = profile?.addresses?.find((addr: any) => addr.isDefault);
@@ -106,7 +100,14 @@ const ServicesPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedLocation, search, profile]);
+
+  // Fetch services when location is confirmed and location selector is hidden
+  useEffect(() => {
+    if (selectedLocation && !showLocationSelector) {
+      fetchServices();
+    }
+  }, [selectedLocation, showLocationSelector, fetchServices]);
 
   const getCategoryEmoji = (category: string, name: string) => {
     if (name.toLowerCase().includes('insta')) return '⚡';
