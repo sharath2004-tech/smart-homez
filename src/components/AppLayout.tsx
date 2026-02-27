@@ -1,4 +1,4 @@
-import { Bell, Calendar, CreditCard, Home, LayoutDashboard, LogOut, MapPin, Settings, User, Wrench } from "lucide-react";
+import { Bell, Calendar, CreditCard, Home, LayoutDashboard, LogOut, MapPin, Settings, User, Users, Wrench } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
 interface AppLayoutProps {
@@ -30,9 +30,12 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
   const adminNav = [
     { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/admin/bookings", icon: Calendar, label: "Bookings" },
+    { to: "/admin/workforce", icon: Users, label: "Workforce" },
+    { to: "/admin/leaves", icon: Bell, label: "Leaves" },
     { to: "/admin/services", icon: Wrench, label: "Services" },
     { to: "/admin/workers", icon: User, label: "Workers" },
     { to: "/admin/locations", icon: MapPin, label: "Locations" },
+    { to: "/admin/settings", icon: Settings, label: "Settings" },
   ];
 
   const navItems = userType === "admin" ? adminNav : userType === "worker" ? workerNav : customerNav;

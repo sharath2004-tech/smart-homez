@@ -6,8 +6,9 @@ import { Edit2, MapPin, Plus, Save, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 // Fix Leaflet default marker icon issue
-// @ts-expect-error - Modifying Leaflet internals for marker icon fix
-delete L.Icon.Default.prototype._getIconUrl;
+if (L.Icon.Default.prototype._getIconUrl) {
+  delete L.Icon.Default.prototype._getIconUrl;
+}
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",

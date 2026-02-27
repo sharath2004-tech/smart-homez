@@ -908,4 +908,267 @@ router.post('/service-areas/check',
   }
 );
 
+// @route   GET /api/admin/workforce-status
+// @desc    Get all workers with their current status and assignments
+// @access  Private/Admin
+router.get('/workforce-status', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const now = new Date();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(now);
+    todayEnd.setHours(23, 59, 59, 999);
+
+    // Get all workers
+    const workers = await User.find({ 
+      role: 'worker', 
+      isActive: true 
+    })
+      .select('name email phone workerProfile.specialization workerProfile.assignedApartments workerProfile.rating workerProfile.availability workerProfile.leaves workerProfile.completedJobs currentLocation')
+      .sort({ name: 1 });
+
+    // Get all bookings for today
+    const bookings = await Booking.find({
+      bookingDate: { $gte: todayStart, $lte: todayEnd },
+      status: { $in: ['confirmed', 'in-progress', 'pending'] }
+    })
+      .populate('customer', 'name')
+      .populate('service', 'name')
+      .populate('location', 'apartmentName area city')
+      .sort({ startTime: 1 });
+
+    // Build worker status map
+    const workforceStatus = await Promise.all(workers.map(async (worker) => {
+      // Check if worker has leave today
+      const todayLeave = worker.workerProfile.leaves?.find(leave => {
+        const leaveDate = new Date(leave.date);
+        leaveDate.setHours(0, 0, 0, 0);
+        return leaveDate.getTime() === todayStart.getTime() && leave.status === 'approved';
+      });
+
+      // Find current and upcoming bookings for this worker
+      const workerBookings = bookings.filter(b => 
+        b.worker && b.worker.toString() === worker._id.toString()
+      );
+
+      // Determine current task
+      let currentTask = null;
+      let status = 'free';
+      let statusDetail = 'Available';
+
+      if (todayLeave) {
+        status = 'on-leave';
+        statusDetail = `On Leave${todayLeave.reason ? `: ${todayLeave.reason}` : ''}`;
+      } else if (!worker.workerProfile.availability) {
+        status = 'offline';
+        statusDetail = 'Offline';
+      } else {
+        // Check if currently working
+        const currentTime = now.getHours() * 60 + now.getMinutes();
+        
+        for (const booking of workerBookings) {
+          const [startHours, startMinutes] = booking.startTime.split(':').map(Number);
+          const [endHours, endMinutes] = booking.endTime.split(':').map(Number);
+          const startMinutesOfDay = startHours * 60 + startMinutes;
+          const endMinutesOfDay = endHours * 60 + endMinutes;
+
+          if (booking.status === 'in-progress') {
+            status = 'working';
+            currentTask = booking;
+            statusDetail = `Working at ${booking.location?.apartmentName || 'Unknown Location'}`;
+            break;
+          } else if (currentTime >= startMinutesOfDay && currentTime <= endMinutesOfDay && booking.status === 'confirmed') {
+            status = 'scheduled';
+            currentTask = booking;
+            statusDetail = `Scheduled at ${booking.location?.apartmentName || 'Unknown Location'}`;
+            break;
+          }
+        }
+      }
+
+      return {
+        _id: worker._id,
+        name: worker.name,
+        email: worker.email,
+        phone: worker.phone,
+        specialization: worker.workerProfile.specialization || [],
+        rating: worker.workerProfile.rating || 0,
+        completedJobs: worker.workerProfile.completedJobs || 0,
+        assignedApartments: worker.workerProfile.assignedApartments || [],
+        availability: worker.workerProfile.availability,
+        status,
+        statusDetail,
+        currentTask: currentTask ? {
+          bookingId: currentTask._id,
+          customer: currentTask.customer?.name,
+          service: currentTask.service?.name,
+          location: currentTask.location,
+          startTime: currentTask.startTime,
+          endTime: currentTask.endTime,
+          status: currentTask.status
+        } : null,
+        todayBookings: workerBookings.map(b => ({
+          bookingId: b._id,
+          customer: b.customer?.name,
+          service: b.service?.name,
+          location: b.location,
+          startTime: b.startTime,
+          endTime: b.endTime,
+          status: b.status
+        })),
+        onLeave: !!todayLeave
+      };
+    }));
+
+    // Calculate summary statistics
+    const summary = {
+      total: workforceStatus.length,
+      free: workforceStatus.filter(w => w.status === 'free').length,
+      working: workforceStatus.filter(w => w.status === 'working' || w.status === 'scheduled').length,
+      onLeave: workforceStatus.filter(w => w.status === 'on-leave').length,
+      offline: workforceStatus.filter(w => w.status === 'offline').length
+    };
+
+    res.json({
+      success: true,
+      summary,
+      workers: workforceStatus
+    });
+  } catch (error) {
+    console.error('Get workforce status error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   POST /api/admin/manual-assign
+// @desc    Manually assign a worker to a booking
+// @access  Private/Admin
+router.post('/manual-assign',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  [
+    body('bookingId').isMongoId().withMessage('Valid booking ID is required'),
+    body('workerId').isMongoId().withMessage('Valid worker ID is required')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: { message: errors.array()[0].msg, status: 400 } });
+      }
+
+      const { bookingId, workerId } = req.body;
+
+      const booking = await Booking.findById(bookingId)
+        .populate('service')
+        .populate('location');
+      
+      if (!booking) {
+        return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
+      }
+
+      if (!['pending', 'confirmed'].includes(booking.status)) {
+        return res.status(400).json({ 
+          error: { 
+            message: `Cannot reassign booking with status: ${booking.status}`,
+            status: 400 
+          } 
+        });
+      }
+
+      const worker = await User.findById(workerId);
+      if (!worker || worker.role !== 'worker') {
+        return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
+      }
+
+      // Check if worker has approved leave on booking date
+      const bookingDate = new Date(booking.bookingDate);
+      bookingDate.setHours(0, 0, 0, 0);
+      
+      const workerLeave = worker.workerProfile.leaves?.find(leave => {
+        const leaveDate = new Date(leave.date);
+        leaveDate.setHours(0, 0, 0, 0);
+        return leaveDate.getTime() === bookingDate.getTime() && leave.status === 'approved';
+      });
+
+      if (workerLeave) {
+        return res.status(400).json({ 
+          error: { 
+            message: 'Worker has approved leave on this date',
+            status: 400 
+          } 
+        });
+      }
+
+      // Check for conflicts
+      const [startHours, startMinutes] = booking.startTime.split(':').map(Number);
+      const [endHours, endMinutes] = booking.endTime.split(':').map(Number);
+      
+      const conflictingBooking = await Booking.findOne({
+        worker: workerId,
+        bookingDate: booking.bookingDate,
+        status: { $in: ['confirmed', 'in-progress', 'pending'] },
+        _id: { $ne: bookingId },
+        $or: [
+          {
+            $and: [
+              { startTime: { $lte: booking.startTime } },
+              { endTime: { $gt: booking.startTime } }
+            ]
+          },
+          {
+            $and: [
+              { startTime: { $lt: booking.endTime } },
+              { endTime: { $gte: booking.endTime } }
+            ]
+          },
+          {
+            $and: [
+              { startTime: { $gte: booking.startTime } },
+              { endTime: { $lte: booking.endTime } }
+            ]
+          }
+        ]
+      });
+
+      if (conflictingBooking) {
+        return res.status(400).json({ 
+          error: { 
+            message: 'Worker has a conflicting booking at this time',
+            status: 400 
+          } 
+        });
+      }
+
+      // Assign worker
+      booking.worker = workerId;
+      booking.assignmentMethod = 'manual';
+      booking.assignedBy = req.user._id;
+      booking.assignedAt = new Date();
+      
+      if (booking.status === 'pending') {
+        booking.status = 'confirmed';
+      }
+
+      await booking.save();
+
+      await booking.populate('worker', 'name email phone');
+
+      res.json({
+        success: true,
+        message: 'Worker assigned successfully',
+        booking: {
+          _id: booking._id,
+          worker: booking.worker,
+          status: booking.status,
+          assignmentMethod: booking.assignmentMethod
+        }
+      });
+    } catch (error) {
+      console.error('Manual assign error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
 export default router;

@@ -20,8 +20,15 @@ interface Service {
   isActive: boolean;
 }
 
+interface UserProfile {
+  role: string;
+  name: string;
+  email: string;
+  [key: string]: unknown;
+}
+
 const AdminServices = () => {
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');

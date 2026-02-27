@@ -34,10 +34,12 @@ import WorkerTasks from "./pages/worker/WorkerTasks";
 // Admin pages
 import AdminBookings from "./pages/admin/AdminBookings";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminLeaves from "./pages/admin/AdminLeaves";
 import AdminLocations from "./pages/admin/AdminLocations";
 import AdminServices from "./pages/admin/AdminServices";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminWorkers from "./pages/admin/AdminWorkers";
+import AdminWorkforce from "./pages/admin/AdminWorkforce";
 
 const queryClient = new QueryClient();
 
@@ -77,6 +79,8 @@ const App = () => (
           {/* Admin */}
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/bookings" element={<AdminBookings />} />
+          <Route path="/admin/workforce" element={<AdminWorkforce />} />
+          <Route path="/admin/leaves" element={<AdminLeaves />} />
           <Route path="/admin/services" element={<AdminServices />} />
           <Route path="/admin/workers" element={<AdminWorkers />} />
           <Route path="/admin/locations" element={<AdminLocations />} />

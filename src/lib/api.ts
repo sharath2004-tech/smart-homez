@@ -570,6 +570,18 @@ export const adminAPI = {
       method: 'PATCH',
       body: JSON.stringify({ locationId, apartmentId })
     });
+  },
+
+  // Workforce Management
+  getWorkforceStatus: async () => {
+    return apiCall('/admin/workforce-status');
+  },
+
+  manualAssign: async (bookingId: string, workerId: string) => {
+    return apiCall('/admin/manual-assign', {
+      method: 'POST',
+      body: JSON.stringify({ bookingId, workerId })
+    });
   }
 };
 
