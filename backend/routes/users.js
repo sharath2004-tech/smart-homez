@@ -3,6 +3,7 @@ import { authenticate, authorize } from '../middleware/auth.js';
 import Booking from '../models/Booking.js';
 import Location from '../models/Location.js';
 import User from '../models/User.js';
+import { getWorkerPerformance } from '../utils/updateWorkerStats.js';
 
 const router = express.Router();
 
@@ -809,6 +810,42 @@ router.get('/admin/alerts', authenticate, authorize('admin'), async (req, res) =
     });
   } catch (error) {
     console.error('Get alerts error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   GET /api/users/:id/performance
+// @desc    Get worker performance statistics
+// @access  Private
+router.get('/:id/performance', authenticate, async (req, res) => {
+  try {
+    const workerId = req.params.id;
+    
+    // Check if user is authorized to view this data
+    const isAuthorized = 
+      req.user.role === 'admin' || 
+      req.user._id.toString() === workerId;
+
+    if (!isAuthorized) {
+      return res.status(403).json({ 
+        error: { message: 'Forbidden', status: 403 } 
+      });
+    }
+
+    const performance = await getWorkerPerformance(workerId);
+    
+    if (!performance) {
+      return res.status(404).json({ 
+        error: { message: 'Worker not found', status: 404 } 
+      });
+    }
+
+    res.json({ 
+      success: true,
+      performance 
+    });
+  } catch (error) {
+    console.error('Get worker performance error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
   }
 });

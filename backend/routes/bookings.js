@@ -361,6 +361,17 @@ router.put('/:id', authenticate, async (req, res) => {
 
     await booking.save();
 
+    // Update worker statistics if booking is completed with a rating
+    if (status === 'completed' && booking.worker) {
+      const onTime = checkIfOnTime(booking);
+      await updateWorkerStats(booking.worker, {
+        rating: rating || booking.rating,
+        onTime,
+        completed: true,
+        bookingId: booking._id
+      });
+    }
+
     const updatedBooking = await Booking.findById(booking._id)
       .populate('customer', 'name email phone')
       .populate('worker', 'name email phone gender religion workerProfile')
