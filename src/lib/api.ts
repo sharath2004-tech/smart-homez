@@ -661,6 +661,53 @@ export const preferencesAPI = {
   }
 };
 
+// ====== Leaves Management APIs ======
+
+export const leavesAPI = {
+  // Apply for leave (Worker)
+  applyLeave: async (date: string, reason?: string) => {
+    return apiCall('/leaves/apply', {
+      method: 'POST',
+      body: JSON.stringify({ date, reason })
+    });
+  },
+
+  // Get my leaves (Worker)
+  getMyLeaves: async () => {
+    return apiCall('/leaves/my-leaves');
+  },
+
+  // Cancel leave request (Worker)
+  cancelLeave: async (leaveId: string) => {
+    return apiCall(`/leaves/${leaveId}`, {
+      method: 'DELETE'
+    });
+  },
+
+  // Get pending leave requests (Admin)
+  getPendingLeaves: async () => {
+    return apiCall('/leaves/pending');
+  },
+
+  // Get worker's leave history (Admin)
+  getWorkerLeaves: async (workerId: string) => {
+    return apiCall(`/leaves/worker/${workerId}`);
+  },
+
+  // Approve or reject leave (Admin)
+  updateLeaveStatus: async (workerId: string, leaveId: string, status: 'approved' | 'rejected') => {
+    return apiCall(`/leaves/${workerId}/${leaveId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status })
+    });
+  },
+
+  // Get leave statistics (Admin)
+  getLeaveStatistics: async () => {
+    return apiCall('/leaves/statistics');
+  }
+};
+
 // Export all
 export default {
   auth: authAPI,
@@ -672,5 +719,6 @@ export default {
   workers: workersAPI,
   admin: adminAPI,
   settings: settingsAPI,
-  preferences: preferencesAPI
+  preferences: preferencesAPI,
+  leaves: leavesAPI
 };

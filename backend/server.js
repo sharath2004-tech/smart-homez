@@ -7,6 +7,7 @@ import mongoose from 'mongoose';
 import adminRoutes from './routes/admin.js';
 import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
+import leavesRoutes from './routes/leaves.js';
 import locationRoutes from './routes/locations.js';
 import paymentRoutes from './routes/payments.js';
 import preferencesRoutes from './routes/preferences.js';
@@ -88,6 +89,7 @@ app.use('/api/locations', locationRoutes);
 app.use('/api/service-areas', serviceAreaRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/preferences', preferencesRoutes);
+app.use('/api/leaves', leavesRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

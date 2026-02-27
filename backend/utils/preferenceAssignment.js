@@ -2,16 +2,43 @@
  * Preference-based Worker Assignment Engine
  * 
  * Assignment Priority:
- * 1. Preference P1 (if available and not in exception list)
+ * 1. Preference P1 (if available and not in exception list and not on leave)
  * 2. Preference P2 (if P1 unavailable)
  * 3. Preference P3 (if P2 unavailable)
- * 4. Any available worker (excluding exception list)
+ * 4. Any available worker (excluding exception list and on leave)
  * 
  * Exception List overrides ALL preferences and proximity rules
+ * Leave Management: Workers on approved leave are automatically excluded
  */
 
 import User from '../models/User.js';
 import { checkSlotAvailability } from './slotManagement.js';
+
+/**
+ * Check if worker is on approved leave for a specific date
+ * @param {Object} worker - Worker user object
+ * @param {Date} bookingDate - Date to check
+ * @returns {boolean} True if worker is on leave
+ */
+const isWorkerOnLeave = (worker, bookingDate) => {
+  if (!worker.workerProfile?.leaves || worker.workerProfile.leaves.length === 0) {
+    return false;
+  }
+
+  const bookingDateOnly = new Date(bookingDate);
+  bookingDateOnly.setHours(0, 0, 0, 0);
+
+  return worker.workerProfile.leaves.some(leave => {
+    if (leave.status !== 'approved') {
+      return false;
+    }
+
+    const leaveDate = new Date(leave.date);
+    leaveDate.setHours(0, 0, 0, 0);
+
+    return leaveDate.getTime() === bookingDateOnly.getTime();
+  });
+};
 
 /**
  * Find available worker based on customer preferences
@@ -209,6 +236,14 @@ const checkWorkerAvailability = async (
     return {
       available: false,
       reason: 'Worker is not active or available'
+    };
+  }
+
+  // Check if worker is on approved leave for this date
+  if (isWorkerOnLeave(worker, bookingDate)) {
+    return {
+      available: false,
+      reason: 'Worker is on approved leave for this date'
     };
   }
 
