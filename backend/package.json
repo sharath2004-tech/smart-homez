@@ -10,7 +10,10 @@
     "prod": "NODE_ENV=production node server.js",
     "seed:admins": "node seedAdmins.js",
     "seed:services": "node seedServices.js",
-    "clear:db": "node clearDatabase.js"
+    "clear:db": "node clearDatabase.js",
+    "check:accounts": "node checkAccounts.js",
+    "activate": "node activateAccount.js",
+    "deactivate": "node deactivateWorker.js"
   },
   "keywords": [
     "express",

@@ -150,6 +150,20 @@ router.post('/',
             error: { message: 'Invalid worker', status: 400 } 
           });
         }
+        
+        // IMPORTANT: Check if worker account is active
+        if (!workerUser.isActive) {
+          return res.status(400).json({ 
+            error: { message: 'Cannot assign task to deactivated worker', status: 400 } 
+          });
+        }
+        
+        // Check if worker is available
+        if (!workerUser.workerProfile?.availability) {
+          return res.status(400).json({ 
+            error: { message: 'Worker is currently unavailable', status: 400 } 
+          });
+        }
       }
 
       // Prepare booking data

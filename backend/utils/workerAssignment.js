@@ -319,9 +319,9 @@ export const reassignWorker = async (bookingId, reason) => {
     if (booking.backupWorkers && booking.backupWorkers.length > 0) {
       const backupWorker = booking.backupWorkers[0];
       
-      // Check if backup worker is still available
+      // Check if backup worker is still available and active
       const worker = await User.findById(backupWorker.worker);
-      if (worker && worker.workerProfile?.availability) {
+      if (worker && worker.isActive && worker.workerProfile?.availability) {
         booking.worker = backupWorker.worker;
         booking.backupWorkers = booking.backupWorkers.slice(1);
         booking.assignedAt = new Date();
