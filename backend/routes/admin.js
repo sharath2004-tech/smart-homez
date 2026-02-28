@@ -44,6 +44,7 @@ router.post('/locations',
           coordinates: coordinates // [longitude, latitude]
         },
         maxServiceRadius: maxServiceRadius || 500,
+        isServiceAvailable: true, // Service available at all created locations
         createdBy: req.user._id
       });
 
