@@ -4,8 +4,8 @@
  * This will rebuild the unique indexes on the User collection
  */
 
-import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
 import User from '../models/User.js';
 
 dotenv.config();
