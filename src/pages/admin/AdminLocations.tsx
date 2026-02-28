@@ -102,6 +102,36 @@ const AdminLocations = () => {
     }
   };
 
+  const handleDeleteLocation = async (locationId: string, locationName: string) => {
+    if (!confirm(`Are you sure you want to delete "${locationName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await adminAPI.deleteLocation(locationId);
+      alert('Location deleted successfully!');
+      fetchData();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to delete location';
+      alert(message);
+    }
+  };
+
+  const handleDeleteAdmin = async (adminId: string, adminName: string) => {
+    if (!confirm(`Are you sure you want to delete admin "${adminName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await adminAPI.deleteAdmin(adminId);
+      alert('Admin deleted successfully!');
+      fetchData();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to delete admin';
+      alert(message);
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -412,7 +442,18 @@ const AdminLocations = () => {
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {locations.map((location) => (
-                  <div key={location._id} className="card-elevated p-5">
+                  <div key={location._id} className="card-elevated p-5 relative">
+                    {/* Delete button for super admin */}
+                    {isSuperAdmin && (
+                      <button
+                        onClick={() => handleDeleteLocation(location._id, location.apartmentName)}
+                        className="absolute top-3 right-3 w-7 h-7 rounded-lg bg-destructive/10 hover:bg-destructive/20 flex items-center justify-center text-destructive transition-colors"
+                        title="Delete location"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                    
                     <div className="flex items-start gap-3 mb-4">
                       <div className="w-10 h-10 bg-primary-light rounded-full flex items-center justify-center text-primary shrink-0">
                         <Building className="w-5 h-5" />
@@ -479,7 +520,16 @@ const AdminLocations = () => {
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
                 {filteredAdmins.map((admin) => (
-                  <div key={admin._id} className="card-elevated p-5">
+                  <div key={admin._id} className="card-elevated p-5 relative">
+                    {/* Delete button for super admin */}
+                    <button
+                      onClick={() => handleDeleteAdmin(admin._id, admin.name)}
+                      className="absolute top-3 right-3 w-7 h-7 rounded-lg bg-destructive/10 hover:bg-destructive/20 flex items-center justify-center text-destructive transition-colors"
+                      title="Delete admin"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                    
                     <div className="flex items-start gap-3 mb-4">
                       <div className="w-12 h-12 bg-secondary rounded-full flex items-center justify-center text-secondary-foreground font-bold shrink-0">
                         {admin.name.split(" ").map(n => n[0]).join("").toUpperCase()}

@@ -160,6 +160,10 @@ const userSchema = new mongoose.Schema({
     hourlyRate: Number,
     // Location-based assignment
     assignedApartments: [{
+      locationId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Location'
+      },
       apartmentName: String,
       building: String,
       area: String,

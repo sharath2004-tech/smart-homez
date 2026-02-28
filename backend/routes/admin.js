@@ -196,6 +196,93 @@ router.get('/locations', authenticate, authorize('admin', 'super_admin'), async 
   }
 });
 
+// @route   PATCH /api/admin/locations/:locationId
+// @desc    Update a location - Super Admin only
+// @access  Private/Super Admin
+router.patch('/locations/:locationId', authenticate, authorize('super_admin'), async (req, res) => {
+  try {
+    const { locationId } = req.params;
+    const updates = req.body;
+
+    const location = await Location.findByIdAndUpdate(
+      locationId,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).populate('assignedAdmin', 'name email');
+
+    if (!location) {
+      return res.status(404).json({ error: { message: 'Location not found', status: 404 } });
+    }
+
+    console.log(`✅ Location ${location.apartmentName} updated by super admin ${req.user.name}`);
+
+    res.json({
+      success: true,
+      message: 'Location updated successfully',
+      location
+    });
+  } catch (error) {
+    console.error('Update location error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   DELETE /api/admin/locations/:locationId
+// @desc    Delete a location - Super Admin only
+// @access  Private/Super Admin
+router.delete('/locations/:locationId', authenticate, authorize('super_admin'), async (req, res) => {
+  try {
+    const { locationId } = req.params;
+
+    const location = await Location.findById(locationId);
+    if (!location) {
+      return res.status(404).json({ error: { message: 'Location not found', status: 404 } });
+    }
+
+    // Check if location has workers assigned
+    const workersCount = await User.countDocuments({
+      role: 'worker',
+      'workerProfile.assignedApartments.locationId': locationId
+    });
+
+    if (workersCount > 0) {
+      return res.status(400).json({
+        error: {
+          message: `Cannot delete location with ${workersCount} assigned worker(s). Please reassign or remove them first.`,
+          status: 400
+        }
+      });
+    }
+
+    // Check for active bookings at this location
+    const activeBookings = await Booking.countDocuments({
+      'location.locationId': locationId,
+      status: { $in: ['pending', 'confirmed', 'in-progress'] }
+    });
+
+    if (activeBookings > 0) {
+      return res.status(400).json({
+        error: {
+          message: `Cannot delete location with ${activeBookings} active booking(s). Please complete them first.`,
+          status: 400
+        }
+      });
+    }
+
+    await Location.findByIdAndDelete(locationId);
+
+    console.log(`✅ Location ${location.apartmentName} deleted by super admin ${req.user.name}`);
+
+    res.json({
+      success: true,
+      message: 'Location deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete location error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
 // @route   GET /api/admin/admins
 // @desc    Get all admins - Super Admin only
 // @access  Private/Super Admin
@@ -247,6 +334,113 @@ router.get('/admins', authenticate, authorize('super_admin'), async (req, res) =
     });
   } catch (error) {
     console.error('Get admins error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   PATCH /api/admin/admins/:adminId
+// @desc    Update an admin - Super Admin only
+// @access  Private/Super Admin
+router.patch('/admins/:adminId', authenticate, authorize('super_admin'), async (req, res) => {
+  try {
+    const { adminId } = req.params;
+    const { name, phone, assignedLocationIds } = req.body;
+
+    const admin = await User.findOne({ _id: adminId, role: 'admin' });
+    if (!admin) {
+      return res.status(404).json({ error: { message: 'Admin not found', status: 404 } });
+    }
+
+    // Update basic fields
+    if (name) admin.name = name;
+    if (phone) admin.phone = phone;
+
+    // Update assigned locations if provided
+    if (assignedLocationIds) {
+      const locations = await Location.find({ _id: { $in: assignedLocationIds } });
+      admin.adminProfile.assignedLocations = locations.map(loc => ({
+        locationId: loc._id,
+        locationName: loc.apartmentName,
+        area: loc.area,
+        city: loc.city
+      }));
+
+      // Update locations with new admin assignment
+      await Location.updateMany(
+        { assignedAdmin: adminId },
+        { $unset: { assignedAdmin: '' } }
+      );
+      await Location.updateMany(
+        { _id: { $in: assignedLocationIds } },
+        { $set: { assignedAdmin: adminId } }
+      );
+    }
+
+    await admin.save();
+
+    console.log(`✅ Admin ${admin.name} updated by super admin ${req.user.name}`);
+
+    res.json({
+      success: true,
+      message: 'Admin updated successfully',
+      admin: {
+        _id: admin._id,
+        name: admin.name,
+        email: admin.email,
+        phone: admin.phone,
+        assignedLocations: admin.adminProfile.assignedLocations
+      }
+    });
+  } catch (error) {
+    console.error('Update admin error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   DELETE /api/admin/admins/:adminId
+// @desc    Delete an admin - Super Admin only
+// @access  Private/Super Admin
+router.delete('/admins/:adminId', authenticate, authorize('super_admin'), async (req, res) => {
+  try {
+    const { adminId } = req.params;
+
+    const admin = await User.findOne({ _id: adminId, role: 'admin' });
+    if (!admin) {
+      return res.status(404).json({ error: { message: 'Admin not found', status: 404 } });
+    }
+
+    // Check if admin has workers assigned to their locations
+    const locationIds = admin.adminProfile?.assignedLocations?.map(loc => loc.locationId) || [];
+    const workersCount = await User.countDocuments({
+      role: 'worker',
+      'workerProfile.assignedApartments.locationId': { $in: locationIds }
+    });
+
+    if (workersCount > 0) {
+      return res.status(400).json({
+        error: {
+          message: `Cannot delete admin with ${workersCount} worker(s) in their locations. Please reassign workers first.`,
+          status: 400
+        }
+      });
+    }
+
+    // Remove admin assignment from locations
+    await Location.updateMany(
+      { assignedAdmin: adminId },
+      { $unset: { assignedAdmin: '' } }
+    );
+
+    await User.findByIdAndDelete(adminId);
+
+    console.log(`✅ Admin ${admin.name} deleted by super admin ${req.user.name}`);
+
+    res.json({
+      success: true,
+      message: 'Admin deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete admin error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
   }
 });
@@ -310,6 +504,7 @@ router.post('/workers',
         }
 
         assignedApartments = locations.map(loc => ({
+          locationId: loc._id, // Add locationId for filtering
           apartmentName: loc.apartmentName,
           building: loc.building,
           area: loc.area,
@@ -406,7 +601,7 @@ router.post('/workers',
 );
 
 // @route   DELETE /api/admin/workers/:workerId
-// @desc    Delete a worker - Admin only
+// @desc    Delete a worker - Admin/Super Admin with location access check
 // @access  Private/Admin
 router.delete('/workers/:workerId', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
   try {
@@ -420,6 +615,24 @@ router.delete('/workers/:workerId', authenticate, authorize('admin', 'super_admi
     const worker = await User.findById(workerId);
     if (!worker || worker.role !== 'worker') {
       return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
+    }
+
+    // For regular admin, verify they have access to at least one of worker's locations
+    if (req.user.role === 'admin') {
+      const adminLocationIds = req.user.adminProfile?.assignedLocations?.map(loc => loc.locationId.toString()) || [];
+      const workerLocationIds = worker.workerProfile?.assignedApartments?.map(apt => apt.locationId?.toString()).filter(Boolean) || [];
+      
+      const hasAccess = workerLocationIds.some(locId => adminLocationIds.includes(locId));
+      
+      if (!hasAccess) {
+        console.log(`⚠️ Admin ${req.user.name} attempted to delete worker ${worker.name} from different location`);
+        return res.status(403).json({ 
+          error: { 
+            message: 'You can only delete workers assigned to your locations', 
+            status: 403 
+          } 
+        });
+      }
     }
 
     // Check for active bookings
@@ -449,7 +662,7 @@ router.delete('/workers/:workerId', authenticate, authorize('admin', 'super_admi
     // Note: Past bookings will remain in history but with worker reference
     // This maintains booking history for auditing purposes
 
-    console.log(`✅ Worker ${worker.name} (${workerId}) permanently deleted from database`);
+    console.log(`✅ Worker ${worker.name} (${workerId}) permanently deleted by ${req.user.role} ${req.user.name}`);
 
     res.json({
       success: true,
@@ -468,13 +681,37 @@ router.get('/workers', authenticate, authorize('admin', 'super_admin'), async (r
   try {
     let query = { role: 'worker', isActive: true };
 
-    // For both admin and super_admin, show all workers
-    // This includes both admin-created workers (with assignedApartments)
-    // and self-registered workers (with currentLocation from registration)
-    
-    const workers = await User.find(query)
-      .select('name email phone workerProfile.specialization workerProfile.assignedApartments workerProfile.rating workerProfile.availability currentLocation addresses')
+    // Get all workers first
+    let workers = await User.find(query)
+      .select('name email phone workerProfile.specialization workerProfile.assignedApartments workerProfile.rating workerProfile.availability workerProfile.experience currentLocation addresses createdAt')
       .sort({ createdAt: -1 });
+
+    // If regular admin, filter workers by assigned locations
+    if (req.user.role === 'admin') {
+      // Get admin's assigned location IDs
+      const adminLocationIds = req.user.adminProfile?.assignedLocations?.map(loc => loc.locationId.toString()) || [];
+      
+      console.log(`🔍 Admin ${req.user.name} filtering workers for locations:`, adminLocationIds);
+
+      // Filter workers who are assigned to ANY of the admin's locations
+      workers = workers.filter(worker => {
+        // Check if worker has any assigned apartments matching admin's locations
+        const workerLocationIds = worker.workerProfile?.assignedApartments?.map(apt => apt.locationId?.toString()).filter(Boolean) || [];
+        
+        // Worker is visible if any of their assigned locations match admin's locations
+        const hasMatchingLocation = workerLocationIds.some(locId => adminLocationIds.includes(locId));
+        
+        if (hasMatchingLocation) {
+          console.log(`✅ Worker ${worker.name} visible to admin (location match)`);
+        }
+        
+        return hasMatchingLocation;
+      });
+
+      console.log(`📊 Admin sees ${workers.length} workers out of total available`);
+    } else {
+      console.log(`👑 Super Admin sees all ${workers.length} workers`);
+    }
 
     res.json({
       success: true,
@@ -527,6 +764,7 @@ router.patch('/workers/:workerId/assign-location',
 
       if (!alreadyAssigned) {
         worker.workerProfile.assignedApartments.push({
+          locationId: location._id, // Add locationId for filtering
           apartmentName: location.apartmentName,
           building: location.building,
           area: location.area,

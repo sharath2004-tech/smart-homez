@@ -516,6 +516,29 @@ export const adminAPI = {
     return apiCall('/admin/locations');
   },
 
+  updateLocation: async (locationId: string, locationData: {
+    apartmentName?: string;
+    building?: string;
+    area?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    coordinates?: number[];
+    maxServiceRadius?: number;
+    isServiceAvailable?: boolean;
+  }) => {
+    return apiCall(`/admin/locations/${locationId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(locationData)
+    });
+  },
+
+  deleteLocation: async (locationId: string) => {
+    return apiCall(`/admin/locations/${locationId}`, {
+      method: 'DELETE'
+    });
+  },
+
   // Admin Management (Super Admin)
   getAdmins: async (city?: string) => {
     const params = new URLSearchParams();
@@ -534,6 +557,23 @@ export const adminAPI = {
     return apiCall('/admin/create-admin', {
       method: 'POST',
       body: JSON.stringify(adminData)
+    });
+  },
+
+  updateAdmin: async (adminId: string, adminData: {
+    name?: string;
+    phone?: string;
+    assignedLocationIds?: string[];
+  }) => {
+    return apiCall(`/admin/admins/${adminId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(adminData)
+    });
+  },
+
+  deleteAdmin: async (adminId: string) => {
+    return apiCall(`/admin/admins/${adminId}`, {
+      method: 'DELETE'
     });
   },
 
