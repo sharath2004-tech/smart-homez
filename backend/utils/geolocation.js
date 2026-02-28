@@ -160,18 +160,7 @@ export const checkServiceAvailability = async (
       };
     }
 
-    // Check if service is available in all locations
-    if (service.availableInAllLocations) {
-      const workers = await findNearbyWorkers(longitude, latitude, 500);
-      return {
-        available: workers.length > 0,
-        reason: workers.length > 0 ? 'Service available' : 'No workers nearby',
-        workersCount: workers.length,
-        workers: workers.slice(0, 3) // Return top 3 workers
-      };
-    }
-
-    // Find nearby service locations
+    // Find nearby locations within their service radius
     const nearbyLocations = await Location.find({
       location: {
         $near: {
@@ -179,7 +168,7 @@ export const checkServiceAvailability = async (
             type: 'Point',
             coordinates: [longitude, latitude]
           },
-          $maxDistance: 500
+          $maxDistance: 500 // Check within 500m
         }
       },
       isServiceAvailable: true,
@@ -190,41 +179,30 @@ export const checkServiceAvailability = async (
       return {
         available: false,
         reason: 'Service not available in your area',
-        workers: []
+        workers: [],
+        nearbyLocations: []
       };
     }
 
-    // Check if apartment name matches (if provided)
-    if (apartmentName) {
-      const matchingLocation = nearbyLocations.find(
-        loc => loc.apartmentName.toLowerCase() === apartmentName.toLowerCase()
-      );
-      if (!matchingLocation) {
-        return {
-          available: false,
-          reason: 'Service not available in your apartment',
-          workers: []
-        };
-      }
-    }
-
-    // Find available workers
+    // Service is available if location exists within radius
+    // Find available workers at these locations
     const workers = await findNearbyWorkers(longitude, latitude, 500);
     
     return {
-      available: workers.length > 0,
-      reason: workers.length > 0 ? 'Service available' : 'No workers available now',
+      available: true, // Available if location exists
+      reason: workers.length > 0 ? 'Service available' : 'Service available (workers will be assigned)',
       workersCount: workers.length,
       workers: workers.slice(0, 3),
       nearbyLocations: nearbyLocations.map(loc => ({
         apartmentName: loc.apartmentName,
         area: loc.area,
-        distance: calculateDistance(
+        city: loc.city,
+        distance: Math.round(calculateDistance(
           latitude,
           longitude,
           loc.location.coordinates[1],
           loc.location.coordinates[0]
-        )
+        ))
       }))
     };
   } catch (error) {

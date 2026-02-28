@@ -46,23 +46,11 @@ router.post('/', authenticate, authorize('admin'), async (req, res) => {
   try {
     const locationData = {
       ...req.body,
-      createdBy: req.user._id
+      createdBy: req.user._id,
+      isServiceAvailable: true // Service available at all created locations
     };
     
     const location = await Location.create(locationData);
-    
-    // Check if there are any workers in the same area/city to set initial availability
-    const workersInArea = await User.find({
-      role: 'worker',
-      'workerProfile.city': location.city,
-      'workerProfile.availability': true
-    }).limit(1);
-    
-    // If workers are available in the area, mark service as available
-    if (workersInArea.length > 0) {
-      location.isServiceAvailable = true;
-      await location.save();
-    }
 
     res.status(201).json({
       success: true,
