@@ -493,30 +493,38 @@ router.post('/workers',
       const temporaryPassword = generateTemporaryPassword();
       console.log(`🔑 Generated temporary password for ${normalizedEmail}:`, temporaryPassword);
 
-      // Get apartment assignments
-      let assignedApartments = [];
-      if (assignedApartmentIds && assignedApartmentIds.length > 0) {
-        const locations = await Location.find({ _id: { $in: assignedApartmentIds } });
-        
-        // Verify admin has access to these locations
-        if (req.user.role === 'admin') {
-          const userLocationIds = req.user.adminProfile.assignedLocations.map(loc => loc.locationId.toString());
-          const unauthorizedLocations = locations.filter(loc => !userLocationIds.includes(loc._id.toString()));
-          if (unauthorizedLocations.length > 0) {
-            return res.status(403).json({ error: { message: 'Cannot assign worker to locations you don\'t manage', status: 403 } });
-          }
-        }
-
-        assignedApartments = locations.map(loc => ({
-          locationId: loc._id, // Add locationId for filtering
-          apartmentName: loc.apartmentName,
-          building: loc.building,
-          area: loc.area,
-          city: loc.city,
-          location: loc.location,
-          maxWalkingDistance: loc.maxServiceRadius
-        }));
+      // REQUIRE location assignment for workers
+      if (!assignedApartmentIds || assignedApartmentIds.length === 0) {
+        return res.status(400).json({ 
+          error: { message: 'Worker must be assigned to at least one location', status: 400 } 
+        });
       }
+
+      // Get apartment assignments
+      const locations = await Location.find({ _id: { $in: assignedApartmentIds } });
+      
+      if (locations.length === 0) {
+        return res.status(404).json({ error: { message: 'No valid locations found', status: 404 } });
+      }
+      
+      // Verify admin has access to these locations
+      if (req.user.role === 'admin') {
+        const userLocationIds = req.user.adminProfile.assignedLocations.map(loc => loc.locationId.toString());
+        const unauthorizedLocations = locations.filter(loc => !userLocationIds.includes(loc._id.toString()));
+        if (unauthorizedLocations.length > 0) {
+          return res.status(403).json({ error: { message: 'Cannot assign worker to locations you don\'t manage', status: 403 } });
+        }
+      }
+
+      const assignedApartments = locations.map(loc => ({
+        locationId: loc._id,
+        apartmentName: loc.apartmentName,
+        building: loc.building,
+        area: loc.area,
+        city: loc.city,
+        location: loc.location,
+        maxWalkingDistance: loc.maxServiceRadius
+      }));
 
       // Create worker
       const worker = new User({
@@ -546,12 +554,10 @@ router.post('/workers',
       console.log(`✅ Worker saved successfully with ID: ${worker._id}`);
 
       // Add worker to location's assignedWorkers
-      if (assignedApartmentIds && assignedApartmentIds.length > 0) {
-        await Location.updateMany(
-          { _id: { $in: assignedApartmentIds } },
-          { $push: { assignedWorkers: { worker: worker._id, assignedAt: new Date() } } }
-        );
-      }
+      await Location.updateMany(
+        { _id: { $in: assignedApartmentIds } },
+        { $push: { assignedWorkers: { worker: worker._id, assignedAt: new Date() } } }
+      );
 
       // Send temporary password email (non-blocking)
       let emailStatus = 'pending';

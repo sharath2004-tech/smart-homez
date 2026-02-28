@@ -122,6 +122,11 @@ const AdminWorkers = () => {
       return;
     }
 
+    if (workerForm.selectedLocations.length === 0) {
+      alert('Please assign worker to at least one location');
+      return;
+    }
+
     setCreatingWorker(true);
 
     try {
@@ -133,7 +138,7 @@ const AdminWorkers = () => {
         religion: workerForm.religion || undefined,
         experience: parseInt(workerForm.experience) || 0,
         specialization: workerForm.specialization,
-        assignedApartmentIds: workerForm.selectedLocations.length > 0 ? workerForm.selectedLocations : []
+        assignedApartmentIds: workerForm.selectedLocations
       });
       
       // Show temporary password to admin
@@ -460,6 +465,32 @@ const AdminWorkers = () => {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Assign to Locations *</label>
+                  <div className="space-y-2 max-h-40 overflow-y-auto border border-border rounded-lg p-3">
+                    {locations.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">No locations available</p>
+                    ) : (
+                      locations.map(loc => (
+                        <button
+                          key={loc._id}
+                          type="button"
+                          onClick={() => toggleLocation(loc._id)}
+                          className={`w-full text-left text-xs px-3 py-2 rounded-lg border transition-colors ${
+                            workerForm.selectedLocations.includes(loc._id)
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'bg-background border-border hover:bg-muted'
+                          }`}
+                        >
+                          {workerForm.selectedLocations.includes(loc._id) && <CheckCircle className="w-3 h-3 inline mr-1" />}
+                          {loc.apartmentName} - {loc.area}, {loc.city}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Worker will only be visible to admins of selected locations</p>
                 </div>
 
                 <div className="flex gap-3 pt-4">
