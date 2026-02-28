@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import { body, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
 import Booking from '../models/Booking.js';
