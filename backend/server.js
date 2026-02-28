@@ -7,14 +7,20 @@ import mongoose from 'mongoose';
 import adminRoutes from './routes/admin.js';
 import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
+import earningsRoutes from './routes/earnings.js';
 import leavesRoutes from './routes/leaves.js';
 import locationRoutes from './routes/locations.js';
+import notificationRoutes from './routes/notifications.js';
 import paymentRoutes from './routes/payments.js';
 import preferencesRoutes from './routes/preferences.js';
 import qrPaymentRoutes from './routes/qrPayments.js';
+import reviewRoutes from './routes/reviews.js';
 import serviceAreaRoutes from './routes/serviceAreas.js';
 import serviceRoutes from './routes/services.js';
 import settingsRoutes from './routes/settings.js';
+import sosRoutes from './routes/sos.js';
+import subscriptionRoutes from './routes/subscriptions.js';
+import trackingRoutes from './routes/tracking.js';
 import userRoutes from './routes/users.js';
 
 // Import utilities
@@ -83,11 +89,17 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/earnings', earningsRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/qr-payments', qrPaymentRoutes);
 app.use('/api/locations', locationRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/reviews', reviewRoutes);
 app.use('/api/service-areas', serviceAreaRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/sos', sosRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/tracking', trackingRoutes);
 app.use('/api/preferences', preferencesRoutes);
 app.use('/api/leaves', leavesRoutes);
 
