@@ -3,6 +3,7 @@ import { body, validationResult } from 'express-validator';
 import { authenticate } from '../middleware/auth.js';
 import SOSAlert from '../models/SOSAlert.js';
 import Notification from '../models/Notification.js';
+import User from '../models/User.js';
 
 const router = express.Router();
 

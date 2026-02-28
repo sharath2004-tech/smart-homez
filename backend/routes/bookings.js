@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { body, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
 import Booking from '../models/Booking.js';
+import Location from '../models/Location.js';
 import User from '../models/User.js';
 import {
     activateBackupWorker,
@@ -282,7 +283,7 @@ router.post('/',
       }
 
       const [customerLng, customerLat] = location.coordinates;
-      const nearbyLocation = await mongoose.model('Location').findOne({
+      const nearbyLocation = await Location.findOne({
         location: {
           $near: {
             $geometry: {
