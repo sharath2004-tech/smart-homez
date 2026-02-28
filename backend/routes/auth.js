@@ -32,12 +32,15 @@ router.post('/register',
       const { name, email, password, role, phone, location, gender, religion, workerProfile } = req.body;
 
       // Check if user already exists
-      const existingUser = await User.findOne({ email });
+      const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
       if (existingUser) {
+        console.log(`⚠️ Registration attempt with existing email: ${email}`);
         return res.status(400).json({ 
           error: { message: 'User already exists with this email', status: 400 } 
         });
       }
+
+      console.log(`✅ No existing user found for email: ${email}, proceeding with registration`);
 
       // Prepare user data
       const userData = {
@@ -108,6 +111,8 @@ router.post('/register',
 
       await user.save();
 
+      console.log(`✅ User registered successfully: ${email} (ID: ${user._id})`);
+
       // Create JWT token
       const token = jwt.sign(
         { userId: user._id, role: user.role },
@@ -127,7 +132,19 @@ router.post('/register',
       });
     } catch (error) {
       console.error('Registration error:', error);
-      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+      
+      // Handle MongoDB duplicate key error (unique index violation)
+      if (error.code === 11000) {
+        const field = Object.keys(error.keyPattern || {})[0];
+        return res.status(400).json({ 
+          error: { 
+            message: `A user with this ${field || 'email'} already exists. If you recently deleted this account, please wait a moment and try again.`, 
+            status: 400 
+          } 
+        });
+      }
+      
+      res.status(500).json({ error: { message: 'Server error during registration', status: 500 } });
     }
   }
 );

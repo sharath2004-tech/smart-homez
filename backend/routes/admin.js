@@ -84,10 +84,13 @@ router.post('/create-admin',
       const { name, email, password, phone, assignedLocationIds } = req.body;
 
       // Check if email exists
-      const existingUser = await User.findOne({ email });
+      const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
       if (existingUser) {
+        console.log(`⚠️ Admin creation attempt with existing email: ${email}`);
         return res.status(400).json({ error: { message: 'Email already exists', status: 400 } });
       }
+
+      console.log(`✅ No existing user found for email: ${email}, proceeding with admin creation`);
 
       // Get location details if provided
       let assignedLocations = [];
@@ -149,6 +152,18 @@ router.post('/create-admin',
       });
     } catch (error) {
       console.error('Create admin error:', error);
+      
+      // Handle MongoDB duplicate key error (unique index violation)
+      if (error.code === 11000) {
+        const field = Object.keys(error.keyPattern || {})[0];
+        return res.status(400).json({ 
+          error: { 
+            message: `A user with this ${field || 'email'} already exists. If you recently deleted this account, please wait a moment and try again.`, 
+            status: 400 
+          } 
+        });
+      }
+      
       res.status(500).json({ error: { message: 'Server error', status: 500 } });
     }
   }
@@ -264,10 +279,13 @@ router.post('/workers',
       const { name, email, phone, gender, religion, experience, specialization, hourlyRate, assignedApartmentIds } = req.body;
 
       // Check if email exists
-      const existingUser = await User.findOne({ email });
+      const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
       if (existingUser) {
+        console.log(`⚠️ Worker creation attempt with existing email: ${email}`);
         return res.status(400).json({ error: { message: 'Email already exists', status: 400 } });
       }
+
+      console.log(`✅ No existing user found for email: ${email}, proceeding with worker creation`);
 
       // Check if admin has permission (only if role is admin, not super_admin)
       if (req.user.role === 'admin' && !req.user.adminProfile?.permissions?.canCreateWorkers) {
@@ -370,6 +388,18 @@ router.post('/workers',
       });
     } catch (error) {
       console.error('Create worker error:', error);
+      
+      // Handle MongoDB duplicate key error (unique index violation)
+      if (error.code === 11000) {
+        const field = Object.keys(error.keyPattern || {})[0];
+        return res.status(400).json({ 
+          error: { 
+            message: `A user with this ${field || 'email'} already exists. If you recently deleted this account, please wait a moment and try again.`, 
+            status: 400 
+          } 
+        });
+      }
+      
       res.status(500).json({ error: { message: 'Server error', status: 500 } });
     }
   }

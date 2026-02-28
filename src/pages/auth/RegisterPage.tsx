@@ -239,7 +239,18 @@ const RegisterPage = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">Email address</label>
-                  <input type="email" className="input-clean" placeholder="you@example.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+                  <input 
+                    type="email" 
+                    className="input-clean" 
+                    placeholder="you@example.com" 
+                    value={form.email} 
+                    onChange={(e) => {
+                      setForm({ ...form, email: e.target.value });
+                      // Clear error when email is changed
+                      if (error) setError("");
+                    }} 
+                    required 
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">Phone number</label>

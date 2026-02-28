@@ -13,7 +13,8 @@
     "clear:db": "node clearDatabase.js",
     "check:accounts": "node checkAccounts.js",
     "activate": "node activateAccount.js",
-    "deactivate": "node deactivateWorker.js"
+    "deactivate": "node deactivateWorker.js",
+    "cleanup:db": "node utils/cleanupDatabase.js"
   },
   "keywords": [
     "express",
