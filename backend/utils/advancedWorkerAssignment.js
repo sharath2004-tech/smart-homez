@@ -227,6 +227,12 @@ export const assignWorkersWithBackup = async (bookingDetails) => {
       _id: { $nin: exceptionWorkerIds } // Exclude exception workers
     };
 
+    // CRITICAL: Filter workers by location - only workers assigned to customer's location
+    if (location?.locationId) {
+      workerQuery['workerProfile.assignedApartments.locationId'] = location.locationId;
+      console.log(`📍 Filtering workers by location: ${location.apartmentName || location.area}`);
+    }
+
     // Filter by service specialization
     if (service?.category) {
       workerQuery['workerProfile.specialization'] = { $in: [service.category] };

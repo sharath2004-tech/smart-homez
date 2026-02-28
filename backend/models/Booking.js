@@ -273,10 +273,17 @@ const bookingSchema = new mongoose.Schema({
     default: null
   },
   location: {
+    locationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Location'
+    },
+    apartmentName: String,
     address: String,
+    area: String,
     city: String,
     state: String,
-    zipCode: String
+    zipCode: String,
+    coordinates: [Number] // [longitude, latitude]
   },
   notes: {
     type: String,

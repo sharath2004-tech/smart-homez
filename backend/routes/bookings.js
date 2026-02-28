@@ -20,7 +20,7 @@ import {
 const router = express.Router();
 
 // @route   GET /api/bookings
-// @desc    Get bookings (filtered by user role)
+// @desc    Get bookings (filtered by user role and location)
 // @access  Private
 router.get('/', authenticate, async (req, res) => {
   try {
@@ -35,6 +35,7 @@ router.get('/', authenticate, async (req, res) => {
     if (req.user.role === 'customer') {
       query.customer = req.user._id;
     } else if (req.user.role === 'worker') {
+      // Workers only see bookings assigned to them
       query.worker = req.user._id;
     }
     // Admin can see all bookings (no filter applied)
@@ -67,6 +68,136 @@ router.get('/', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('Get bookings error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   GET /api/bookings/available-orders
+// @desc    Get available orders in worker's assigned locations (pending/unassigned)
+// @access  Private/Worker
+router.get('/available-orders', authenticate, authorize('worker'), async (req, res) => {
+  try {
+    const worker = await User.findById(req.user._id);
+    
+    if (!worker || !worker.workerProfile?.assignedApartments?.length) {
+      return res.json({ 
+        orders: [],
+        message: 'No locations assigned to you yet'
+      });
+    }
+
+    // Get location IDs assigned to this worker
+    const assignedLocationIds = worker.workerProfile.assignedApartments.map(
+      apt => apt.locationId
+    );
+
+    // Find pending bookings in worker's assigned locations
+    const availableOrders = await Booking.find({
+      'location.locationId': { $in: assignedLocationIds },
+      status: 'pending',
+      $or: [
+        { worker: null },
+        { worker: { $exists: false } }
+      ]
+    })
+      .populate('customer', 'name email phone')
+      .populate('service', 'name description price duration')
+      .populate('location.locationId', 'apartmentName area city')
+      .sort({ bookingDate: 1, startTime: 1 })
+      .limit(20);
+
+    res.json({
+      orders: availableOrders,
+      totalOrders: availableOrders.length,
+      assignedLocations: worker.workerProfile.assignedApartments.map(apt => ({
+        apartmentName: apt.apartmentName,
+        area: apt.area,
+        city: apt.city
+      }))
+    });
+  } catch (error) {
+    console.error('Get available orders error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   POST /api/bookings/:id/accept-order
+// @desc    Worker accepts an available order in their region
+// @access  Private/Worker
+router.post('/:id/accept-order', authenticate, authorize('worker'), async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id)
+      .populate('location.locationId');
+    
+    if (!booking) {
+      return res.status(404).json({ 
+        error: { message: 'Booking not found', status: 404 } 
+      });
+    }
+
+    // Check if booking is still available
+    if (booking.worker) {
+      return res.status(400).json({ 
+        error: { message: 'This order has already been accepted by another worker', status: 400 } 
+      });
+    }
+
+    if (booking.status !== 'pending') {
+      return res.status(400).json({ 
+        error: { message: 'This order is no longer available', status: 400 } 
+      });
+    }
+
+    // Verify worker is assigned to this location
+    const worker = await User.findById(req.user._id);
+    const workerInLocation = worker.workerProfile?.assignedApartments?.some(
+      apt => apt.locationId.toString() === booking.location.locationId._id.toString()
+    );
+
+    if (!workerInLocation) {
+      return res.status(403).json({ 
+        error: { message: 'You are not assigned to this location', status: 403 } 
+      });
+    }
+
+    // Check for time conflicts
+    const conflictingBooking = await Booking.findOne({
+      worker: req.user._id,
+      bookingDate: booking.bookingDate,
+      status: { $in: ['confirmed', 'in-progress'] },
+      $or: [
+        {
+          startTime: { $lt: booking.endTime },
+          endTime: { $gt: booking.startTime }
+        }
+      ]
+    });
+
+    if (conflictingBooking) {
+      return res.status(400).json({ 
+        error: { message: 'You have a conflicting booking at this time', status: 400 } 
+      });
+    }
+
+    // Assign worker to booking
+    booking.worker = req.user._id;
+    booking.status = 'confirmed';
+    booking.assignmentMethod = 'worker-accepted';
+    booking.assignedAt = new Date();
+    await booking.save();
+
+    const updatedBooking = await Booking.findById(booking._id)
+      .populate('customer', 'name email phone')
+      .populate('worker', 'name email phone gender religion workerProfile')
+      .populate('service', 'name description price duration')
+      .populate('location.locationId', 'apartmentName area city');
+
+    res.json({ 
+      message: 'Order accepted successfully', 
+      booking: updatedBooking 
+    });
+  } catch (error) {
+    console.error('Accept order error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
   }
 });
@@ -142,7 +273,35 @@ router.post('/',
         preferences
       } = req.body;
 
-      // If worker is provided, verify they exist and are available
+      // Validate customer location is in a service area
+      if (!location?.coordinates || location.coordinates.length !== 2) {
+        return res.status(400).json({ 
+          error: { message: 'Valid location coordinates required', status: 400 } 
+        });
+      }
+
+      const [customerLng, customerLat] = location.coordinates;
+      const nearbyLocation = await mongoose.model('Location').findOne({
+        location: {
+          $near: {
+            $geometry: {
+              type: 'Point',
+              coordinates: [customerLng, customerLat]
+            },
+            $maxDistance: 500 // 500m radius
+          }
+        },
+        isServiceAvailable: true,
+        isActive: true
+      });
+
+      if (!nearbyLocation) {
+        return res.status(400).json({ 
+          error: { message: 'Service not available in your location', status: 400 } 
+        });
+      }
+
+      // If worker is provided, verify they exist and are available in this location
       if (worker) {
         const workerUser = await User.findById(worker);
         if (!workerUser || workerUser.role !== 'worker') {
@@ -164,9 +323,20 @@ router.post('/',
             error: { message: 'Worker is currently unavailable', status: 400 } 
           });
         }
+
+        // Verify worker is assigned to customer's location
+        const workerInLocation = workerUser.workerProfile.assignedApartments?.some(apt => 
+          apt.locationId.toString() === nearbyLocation._id.toString()
+        );
+
+        if (!workerInLocation) {
+          return res.status(400).json({ 
+            error: { message: 'Worker not available in your location', status: 400 } 
+          });
+        }
       }
 
-      // Prepare booking data
+      // Prepare booking data with location reference
       const bookingData = {
         customer: req.user._id,
         worker: worker || undefined,
@@ -175,7 +345,13 @@ router.post('/',
         startTime,
         endTime,
         totalAmount,
-        location,
+        location: {
+          ...location,
+          locationId: nearbyLocation._id,
+          apartmentName: nearbyLocation.apartmentName,
+          area: nearbyLocation.area,
+          city: nearbyLocation.city
+        },
         notes,
         assignmentMethod: worker ? 'manual' : 'auto',
         bookingType: bookingType || 'oneTime',
