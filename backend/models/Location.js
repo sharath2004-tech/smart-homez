@@ -46,7 +46,7 @@ const locationSchema = new mongoose.Schema({
   // Service availability in this location
   isServiceAvailable: {
     type: Boolean,
-    default: true
+    default: false // Will be set to true when workers are assigned
   },
   availableServices: [{
     service: {

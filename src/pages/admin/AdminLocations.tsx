@@ -1,7 +1,9 @@
 import AppLayout from "@/components/AppLayout";
 import { adminAPI, authAPI, locationsAPI } from "@/lib/api";
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { Building, MapPin, Plus, Search, Shield, UserPlus, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface Location {
   _id: string;
@@ -62,6 +64,10 @@ const AdminLocations = () => {
   const [cityFilter, setCityFilter] = useState("");
   const [activeTab, setActiveTab] = useState<'locations' | 'admins'>('locations');
   const [geocoding, setGeocoding] = useState(false);
+  const [showMap, setShowMap] = useState(false);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstance = useRef<L.Map | null>(null);
+  const markerRef = useRef<L.Marker | null>(null);
   
   const [locationForm, setLocationForm] = useState({
     apartmentName: "",
@@ -86,9 +92,86 @@ const AdminLocations = () => {
 
   const isSuperAdmin = profile?.role === 'super_admin';
 
+  const handleCloseLocationForm = () => {
+    setShowLocationForm(false);
+    setShowMap(false);
+    if (mapInstance.current) {
+      mapInstance.current.remove();
+      mapInstance.current = null;
+      markerRef.current = null;
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Initialize map when show map is toggled
+  useEffect(() => {
+    if (!showMap || !mapRef.current || mapInstance.current) return;
+
+    // Initialize map centered on India
+    const map = L.map(mapRef.current).setView([20.5937, 78.9629], 5);
+
+    // Add tile layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
+    }).addTo(map);
+
+    // Fix Leaflet default marker icon issue
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (L.Icon.Default.prototype as any)._getIconUrl;
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+    });
+
+    // Add click handler to place marker
+    map.on('click', (e: L.LeafletMouseEvent) => {
+      const { lat, lng } = e.latlng;
+      
+      // Remove existing marker if any
+      if (markerRef.current) {
+        map.removeLayer(markerRef.current);
+      }
+
+      // Add new marker
+      const marker = L.marker([lat, lng]).addTo(map);
+      marker.bindPopup(`<b>Selected Location</b><br>Lat: ${lat.toFixed(6)}<br>Lng: ${lng.toFixed(6)}`).openPopup();
+      markerRef.current = marker;
+
+      // Update form with coordinates
+      setLocationForm(prev => ({
+        ...prev,
+        latitude: lat.toFixed(6),
+        longitude: lng.toFixed(6)
+      }));
+    });
+
+    mapInstance.current = map;
+
+    // If coordinates already exist, show marker
+    if (locationForm.latitude && locationForm.longitude) {
+      const lat = parseFloat(locationForm.latitude);
+      const lng = parseFloat(locationForm.longitude);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        const marker = L.marker([lat, lng]).addTo(map);
+        marker.bindPopup(`<b>Selected Location</b><br>Lat: ${lat.toFixed(6)}<br>Lng: ${lng.toFixed(6)}`).openPopup();
+        markerRef.current = marker;
+        map.setView([lat, lng], 15);
+      }
+    }
+
+    return () => {
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+        markerRef.current = null;
+      }
+    };
+  }, [showMap, locationForm.latitude, locationForm.longitude]);
 
   const fetchData = async () => {
     try {
@@ -126,6 +209,12 @@ const AdminLocations = () => {
       });
       alert('Location created successfully!');
       setShowLocationForm(false);
+      setShowMap(false);
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+        markerRef.current = null;
+      }
       setLocationForm({
         apartmentName: "",
         building: "",
@@ -447,7 +536,7 @@ const AdminLocations = () => {
             <div className="bg-background rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold">Add New Location</h2>
-                <button onClick={() => setShowLocationForm(false)} className="text-muted-foreground hover:text-foreground">
+                <button onClick={handleCloseLocationForm} className="text-muted-foreground hover:text-foreground">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -559,6 +648,41 @@ const AdminLocations = () => {
                   </button>
                 </div>
 
+                {/* Interactive Map for Location Selection */}
+                <div className="bg-accent/50 border border-border rounded-xl p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-start gap-3">
+                      <MapPin className="w-5 h-5 text-primary mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-foreground">Pin Location on Map</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Click on the map to select exact coordinates
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowMap(!showMap)}
+                      className="text-xs btn-brand py-1 px-3"
+                    >
+                      {showMap ? 'Hide Map' : 'Show Map'}
+                    </button>
+                  </div>
+                  
+                  {showMap && (
+                    <div className="mt-3">
+                      <div 
+                        ref={mapRef} 
+                        className="w-full h-[400px] rounded-lg border-2 border-border overflow-hidden"
+                        style={{ zIndex: 0 }}
+                      />
+                      <p className="text-xs text-muted-foreground mt-2">
+                        💡 Click anywhere on the map to pin your location. The coordinates will be filled automatically.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium mb-1">Latitude</label>
@@ -603,7 +727,7 @@ const AdminLocations = () => {
                 </div>
 
                 <div className="flex gap-3 pt-4">
-                  <button type="button" onClick={() => setShowLocationForm(false)} className="flex-1 py-2 border border-border rounded-xl">
+                  <button type="button" onClick={handleCloseLocationForm} className="flex-1 py-2 border border-border rounded-xl">
                     Cancel
                   </button>
                   <button type="submit" className="flex-1 btn-brand py-2">

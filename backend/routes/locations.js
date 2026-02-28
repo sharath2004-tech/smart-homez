@@ -44,10 +44,25 @@ router.get('/', authenticate, authorize('admin'), async (req, res) => {
 // Create new location (admin only)
 router.post('/', authenticate, authorize('admin'), async (req, res) => {
   try {
-    const location = await Location.create({
+    const locationData = {
       ...req.body,
       createdBy: req.user._id
-    });
+    };
+    
+    const location = await Location.create(locationData);
+    
+    // Check if there are any workers in the same area/city to set initial availability
+    const workersInArea = await User.find({
+      role: 'worker',
+      'workerProfile.city': location.city,
+      'workerProfile.availability': true
+    }).limit(1);
+    
+    // If workers are available in the area, mark service as available
+    if (workersInArea.length > 0) {
+      location.isServiceAvailable = true;
+      await location.save();
+    }
 
     res.status(201).json({
       success: true,
@@ -151,6 +166,12 @@ router.post('/:id/assign-worker', authenticate, authorize('admin'), async (req, 
 
     // Add to location's assigned workers
     location.assignedWorkers.push({ worker: workerId });
+    
+    // Auto-enable service availability when first worker is assigned
+    if (location.assignedWorkers.length === 1) {
+      location.isServiceAvailable = true;
+    }
+    
     await location.save();
 
     // Add to worker's assigned apartments
