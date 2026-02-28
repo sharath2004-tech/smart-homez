@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { adminAPI } from "@/lib/api";
-import { CheckCircle, MapPin, Plus, Search, Star, Trash2, X } from "lucide-react";
+import { CheckCircle, Loader2, MapPin, Plus, Search, Star, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface Location {
@@ -63,6 +63,7 @@ const AdminWorkers = () => {
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [showWorkerForm, setShowWorkerForm] = useState(false);
+  const [creatingWorker, setCreatingWorker] = useState(false);
 
   const [workerForm, setWorkerForm] = useState({
     name: "",
@@ -116,6 +117,8 @@ const AdminWorkers = () => {
       return;
     }
 
+    setCreatingWorker(true);
+
     try {
       const response = await adminAPI.createWorker({
         name: workerForm.name,
@@ -130,9 +133,9 @@ const AdminWorkers = () => {
       
       // Show temporary password to admin
       if (response.temporaryPassword) {
-        alert(`Worker created successfully!\n\nTemporary Password: ${response.temporaryPassword}\n\nThis password has been sent to the worker's email. Please ask them to check their inbox and change it on first login.`);
+        alert(`Worker created successfully! ✅\n\nTemporary Password: ${response.temporaryPassword}\n\n📧 An email with login credentials is being sent to: ${workerForm.email}\n\nPlease save this password as a backup and share it with the worker if they don't receive the email.`);
       } else {
-        alert('Worker created successfully! Temporary password sent to email.');
+        alert('Worker created successfully! ✅\n\nTemporary password is being sent to their email.');
       }
       
       setShowWorkerForm(false);
@@ -149,7 +152,9 @@ const AdminWorkers = () => {
       fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create worker';
-      alert(message);
+      alert('❌ Error: ' + message);
+    } finally {
+      setCreatingWorker(false);
     }
   };
 
@@ -453,14 +458,21 @@ const AdminWorkers = () => {
                 </div>
 
                 <div className="flex gap-3 pt-4">
-                  <button type="button" onClick={() => setShowWorkerForm(false)} className="flex-1 py-2 border border-border rounded-xl">
+                  <button 
+                    type="button" 
+                    onClick={() => setShowWorkerForm(false)} 
+                    className="flex-1 py-2 border border-border rounded-xl"
+                    disabled={creatingWorker}
+                  >
                     Cancel
                   </button>
                   <button 
                     type="submit" 
-                    className="flex-1 btn-brand py-2"
+                    className="flex-1 btn-brand py-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    disabled={creatingWorker}
                   >
-                    Create Worker
+                    {creatingWorker && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {creatingWorker ? 'Creating Worker...' : 'Create Worker'}
                   </button>
                 </div>
               </form>

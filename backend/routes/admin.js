@@ -517,9 +517,9 @@ router.post('/workers',
       // Create worker
       const worker = new User({
         name,
-        email,
+        email: email.toLowerCase().trim(), // Normalize email to match schema
         password: temporaryPassword, // Will be hashed by pre-save hook
-        temporaryPassword: temporaryPassword, // Store for verification (will also be hashed)
+        temporaryPassword: temporaryPassword, // Store plain text for reference (not hashed)
         isFirstLogin: true, // Force password change on first login
         phone,
         gender: gender || 'prefer_not_to_say',
@@ -545,28 +545,30 @@ router.post('/workers',
         );
       }
 
-      // Send temporary password email
-      let emailSent = false;
-      let emailMessage = '';
-      try {
-        const emailResult = await sendTemporaryPasswordEmail(email, name, temporaryPassword);
-        emailSent = emailResult.success;
-        if (emailResult.success) {
-          emailMessage = 'Temporary password sent to email.';
+      // Send temporary password email (non-blocking with timeout)
+      // Don't wait for email to send - return response immediately
+      let emailStatus = 'sending';
+      const emailPromise = Promise.race([
+        sendTemporaryPasswordEmail(email, name, temporaryPassword),
+        new Promise((resolve) => setTimeout(() => resolve({ success: false, reason: 'timeout' }), 5000)) // 5 second timeout
+      ]).then(result => {
+        if (result.success) {
           console.log('✅ Email sent successfully to:', email);
         } else {
-          emailMessage = `Email not sent (${emailResult.reason}). Please provide the password manually.`;
-          console.log('⚠️ Email not sent:', emailResult.reason);
+          console.log('⚠️ Email not sent:', result.reason);
         }
-      } catch (emailError) {
-        console.error('❌ Failed to send email:', emailError.message);
-        emailMessage = 'Failed to send email. Please provide the password manually.';
-      }
+      }).catch(error => {
+        console.error('❌ Failed to send email:', error.message);
+      });
 
+      // Fire and forget - don't wait for email
+      emailPromise.catch(() => {}); // Prevent unhandled promise rejection
+
+      // Return response immediately
       res.status(201).json({
         success: true,
-        message: `Worker created successfully. ${emailMessage}`,
-        emailSent,
+        message: 'Worker created successfully. Temporary password is being sent to email.',
+        emailStatus, // 'sending' status
         worker: {
           _id: worker._id,
           name: worker.name,

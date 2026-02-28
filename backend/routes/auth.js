@@ -45,7 +45,7 @@ router.post('/register',
       // Prepare user data
       const userData = {
         name,
-        email,
+        email: email.toLowerCase().trim(), // Normalize email
         password,
         role: role || 'customer',
         phone,
@@ -166,8 +166,11 @@ router.post('/login',
 
       const { email, password } = req.body;
 
+      // Normalize email (lowercase and trim) to match schema
+      const normalizedEmail = email.toLowerCase().trim();
+
       // Find user with password field
-      const user = await User.findOne({ email }).select('+password');
+      const user = await User.findOne({ email: normalizedEmail }).select('+password');
       if (!user) {
         return res.status(401).json({ 
           error: { message: 'Invalid credentials', status: 401 } 
