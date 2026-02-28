@@ -87,6 +87,11 @@ const AdminWorkers = () => {
         adminAPI.getWorkers(),
         adminAPI.getLocations()
       ]);
+      console.log('📊 Workers fetched:', workersRes.workers?.length || 0, 'workers');
+      console.log('📍 Locations fetched:', locationsRes.locations?.length || 0, 'locations');
+      if (workersRes.workers?.length > 0) {
+        console.log('Sample worker:', workersRes.workers[0]);
+      }
       setWorkers(workersRes.workers || []);
       setLocations(locationsRes.locations || []);
     } catch (error) {

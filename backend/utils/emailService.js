@@ -56,18 +56,23 @@ export const generateTemporaryPassword = () => {
 // Send temporary password email
 export const sendTemporaryPasswordEmail = async (email, name, temporaryPassword) => {
   try {
+    console.log('📧 sendTemporaryPasswordEmail called for:', email);
+    
     if (!isEmailConfigured()) {
-      console.log('ℹ️ Email not configured. Skipping email to:', email);
+      console.log('ℹ️ Email not configured. SMTP_USER:', process.env.SMTP_USER ? 'SET' : 'NOT SET');
+      console.log('ℹ️ Email not configured. SMTP_PASS:', process.env.SMTP_PASS ? 'SET' : 'NOT SET');
       console.log('📧 Temporary password for', name, ':', temporaryPassword);
       return { success: false, reason: 'Email not configured', password: temporaryPassword };
     }
 
+    console.log('✅ Email is configured. Creating transporter...');
     const transporter = createTransporter();
     if (!transporter) {
       console.log('ℹ️ Email transporter not available. Skipping email to:', email);
       return { success: false, reason: 'Transporter creation failed', password: temporaryPassword };
     }
     
+    console.log('✅ Transporter created. Preparing email...');
     const mailOptions = {
       from: `"Healthy Homez" <${process.env.SMTP_USER}>`,
       to: email,
@@ -137,12 +142,17 @@ export const sendTemporaryPasswordEmail = async (email, name, temporaryPassword)
       `
     };
     
+    console.log('🚀 Sending email...');
     const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Temporary password email sent:', info.messageId);
+    console.log('✅ Temporary password email sent successfully! Message ID:', info.messageId);
+    console.log('📧 Email accepted by:', info.accepted);
+    console.log('❌ Email rejected by:', info.rejected);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('❌ Error sending temporary password email:', error.message);
-    // Don't throw error - just log it and return failure status
+    console.error('❌ Error sending temporary password email:');
+    console.error('   Error message:', error.message);
+    console.error('   Error code:', error.code);
+    console.error('   Error stack:', error.stack);
     return { success: false, reason: error.message, password: temporaryPassword };
   }
 };
@@ -205,7 +215,6 @@ export const sendPasswordChangeConfirmation = async (email, name) => {
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('❌ Error sending password change confirmation:', error.message);
-    // Don't throw error, just log it and return failure status
     return { success: false, reason: error.message };
   }
 };

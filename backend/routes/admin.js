@@ -472,14 +472,17 @@ router.post('/workers',
 
       const { name, email, phone, gender, religion, experience, specialization, hourlyRate, assignedApartmentIds } = req.body;
 
+      // Normalize email
+      const normalizedEmail = email.toLowerCase().trim();
+      
       // Check if email exists
-      const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
+      const existingUser = await User.findOne({ email: normalizedEmail });
       if (existingUser) {
-        console.log(`⚠️ Worker creation attempt with existing email: ${email}`);
+        console.log(`⚠️ Worker creation attempt with existing email: ${normalizedEmail}`);
         return res.status(400).json({ error: { message: 'Email already exists', status: 400 } });
       }
 
-      console.log(`✅ No existing user found for email: ${email}, proceeding with worker creation`);
+      console.log(`✅ No existing user found for email: ${normalizedEmail}, proceeding with worker creation`);
 
       // Check if admin has permission (only if role is admin, not super_admin)
       if (req.user.role === 'admin' && !req.user.adminProfile?.permissions?.canCreateWorkers) {
@@ -488,6 +491,7 @@ router.post('/workers',
 
       // Generate temporary password
       const temporaryPassword = generateTemporaryPassword();
+      console.log(`🔑 Generated temporary password for ${normalizedEmail}:`, temporaryPassword);
 
       // Get apartment assignments
       let assignedApartments = [];
@@ -517,7 +521,7 @@ router.post('/workers',
       // Create worker
       const worker = new User({
         name,
-        email: email.toLowerCase().trim(), // Normalize email to match schema
+        email: normalizedEmail,
         password: temporaryPassword, // Will be hashed by pre-save hook
         temporaryPassword: temporaryPassword, // Store plain text for reference (not hashed)
         isFirstLogin: true, // Force password change on first login
@@ -525,6 +529,8 @@ router.post('/workers',
         gender: gender || 'prefer_not_to_say',
         religion: religion || undefined,
         role: 'worker',
+        isActive: true,
+        isVerified: false,
         workerProfile: {
           specialization,
           experience: experience || 0,
@@ -535,7 +541,9 @@ router.post('/workers',
         }
       });
 
+      console.log(`💾 Saving worker to database...`);
       await worker.save();
+      console.log(`✅ Worker saved successfully with ID: ${worker._id}`);
 
       // Add worker to location's assignedWorkers
       if (assignedApartmentIds && assignedApartmentIds.length > 0) {
@@ -545,24 +553,25 @@ router.post('/workers',
         );
       }
 
-      // Send temporary password email (non-blocking with timeout)
-      // Don't wait for email to send - return response immediately
-      let emailStatus = 'sending';
-      const emailPromise = Promise.race([
-        sendTemporaryPasswordEmail(email, name, temporaryPassword),
-        new Promise((resolve) => setTimeout(() => resolve({ success: false, reason: 'timeout' }), 5000)) // 5 second timeout
-      ]).then(result => {
-        if (result.success) {
-          console.log('✅ Email sent successfully to:', email);
-        } else {
-          console.log('⚠️ Email not sent:', result.reason);
-        }
-      }).catch(error => {
-        console.error('❌ Failed to send email:', error.message);
-      });
-
+      // Send temporary password email (non-blocking)
+      let emailStatus = 'pending';
+      console.log(`📧 Attempting to send email to: ${normalizedEmail}`);
+      
       // Fire and forget - don't wait for email
-      emailPromise.catch(() => {}); // Prevent unhandled promise rejection
+      sendTemporaryPasswordEmail(normalizedEmail, name, temporaryPassword)
+        .then(result => {
+          if (result.success) {
+            console.log('✅ Email sent successfully to:', normalizedEmail);
+            emailStatus = 'sent';
+          } else {
+            console.log('⚠️ Email not sent:', result.reason);
+            emailStatus = 'failed';
+          }
+        })
+        .catch(error => {
+          console.error('❌ Failed to send email:', error.message);
+          emailStatus = 'failed';
+        });
 
       // Return response immediately
       res.status(201).json({
@@ -681,6 +690,10 @@ router.delete('/workers/:workerId', authenticate, authorize('admin', 'super_admi
 // @access  Private/Admin
 router.get('/workers', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
   try {
+    console.log('\n==================== GET /workers ====================');
+    console.log('👤 User:', req.user.name, '| Role:', req.user.role, '| ID:', req.user._id);
+    console.log('📋 Admin Profile:', JSON.stringify(req.user.adminProfile, null, 2));
+    
     let query = { role: 'worker', isActive: true };
 
     // Get all workers first
@@ -688,32 +701,46 @@ router.get('/workers', authenticate, authorize('admin', 'super_admin'), async (r
       .select('name email phone workerProfile.specialization workerProfile.assignedApartments workerProfile.rating workerProfile.availability workerProfile.experience currentLocation addresses createdAt')
       .sort({ createdAt: -1 });
 
+    console.log(`🔍 Total active workers in database: ${workers.length}`);
+
     // If regular admin, filter workers by assigned locations
     if (req.user.role === 'admin') {
       // Get admin's assigned location IDs
       const adminLocationIds = req.user.adminProfile?.assignedLocations?.map(loc => loc.locationId.toString()) || [];
       
-      console.log(`🔍 Admin ${req.user.name} filtering workers for locations:`, adminLocationIds);
+      console.log(`🔍 Admin ${req.user.name} (ID: ${req.user._id}) assigned to locations:`, adminLocationIds);
 
-      // Filter workers who are assigned to ANY of the admin's locations
-      workers = workers.filter(worker => {
-        // Check if worker has any assigned apartments matching admin's locations
-        const workerLocationIds = worker.workerProfile?.assignedApartments?.map(apt => apt.locationId?.toString()).filter(Boolean) || [];
-        
-        // Worker is visible if any of their assigned locations match admin's locations
-        const hasMatchingLocation = workerLocationIds.some(locId => adminLocationIds.includes(locId));
-        
-        if (hasMatchingLocation) {
-          console.log(`✅ Worker ${worker.name} visible to admin (location match)`);
-        }
-        
-        return hasMatchingLocation;
-      });
+      if (adminLocationIds.length === 0) {
+        console.log(`⚠️ Admin ${req.user.name} has NO assigned locations - returning empty worker list`);
+        workers = [];
+      } else {
+        // Filter workers who are assigned to ANY of the admin's locations
+        workers = workers.filter(worker => {
+          // Check if worker has any assigned apartments matching admin's locations
+          const workerLocationIds = worker.workerProfile?.assignedApartments?.map(apt => apt.locationId?.toString()).filter(Boolean) || [];
+          
+          console.log(`  🔎 Checking worker ${worker.name}: locations =`, workerLocationIds);
+          
+          // Worker is visible if any of their assigned locations match admin's locations
+          const hasMatchingLocation = workerLocationIds.some(locId => adminLocationIds.includes(locId));
+          
+          if (hasMatchingLocation) {
+            console.log(`    ✅ Worker ${worker.name} visible to admin (location match)`);
+          } else {
+            console.log(`    ❌ Worker ${worker.name} NOT visible to admin (no location match)`);
+          }
+          
+          return hasMatchingLocation;
+        });
 
-      console.log(`📊 Admin sees ${workers.length} workers out of total available`);
+        console.log(`📊 Admin ${req.user.name} sees ${workers.length} workers`);
+      }
     } else {
       console.log(`👑 Super Admin sees all ${workers.length} workers`);
     }
+
+    console.log('✅ Returning', workers.length, 'workers to', req.user.role);
+    console.log('==================== END GET /workers ====================\n');
 
     res.json({
       success: true,
@@ -810,26 +837,30 @@ router.get('/dashboard-stats', authenticate, authorize('admin', 'super_admin'), 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    let locationQuery = { isActive: true };
-    if (req.user.role === 'admin') {
-      locationQuery.assignedAdmin = req.user._id;
-    }
-
-    const locations = await Location.find(locationQuery);
-    const locationIds = locations.map(loc => loc._id);
-
-    // Get workers in these locations
-    const workers = await User.find({
+    // Get workers based on role
+    let workers = await User.find({
       role: 'worker',
-      isActive: true,
-      'workerProfile.assignedApartments': { $exists: true, $ne: [] }
+      isActive: true
     });
 
-    const workersInLocations = workers.filter(w => 
-      w.workerProfile.assignedApartments.some(apt => 
-        locations.some(loc => loc.apartmentName === apt.apartmentName && loc.area === apt.area)
-      )
-    );
+    // Filter workers by location for regular admins
+    if (req.user.role === 'admin') {
+      const adminLocationIds = req.user.adminProfile?.assignedLocations?.map(loc => loc.locationId.toString()) || [];
+      
+      console.log(`📊 Dashboard: Admin ${req.user.name} filtering workers for locations:`, adminLocationIds);
+
+      // Filter workers who are assigned to ANY of the admin's locations
+      workers = workers.filter(worker => {
+        const workerLocationIds = worker.workerProfile?.assignedApartments?.map(apt => apt.locationId?.toString()).filter(Boolean) || [];
+        return workerLocationIds.some(locId => adminLocationIds.includes(locId));
+      });
+
+      console.log(`📊 Dashboard: Admin sees ${workers.length} workers`);
+    } else {
+      console.log(`👑 Dashboard: Super Admin sees all ${workers.length} workers`);
+    }
+
+    const workersInLocations = workers;
 
     // Get bookings for these locations (based on address matching)
     const todayBookings = await Booking.countDocuments({
@@ -882,12 +913,34 @@ router.get('/recent-bookings', authenticate, authorize('admin', 'super_admin'), 
   try {
     const { limit = 10 } = req.query;
 
-    const bookings = await Booking.find()
+    let bookings = await Booking.find()
       .populate('customer', 'name')
       .populate('worker', 'name')
       .populate('service', 'name')
       .sort({ createdAt: -1 })
-      .limit(parseInt(limit));
+      .limit(parseInt(limit) * 5); // Fetch more to filter
+
+    // Filter bookings by admin's assigned locations
+    if (req.user.role === 'admin') {
+      const adminLocationIds = req.user.adminProfile?.assignedLocations?.map(loc => loc.locationId.toString()) || [];
+      
+      // Filter bookings where worker is assigned to admin's locations
+      bookings = await Promise.all(
+        bookings.map(async (booking) => {
+          if (!booking.worker) return booking; // Include unassigned bookings
+          
+          const worker = await User.findById(booking.worker._id);
+          if (!worker) return null;
+          
+          const workerLocationIds = worker.workerProfile?.assignedApartments?.map(apt => apt.locationId?.toString()).filter(Boolean) || [];
+          const hasMatch = workerLocationIds.some(locId => adminLocationIds.includes(locId));
+          
+          return hasMatch ? booking : null;
+        })
+      );
+      
+      bookings = bookings.filter(b => b !== null).slice(0, parseInt(limit));
+    }
 
     res.json({
       success: true,
@@ -906,10 +959,26 @@ router.get('/alerts', authenticate, authorize('admin', 'super_admin'), async (re
   try {
     const alerts = [];
 
-    // Check for unassigned bookings
+    // Get workers for this admin
+    let workerQuery = { role: 'worker', isActive: true };
+    let workers = await User.find(workerQuery);
+
+    // Filter workers by admin's locations
+    if (req.user.role === 'admin') {
+      const adminLocationIds = req.user.adminProfile?.assignedLocations?.map(loc => loc.locationId.toString()) || [];
+      workers = workers.filter(worker => {
+        const workerLocationIds = worker.workerProfile?.assignedApartments?.map(apt => apt.locationId?.toString()).filter(Boolean) || [];
+        return workerLocationIds.some(locId => adminLocationIds.includes(locId));
+      });
+    }
+
+    const workerIds = workers.map(w => w._id);
+
+    // Check for unassigned bookings (only for this admin's area)
     const unassignedBookings = await Booking.countDocuments({
       worker: null,
       status: 'pending'
+      // Note: Ideally filter by location/address, but for now showing all unassigned
     });
 
     if (unassignedBookings > 0) {
@@ -921,22 +990,18 @@ router.get('/alerts', authenticate, authorize('admin', 'super_admin'), async (re
       });
     }
 
-    // Check for offline workers during active shift
+    // Check for offline workers during active shift (only admin's workers)
     const now = new Date();
     const currentHour = now.getHours();
     if (currentHour >= 8 && currentHour <= 20) { // During working hours
-      const offlineWorkers = await User.find({
-        role: 'worker',
-        isActive: true,
-        'workerProfile.availability': false
-      }).select('name');
+      const offlineWorkers = workers.filter(w => !w.workerProfile?.availability);
 
       if (offlineWorkers.length > 0) {
         alerts.push({
           type: 'error',
           message: `${offlineWorkers.length} worker(s) have been offline for 2+ hours during active shift`,
           action: 'contact-workers',
-          workers: offlineWorkers
+          workers: offlineWorkers.map(w => ({ _id: w._id, name: w.name }))
         });
       }
     }
