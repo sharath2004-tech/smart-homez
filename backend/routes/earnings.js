@@ -1,8 +1,8 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
-import WorkerEarnings from '../models/WorkerEarnings.js';
 import Settings from '../models/Settings.js';
 import User from '../models/User.js';
+import WorkerEarnings from '../models/WorkerEarnings.js';
 
 const router = express.Router();
 

@@ -6,7 +6,6 @@ import Location from '../models/Location.js';
 import ServiceArea from '../models/ServiceArea.js';
 import User from '../models/User.js';
 import WorkerEarnings from '../models/WorkerEarnings.js';
-import Settings from '../models/Settings.js';
 import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/emailService.js';
 
 const router = express.Router();

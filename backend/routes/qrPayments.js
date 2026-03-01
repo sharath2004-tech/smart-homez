@@ -2,8 +2,8 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
 import Booking from '../models/Booking.js';
-import QRPayment from '../models/QRPayment.js';
 import Location from '../models/Location.js';
+import QRPayment from '../models/QRPayment.js';
 import Settings from '../models/Settings.js';
 
 const router = express.Router();
