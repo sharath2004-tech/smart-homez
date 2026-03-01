@@ -308,34 +308,82 @@ router.post('/',
         preferences
       } = req.body;
 
-      // ⚠️ IMPORTANT: Validate customer location is in a service area
-      if (!location?.coordinates || location.coordinates.length !== 2) {
-        return res.status(400).json({ 
-          error: { 
-            message: 'Location is required. Please select your location to book this service.', 
-            status: 400,
-            code: 'LOCATION_REQUIRED'
-          } 
-        });
-      }
+      // ⚠️ IMPORTANT: Get customer location with fallback to saved addresses
+      let customerLocation = location;
+      let customerLng, customerLat;
 
-      // Validate coordinates are valid numbers
-      const [customerLng, customerLat] = location.coordinates;
-      if (
-        customerLng === null || customerLng === undefined || 
-        customerLat === null || customerLat === undefined ||
-        isNaN(customerLng) || isNaN(customerLat) ||
-        customerLng < -180 || customerLng > 180 ||
-        customerLat < -90 || customerLat > 90
-      ) {
-        return res.status(400).json({ 
-          error: { 
-            message: 'Invalid location coordinates. Please select a valid location on the map.', 
-            status: 400,
-            code: 'INVALID_COORDINATES',
-            details: `Received coordinates: [${customerLng}, ${customerLat}]`
-          } 
-        });
+      // Check if location coordinates are provided and valid
+      const hasValidCoordinates = 
+        location?.coordinates && 
+        location.coordinates.length === 2 &&
+        location.coordinates[0] !== null && 
+        location.coordinates[0] !== undefined &&
+        location.coordinates[1] !== null && 
+        location.coordinates[1] !== undefined &&
+        !isNaN(location.coordinates[0]) && 
+        !isNaN(location.coordinates[1]) &&
+        location.coordinates[0] >= -180 && 
+        location.coordinates[0] <= 180 &&
+        location.coordinates[1] >= -90 && 
+        location.coordinates[1] <= 90;
+
+      if (!hasValidCoordinates) {
+        // Fallback: Try to use customer's saved location
+        console.log('⚠️ Invalid or missing coordinates, fetching customer saved location...');
+        const customer = await User.findById(req.user._id);
+        
+        if (!customer) {
+          return res.status(400).json({ 
+            error: { 
+              message: 'Customer not found.', 
+              status: 400,
+              code: 'CUSTOMER_NOT_FOUND'
+            } 
+          });
+        }
+
+        // Try to use default address first
+        const defaultAddress = customer.addresses?.find(addr => addr.isDefault);
+        const fallbackAddress = defaultAddress || customer.addresses?.[0];
+        
+        if (fallbackAddress?.location?.coordinates?.length === 2) {
+          customerLng = fallbackAddress.location.coordinates[0];
+          customerLat = fallbackAddress.location.coordinates[1];
+          customerLocation = {
+            coordinates: [customerLng, customerLat],
+            address: fallbackAddress.street || '',
+            area: fallbackAddress.area || '',
+            city: fallbackAddress.city || '',
+            apartment: fallbackAddress.apartment || '',
+            building: fallbackAddress.building || ''
+          };
+          console.log(`✅ Using customer's saved address: ${fallbackAddress.area}, ${fallbackAddress.city}`);
+        } 
+        // Try currentLocation as last resort
+        else if (customer.currentLocation?.coordinates?.length === 2) {
+          customerLng = customer.currentLocation.coordinates[0];
+          customerLat = customer.currentLocation.coordinates[1];
+          customerLocation = {
+            coordinates: [customerLng, customerLat],
+            address: location?.address || '',
+            area: location?.area || '',
+            city: location?.city || ''
+          };
+          console.log(`✅ Using customer's current location`);
+        } 
+        // No valid location found
+        else {
+          return res.status(400).json({ 
+            error: { 
+              message: 'No valid location found. Please add your address in your profile or select a location on the map.', 
+              status: 400,
+              code: 'NO_LOCATION_AVAILABLE'
+            } 
+          });
+        }
+      } else {
+        customerLng = location.coordinates[0];
+        customerLat = location.coordinates[1];
       }
 
       console.log(`🔍 Searching for service location near: [${customerLng}, ${customerLat}]`);
@@ -432,11 +480,12 @@ router.post('/',
         endTime,
         totalAmount,
         location: {
-          ...location,
+          ...customerLocation,
+          coordinates: [customerLng, customerLat],
           locationId: nearbyLocation._id,
           apartmentName: nearbyLocation.apartmentName,
-          area: nearbyLocation.area,
-          city: nearbyLocation.city,
+          area: nearbyLocation.area || customerLocation.area,
+          city: nearbyLocation.city || customerLocation.city,
           state: nearbyLocation.state
         },
         notes,

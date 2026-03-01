@@ -231,12 +231,26 @@ const BookServicePage = () => {
       
       // Get user location from localStorage
       const userLocation = localStorage.getItem('userLocation');
-      const location = userLocation ? JSON.parse(userLocation) : null;
+      let location = userLocation ? JSON.parse(userLocation) : null;
       
-      if (!location) {
-        toast.error('Please set your location first');
-        navigate('/customer/services');
-        return;
+      // Validate location coordinates
+      const hasValidLocation = location && 
+        typeof location.lng === 'number' && 
+        typeof location.lat === 'number' &&
+        !isNaN(location.lng) && 
+        !isNaN(location.lat) &&
+        location.lng >= -180 && location.lng <= 180 &&
+        location.lat >= -90 && location.lat <= 90;
+
+      // If no valid location in localStorage, send partial location
+      // Backend will fallback to user's saved address
+      if (!hasValidLocation) {
+        console.log('No valid location in localStorage, backend will use saved address');
+        location = location || {
+          address: '',
+          area: '',
+          city: ''
+        };
       }
 
       const bookingDate = bookingMode === 'now'
@@ -257,11 +271,11 @@ const BookServicePage = () => {
           ...(selectedWorker && { preferredWorkers: [selectedWorker] })
         },
         location: {
-          coordinates: [location.lng, location.lat],
-          address: location.address,
-          area: location.area,
-          city: location.city
-        },
+          ...(hasValidLocation && { coordinates: [location.lng, location.lat] }),
+          address: location.address || '',
+          area: location.area || '',
+          city: location.city || ''
+        } as { coordinates?: number[], address: string, area: string, city: string },
         // Enable auto-assignment only when no worker manually selected
         autoAssign: !selectedWorker
       };
