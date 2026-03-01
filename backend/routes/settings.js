@@ -63,7 +63,7 @@ router.put('/',
   [
     body('payment.upiId').optional().isString().trim().withMessage('UPI ID must be a string'),
     body('payment.upiName').optional().isString().trim().withMessage('UPI Name must be a string'),
-    body('payment.qrCodeImage').optional().withMessage('QR Code Image must be a string or null'),
+    body('payment.qrCodeImage').optional(),
     body('company.name').optional().isString().trim().withMessage('Company name must be a string'),
     body('company.phone').optional().isString().trim().withMessage('Company phone must be a string'),
     body('company.email').optional().isEmail().withMessage('Company email must be valid'),
