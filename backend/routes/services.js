@@ -90,6 +90,56 @@ router.get('/', async (req, res) => {
   }
 });
 
+// @route   GET /api/services/by-location/:locationId
+// @desc    Get services available at a specific location
+// @access  Public
+router.get('/by-location/:locationId', async (req, res) => {
+  try {
+    const { locationId } = req.params;
+    
+    // Import Location model dynamically to avoid circular dependency
+    const Location = (await import('../models/Location.js')).default;
+    
+    const location = await Location.findById(locationId);
+    if (!location) {
+      return res.status(404).json({ 
+        error: { message: 'Location not found', status: 404 } 
+      });
+    }
+
+    // Get services available at this location
+    let query = { isActive: true };
+    
+    if (location.availableServices && location.availableServices.length > 0) {
+      // Filter to only show services available at this location
+      const availableServiceIds = location.availableServices
+        .filter(s => s.isActive)
+        .map(s => s.service);
+      query._id = { $in: availableServiceIds };
+    }
+    // If no specific services listed, assume all active services are available
+    
+    const services = await Service.find(query)
+      .populate('createdBy', 'name email')
+      .sort({ name: 1 });
+
+    res.json({
+      services,
+      location: {
+        _id: location._id,
+        apartmentName: location.apartmentName,
+        area: location.area,
+        city: location.city,
+        isServiceAvailable: location.isServiceAvailable
+      },
+      totalServices: services.length
+    });
+  } catch (error) {
+    console.error('Get services by location error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
 // @route   GET /api/services/:id
 // @desc    Get service by ID
 // @access  Public

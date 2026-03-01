@@ -1,5 +1,4 @@
 import express from 'express';
-import mongoose from 'mongoose';
 import { body, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
 import Booking from '../models/Booking.js';
@@ -27,7 +26,12 @@ const router = express.Router();
 router.get('/', authenticate, async (req, res) => {
   try {
     // Update booking statuses before fetching
-    await updateBookingStatuses();
+    try {
+      await updateBookingStatuses();
+    } catch (statusUpdateError) {
+      console.error('Error updating booking statuses:', statusUpdateError);
+      // Continue even if status update fails
+    }
     
     const { status, page = 1, limit = 10 } = req.query;
     
@@ -52,13 +56,30 @@ router.get('/', authenticate, async (req, res) => {
       }
     }
 
+    console.log('Fetching bookings with query:', JSON.stringify(query));
+
     const bookings = await Booking.find(query)
-      .populate('customer', 'name email phone')
-      .populate('worker', 'name email phone gender religion workerProfile')
-      .populate('service', 'name description price duration')
+      .populate({
+        path: 'customer',
+        select: 'name email phone',
+        options: { strictPopulate: false }
+      })
+      .populate({
+        path: 'worker',
+        select: 'name email phone gender religion workerProfile',
+        options: { strictPopulate: false }
+      })
+      .populate({
+        path: 'service',
+        select: 'name description price duration',
+        options: { strictPopulate: false }
+      })
       .limit(limit * 1)
       .skip((page - 1) * limit)
-      .sort({ bookingDate: -1 });
+      .sort({ bookingDate: -1 })
+      .lean();
+
+    console.log(`Found ${bookings.length} bookings`);
 
     const count = await Booking.countDocuments(query);
 
@@ -70,7 +91,19 @@ router.get('/', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('Get bookings error:', error);
-    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      code: error.code
+    });
+    res.status(500).json({ 
+      error: { 
+        message: 'Server error', 
+        status: 500,
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      } 
+    });
   }
 });
 
@@ -275,13 +308,18 @@ router.post('/',
         preferences
       } = req.body;
 
-      // Validate customer location is in a service area
+      // ⚠️ IMPORTANT: Validate customer location is in a service area
       if (!location?.coordinates || location.coordinates.length !== 2) {
         return res.status(400).json({ 
-          error: { message: 'Valid location coordinates required', status: 400 } 
+          error: { 
+            message: 'Location is required. Please select your location to book this service.', 
+            status: 400,
+            code: 'LOCATION_REQUIRED'
+          } 
         });
       }
 
+      // Find nearby location (5km radius)
       const [customerLng, customerLat] = location.coordinates;
       const nearbyLocation = await Location.findOne({
         location: {
@@ -290,18 +328,40 @@ router.post('/',
               type: 'Point',
               coordinates: [customerLng, customerLat]
             },
-            $maxDistance: 500 // 500m radius
+            $maxDistance: 5000 // 5km radius
           }
         },
-        isServiceAvailable: true,
-        isActive: true
+        isActive: true,
+        isServiceAvailable: true
       });
 
       if (!nearbyLocation) {
         return res.status(400).json({ 
-          error: { message: 'Service not available in your location', status: 400 } 
+          error: { 
+            message: 'Service not available in your area. Please select a location within our service coverage.', 
+            status: 400,
+            code: 'SERVICE_NOT_AVAILABLE_IN_AREA',
+            suggestion: 'Try selecting a different location or check available service areas.'
+          } 
         });
       }
+
+      // Check if the requested service is available at this location
+      const serviceAvailableAtLocation = nearbyLocation.availableServices?.some(
+        s => s.service.toString() === service && s.isActive
+      ) || nearbyLocation.availableServices?.length === 0; // If no services specified, assume all available
+
+      if (!serviceAvailableAtLocation && nearbyLocation.availableServices?.length > 0) {
+        return res.status(400).json({ 
+          error: { 
+            message: 'This service is not available at your selected location.', 
+            status: 400,
+            code: 'SERVICE_NOT_AT_LOCATION'
+          } 
+        });
+      }
+
+      console.log(`✅ Booking location validated: ${nearbyLocation.apartmentName}, ${nearbyLocation.area}`);
 
       // If worker is provided, verify they exist and are available in this location
       if (worker) {
@@ -326,19 +386,25 @@ router.post('/',
           });
         }
 
-        // Verify worker is assigned to customer's location
+        // ✅ STRICT VERIFICATION: Worker must be assigned to the customer's location
         const workerInLocation = workerUser.workerProfile.assignedApartments?.some(apt => 
           apt.locationId.toString() === nearbyLocation._id.toString()
         );
 
         if (!workerInLocation) {
-          return res.status(400).json({ 
-            error: { message: 'Worker not available in your location', status: 400 } 
+          return res.status(403).json({ 
+            error: { 
+              message: `This worker is not available in ${nearbyLocation.apartmentName}. Workers can only serve their assigned locations.`, 
+              status: 403,
+              code: 'WORKER_NOT_IN_LOCATION'
+            } 
           });
         }
+
+        console.log(`✅ Worker ${workerUser.name} verified for location ${nearbyLocation.apartmentName}`);
       }
 
-      // Prepare booking data with location reference
+      // Prepare booking data with validated location reference
       const bookingData = {
         customer: req.user._id,
         worker: worker || undefined,
@@ -352,7 +418,8 @@ router.post('/',
           locationId: nearbyLocation._id,
           apartmentName: nearbyLocation.apartmentName,
           area: nearbyLocation.area,
-          city: nearbyLocation.city
+          city: nearbyLocation.city,
+          state: nearbyLocation.state
         },
         notes,
         assignmentMethod: worker ? 'manual' : 'auto',
@@ -481,7 +548,13 @@ router.post('/',
       });
     } catch (error) {
       console.error('Create booking error:', error);
-      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+      console.error('Error stack:', error.stack);
+      console.error('Error details:', {
+        message: error.message,
+        name: error.name,
+        code: error.code
+      });
+      res.status(500).json({ error: { message: error.message || 'Server error', status: 500 } });
     }
   }
 );

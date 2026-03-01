@@ -361,4 +361,107 @@ router.post('/reverse-geocode', authenticate, async (req, res) => {
   }
 });
 
+// @route   GET /api/locations/customer/nearby
+// @desc    Get nearby service locations for customers (public/authenticated)
+// @access  Public or Customer
+router.get('/customer/nearby', async (req, res) => {
+  try {
+    const { latitude, longitude, maxDistance = 5000 } = req.query;
+
+    if (!latitude || !longitude) {
+      return res.status(400).json({
+        success: false,
+        message: 'Latitude and longitude are required',
+        code: 'COORDINATES_REQUIRED'
+      });
+    }
+
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
+
+    if (isNaN(lat) || isNaN(lng)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid coordinates',
+        code: 'INVALID_COORDINATES'
+      });
+    }
+
+    // Find nearby locations with available services
+    const nearbyLocations = await Location.find({
+      location: {
+        $near: {
+          $geometry: {
+            type: 'Point',
+            coordinates: [lng, lat]
+          },
+          $maxDistance: parseInt(maxDistance)
+        }
+      },
+      isActive: true,
+      isServiceAvailable: true
+    })
+    .populate('assignedWorkers.worker', 'name workerProfile.specialization workerProfile.rating workerProfile.availability')
+    .select('apartmentName building area city state zipCode location assignedWorkers availableServices isServiceAvailable')
+    .limit(10);
+
+    // Calculate distance for each location
+    const locationsWithDistance = nearbyLocations.map(location => {
+      const distance = calculateDistance(
+        lat,
+        lng,
+        location.location.coordinates[1],
+        location.location.coordinates[0]
+      );
+
+      // Count available workers at this location
+      const availableWorkersCount = location.assignedWorkers.filter(
+        aw => aw.worker?.workerProfile?.availability
+      ).length;
+
+      return {
+        _id: location._id,
+        apartmentName: location.apartmentName,
+        building: location.building,
+        area: location.area,
+        city: location.city,
+        state: location.state,
+        zipCode: location.zipCode,
+        coordinates: {
+          lat: location.location.coordinates[1],
+          lng: location.location.coordinates[0]
+        },
+        distance: Math.round(distance * 10) / 10, // Round to 1 decimal (in km)
+        distanceFormatted: distance < 1 
+          ? `${Math.round(distance * 1000)}m` 
+          : `${(Math.round(distance * 10) / 10)}km`,
+        availableWorkersCount,
+        servicesAvailable: location.availableServices?.length || 0,
+        isServiceAvailable: location.isServiceAvailable
+      };
+    });
+
+    // Sort by distance
+    locationsWithDistance.sort((a, b) => a.distance - b.distance);
+
+    res.status(200).json({
+      success: true,
+      count: locationsWithDistance.length,
+      data: locationsWithDistance,
+      searchCenter: {
+        latitude: lat,
+        longitude: lng
+      },
+      maxDistance: parseInt(maxDistance)
+    });
+  } catch (error) {
+    console.error('Get nearby locations error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error finding nearby locations',
+      error: error.message
+    });
+  }
+});
+
 export default router;
