@@ -319,8 +319,26 @@ router.post('/',
         });
       }
 
-      // Find nearby location (5km radius)
+      // Validate coordinates are valid numbers
       const [customerLng, customerLat] = location.coordinates;
+      if (
+        customerLng === null || customerLng === undefined || 
+        customerLat === null || customerLat === undefined ||
+        isNaN(customerLng) || isNaN(customerLat) ||
+        customerLng < -180 || customerLng > 180 ||
+        customerLat < -90 || customerLat > 90
+      ) {
+        return res.status(400).json({ 
+          error: { 
+            message: 'Invalid location coordinates. Please select a valid location on the map.', 
+            status: 400,
+            code: 'INVALID_COORDINATES',
+            details: `Received coordinates: [${customerLng}, ${customerLat}]`
+          } 
+        });
+      }
+
+      console.log(`🔍 Searching for service location near: [${customerLng}, ${customerLat}]`);
       const nearbyLocation = await Location.findOne({
         location: {
           $near: {
