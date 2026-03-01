@@ -3,6 +3,7 @@ import { body, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
 import Booking from '../models/Booking.js';
 import QRPayment from '../models/QRPayment.js';
+import Location from '../models/Location.js';
 import Settings from '../models/Settings.js';
 
 const router = express.Router();
@@ -50,14 +51,38 @@ router.post('/generate',
       // Check if QR payment already exists
       let qrPayment = await QRPayment.findOne({ booking: bookingId });
       
-      // Get UPI settings
-      const settings = await Settings.getSettings();
-      const upiId = settings.payment.upiId || 'healthyhomez@upi';
+      // Get payment details: Try location-specific first, then fallback to global settings
+      let upiId, upiName, qrCodeImage;
+      let paymentSource = 'global';
+      
+      // Try to get location-specific payment QR
+      if (booking.location?.locationId) {
+        const location = await Location.findById(booking.location.locationId);
+        
+        if (location?.paymentQR?.isActive && location.paymentQR?.upiId) {
+          // Use location-specific QR
+          upiId = location.paymentQR.upiId;
+          upiName = location.paymentQR.upiName;
+          qrCodeImage = location.paymentQR.qrCodeImage;
+          paymentSource = 'location';
+          console.log(`✅ Using location-specific QR for ${location.apartmentName}`);
+        }
+      }
+      
+      // Fallback to global settings if no location QR
+      if (!upiId) {
+        const settings = await Settings.getSettings();
+        upiId = settings.payment?.upiId || 'healthyhomez@upi';
+        upiName = settings.payment?.upiName || 'Healthy Homez';
+        qrCodeImage = settings.payment?.qrCodeImage;
+        console.log('ℹ️ Using global payment settings (no location QR configured)');
+      }
       
       if (qrPayment) {
         // Update existing QR payment
         qrPayment.amount = booking.totalAmount;
         qrPayment.upiId = upiId;
+        qrPayment.qrCodeImageUrl = qrCodeImage;
         qrPayment.qrCodeData = qrPayment.generateQRData();
         await qrPayment.save();
       } else {
@@ -67,7 +92,8 @@ router.post('/generate',
           customer: booking.customer,
           worker: booking.worker,
           amount: booking.totalAmount,
-          upiId: upiId
+          upiId: upiId,
+          qrCodeImageUrl: qrCodeImage
         });
         
         qrPayment.qrCodeData = qrPayment.generateQRData();
@@ -86,7 +112,14 @@ router.post('/generate',
 
       res.status(201).json({ 
         message: 'QR code generated successfully', 
-        qrPayment: populatedPayment 
+        qrPayment: populatedPayment,
+        paymentDetails: {
+          upiId,
+          upiName,
+          qrCodeImage,
+          source: paymentSource,
+          locationName: booking.location?.apartmentName
+        }
       });
 
     } catch (error) {

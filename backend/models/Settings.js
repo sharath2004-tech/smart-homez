@@ -53,6 +53,113 @@ const settingsSchema = new mongoose.Schema({
     }
   },
 
+  // Earnings & Payout Settings
+  earnings: {
+    // Platform commission rate (0 = free, 0.15 = 15%)
+    platformCommissionRate: {
+      type: Number,
+      default: 0, // FREE - Set to 0.15 for 15% commission
+      min: 0,
+      max: 1
+    },
+    // Convenience fee per booking (₹)
+    bookingConvenienceFee: {
+      type: Number,
+      default: 0, // FREE - Set to 20 for ₹20 fee
+      min: 0
+    },
+    // Minimum payout amount
+    minPayoutAmount: {
+      type: Number,
+      default: 500, // ₹500 minimum
+      min: 0
+    },
+    // Payout schedule
+    payoutSchedule: {
+      type: String,
+      enum: ['instant', 'weekly', 'biweekly', 'monthly'],
+      default: 'weekly'
+    },
+    // Instant payout fee (0 = free, 0.02 = 2%)
+    instantPayoutFee: {
+      type: Number,
+      default: 0, // FREE - Set to 0.02 for 2% fee
+      min: 0,
+      max: 0.1
+    },
+    // Payout processing day (1 = Monday, 7 = Sunday)
+    payoutDay: {
+      type: Number,
+      default: 1, // Monday
+      min: 1,
+      max: 7
+    },
+    // Enable auto-payouts
+    autoPayoutEnabled: {
+      type: Boolean,
+      default: false // Manual payouts initially
+    }
+  },
+
+  // Subscription Plans (Currently FREE)
+  subscriptions: {
+    workerPlans: {
+      basic: {
+        price: { type: Number, default: 0 }, // FREE
+        commissionRate: { type: Number, default: 0 },
+        features: [String]
+      },
+      pro: {
+        price: { type: Number, default: 0 }, // FREE
+        commissionRate: { type: Number, default: 0 },
+        features: [String]
+      },
+      premium: {
+        price: { type: Number, default: 0 }, // FREE
+        commissionRate: { type: Number, default: 0 },
+        features: [String]
+      }
+    },
+    customerPlans: {
+      basic: {
+        price: { type: Number, default: 0 }, // FREE
+        discountRate: { type: Number, default: 0 },
+        features: [String]
+      },
+      premium: {
+        price: { type: Number, default: 0 }, // FREE
+        discountRate: { type: Number, default: 0 },
+        features: [String]
+      }
+    }
+  },
+
+  // Cancellation Policy
+  cancellationPolicy: {
+    // Hours before booking to get full refund
+    fullRefundHours: {
+      type: Number,
+      default: 24
+    },
+    // Refund percentage if cancelled < fullRefundHours
+    partialRefundPercentage: {
+      type: Number,
+      default: 50, // 50% refund
+      min: 0,
+      max: 100
+    },
+    // Hours before booking for partial refund
+    partialRefundHours: {
+      type: Number,
+      default: 12
+    },
+    // No refund if cancelled within this many hours
+    noRefundHours: {
+      type: Number,
+      default: 2
+    }
+  },
+
   // Last updated info
   updatedBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -87,6 +194,15 @@ settingsSchema.statics.updateSettings = async function(updates, userId) {
   }
   if (updates.booking) {
     settings.booking = { ...settings.booking, ...updates.booking };
+  }
+  if (updates.earnings) {
+    settings.earnings = { ...settings.earnings, ...updates.earnings };
+  }
+  if (updates.subscriptions) {
+    settings.subscriptions = { ...settings.subscriptions, ...updates.subscriptions };
+  }
+  if (updates.cancellationPolicy) {
+    settings.cancellationPolicy = { ...settings.cancellationPolicy, ...updates.cancellationPolicy };
   }
   
   settings.updatedBy = userId;

@@ -15,7 +15,14 @@ const workerEarningsSchema = new mongoose.Schema({
   payoutMethod: { type: String, enum: ['bank', 'upi'] },
   payoutDetails: { accountNumber: String, ifsc: String, upiId: String },
   workDuration: { type: Number, required: true },
-  date: { type: Date, required: true }
+  date: { type: Date, required: true },
+  metadata: {
+    transactionId: String,
+    processedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    rejectedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    rejectionReason: String,
+    notes: String
+  }
 }, { timestamps: true });
 
 workerEarningsSchema.index({ worker: 1, date: -1 });

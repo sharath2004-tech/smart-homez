@@ -5,6 +5,8 @@ import Booking from '../models/Booking.js';
 import Location from '../models/Location.js';
 import ServiceArea from '../models/ServiceArea.js';
 import User from '../models/User.js';
+import WorkerEarnings from '../models/WorkerEarnings.js';
+import Settings from '../models/Settings.js';
 import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/emailService.js';
 
 const router = express.Router();
@@ -1512,5 +1514,235 @@ router.post('/manual-assign',
     }
   }
 );
+
+// ==================== PAYOUT MANAGEMENT ====================
+
+// @route   GET /api/admin/payouts/pending
+// @desc    Get all pending payout requests
+// @access  Private/Admin
+router.get('/payouts/pending', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+
+    const payouts = await WorkerEarnings.find({
+      payoutStatus: 'processing'
+    })
+      .populate('worker', 'name email phone workerProfile.bankDetails')
+      .populate('booking', 'bookingDate service')
+      .sort({ payoutDate: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    // Group by worker
+    const workerPayouts = {};
+    payouts.forEach(earning => {
+      const workerId = earning.worker._id.toString();
+      if (!workerPayouts[workerId]) {
+        workerPayouts[workerId] = {
+          worker: earning.worker,
+          earnings: [],
+          totalAmount: 0,
+          earningsCount: 0,
+          requestedDate: earning.payoutDate
+        };
+      }
+      workerPayouts[workerId].earnings.push(earning);
+      workerPayouts[workerId].totalAmount += earning.netEarning;
+      workerPayouts[workerId].earningsCount += 1;
+    });
+
+    const count = Object.keys(workerPayouts).length;
+
+    res.json({
+      payouts: Object.values(workerPayouts),
+      totalPages: Math.ceil(count / limit),
+      currentPage: parseInt(page),
+      totalWorkers: count,
+      totalAmount: Object.values(workerPayouts).reduce((sum, p) => sum + p.totalAmount, 0)
+    });
+  } catch (error) {
+    console.error('Get pending payouts error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   POST /api/admin/payouts/process/:workerId
+// @desc    Process payout for a worker (mark as completed)
+// @access  Private/Admin
+router.post('/payouts/process/:workerId', 
+  authenticate, 
+  authorize('admin', 'super_admin'), 
+  async (req, res) => {
+    try {
+      const { workerId } = req.params;
+      const { transactionId, notes } = req.body;
+
+      // Get all processing earnings for this worker
+      const earnings = await WorkerEarnings.find({
+        worker: workerId,
+        payoutStatus: 'processing'
+      });
+
+      if (earnings.length === 0) {
+        return res.status(404).json({
+          error: { message: 'No pending payouts found for this worker', status: 404 }
+        });
+      }
+
+      const totalAmount = earnings.reduce((sum, e) => sum + e.netEarning, 0);
+
+      // Update all to completed
+      await WorkerEarnings.updateMany(
+        { 
+          worker: workerId, 
+          payoutStatus: 'processing' 
+        },
+        { 
+          payoutStatus: 'completed',
+          payoutDate: new Date(),
+          'metadata.transactionId': transactionId,
+          'metadata.processedBy': req.user._id,
+          'metadata.notes': notes
+        }
+      );
+
+      res.json({
+        message: 'Payout processed successfully',
+        workerId,
+        amount: totalAmount.toFixed(2),
+        earningsCount: earnings.length,
+        transactionId
+      });
+
+    } catch (error) {
+      console.error('Process payout error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   POST /api/admin/payouts/reject/:workerId
+// @desc    Reject payout request (return to pending)
+// @access  Private/Admin
+router.post('/payouts/reject/:workerId', 
+  authenticate, 
+  authorize('admin', 'super_admin'), 
+  async (req, res) => {
+    try {
+      const { workerId } = req.params;
+      const { reason } = req.body;
+
+      // Update all processing to pending
+      const result = await WorkerEarnings.updateMany(
+        { 
+          worker: workerId, 
+          payoutStatus: 'processing' 
+        },
+        { 
+          payoutStatus: 'pending',
+          payoutDate: null,
+          'metadata.rejectedBy': req.user._id,
+          'metadata.rejectionReason': reason
+        }
+      );
+
+      if (result.modifiedCount === 0) {
+        return res.status(404).json({
+          error: { message: 'No pending payouts found for this worker', status: 404 }
+        });
+      }
+
+      res.json({
+        message: 'Payout request rejected',
+        workerId,
+        earningsReturned: result.modifiedCount
+      });
+
+    } catch (error) {
+      console.error('Reject payout error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   GET /api/admin/payouts/history
+// @desc    Get payout history
+// @access  Private/Admin
+router.get('/payouts/history', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { page = 1, limit = 20, status = 'completed' } = req.query;
+
+    const payouts = await WorkerEarnings.find({
+      payoutStatus: status
+    })
+      .populate('worker', 'name email phone')
+      .populate('booking', 'bookingDate service')
+      .sort({ payoutDate: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const count = await WorkerEarnings.countDocuments({ payoutStatus: status });
+
+    const totalAmount = await WorkerEarnings.aggregate([
+      { $match: { payoutStatus: status } },
+      { $group: { _id: null, total: { $sum: '$netEarning' } } }
+    ]);
+
+    res.json({
+      payouts,
+      totalPages: Math.ceil(count / limit),
+      currentPage: parseInt(page),
+      totalPayouts: count,
+      totalAmount: totalAmount[0]?.total || 0
+    });
+  } catch (error) {
+    console.error('Get payout history error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   GET /api/admin/payouts/stats
+// @desc    Get payout statistics
+// @access  Private/Admin
+router.get('/payouts/stats', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const [pending, processing, completed, platformRevenue] = await Promise.all([
+      WorkerEarnings.aggregate([
+        { $match: { payoutStatus: 'pending' } },
+        { $group: { _id: null, total: { $sum: '$netEarning' }, count: { $sum: 1 } } }
+      ]),
+      WorkerEarnings.aggregate([
+        { $match: { payoutStatus: 'processing' } },
+        { $group: { _id: null, total: { $sum: '$netEarning' }, count: { $sum: 1 } } }
+      ]),
+      WorkerEarnings.aggregate([
+        { $match: { payoutStatus: 'completed' } },
+        { $group: { _id: null, total: { $sum: '$netEarning' }, count: { $sum: 1 } } }
+      ]),
+      WorkerEarnings.aggregate([
+        { $group: { _id: null, total: { $sum: '$platformCommission' } } }
+      ])
+    ]);
+
+    res.json({
+      pending: {
+        amount: pending[0]?.total || 0,
+        count: pending[0]?.count || 0
+      },
+      processing: {
+        amount: processing[0]?.total || 0,
+        count: processing[0]?.count || 0
+      },
+      completed: {
+        amount: completed[0]?.total || 0,
+        count: completed[0]?.count || 0
+      },
+      platformRevenue: platformRevenue[0]?.total || 0
+    });
+  } catch (error) {
+    console.error('Get payout stats error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
 
 export default router;

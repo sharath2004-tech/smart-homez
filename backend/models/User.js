@@ -250,6 +250,14 @@ const userSchema = new mongoose.Schema({
     totalBookingsCompleted: {
       type: Number,
       default: 0
+    },
+    // Bank details for payouts
+    bankDetails: {
+      accountHolderName: String,
+      accountNumber: String,
+      ifscCode: String,
+      bankName: String,
+      upiId: String
     }
   },
   // Customer preferences

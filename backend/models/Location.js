@@ -85,6 +85,45 @@ const locationSchema = new mongoose.Schema({
   notes: {
     type: String
   },
+  // Payment QR Code for this location (admin-managed)
+  paymentQR: {
+    upiId: {
+      type: String,
+      default: null // Location-specific UPI ID
+    },
+    upiName: {
+      type: String,
+      default: null // Payee name for this location
+    },
+    qrCodeImage: {
+      type: String, // Base64 or URL of uploaded QR code
+      default: null
+    },
+    accountNumber: {
+      type: String,
+      default: null
+    },
+    ifscCode: {
+      type: String,
+      default: null
+    },
+    phoneNumber: {
+      type: String,
+      default: null
+    },
+    isActive: {
+      type: Boolean,
+      default: true
+    },
+    updatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    updatedAt: {
+      type: Date,
+      default: Date.now
+    }
+  },
   isActive: {
     type: Boolean,
     default: true

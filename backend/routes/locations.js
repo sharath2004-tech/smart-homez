@@ -464,4 +464,184 @@ router.get('/customer/nearby', async (req, res) => {
   }
 });
 
+// ==================== PAYMENT QR CODE MANAGEMENT ====================
+
+// @route   PUT /api/locations/:id/payment-qr
+// @desc    Update payment QR code for a location (Admin only)
+// @access  Private/Admin
+router.put('/:id/payment-qr', 
+  authenticate, 
+  authorize('admin', 'super_admin'), 
+  async (req, res) => {
+    try {
+      const { upiId, upiName, qrCodeImage, accountNumber, ifscCode, phoneNumber } = req.body;
+
+      const location = await Location.findById(req.params.id);
+      
+      if (!location) {
+        return res.status(404).json({
+          success: false,
+          message: 'Location not found'
+        });
+      }
+
+      // Check if admin has access to this location
+      if (req.user.role === 'admin' && location.assignedAdmin?.toString() !== req.user._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'You are not authorized to manage this location'
+        });
+      }
+
+      // Update payment QR details
+      location.paymentQR = {
+        upiId: upiId || location.paymentQR?.upiId,
+        upiName: upiName || location.paymentQR?.upiName,
+        qrCodeImage: qrCodeImage || location.paymentQR?.qrCodeImage,
+        accountNumber: accountNumber || location.paymentQR?.accountNumber,
+        ifscCode: ifscCode || location.paymentQR?.ifscCode,
+        phoneNumber: phoneNumber || location.paymentQR?.phoneNumber,
+        isActive: true,
+        updatedBy: req.user._id,
+        updatedAt: new Date()
+      };
+
+      await location.save();
+
+      res.status(200).json({
+        success: true,
+        message: 'Payment QR updated successfully',
+        paymentQR: location.paymentQR
+      });
+
+    } catch (error) {
+      console.error('Update payment QR error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error updating payment QR',
+        error: error.message
+      });
+    }
+  }
+);
+
+// @route   GET /api/locations/:id/payment-qr
+// @desc    Get payment QR code for a location
+// @access  Private (Customer/Worker/Admin)
+router.get('/:id/payment-qr', 
+  authenticate, 
+  async (req, res) => {
+    try {
+      const location = await Location.findById(req.params.id)
+        .select('apartmentName area city paymentQR');
+      
+      if (!location) {
+        return res.status(404).json({
+          success: false,
+          message: 'Location not found'
+        });
+      }
+
+      // Check if location has payment QR configured
+      if (!location.paymentQR?.upiId && !location.paymentQR?.qrCodeImage) {
+        // Fallback to global settings
+        const Settings = (await import('../models/Settings.js')).default;
+        const settings = await Settings.getSettings();
+        
+        return res.status(200).json({
+          success: true,
+          message: 'Using global payment settings',
+          paymentQR: {
+            upiId: settings.payment?.upiId,
+            upiName: settings.payment?.upiName,
+            qrCodeImage: settings.payment?.qrCodeImage,
+            isGlobal: true
+          },
+          location: {
+            id: location._id,
+            name: location.apartmentName,
+            area: location.area,
+            city: location.city
+          }
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        paymentQR: {
+          upiId: location.paymentQR.upiId,
+          upiName: location.paymentQR.upiName,
+          qrCodeImage: location.paymentQR.qrCodeImage,
+          phoneNumber: location.paymentQR.phoneNumber,
+          isGlobal: false
+        },
+        location: {
+          id: location._id,
+          name: location.apartmentName,
+          area: location.area,
+          city: location.city
+        }
+      });
+
+    } catch (error) {
+      console.error('Get payment QR error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error retrieving payment QR',
+        error: error.message
+      });
+    }
+  }
+);
+
+// @route   DELETE /api/locations/:id/payment-qr
+// @desc    Remove payment QR code for a location (reverts to global)
+// @access  Private/Admin
+router.delete('/:id/payment-qr', 
+  authenticate, 
+  authorize('admin', 'super_admin'), 
+  async (req, res) => {
+    try {
+      const location = await Location.findById(req.params.id);
+      
+      if (!location) {
+        return res.status(404).json({
+          success: false,
+          message: 'Location not found'
+        });
+      }
+
+      // Check if admin has access
+      if (req.user.role === 'admin' && location.assignedAdmin?.toString() !== req.user._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'You are not authorized to manage this location'
+        });
+      }
+
+      // Clear payment QR (will fallback to global settings)
+      location.paymentQR = {
+        isActive: false,
+        updatedBy: req.user._id,
+        updatedAt: new Date()
+      };
+
+      await location.save();
+
+      res.status(200).json({
+        success: true,
+        message: 'Payment QR removed. Will use global settings for payments.'
+      });
+
+    } catch (error) {
+      console.error('Delete payment QR error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error removing payment QR',
+        error: error.message
+      });
+    }
+  }
+);
+
 export default router;
