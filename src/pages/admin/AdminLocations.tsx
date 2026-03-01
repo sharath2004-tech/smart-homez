@@ -442,7 +442,7 @@ const AdminLocations = () => {
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {locations.map((location) => (
-                  <div key={location._id} className="card-elevated p-5 relative">
+                  <div key={location._id} className="card-elevated p-5 relative overflow-hidden">
                     {/* Delete button for super admin */}
                     {isSuperAdmin && (
                       <button
@@ -458,14 +458,14 @@ const AdminLocations = () => {
                       <div className="w-10 h-10 bg-primary-light rounded-full flex items-center justify-center text-primary shrink-0">
                         <Building className="w-5 h-5" />
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 overflow-hidden">
                         <h3 className="font-bold text-foreground truncate">{location.apartmentName}</h3>
                         {location.building && (
-                          <p className="text-xs text-muted-foreground">{location.building}</p>
+                          <p className="text-xs text-muted-foreground truncate">{location.building}</p>
                         )}
                         <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
-                          {location.area}, {location.city}
+                          <MapPin className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{location.area}, {location.city}</span>
                         </p>
                       </div>
                     </div>
@@ -483,8 +483,8 @@ const AdminLocations = () => {
 
                     {location.assignedAdmin && (
                       <div className="text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg flex items-center gap-2">
-                        <Shield className="w-3 h-3" />
-                        <span><strong>Admin:</strong> {location.assignedAdmin.name}</span>
+                        <Shield className="w-3 h-3 shrink-0" />
+                        <span className="truncate"><strong>Admin:</strong> {location.assignedAdmin.name}</span>
                       </div>
                     )}
                   </div>
@@ -520,7 +520,7 @@ const AdminLocations = () => {
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
                 {filteredAdmins.map((admin) => (
-                  <div key={admin._id} className="card-elevated p-5 relative">
+                  <div key={admin._id} className="card-elevated p-5 relative overflow-hidden">
                     {/* Delete button for super admin */}
                     <button
                       onClick={() => handleDeleteAdmin(admin._id, admin.name)}
@@ -534,13 +534,13 @@ const AdminLocations = () => {
                       <div className="w-12 h-12 bg-secondary rounded-full flex items-center justify-center text-secondary-foreground font-bold shrink-0">
                         {admin.name.split(" ").map(n => n[0]).join("").toUpperCase()}
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 overflow-hidden">
                         <div className="flex items-center gap-2">
-                          <p className="font-bold text-foreground">{admin.name}</p>
-                          <span className="badge-primary text-xs">Admin</span>
+                          <p className="font-bold text-foreground truncate">{admin.name}</p>
+                          <span className="badge-primary text-xs shrink-0">Admin</span>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">{admin.email}</p>
-                        {admin.phone && <p className="text-xs text-muted-foreground">{admin.phone}</p>}
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{admin.email}</p>
+                        {admin.phone && <p className="text-xs text-muted-foreground truncate">{admin.phone}</p>}
                       </div>
                     </div>
 
@@ -561,8 +561,8 @@ const AdminLocations = () => {
                         <div className="space-y-1">
                           {admin.assignedLocations.slice(0, 3).map((loc, idx) => (
                             <div key={idx} className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded flex items-center gap-1">
-                              <MapPin className="w-3 h-3" />
-                              {loc.locationName} - {loc.area}, {loc.city}
+                              <MapPin className="w-3 h-3 shrink-0" />
+                              <span className="truncate">{loc.locationName} - {loc.area}, {loc.city}</span>
                             </div>
                           ))}
                           {admin.assignedLocations.length > 3 && (

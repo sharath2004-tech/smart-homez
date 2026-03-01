@@ -25,6 +25,7 @@ const AdminSettings = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingQR, setUploadingQR] = useState(false);
   const [settings, setSettings] = useState<Settings>({
     payment: {
       upiId: 'healthyhomez@upi',
@@ -76,15 +77,61 @@ const AdminSettings = () => {
       return;
     }
 
+    setUploadingQR(true);
+
+    // Compress and convert image
     const reader = new FileReader();
     reader.onloadend = () => {
-      setSettings(prev => ({
-        ...prev,
-        payment: {
-          ...prev.payment,
-          qrCodeImage: reader.result as string
+      const img = new Image();
+      img.onload = () => {
+        // Create canvas to compress image
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Set max dimensions (QR codes don't need to be huge)
+        const maxWidth = 800;
+        const maxHeight = 800;
+        let width = img.width;
+        let height = img.height;
+
+        // Calculate new dimensions
+        if (width > height) {
+          if (width > maxWidth) {
+            height *= maxWidth / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width *= maxHeight / height;
+            height = maxHeight;
+          }
         }
-      }));
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        // Convert to compressed base64 (0.8 quality)
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+        
+        setSettings(prev => ({
+          ...prev,
+          payment: {
+            ...prev.payment,
+            qrCodeImage: compressedBase64
+          }
+        }));
+        setUploadingQR(false);
+      };
+      img.onerror = () => {
+        alert('Failed to load image. Please try another file.');
+        setUploadingQR(false);
+      };
+      img.src = reader.result as string;
+    };
+    reader.onerror = () => {
+      alert('Failed to read file. Please try again.');
+      setUploadingQR(false);
     };
     reader.readAsDataURL(file);
   };
@@ -94,9 +141,12 @@ const AdminSettings = () => {
       setSaving(true);
       await settingsAPI.updateSettings(settings);
       alert('Settings saved successfully!');
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error saving settings:', error);
-      alert('Failed to save settings. Please try again.');
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to save settings. Please try again.';
+      alert(`Failed to save settings: ${errorMessage}`);
     } finally {
       setSaving(false);
     }
@@ -182,7 +232,13 @@ const AdminSettings = () => {
                   Upload a QR code image for workers to show customers. Workers will see this constant QR code.
                 </p>
                 
-                {settings.payment.qrCodeImage ? (
+                {uploadingQR ? (
+                  <div className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-primary rounded-xl bg-primary/5">
+                    <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full mb-3"></div>
+                    <p className="text-sm text-foreground font-medium">Processing image...</p>
+                    <p className="text-xs text-muted-foreground mt-1">Compressing and optimizing</p>
+                  </div>
+                ) : settings.payment.qrCodeImage ? (
                   <div className="relative inline-block">
                     <img 
                       src={settings.payment.qrCodeImage} 
@@ -203,7 +259,7 @@ const AdminSettings = () => {
                   <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-border rounded-xl cursor-pointer hover:bg-muted transition-colors">
                     <Upload className="w-12 h-12 text-muted-foreground mb-2" />
                     <p className="text-sm text-muted-foreground">Click to upload QR code</p>
-                    <p className="text-xs text-muted-foreground mt-1">Max 2MB, JPG/PNG</p>
+                    <p className="text-xs text-muted-foreground mt-1">Max 2MB, JPG/PNG (will be compressed)</p>
                     <input
                       type="file"
                       accept="image/*"

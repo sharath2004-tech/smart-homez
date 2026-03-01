@@ -61,11 +61,11 @@ router.put('/',
   authenticate,
   authorize('admin'),
   [
-    body('payment.upiId').optional().isString().withMessage('UPI ID must be a string'),
-    body('payment.upiName').optional().isString().withMessage('UPI Name must be a string'),
-    body('payment.qrCodeImage').optional().isString().withMessage('QR Code Image must be a string'),
-    body('company.name').optional().isString().withMessage('Company name must be a string'),
-    body('company.phone').optional().isString().withMessage('Company phone must be a string'),
+    body('payment.upiId').optional().isString().trim().withMessage('UPI ID must be a string'),
+    body('payment.upiName').optional().isString().trim().withMessage('UPI Name must be a string'),
+    body('payment.qrCodeImage').optional().withMessage('QR Code Image must be a string or null'),
+    body('company.name').optional().isString().trim().withMessage('Company name must be a string'),
+    body('company.phone').optional().isString().trim().withMessage('Company phone must be a string'),
     body('company.email').optional().isEmail().withMessage('Company email must be valid'),
     body('booking.overtimeRate').optional().isFloat({ min: 0 }).withMessage('Overtime rate must be a positive number'),
     body('booking.cancellationHours').optional().isInt({ min: 0 }).withMessage('Cancellation hours must be a positive integer')
@@ -74,6 +74,7 @@ router.put('/',
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
+        console.error('Settings validation errors:', errors.array());
         return res.status(400).json({ errors: errors.array() });
       }
 
@@ -83,6 +84,14 @@ router.put('/',
         booking: req.body.booking
       };
 
+      console.log('Updating settings with:', {
+        hasPayment: !!updates.payment,
+        hasQrCodeImage: !!updates.payment?.qrCodeImage,
+        qrCodeImageLength: updates.payment?.qrCodeImage?.length || 0,
+        hasCompany: !!updates.company,
+        hasBooking: !!updates.booking
+      });
+
       const settings = await Settings.updateSettings(updates, req.user._id);
 
       res.json({ 
@@ -91,6 +100,11 @@ router.put('/',
       });
     } catch (error) {
       console.error('Update settings error:', error);
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       res.status(500).json({ error: { message: 'Server error', status: 500 } });
     }
   }

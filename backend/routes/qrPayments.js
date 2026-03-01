@@ -159,7 +159,7 @@ router.post('/:id/worker-confirm',
       }
 
       // Check if worker is assigned to this booking
-      if (qrPayment.worker.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      if (qrPayment.worker._id.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
         return res.status(403).json({ 
           error: { message: 'Forbidden: You are not assigned to this booking', status: 403 } 
         });
