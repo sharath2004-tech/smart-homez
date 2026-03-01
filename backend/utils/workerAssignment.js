@@ -122,11 +122,16 @@ export const findBestWorkers = async (bookingDetails, count = 3) => {
       throw new Error('No available workers found');
     }
 
-    // Filter by availability (prefer available, but include unavailable as backup)
-    const availableWorkers = workers.filter(w => w.workerProfile?.availability === true);
-    const unavailableWorkers = workers.filter(w => w.workerProfile?.availability !== true);
+    // STRICT FILTER: Only use workers who are ONLINE (availability = true)
+    const onlineWorkers = workers.filter(w => w.workerProfile?.availability === true);
+    const offlineWorkers = workers.filter(w => w.workerProfile?.availability !== true);
     
-    console.log(`✅ ${availableWorkers.length} available workers, ⏸️ ${unavailableWorkers.length} unavailable workers`);
+    console.log(`✅ ${onlineWorkers.length} ONLINE workers`);
+    console.log(`📴 ${offlineWorkers.length} OFFLINE workers (excluded from assignment)`);
+
+    if (onlineWorkers.length === 0) {
+      throw new Error('No workers are currently online. Please ask workers to go online or try again later.');
+    }
 
     // Extract customer location from booking
     const customerLat = location?.coordinates?.[1]; // [lng, lat] format
@@ -134,8 +139,8 @@ export const findBestWorkers = async (bookingDetails, count = 3) => {
 
     console.log(`📍 Customer location: ${customerLat ? `${customerLat}, ${customerLng}` : 'Not provided'}`);
 
-    // Prioritize available workers, but include unavailable as backup
-    const prioritizedWorkers = [...availableWorkers, ...unavailableWorkers];
+    // USE ONLY ONLINE WORKERS - no backups from offline workers
+    const prioritizedWorkers = onlineWorkers;
 
     // Check if workers have reached leave limit
     const eligibleWorkers = prioritizedWorkers.filter(worker => {

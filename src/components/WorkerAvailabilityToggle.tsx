@@ -1,42 +1,86 @@
+import { Card } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { authAPI } from '@/lib/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../lib/api';
-import { Switch } from '../../components/ui/switch';
-import { Card } from '../../components/ui/card';
+import { toast } from 'sonner';
 
 export default function WorkerAvailabilityToggle() {
   const queryClient = useQueryClient();
 
-  const { data: profile } = useQuery({
+  const { data: profile, isLoading } = useQuery({
     queryKey: ['worker-profile'],
     queryFn: async () => {
-      const res = await api.get('/users/profile');
-      return res.data.user;
+      const res = await authAPI.getProfile();
+      return res.user;
     }
   });
 
   const toggleMutation = useMutation({
-    mutationFn: async (available) => {
-      return api.put('/users/profile', {
-        workerProfile: { ...profile.workerProfile, availability: available }
+    mutationFn: async (available: boolean) => {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/users/toggle-availability`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ availability: available })
       });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || 'Failed to update availability');
+      }
+
+      return response.json();
     },
-    onSuccess: () => queryClient.invalidateQueries(['worker-profile'])
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['worker-profile'] });
+      toast.success(data.message);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update availability');
+    }
   });
 
+  if (isLoading) {
+    return (
+      <Card className="p-4">
+        <div className="flex justify-between items-center">
+          <div className="animate-pulse">
+            <div className="h-5 bg-gray-200 rounded w-32 mb-2"></div>
+            <div className="h-4 bg-gray-200 rounded w-48"></div>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  const isOnline = profile?.workerProfile?.availability || false;
+
   return (
-    <Card className="p-4">
+    <Card className="p-4 bg-gradient-to-r from-white to-gray-50 dark:from-gray-800 dark:to-gray-900">
       <div className="flex justify-between items-center">
         <div>
-          <h3 className="font-semibold">Availability Status</h3>
-          <p className="text-sm text-gray-600">
-            {profile?.workerProfile?.availability ? 'You are online and accepting orders' : 'You are offline'}
+          <h3 className="font-semibold text-lg flex items-center gap-2">
+            <span className={`w-3 h-3 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
+            Availability Status
+          </h3>
+          <p className={`text-sm ${isOnline ? 'text-green-600 dark:text-green-400 font-medium' : 'text-gray-600 dark:text-gray-400'}`}>
+            {isOnline 
+              ? '🟢 You are online and accepting orders' 
+              : '🔴 You are offline - No orders will be assigned'}
           </p>
         </div>
         <Switch
-          checked={profile?.workerProfile?.availability || false}
+          checked={isOnline}
           onCheckedChange={(checked) => toggleMutation.mutate(checked)}
+          disabled={toggleMutation.isPending}
         />
       </div>
+      {toggleMutation.isPending && (
+        <p className="text-xs text-gray-500 mt-2">Updating...</p>
+      )}
     </Card>
   );
 }

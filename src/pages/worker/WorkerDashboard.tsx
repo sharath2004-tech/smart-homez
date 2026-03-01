@@ -1,6 +1,7 @@
 import AppLayout from "@/components/AppLayout";
+import WorkerAvailabilityToggle from "@/components/WorkerAvailabilityToggle";
 import { authAPI, bookingsAPI, workersAPI } from "@/lib/api";
-import { Bell, CheckCircle, ChevronRight, Clock, MapPin, QrCode, Star, ToggleLeft, ToggleRight, TrendingUp } from "lucide-react";
+import { Bell, CheckCircle, ChevronRight, Clock, MapPin, QrCode, Star, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import TaskDetailModal from "./TaskDetailModal";
@@ -38,10 +39,14 @@ interface Profile {
   name: string;
   email: string;
   role: string;
+  workerProfile?: {
+    availability?: boolean;
+    rating?: number;
+    completedServices?: number;
+  };
 }
 
 const WorkerDashboard = () => {
-  const [isOnline, setIsOnline] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [stats, setStats] = useState<Stats>({ today: 0, thisWeek: 0, thisMonth: 0 });
   const [currentTask, setCurrentTask] = useState<Task | null>(null);
@@ -119,20 +124,11 @@ const WorkerDashboard = () => {
       console.log('  Current Task:', currentTaskData.task);
       console.log('  Upcoming Tasks:', upcomingTasksData.tasks);
       console.log('  Tasks Count:', upcomingTasksData.tasks?.length || 0);
+      console.log('  Worker Availability:', profileData.user?.workerProfile?.availability);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleToggleOnline = async () => {
-    try {
-      await workersAPI.updateAvailability(!isOnline);
-      setIsOnline(!isOnline);
-    } catch (error) {
-      console.error('Error updating availability:', error);
-      alert('Failed to update availability');
     }
   };
 
@@ -182,22 +178,16 @@ const WorkerDashboard = () => {
     <AppLayout userType="worker" userName={profile?.name || "Worker"}>
       <div className="max-w-3xl mx-auto space-y-6 animate-fade-in pb-20 md:pb-0">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-muted-foreground text-sm">Welcome back 👋</p>
-            <h1 className="text-2xl font-bold font-heading text-foreground">{profile?.name}</h1>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-muted-foreground text-sm">Welcome back 👋</p>
+              <h1 className="text-2xl font-bold font-heading text-foreground">{profile?.name}</h1>
+            </div>
           </div>
-          <button
-            onClick={handleToggleOnline}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${
-              isOnline
-                ? "border-success bg-success-light text-success"
-                : "border-border bg-muted text-muted-foreground"
-            }`}
-          >
-            {isOnline ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
-            {isOnline ? "Online" : "Offline"}
-          </button>
+          
+          {/* Availability Toggle - Prominent position */}
+          <WorkerAvailabilityToggle />
         </div>
 
         {/* Earnings summary */}
@@ -218,7 +208,7 @@ const WorkerDashboard = () => {
         </div>
 
         {/* Active task */}
-        {isOnline && currentTask && (
+        {currentTask && (
           <div className="rounded-2xl overflow-hidden border-2 border-warning">
             <div className="bg-warning-light px-5 py-3 flex items-center gap-2">
               <div className="w-2 h-2 bg-warning rounded-full animate-pulse" />
@@ -269,7 +259,7 @@ const WorkerDashboard = () => {
         )}
 
         {/* No active task message */}
-        {isOnline && !currentTask && upcomingTasks.length === 0 && (
+        {profile?.workerProfile?.availability && !currentTask && upcomingTasks.length === 0 && (
           <div className="card-elevated p-8 text-center">
             <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
             <h3 className="text-lg font-bold text-foreground mb-1">No Active Task</h3>
@@ -280,7 +270,7 @@ const WorkerDashboard = () => {
         )}
 
         {/* Show upcoming tasks count when no active task */}
-        {isOnline && !currentTask && upcomingTasks.length > 0 && (
+        {profile?.workerProfile?.availability && !currentTask && upcomingTasks.length > 0 && (
           <div className="card-elevated p-8 text-center border-2 border-primary/20">
             <CheckCircle className="w-12 h-12 text-primary mx-auto mb-3" />
             <h3 className="text-lg font-bold text-foreground mb-1">Ready to Work!</h3>
@@ -291,19 +281,13 @@ const WorkerDashboard = () => {
         )}
 
         {/* Offline message */}
-        {!isOnline && (
+        {!profile?.workerProfile?.availability && (
           <div className="card-elevated p-8 text-center">
-            <ToggleLeft className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+            <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
             <h3 className="text-lg font-bold text-foreground mb-1">You're Offline</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Go online to receive task assignments
+            <p className="text-sm text-muted-foreground">
+              Use the toggle above to go online and receive task assignments
             </p>
-            <button
-              onClick={handleToggleOnline}
-              className="btn-brand py-2.5 px-6 text-sm"
-            >
-              Go Online
-            </button>
           </div>
         )}
 

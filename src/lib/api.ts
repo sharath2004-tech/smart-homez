@@ -447,9 +447,9 @@ export const workersAPI = {
   },
 
   updateAvailability: async (available: boolean) => {
-    return apiCall('/users/worker/availability', {
-      method: 'PATCH',
-      body: JSON.stringify({ available })
+    return apiCall('/users/toggle-availability', {
+      method: 'PUT',
+      body: JSON.stringify({ availability: available })
     });
   },
 

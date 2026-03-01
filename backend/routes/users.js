@@ -132,6 +132,49 @@ router.get('/:id', authenticate, async (req, res) => {
   }
 });
 
+// @route   PUT /api/users/toggle-availability
+// @desc    Toggle worker availability (online/offline)
+// @access  Private/Worker
+router.put('/toggle-availability', authenticate, authorize('worker'), async (req, res) => {
+  try {
+    const { availability } = req.body;
+
+    if (typeof availability !== 'boolean') {
+      return res.status(400).json({ 
+        error: { message: 'Availability must be a boolean value', status: 400 } 
+      });
+    }
+
+    const worker = await User.findByIdAndUpdate(
+      req.user._id,
+      { 
+        $set: { 
+          'workerProfile.availability': availability,
+          'workerProfile.lastAvailabilityUpdate': new Date()
+        } 
+      },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!worker) {
+      return res.status(404).json({ 
+        error: { message: 'Worker not found', status: 404 } 
+      });
+    }
+
+    console.log(`🔄 Worker ${worker.name} availability changed to: ${availability ? 'ONLINE' : 'OFFLINE'}`);
+
+    res.json({ 
+      message: `You are now ${availability ? 'online' : 'offline'}`, 
+      worker,
+      availability: worker.workerProfile.availability
+    });
+  } catch (error) {
+    console.error('Toggle availability error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
 // @route   PUT /api/users/:id
 // @desc    Update user
 // @access  Private
@@ -144,13 +187,15 @@ router.put('/:id', authenticate, async (req, res) => {
       });
     }
 
-    const { name, phone, address, profileImage, workerProfile } = req.body;
+    const { name, phone, address, profileImage, workerProfile, addresses, currentLocation } = req.body;
 
     const updateData = {};
     if (name) updateData.name = name;
     if (phone) updateData.phone = phone;
     if (address) updateData.address = address;
     if (profileImage) updateData.profileImage = profileImage;
+    if (addresses) updateData.addresses = addresses;
+    if (currentLocation) updateData.currentLocation = currentLocation;
     if (workerProfile && req.user.role === 'worker') {
       updateData.workerProfile = workerProfile;
     }

@@ -260,13 +260,28 @@ export const assignWorkersWithBackup = async (bookingDetails) => {
       throw new Error('No eligible workers found');
     }
 
-    // Step 3: Filter workers on leave
-    const availableWorkers = workers.filter(worker => !isWorkerOnLeave(worker, bookingDate));
+    // Step 3: Filter workers on leave AND check online status
+    const activeWorkers = workers.filter(worker => {
+      const notOnLeave = !isWorkerOnLeave(worker, bookingDate);
+      const isOnline = worker.workerProfile?.availability === true;
+      
+      if (!notOnLeave) {
+        console.log(`⏸️ ${worker.name} - on leave`);
+        return false;
+      }
+      
+      if (!isOnline) {
+        console.log(`📴 ${worker.name} - offline (availability: ${worker.workerProfile?.availability})`);
+        return false;
+      }
+      
+      return true;
+    });
     
-    console.log(`✅ ${availableWorkers.length} workers not on leave`);
+    console.log(`✅ ${activeWorkers.length} workers available (not on leave AND online)`);
 
-    if (availableWorkers.length === 0) {
-      throw new Error('All workers are on leave for this date');
+    if (activeWorkers.length === 0) {
+      throw new Error('No workers available - all workers are either on leave or offline');
     }
 
     // Step 4: Calculate distance and scores for all workers
@@ -279,7 +294,7 @@ export const assignWorkersWithBackup = async (bookingDetails) => {
 
     const workersWithScores = [];
 
-    for (const worker of availableWorkers) {
+    for (const worker of activeWorkers) {
       // Get worker location
       const workerLat = worker.currentLocation?.coordinates?.[1] 
         || worker.addresses?.[0]?.location?.coordinates?.[1];
