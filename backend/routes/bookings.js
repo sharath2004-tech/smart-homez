@@ -13,6 +13,7 @@ import {
 } from '../utils/advancedWorkerAssignment.js';
 import { updateBookingStatuses } from '../utils/bookingStatusUpdater.js';
 import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
+import { checkIfOnTime, updateWorkerStats } from '../utils/updateWorkerStats.js';
 import { assignWorkerToBooking, reassignWorker } from '../utils/workerAssignment.js';
 import {
     getWorkerAvailabilityForecast,
@@ -695,6 +696,56 @@ router.put('/:id', authenticate, async (req, res) => {
 
     await booking.save();
 
+    // ✅ AUTO-CREATE WORKER EARNINGS when booking is completed
+    if (status === 'completed' && booking.worker) {
+      try {
+        // Get worker ID (handle both populated and non-populated cases)
+        const workerId = booking.worker._id || booking.worker;
+        
+        // Check if earnings already exist for this booking
+        const existingEarnings = await WorkerEarnings.findOne({ booking: booking._id });
+        
+        if (!existingEarnings) {
+          // Get platform settings
+          const settings = await Settings.getSettings();
+          const commissionRate = settings.earnings?.platformCommissionRate || 0;
+
+          // Calculate earnings
+          const baseAmount = booking.totalAmount - (booking.overtimeCharges || 0);
+          const overtimeAmount = booking.overtimeCharges || 0;
+          const totalEarning = baseAmount + overtimeAmount;
+          
+          // Calculate platform commission (only on base amount, not overtime)
+          const platformCommission = baseAmount * commissionRate;
+          
+          // Worker gets: base + overtime - commission
+          const netEarning = totalEarning - platformCommission;
+
+          const earnings = new WorkerEarnings({
+            worker: workerId,
+            booking: booking._id,
+            baseAmount: baseAmount,
+            overtimeAmount: overtimeAmount,
+            bonus: 0,
+            incentive: 0,
+            totalEarning: totalEarning,
+            platformCommission: platformCommission,
+            netEarning: netEarning,
+            payoutStatus: 'pending',
+            workDuration: booking.actualDurationMinutes || 0,
+            date: new Date()
+          });
+          
+          await earnings.save();
+          console.log(`✅ Earnings auto-created: ₹${netEarning.toFixed(2)} (Booking ${booking._id})`);
+        }
+      } catch (earningsError) {
+        // Log error but don't fail the booking update
+        console.error('❌ Error creating worker earnings:', earningsError);
+        console.error('Error details:', earningsError.message);
+      }
+    }
+
     // Update worker statistics if booking is completed with a rating
     if (status === 'completed' && booking.worker) {
       const onTime = checkIfOnTime(booking);
@@ -1136,6 +1187,9 @@ router.post('/:id/scan-end-qr',
       // ✅ AUTO-CREATE WORKER EARNINGS
       if (booking.worker) {
         try {
+          // Get worker ID (handle both populated and non-populated cases)
+          const workerId = booking.worker._id || booking.worker;
+          
           // Get platform settings
           const settings = await Settings.getSettings();
           const commissionRate = settings.earnings?.platformCommissionRate || 0;
@@ -1157,7 +1211,7 @@ router.post('/:id/scan-end-qr',
           
           if (!existingEarnings) {
             const earnings = new WorkerEarnings({
-              worker: booking.worker._id,
+              worker: workerId,
               booking: booking._id,
               baseAmount: baseAmount,
               overtimeAmount: overtimeAmount,
@@ -1167,16 +1221,18 @@ router.post('/:id/scan-end-qr',
               platformCommission: platformCommission,
               netEarning: netEarning,
               payoutStatus: 'pending',
-              workDuration: booking.actualDurationMinutes,
+              workDuration: booking.actualDurationMinutes || 0,
               date: new Date()
             });
             
             await earnings.save();
-            console.log(`✅ Earnings created for worker ${booking.worker.name}: ₹${netEarning} (Commission: ₹${platformCommission})`);
+            const workerName = booking.worker.name || 'Worker';
+            console.log(`✅ Earnings created for ${workerName}: ₹${netEarning.toFixed(2)} (Commission: ₹${platformCommission.toFixed(2)})`);
           }
         } catch (earningsError) {
           // Log error but don't fail the booking completion
-          console.error('Error creating worker earnings:', earningsError);
+          console.error('❌ Error creating worker earnings:', earningsError);
+          console.error('Error details:', earningsError.message);
         }
       }
 
