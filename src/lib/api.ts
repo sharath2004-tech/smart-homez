@@ -194,6 +194,13 @@ export const bookingsAPI = {
     });
   },
 
+  reschedule: async (id: string, newDate: string, newTime: string) => {
+    return apiCall(`/bookings/${id}/reschedule`, {
+      method: 'PUT',
+      body: JSON.stringify({ newDate, newTime })
+    });
+  },
+
   getUpcoming: async () => {
     return apiCall('/bookings?status=confirmed,pending');
   },

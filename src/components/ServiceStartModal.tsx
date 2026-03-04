@@ -4,7 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertCircle, Briefcase, CheckCircle, Clock, FileText, QrCode } from "lucide-react";
+import { AlertCircle, CheckCircle, Clock, FileText, QrCode } from "lucide-react";
 import { useState } from "react";
 import EmbeddedQRScanner from "./EmbeddedQRScanner";
 
@@ -32,7 +32,6 @@ const ServiceStartModal = ({
 }: ServiceStartModalProps) => {
   const [qrCode, setQrCode] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const [jobDescriptionAcknowledged, setJobDescriptionAcknowledged] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -56,11 +55,6 @@ const ServiceStartModal = ({
       return;
     }
 
-    if (!jobDescriptionAcknowledged) {
-      setError("Please acknowledge the job description");
-      return;
-    }
-
     setLoading(true);
     setError("");
 
@@ -74,8 +68,7 @@ const ServiceStartModal = ({
         },
         body: JSON.stringify({
           qrCode,
-          termsAccepted,
-          jobDescriptionAcknowledged
+          termsAccepted
         })
       });
 
@@ -102,7 +95,6 @@ const ServiceStartModal = ({
   const handleClose = () => {
     setQrCode("");
     setTermsAccepted(false);
-    setJobDescriptionAcknowledged(false);
     setShowScanner(false);
     setError("");
     setSuccess(false);
@@ -199,41 +191,11 @@ const ServiceStartModal = ({
             )}
           </div>
 
-          {/* Job Description Acknowledgment */}
-          <div className="space-y-3">
-            <Label className="flex items-center gap-2">
-              <Briefcase className="w-4 h-4" />
-              2. Job Description Acknowledgment
-            </Label>
-            <div className="bg-muted/30 p-4 rounded-lg space-y-3">
-              <p className="text-sm">
-                <strong>Job Description:</strong> {serviceName}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                The worker will perform the service as described. Please ensure you have discussed any specific requirements or preferences before starting.
-              </p>
-              <div className="flex items-start gap-2">
-                <Checkbox
-                  id="job-acknowledged"
-                  checked={jobDescriptionAcknowledged}
-                  onCheckedChange={(checked) => setJobDescriptionAcknowledged(checked as boolean)}
-                  disabled={loading}
-                />
-                <label
-                  htmlFor="job-acknowledged"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                >
-                  I acknowledge and understand the job description
-                </label>
-              </div>
-            </div>
-          </div>
-
           {/* Terms and Conditions */}
           <div className="space-y-3">
             <Label className="flex items-center gap-2">
               <FileText className="w-4 h-4" />
-              3. Terms and Conditions
+              2. Terms and Conditions
             </Label>
             <div className="bg-muted/30 p-4 rounded-lg space-y-3 max-h-40 overflow-y-auto text-sm">
               <p className="font-medium">Service Agreement:</p>
@@ -284,7 +246,7 @@ const ServiceStartModal = ({
             </Button>
             <Button
               onClick={handleStartService}
-              disabled={loading || !qrCode || !termsAccepted || !jobDescriptionAcknowledged}
+              disabled={loading || !qrCode || !termsAccepted}
               className="flex-1"
             >
               {loading ? (

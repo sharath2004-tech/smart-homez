@@ -950,8 +950,13 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
 
     // Validate 1-hour minimum notice
     const now = new Date();
-    const currentScheduledTime = new Date(booking.scheduledDate);
-    const hoursUntilBooking = (currentScheduledTime - now) / (1000 * 60 * 60);
+    
+    // Combine bookingDate and startTime to get current scheduled datetime
+    const currentBookingDate = new Date(booking.bookingDate);
+    const [startHour, startMinute] = booking.startTime.split(':').map(Number);
+    currentBookingDate.setHours(startHour, startMinute, 0, 0);
+    
+    const hoursUntilBooking = (currentBookingDate - now) / (1000 * 60 * 60);
 
     if (hoursUntilBooking < 1) {
       return res.status(400).json({ 
@@ -971,11 +976,22 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
       });
     }
 
-    const oldDate = booking.scheduledDate;
+    const oldDate = currentBookingDate;
     const oldWorker = booking.worker;
     
-    // Update booking schedule
-    booking.scheduledDate = newScheduledDate;
+    // Update booking schedule - update bookingDate and startTime
+    booking.bookingDate = new Date(newDate);
+    booking.startTime = newTime;
+    
+    // Calculate and update endTime based on duration
+    if (booking.duration) {
+      const [newStartHour, newStartMinute] = newTime.split(':').map(Number);
+      const durationMinutes = booking.duration * 60; // duration is in hours
+      const totalMinutes = newStartHour * 60 + newStartMinute + durationMinutes;
+      const endHour = Math.floor(totalMinutes / 60) % 24;
+      const endMinute = totalMinutes % 60;
+      booking.endTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+    }
     
     // Check if original worker is available at new time
     const workerAvailable = oldWorker ? await checkWorkerAvailability(oldWorker._id, newScheduledDate, booking.duration) : false;
@@ -1124,28 +1140,31 @@ async function checkWorkerAvailability(workerId, scheduledDate, duration) {
     const startTime = new Date(scheduledDate);
     const endTime = new Date(startTime.getTime() + duration * 60 * 60 * 1000);
     
-    const conflictingBookings = await Booking.find({
+    // Get all bookings for this worker in the relevant time period
+    const existingBookings = await Booking.find({
       worker: workerId,
-      status: { $in: ['pending', 'confirmed', 'in-progress'] },
-      $or: [
-        // New booking starts during existing booking
-        {
-          scheduledDate: { $lte: startTime },
-          $expr: {
-            $gte: [
-              { $add: ['$scheduledDate', { $multiply: ['$duration', 3600000] }] },
-              startTime
-            ]
-          }
-        },
-        // New booking ends during existing booking
-        {
-          scheduledDate: { $gte: startTime, $lte: endTime }
-        }
-      ]
+      status: { $in: ['pending', 'confirmed', 'in-progress'] }
     });
 
-    return conflictingBookings.length === 0;
+    // Check if any existing booking conflicts with the new time slot
+    for (const existingBooking of existingBookings) {
+      // Parse existing booking's start and end times
+      const existingDate = new Date(existingBooking.bookingDate);
+      const [existingStartHour, existingStartMinute] = existingBooking.startTime.split(':').map(Number);
+      existingDate.setHours(existingStartHour, existingStartMinute, 0, 0);
+      
+      const existingEndDate = new Date(existingDate);
+      if (existingBooking.duration) {
+        existingEndDate.setTime(existingEndDate.getTime() + existingBooking.duration * 60 * 60 * 1000);
+      }
+      
+      // Check for overlap: new booking overlaps if it starts before existing ends AND ends after existing starts
+      if (startTime < existingEndDate && endTime > existingDate) {
+        return false; // Conflict found
+      }
+    }
+
+    return true; // No conflicts
   } catch (error) {
     console.error('Check worker availability error:', error);
     return false;
@@ -1295,15 +1314,14 @@ router.post('/:id/generate-start-qr',
 );
 
 // @route   POST /api/bookings/:id/scan-start-qr
-// @desc    Customer scans QR code to start service with terms & job acknowledgment
+// @desc    Customer scans QR code to start service with terms acceptance
 // @access  Private/Customer
 router.post('/:id/scan-start-qr',
   authenticate,
   authorize('customer', 'admin'),
   [
     body('qrCode').notEmpty().withMessage('QR code is required'),
-    body('termsAccepted').isBoolean().withMessage('Terms acceptance is required'),
-    body('jobDescriptionAcknowledged').isBoolean().withMessage('Job description acknowledgment is required')
+    body('termsAccepted').isBoolean().withMessage('Terms acceptance is required')
   ],
   async (req, res) => {
     try {
@@ -1312,7 +1330,7 @@ router.post('/:id/scan-start-qr',
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { qrCode, termsAccepted, jobDescriptionAcknowledged } = req.body;
+      const { qrCode, termsAccepted } = req.body;
 
       const booking = await Booking.findById(req.params.id)
         .populate('service', 'name description price duration')
@@ -1352,13 +1370,6 @@ router.post('/:id/scan-start-qr',
         });
       }
 
-      // Verify job description is acknowledged
-      if (!jobDescriptionAcknowledged) {
-        return res.status(400).json({ 
-          error: { message: 'Job description must be acknowledged', status: 400 } 
-        });
-      }
-
       // Start the service
       const now = new Date();
       
@@ -1373,8 +1384,6 @@ router.post('/:id/scan-start-qr',
       booking.actualStartTime = now;
       booking.termsAccepted = termsAccepted;
       booking.termsAcceptedAt = now;
-      booking.jobDescriptionAcknowledged = jobDescriptionAcknowledged;
-      booking.jobDescriptionAcknowledgedAt = now;
       booking.status = 'in-progress';
       
       await booking.save();

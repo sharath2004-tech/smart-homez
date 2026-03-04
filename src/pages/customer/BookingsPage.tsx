@@ -127,25 +127,7 @@ const BookingsPage = () => {
     if (!bookingToReschedule) return;
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/bookings/${bookingToReschedule._id}/reschedule`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          newDate,
-          newTime
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Failed to reschedule booking');
-      }
-
-      const result = await response.json();
+      const result = await bookingsAPI.reschedule(bookingToReschedule._id, newDate, newTime);
       
       // Show success message with worker reassignment info if applicable
       if (result.rescheduleInfo?.workerReassigned) {
