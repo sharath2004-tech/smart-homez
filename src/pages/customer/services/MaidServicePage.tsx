@@ -181,10 +181,18 @@ const MaidServicePage = () => {
       const userLocation = localStorage.getItem('userLocation');
       const location = userLocation ? JSON.parse(userLocation) : null;
 
+      // Calculate end time based on hours
+      const [startHour, startMinute] = maidDetails.preferredTimeSlot.split(':').map(Number);
+      const totalMinutes = startHour * 60 + startMinute + (maidDetails.hours * 60);
+      const endHour = Math.floor(totalMinutes / 60) % 24;
+      const endMinute = totalMinutes % 60;
+      const endTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+
       const bookingData = {
         service: service?._id,
         bookingDate: maidDetails.startDate,
         startTime: maidDetails.preferredTimeSlot,
+        endTime: endTime,
         bookingType: maidDetails.bookingType,
         serviceDetails: {
           hours: maidDetails.hours,

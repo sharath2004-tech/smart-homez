@@ -132,10 +132,19 @@ const PlumbingServicePage = () => {
       const userLocation = localStorage.getItem('userLocation');
       const location = userLocation ? JSON.parse(userLocation) : null;
 
+      // Calculate end time based on service duration (default 1.5 hours for plumbing)
+      const durationMinutes = service?.duration || 90; // 1.5 hours default
+      const [startHour, startMinute] = selectedTime.split(':').map(Number);
+      const totalMinutes = startHour * 60 + startMinute + durationMinutes;
+      const endHour = Math.floor(totalMinutes / 60) % 24;
+      const endMinute = totalMinutes % 60;
+      const endTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+
       const bookingData = {
         service: service?._id,
         bookingDate: selectedDate,
         startTime: selectedTime,
+        endTime: endTime,
         bookingType: 'oneTime',
         serviceDetails: {
           issueType: plumbingDetails.issueType,
