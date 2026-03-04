@@ -1540,10 +1540,8 @@ router.post('/:id/scan-end-qr',
       if (actualDurationMinutes > scheduledDurationMinutes) {
         booking.overtimeMinutes = actualDurationMinutes - scheduledDurationMinutes;
         
-        // Calculate overtime charges (e.g., 1.5x the hourly rate)
-        // Assuming service price is for the scheduled duration
-        const hourlyRate = booking.totalAmount / (scheduledDurationMinutes / 60);
-        booking.overtimeCharges = (booking.overtimeMinutes / 60) * hourlyRate * 1.5;
+        // Calculate overtime charges at ₹2.5 per minute
+        booking.overtimeCharges = booking.overtimeMinutes * 2.5;
         
         // Update total amount to include overtime
         booking.totalAmount += booking.overtimeCharges;

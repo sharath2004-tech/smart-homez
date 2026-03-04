@@ -211,7 +211,7 @@ const ServiceEndModal = ({
             <Alert>
               <Timer className="h-4 w-4" />
               <AlertDescription>
-                This service is running overtime. Additional charges may apply at 1.5x the hourly rate.
+                This service is running overtime. Additional charges of ₹2.5 per minute will apply.
               </AlertDescription>
             </Alert>
           )}
@@ -276,11 +276,11 @@ const ServiceEndModal = ({
                 <>
                   <div className="flex justify-between text-orange-600">
                     <span>Estimated Overtime Charge:</span>
-                    <span>₹{((estimatedOvertime / 60) * (totalAmount / scheduledDuration) * 1.5).toFixed(2)}</span>
+                    <span>₹{(estimatedOvertime * 2.5).toFixed(2)}</span>
                   </div>
                   <div className="border-t pt-1 flex justify-between font-semibold">
                     <span>Estimated Total:</span>
-                    <span>₹{(totalAmount + ((estimatedOvertime / 60) * (totalAmount / scheduledDuration) * 1.5)).toFixed(2)}</span>
+                    <span>₹{(totalAmount + (estimatedOvertime * 2.5)).toFixed(2)}</span>
                   </div>
                 </>
               )}

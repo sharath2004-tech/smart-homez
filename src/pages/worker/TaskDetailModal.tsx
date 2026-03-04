@@ -74,6 +74,11 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       if (response.booking.serviceStartQRCode && !response.booking.actualStartTime) {
         generateQRCode(response.booking.serviceStartQRCode);
       }
+      
+      // Generate end QR code if service is in progress and end QR exists
+      if (response.booking.serviceEndQRCode && response.booking.actualStartTime && !response.booking.actualEndTime) {
+        generateQRCode(response.booking.serviceEndQRCode);
+      }
     } catch (error) {
       console.error('Error fetching task detail:', error);
       if (!silent) alert('Failed to load task details');
@@ -171,6 +176,18 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
     } catch (error) {
       console.error('Error generating QR:', error);
       alert('Failed to generate QR code');
+    }
+  };
+
+  const handleGenerateEndQR = async () => {
+    try {
+      const response = await bookingsAPI.generateEndQR(taskId);
+      setTask({ ...task!, serviceEndQRCode: response.qrCode });
+      generateQRCode(response.qrCode);
+      alert('End QR Code generated! Show this to customer to end service and calculate final charges.');
+    } catch (error) {
+      console.error('Error generating end QR:', error);
+      alert('Failed to generate end QR code');
     }
   };
 
@@ -494,15 +511,67 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
             </div>
           )}
 
+          {/* End QR Code Section - Show for in-progress tasks */}
+          {task.status === 'in-progress' && task.actualStartTime && (
+            <div className="card-elevated p-5 text-center bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200">
+              <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
+                <QrCode className="w-5 h-5 text-green-600" />
+                Service End QR Code
+              </h3>
+              
+              {task.serviceEndQRCode ? (
+                <div>
+                  <div className="bg-white p-4 rounded-xl inline-block mb-3 shadow-lg">
+                    <img src={qrCodeImage} alt="Service End QR" className="w-64 h-64" />
+                  </div>
+                  <p className="text-sm font-medium text-green-700 mb-2">
+                    ✅ Show this QR code to customer to end service
+                  </p>
+                  <div className="text-xs bg-green-100 text-green-800 p-3 rounded-lg space-y-1">
+                    <p className="font-semibold">Customer will scan this QR to:</p>
+                    <p>• Stop the service timer</p>
+                    <p>• Calculate final charges including overtime</p>
+                    <p>• Complete the booking</p>
+                  </div>
+                  {overtimeMinutes > 0 && (
+                    <div className="mt-3 bg-orange-100 border border-orange-300 rounded-lg p-3">
+                      <p className="text-sm font-semibold text-orange-800">
+                        ⚠️ Overtime: {overtimeMinutes} minutes
+                      </p>
+                      <p className="text-xs text-orange-700">
+                        Extra ₹{(overtimeMinutes * OVERTIME_RATE).toFixed(2)} will be added to final bill
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <button
+                    onClick={handleGenerateEndQR}
+                    className="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors shadow-md"
+                  >
+                    <QrCode className="w-5 h-5 inline-block mr-2" />
+                    Generate End QR Code
+                  </button>
+                  <p className="text-sm text-green-700 font-medium mt-3">
+                    Generate this when work is completed
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Customer will scan to finalize and calculate charges
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="flex gap-3">
             {task.status === 'in-progress' && (
               <button
-                onClick={handleCompleteTask}
-                className="flex-1 btn-brand py-3 flex items-center justify-center gap-2"
+                onClick={onClose}
+                className="flex-1 py-3 border-2 border-green-600 text-green-600 rounded-lg font-medium hover:bg-green-50 transition-colors"
               >
-                <CheckCircle className="w-5 h-5" />
-                Complete Task
+                Close
               </button>
             )}
             {task.status !== 'completed' && task.status !== 'in-progress' && (
