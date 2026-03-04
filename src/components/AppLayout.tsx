@@ -48,6 +48,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
 
   const navItems = userType === "admin" ? adminNav : userType === "worker" ? workerNav : customerNav;
   const initials = userName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+  const dashboardPath = userType === "admin" ? "/admin/dashboard" : userType === "worker" ? "/worker/dashboard" : "/customer/dashboard";
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -55,7 +56,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
       <aside className="hidden md:flex w-64 flex-col bg-sidebar border-r border-sidebar-border fixed inset-y-0 left-0 z-40">
         {/* Logo */}
         <div className="p-5 border-b border-sidebar-border">
-          <Link to="/" className="flex items-center gap-2.5">
+          <Link to={dashboardPath} className="flex items-center gap-2.5">
             <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center">
               <Home className="w-4 h-4 text-primary-foreground" />
             </div>
@@ -115,7 +116,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
 
       {/* Mobile top bar */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b border-border px-4 py-3 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2">
+        <Link to={dashboardPath} className="flex items-center gap-2">
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
             <Home className="w-4 h-4 text-primary-foreground" />
           </div>
