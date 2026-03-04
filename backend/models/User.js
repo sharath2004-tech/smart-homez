@@ -331,6 +331,54 @@ const userSchema = new mongoose.Schema({
       default: new Map()
     }
   },
+  // Notification Preferences (REQ-C-010)
+  notificationPreferences: {
+    inApp: {
+      enabled: {
+        type: Boolean,
+        default: true
+      }
+    },
+    whatsapp: {
+      enabled: {
+        type: Boolean,
+        default: false
+      },
+      consentDate: {
+        type: Date
+      }
+    },
+    sms: {
+      enabled: {
+        type: Boolean,
+        default: false
+      },
+      consentDate: {
+        type: Date
+      }
+    },
+    // Notification type preferences
+    notifyOnWorkerAssignment: {
+      type: Boolean,
+      default: true
+    },
+    notifyOnScheduleChange: {
+      type: Boolean,
+      default: true
+    },
+    notifyOnWorkerReassignment: {
+      type: Boolean,
+      default: true
+    },
+    notifyOnDelay: {
+      type: Boolean,
+      default: true
+    },
+    notifyOnCancellation: {
+      type: Boolean,
+      default: true
+    }
+  },
   isActive: {
     type: Boolean,
     default: true

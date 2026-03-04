@@ -10,6 +10,15 @@ interface AppLayoutProps {
 const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLayoutProps) => {
   const location = useLocation();
 
+  const handleLogout = () => {
+    // Clear authentication data
+    localStorage.removeItem('token');
+    localStorage.removeItem('userLocation');
+    localStorage.removeItem('user');
+    // Redirect to login
+    window.location.href = '/login';
+  };
+
   const customerNav = [
     { to: "/customer/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/customer/services", icon: Wrench, label: "Services" },
@@ -94,10 +103,13 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
             <Bell className="w-4 h-4" />
             Notifications
           </button>
-          <Link to="/login" className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10 transition-all">
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10 transition-all"
+          >
             <LogOut className="w-4 h-4" />
             Sign out
-          </Link>
+          </button>
         </div>
       </aside>
 

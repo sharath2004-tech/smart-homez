@@ -770,11 +770,13 @@ router.put('/:id', authenticate, async (req, res) => {
 });
 
 // @route   DELETE /api/bookings/:id
-// @desc    Cancel booking
+// @desc    Cancel booking with refund calculation (REQ-C-010)
 // @access  Private
 router.delete('/:id', authenticate, async (req, res) => {
   try {
-    const booking = await Booking.findById(req.params.id);
+    const booking = await Booking.findById(req.params.id)
+      .populate('customer', 'name email phone')
+      .populate('service', 'name');
     
     if (!booking) {
       return res.status(404).json({ 
@@ -783,22 +785,372 @@ router.delete('/:id', authenticate, async (req, res) => {
     }
 
     // Only customer or admin can cancel
-    if (req.user.role !== 'admin' && booking.customer.toString() !== req.user._id.toString()) {
+    if (req.user.role !== 'admin' && booking.customer._id.toString() !== req.user._id.toString()) {
       return res.status(403).json({ 
         error: { message: 'Forbidden', status: 403 } 
       });
     }
 
+    // Check if booking can be cancelled
+    if (['completed', 'cancelled'].includes(booking.status)) {
+      return res.status(400).json({ 
+        error: { message: `Cannot cancel ${booking.status} booking`, status: 400 } 
+      });
+    }
+
+    // Get cancellation policy from settings
+    const Settings = require('../models/Settings');
+    const settings = await Settings.findOne();
+    const policy = settings?.cancellationPolicy || {
+      fullRefundHours: 1,
+      cancellationCharge: 100,
+      partialRefundPercentage: 0
+    };
+
+    // Calculate time difference
+    const now = new Date();
+    const scheduledTime = new Date(booking.scheduledDate);
+    const hoursUntilBooking = (scheduledTime - now) / (1000 * 60 * 60);
+
+    // Calculate refund based on policy
+    let refundAmount = 0;
+    let refundPercentage = 0;
+    let cancellationCharge = 0;
+    let refundReason = '';
+
+    const bookingAmount = booking.totalAmount || 0;
+
+    if (hoursUntilBooking >= policy.fullRefundHours) {
+      // FREE cancellation - Full refund
+      refundAmount = bookingAmount;
+      refundPercentage = 100;
+      refundReason = `Free cancellation (${hoursUntilBooking.toFixed(1)} hours before booking)`;
+    } else if (hoursUntilBooking > 0) {
+      // Within 1-hour window - Apply cancellation charge
+      cancellationCharge = policy.cancellationCharge || 100;
+      refundAmount = Math.max(0, bookingAmount - cancellationCharge);
+      refundPercentage = (refundAmount / bookingAmount) * 100;
+      refundReason = `Cancellation within 1-hour window. ₹${cancellationCharge} charge applied.`;
+    } else {
+      // Booking has already started - No refund
+      refundAmount = 0;
+      refundPercentage = 0;
+      refundReason = 'Booking has already started. No refund applicable.';
+    }
+
+    // Update booking
     booking.status = 'cancelled';
     booking.cancellationReason = req.body.reason || 'Cancelled by customer';
+    booking.cancellationDate = now;
+    booking.refund = {
+      amount: refundAmount,
+      percentage: refundPercentage,
+      reason: refundReason,
+      processedAt: refundAmount > 0 ? now : null,
+      status: refundAmount > 0 ? 'processed' : 'not-applicable'
+    };
+    
     await booking.save();
 
-    res.json({ message: 'Booking cancelled successfully', booking });
+    // Send multi-channel notifications
+    const notificationService = require('../utils/notificationService');
+    
+    // Notify customer about cancellation
+    await notificationService.sendTemplatedNotification(
+      booking.customer._id,
+      'BOOKING_CANCELLED',
+      {
+        bookingId: booking._id,
+        serviceName: booking.service.name,
+        refundAmount: refundAmount > 0 ? refundAmount : null,
+        reason: booking.cancellationReason
+      }
+    );
+
+    // Send refund notification if applicable
+    if (refundAmount > 0) {
+      await notificationService.sendTemplatedNotification(
+        booking.customer._id,
+        'REFUND_PROCESSED',
+        {
+          bookingId: booking._id,
+          amount: refundAmount,
+          refundReason
+        }
+      );
+    }
+
+    // Notify worker if assigned
+    if (booking.worker) {
+      await notificationService.sendNotification({
+        userId: booking.worker,
+        type: 'cancellation',
+        title: '❌ Booking Cancelled',
+        message: `Customer cancelled booking for ${booking.service.name}. ${refundReason}`,
+        priority: 'medium',
+        data: {
+          bookingId: booking._id
+        }
+      });
+    }
+
+    res.json({ 
+      message: 'Booking cancelled successfully', 
+      booking,
+      refund: {
+        amount: refundAmount,
+        percentage: refundPercentage,
+        reason: refundReason,
+        cancellationCharge: cancellationCharge
+      }
+    });
   } catch (error) {
     console.error('Cancel booking error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
   }
 });
+
+// @route   PUT /api/bookings/:id/reschedule
+// @desc    Reschedule booking with auto worker reassignment (REQ-C-010)
+// @access  Private
+router.put('/:id/reschedule', authenticate, async (req, res) => {
+  try {
+    const { newDate, newTime } = req.body;
+    
+    if (!newDate || !newTime) {
+      return res.status(400).json({ 
+        error: { message: 'New date and time are required', status: 400 } 
+      });
+    }
+
+    const booking = await Booking.findById(req.params.id)
+      .populate('customer', 'name email phone')
+      .populate('service', 'name')
+      .populate('worker', 'name phone');
+    
+    if (!booking) {
+      return res.status(404).json({ 
+        error: { message: 'Booking not found', status: 404 } 
+      });
+    }
+
+    // Only customer or admin can reschedule
+    if (req.user.role !== 'admin' && booking.customer._id.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ 
+        error: { message: 'Forbidden', status: 403 } 
+      });
+    }
+
+    // Check if booking can be rescheduled
+    if (['completed', 'cancelled'].includes(booking.status)) {
+      return res.status(400).json({ 
+        error: { message: `Cannot reschedule ${booking.status} booking`, status: 400 } 
+      });
+    }
+
+    // Validate 1-hour minimum notice
+    const now = new Date();
+    const currentScheduledTime = new Date(booking.scheduledDate);
+    const hoursUntilBooking = (currentScheduledTime - now) / (1000 * 60 * 60);
+
+    if (hoursUntilBooking < 1) {
+      return res.status(400).json({ 
+        error: { 
+          message: 'Rescheduling must be done at least 1 hour before scheduled time', 
+          status: 400 
+        } 
+      });
+    }
+
+    // Parse new schedule
+    const newScheduledDate = new Date(`${newDate}T${newTime}`);
+    
+    if (newScheduledDate < now) {
+      return res.status(400).json({ 
+        error: { message: 'Cannot reschedule to past date/time', status: 400 } 
+      });
+    }
+
+    const oldDate = booking.scheduledDate;
+    const oldWorker = booking.worker;
+    
+    // Update booking schedule
+    booking.scheduledDate = newScheduledDate;
+    
+    // Check if original worker is available at new time
+    const workerAvailable = oldWorker ? await checkWorkerAvailability(oldWorker._id, newScheduledDate, booking.duration) : false;
+    
+    let workerReassigned = false;
+    let newWorkerInfo = null;
+
+    if (!workerAvailable && oldWorker) {
+      // Worker not available - need to reassign
+      try {
+        const { assignWorkerToBooking } = require('../utils/workerAssignment');
+        
+        // Temporarily remove current worker
+        booking.worker = null;
+        await booking.save();
+        
+        // Assign new worker
+        const updatedBooking = await assignWorkerToBooking(booking._id);
+        
+        if (updatedBooking.worker) {
+          workerReassigned = true;
+          newWorkerInfo = await require('../models/User').findById(updatedBooking.worker).select('name phone');
+          booking.worker = updatedBooking.worker;
+        }
+      } catch (assignError) {
+        console.error('Worker reassignment failed:', assignError);
+        // Continue with booking update even if reassignment fails
+      }
+    }
+
+    await booking.save();
+
+    // Send notifications
+    const notificationService = require('../utils/notificationService');
+    
+    // Format dates for display
+    const formatDate = (date) => new Date(date).toLocaleDateString('en-IN', { 
+      day: '2-digit', 
+      month: 'short', 
+      year: 'numeric' 
+    });
+    const formatTime = (date) => new Date(date).toLocaleTimeString('en-IN', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+
+    // Notify customer about reschedule
+    await notificationService.sendTemplatedNotification(
+      booking.customer._id,
+      'SCHEDULE_CHANGE',
+      {
+        bookingId: booking._id,
+        serviceName: booking.service.name,
+        newDate: formatDate(newScheduledDate),
+        newTime: formatTime(newScheduledDate)
+      }
+    );
+
+    // If worker was reassigned, send additional notifications
+    if (workerReassigned && newWorkerInfo) {
+      // Notify customer about worker reassignment
+      await notificationService.sendTemplatedNotification(
+        booking.customer._id,
+        'WORKER_REASSIGNMENT',
+        {
+          bookingId: booking._id,
+          newWorkerName: newWorkerInfo.name,
+          reason: 'Original worker was not available at the new scheduled time.'
+        }
+      );
+
+      // Notify old worker about booking removal
+      if (oldWorker) {
+        await notificationService.sendNotification({
+          userId: oldWorker._id,
+          type: 'schedule-change',
+          title: '📅 Booking Rescheduled',
+          message: `Customer rescheduled booking for ${booking.service.name}. Booking reassigned to another worker.`,
+          priority: 'medium',
+          data: { bookingId: booking._id }
+        });
+      }
+
+      // Notify new worker about assignment
+      await notificationService.sendTemplatedNotification(
+        newWorkerInfo._id,
+        'WORKER_ASSIGNED',
+        {
+          bookingId: booking._id,
+          workerName: newWorkerInfo.name,
+          serviceName: booking.service.name,
+          date: formatDate(newScheduledDate),
+          time: formatTime(newScheduledDate)
+        }
+      );
+    } else if (oldWorker) {
+      // Same worker, just notify about time change
+      await notificationService.sendNotification({
+        userId: oldWorker._id,
+        type: 'schedule-change',
+        title: '📅 Booking Rescheduled',
+        message: `Customer rescheduled booking for ${booking.service.name} to ${formatDate(newScheduledDate)} at ${formatTime(newScheduledDate)}.`,
+        priority: 'medium',
+        data: { 
+          bookingId: booking._id,
+          newDate: formatDate(newScheduledDate),
+          newTime: formatTime(newScheduledDate)
+        }
+      });
+    }
+
+    res.json({ 
+      message: 'Booking rescheduled successfully', 
+      booking,
+      rescheduleInfo: {
+        oldDate: formatDate(oldDate),
+        oldTime: formatTime(oldDate),
+        newDate: formatDate(newScheduledDate),
+        newTime: formatTime(newScheduledDate),
+        workerReassigned,
+        newWorker: workerReassigned ? {
+          name: newWorkerInfo.name,
+          phone: newWorkerInfo.phone
+        } : null
+      }
+    });
+  } catch (error) {
+    console.error('Reschedule booking error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// Helper function to check worker availability
+async function checkWorkerAvailability(workerId, scheduledDate, duration) {
+  try {
+    const Booking = require('../models/Booking');
+    const User = require('../models/User');
+    
+    // Check if worker exists and is available
+    const worker = await User.findById(workerId);
+    if (!worker || !worker.workerDetails?.isAvailable) {
+      return false;
+    }
+
+    // Check for conflicting bookings
+    const startTime = new Date(scheduledDate);
+    const endTime = new Date(startTime.getTime() + duration * 60 * 60 * 1000);
+    
+    const conflictingBookings = await Booking.find({
+      worker: workerId,
+      status: { $in: ['pending', 'confirmed', 'in-progress'] },
+      $or: [
+        // New booking starts during existing booking
+        {
+          scheduledDate: { $lte: startTime },
+          $expr: {
+            $gte: [
+              { $add: ['$scheduledDate', { $multiply: ['$duration', 3600000] }] },
+              startTime
+            ]
+          }
+        },
+        // New booking ends during existing booking
+        {
+          scheduledDate: { $gte: startTime, $lte: endTime }
+        }
+      ]
+    });
+
+    return conflictingBookings.length === 0;
+  } catch (error) {
+    console.error('Check worker availability error:', error);
+    return false;
+  }
+}
 
 // @route   POST /api/bookings/:id/assign-worker
 // @desc    Auto-assign best worker to booking
@@ -943,14 +1295,15 @@ router.post('/:id/generate-start-qr',
 );
 
 // @route   POST /api/bookings/:id/scan-start-qr
-// @desc    Customer scans QR code to start service
+// @desc    Customer scans QR code to start service with terms & job acknowledgment
 // @access  Private/Customer
 router.post('/:id/scan-start-qr',
   authenticate,
   authorize('customer', 'admin'),
   [
     body('qrCode').notEmpty().withMessage('QR code is required'),
-    body('termsAccepted').isBoolean().withMessage('Terms acceptance is required')
+    body('termsAccepted').isBoolean().withMessage('Terms acceptance is required'),
+    body('jobDescriptionAcknowledged').isBoolean().withMessage('Job description acknowledgment is required')
   ],
   async (req, res) => {
     try {
@@ -959,7 +1312,7 @@ router.post('/:id/scan-start-qr',
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { qrCode, termsAccepted } = req.body;
+      const { qrCode, termsAccepted, jobDescriptionAcknowledged } = req.body;
 
       const booking = await Booking.findById(req.params.id)
         .populate('service', 'name description price duration')
@@ -999,6 +1352,13 @@ router.post('/:id/scan-start-qr',
         });
       }
 
+      // Verify job description is acknowledged
+      if (!jobDescriptionAcknowledged) {
+        return res.status(400).json({ 
+          error: { message: 'Job description must be acknowledged', status: 400 } 
+        });
+      }
+
       // Start the service
       const now = new Date();
       
@@ -1013,6 +1373,8 @@ router.post('/:id/scan-start-qr',
       booking.actualStartTime = now;
       booking.termsAccepted = termsAccepted;
       booking.termsAcceptedAt = now;
+      booking.jobDescriptionAcknowledged = jobDescriptionAcknowledged;
+      booking.jobDescriptionAcknowledgedAt = now;
       booking.status = 'in-progress';
       
       await booking.save();

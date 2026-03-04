@@ -1,0 +1,5 @@
+{
+  "scripts": {
+    "seed-complete-services": "node seedCompleteServiceCatalog.js"
+  }
+}

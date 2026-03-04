@@ -17,8 +17,9 @@ import RegisterPage from "./pages/auth/RegisterPage";
 
 // Customer pages
 import BookingsPage from "./pages/customer/BookingsPage";
-import BookServicePage from "./pages/customer/BookServicePage";
+import ServiceRouter from "./pages/customer/ServiceRouter";
 import CustomerDashboard from "./pages/customer/CustomerDashboard";
+import NotificationSettingsPage from "./pages/customer/NotificationSettingsPage";
 import PaymentsPage from "./pages/customer/PaymentsPage";
 import PreferencesPage from "./pages/customer/PreferencesPage";
 import ProfilePage from "./pages/customer/ProfilePage";
@@ -63,10 +64,11 @@ const App = () => (
           {/* Customer */}
           <Route path="/customer/dashboard" element={<ProtectedRoute allowedRoles={['customer']}><CustomerDashboard /></ProtectedRoute>} />
           <Route path="/customer/services" element={<ProtectedRoute allowedRoles={['customer']}><ServicesPage /></ProtectedRoute>} />
-          <Route path="/customer/book/:id" element={<ProtectedRoute allowedRoles={['customer']}><BookServicePage /></ProtectedRoute>} />
+          <Route path="/customer/book/:id" element={<ProtectedRoute allowedRoles={['customer']}><ServiceRouter /></ProtectedRoute>} />
           <Route path="/customer/bookings" element={<ProtectedRoute allowedRoles={['customer']}><BookingsPage /></ProtectedRoute>} />
           <Route path="/customer/payments" element={<ProtectedRoute allowedRoles={['customer']}><PaymentsPage /></ProtectedRoute>} />
           <Route path="/customer/preferences" element={<ProtectedRoute allowedRoles={['customer']}><PreferencesPage /></ProtectedRoute>} />
+          <Route path="/customer/notifications" element={<ProtectedRoute allowedRoles={['customer']}><NotificationSettingsPage /></ProtectedRoute>} />
           <Route path="/customer/profile" element={<ProtectedRoute allowedRoles={['customer']}><ProfilePage /></ProtectedRoute>} />
           <Route path="/customer/service-areas" element={<ProtectedRoute allowedRoles={['customer']}><ServiceAreaDemo /></ProtectedRoute>} />
 

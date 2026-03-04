@@ -293,6 +293,34 @@ const bookingSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  cancellationDate: {
+    type: Date,
+    default: null
+  },
+  // Refund information (REQ-C-010)
+  refund: {
+    amount: {
+      type: Number,
+      default: 0
+    },
+    percentage: {
+      type: Number,
+      default: 0
+    },
+    reason: {
+      type: String,
+      default: null
+    },
+    processedAt: {
+      type: Date,
+      default: null
+    },
+    status: {
+      type: String,
+      enum: ['not-applicable', 'pending', 'processed', 'failed'],
+      default: 'not-applicable'
+    }
+  },
   rating: {
     type: Number,
     min: 0,

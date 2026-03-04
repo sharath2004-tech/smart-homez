@@ -4,6 +4,7 @@ import { bookingsAPI } from "@/lib/api";
 import { Calendar, Clock, MapPin, Phone, QrCode, RefreshCw, Star } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import BookingDetailModal from "./BookingDetailModal";
+import RescheduleModal from "@/components/RescheduleModal";
 
 interface Worker {
   _id: string;
@@ -64,6 +65,8 @@ const BookingsPage = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  const [bookingToReschedule, setBookingToReschedule] = useState<Booking | null>(null);
 
   const fetchBookings = useCallback(async (silent = false) => {
     try {
@@ -115,22 +118,46 @@ const BookingsPage = () => {
     }
   };
 
-  const handleReschedule = async (bookingId: string) => {
-    const newDate = prompt('Enter new date (YYYY-MM-DD):');
-    const newTime = prompt('Enter new time (HH:MM):');
-    
-    if (!newDate || !newTime) return;
+  const handleReschedule = (booking: Booking) => {
+    setBookingToReschedule(booking);
+    setRescheduleModalOpen(true);
+  };
+
+  const confirmReschedule = async (newDate: string, newTime: string) => {
+    if (!bookingToReschedule) return;
 
     try {
-      await bookingsAPI.update(bookingId, {
-        bookingDate: newDate,
-        startTime: newTime
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/bookings/${bookingToReschedule._id}/reschedule`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          newDate,
+          newTime
+        })
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Failed to reschedule booking');
+      }
+
+      const result = await response.json();
+      
+      // Show success message with worker reassignment info if applicable
+      if (result.rescheduleInfo?.workerReassigned) {
+        alert(`Booking rescheduled successfully!\n\nNote: Your original worker was not available at the new time.\nNew worker assigned: ${result.rescheduleInfo.newWorker?.name || 'TBD'}`);
+      }
+      
       await fetchBookings();
-      alert('Booking rescheduled successfully!');
+      setRescheduleModalOpen(false);
+      setBookingToReschedule(null);
     } catch (error) {
       console.error('Error rescheduling booking:', error);
-      alert('Failed to reschedule booking. Please try again.');
+      throw error;
     }
   };
 
@@ -385,7 +412,7 @@ const BookingsPage = () => {
                     {isUpcoming && booking.status !== 'cancelled' && (
                       <>
                         <button
-                          onClick={() => handleReschedule(booking._id)}
+                          onClick={() => handleReschedule(booking)}
                           className="flex-1 py-2.5 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors"
                         >
                           Reschedule
@@ -432,6 +459,21 @@ const BookingsPage = () => {
           bookingId={selectedBookingId}
           onClose={() => setSelectedBookingId(null)}
           onRefresh={fetchBookings}
+        />
+      )}
+
+      {/* Reschedule Modal */}
+      {bookingToReschedule && (
+        <RescheduleModal
+          open={rescheduleModalOpen}
+          onClose={() => {
+            setRescheduleModalOpen(false);
+            setBookingToReschedule(null);
+          }}
+          onConfirm={confirmReschedule}
+          currentDate={bookingToReschedule.bookingDate}
+          currentTime={bookingToReschedule.startTime}
+          bookingId={bookingToReschedule._id}
         />
       )}
     </AppLayout>

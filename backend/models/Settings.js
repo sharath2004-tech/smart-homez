@@ -134,29 +134,34 @@ const settingsSchema = new mongoose.Schema({
     }
   },
 
-  // Cancellation Policy
+  // Cancellation Policy (REQ-C-010: Free cancellation up to 1 hour before)
   cancellationPolicy: {
-    // Hours before booking to get full refund
+    // Hours before booking to get full refund (FREE cancellation)
     fullRefundHours: {
       type: Number,
-      default: 24
+      default: 1 // 1 hour before = FREE cancellation
     },
     // Refund percentage if cancelled < fullRefundHours
     partialRefundPercentage: {
       type: Number,
-      default: 50, // 50% refund
+      default: 0, // No refund within 1 hour window
       min: 0,
       max: 100
     },
     // Hours before booking for partial refund
     partialRefundHours: {
       type: Number,
-      default: 12
+      default: 0.5 // 30 minutes before
+    },
+    // Cancellation charge (flat fee or percentage)
+    cancellationCharge: {
+      type: Number,
+      default: 100 // ₹100 cancellation charge within 1-hour window
     },
     // No refund if cancelled within this many hours
     noRefundHours: {
       type: Number,
-      default: 2
+      default: 0 // No refund for ongoing/completed bookings
     }
   },
 
