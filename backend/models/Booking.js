@@ -380,6 +380,26 @@ const bookingSchema = new mongoose.Schema({
     type: Number,
     default: 0 // Additional charges for overtime
   },
+  // Photo Verification at Service Completion
+  completionPhoto: {
+    url: {
+      type: String,
+      default: null
+    },
+    timestamp: {
+      type: Date,
+      default: null
+    },
+    uploadedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    verified: {
+      type: Boolean,
+      default: false
+    }
+  },
   // Work Documentation (REQ-C-012)
   workDocumentation: {
     photos: [{

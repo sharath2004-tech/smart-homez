@@ -1,6 +1,6 @@
 import EmbeddedQRScanner from "@/components/EmbeddedQRScanner";
 import { bookingsAPI } from "@/lib/api";
-import { ArrowLeft, Calendar, DollarSign, Phone, QrCode, Timer, User } from "lucide-react";
+import { ArrowLeft, Calendar, Camera, CheckCircle, DollarSign, Phone, QrCode, Timer, User } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReviewModal from "./ReviewModal";
 
@@ -60,6 +60,11 @@ interface Booking {
   rating?: number;
   review?: string;
   paymentStatus?: string;
+  completionPhoto?: {
+    url: string;
+    timestamp: string;
+    verified: boolean;
+  };
 }
 
 interface BookingDetailModalProps {
@@ -72,8 +77,12 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
   const [showScanner, setShowScanner] = useState(false);
+  const [showEndScanner, setShowEndScanner] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [overtimeMinutes, setOvertimeMinutes] = useState(0);  const [showReviewModal, setShowReviewModal] = useState(false);  const OVERTIME_RATE = 2.5; // ₹2.5 per minute
+  const [overtimeMinutes, setOvertimeMinutes] = useState(0);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [endingService, setEndingService] = useState(false);
+  const OVERTIME_RATE = 2.5; // ₹2.5 per minute
 
   // Use refs to persist values across renders
   const timeOffsetRef = useRef<number>(0);
@@ -172,6 +181,65 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
       setShowScanner(false);
     }
   }, [bookingId, fetchBookingDetail, onRefresh]);
+
+  const handleScanEndQR = useCallback(async (qrCode: string) => {
+    try {
+      const response = await bookingsAPI.scanEndQR(bookingId, qrCode);
+      const result = response.booking;
+      
+      let message = 'Service completed successfully!';
+      if (result.overtimeMinutes > 0) {
+        message += `\n\nOvertime: ${result.overtimeMinutes} minutes\nOvertime Charge: ₹${result.overtimeCharges.toFixed(2)}\nTotal Amount: ₹${result.totalAmount.toFixed(2)}`;
+      }
+      
+      alert(message);
+      setShowEndScanner(false);
+      fetchBookingDetail();
+      onRefresh();
+    } catch (error) {
+      console.error('Error scanning end QR:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to end service';
+      alert(errorMessage);
+      setShowEndScanner(false);
+    }
+  }, [bookingId, fetchBookingDetail, onRefresh]);
+
+  const handleDirectEndService = useCallback(async () => {
+    if (!confirm('Are you sure you want to end the service now?\n\nNote: If worker has generated an end QR code, it\'s better to scan it for verification.')) {
+      return;
+    }
+
+    try {
+      setEndingService(true);
+      // Generate end QR automatically if worker hasn't done it yet
+      let endQRCode = booking?.serviceEndQRCode;
+      
+      if (!endQRCode) {
+        // If worker hasn't generated end QR, we'll create one automatically
+        endQRCode = `END-${bookingId}-${Date.now()}-AUTO`;
+      }
+      
+      const response = await bookingsAPI.scanEndQR(bookingId, endQRCode);
+      const result = response.booking;
+      
+      let message = '✅ Service completed successfully!';
+      if (result.overtimeMinutes > 0) {
+        message += `\n\n⏰ Overtime: ${result.overtimeMinutes} minutes\n💰 Overtime Charge: ₹${result.overtimeCharges.toFixed(2)}\n💵 Total Amount: ₹${result.totalAmount.toFixed(2)}`;
+      } else {
+        message += `\n\n💵 Total Amount: ₹${result.totalAmount.toFixed(2)}`;
+      }
+      
+      alert(message);
+      fetchBookingDetail();
+      onRefresh();
+    } catch (error) {
+      console.error('Error ending service:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to end service';
+      alert(errorMessage);
+    } finally {
+      setEndingService(false);
+    }
+  }, [bookingId, booking?.serviceEndQRCode, fetchBookingDetail, onRefresh]);
 
   const formatTime = (timeString: string) => {
     if (!timeString) return '';
@@ -354,6 +422,101 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                     </div>
                   )}
                 </div>
+
+                {/* End Service Options */}
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 p-4 rounded-xl space-y-3">
+                  <h4 className="font-semibold text-green-800 text-center flex items-center justify-center gap-2">
+                    <QrCode className="w-5 h-5" />
+                    End Service Options
+                  </h4>
+                  
+                  <p className="text-xs text-green-700 text-center">
+                    Choose how you want to end the service:
+                  </p>
+
+                  {/* Option 1: Scan Worker's End QR */}
+                  <button
+                    onClick={() => setShowEndScanner(true)}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <QrCode className="w-5 h-5" />
+                    Scan Worker's End QR Code
+                  </button>
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-green-300"></div>
+                    </div>
+                    <div className="relative flex justify-center text-xs">
+                      <span className="bg-gradient-to-br from-green-50 to-emerald-50 px-2 text-green-600">OR</span>
+                    </div>
+                  </div>
+
+                  {/* Option 2: Direct End Service */}
+                  <button
+                    onClick={handleDirectEndService}
+                    disabled={endingService}
+                    className="w-full bg-white hover:bg-green-50 text-green-700 font-semibold py-3 px-4 rounded-lg border-2 border-green-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {endingService ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                        Ending Service...
+                      </>
+                    ) : (
+                      <>
+                        <Timer className="w-5 h-5" />
+                        End Service Now
+                      </>
+                    )}
+                  </button>
+
+                  <p className="text-xs text-green-600 text-center italic">
+                    💡 Tip: Scanning worker's QR is recommended for verification
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Completion Photo Section */}
+            {booking.status === 'completed' && booking.completionPhoto && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <Camera className="w-5 h-5 text-primary" />
+                  Completion Photo
+                  {booking.completionPhoto.verified && (
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                  )}
+                </h3>
+                <div className="bg-muted p-4 rounded-xl space-y-3">
+                  <div className="relative rounded-lg overflow-hidden border-2 border-green-500">
+                    <img 
+                      src={`http://localhost:5000${booking.completionPhoto.url}`}
+                      alt="Service completion verification" 
+                      className="w-full h-auto max-h-96 object-contain bg-black"
+                      onError={(e) => {
+                        // Fallback if image fails to load
+                        e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23ddd" width="400" height="300"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3EImage not available%3C/text%3E%3C/svg%3E';
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3 text-green-600" />
+                      Verified completion photo
+                    </span>
+                    {booking.completionPhoto.timestamp && (
+                      <span>
+                        {new Date(booking.completionPhoto.timestamp).toLocaleString('en-IN', {
+                          day: '2-digit',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -445,11 +608,19 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
         />
       )}
 
-      {/* Embedded QR Scanner */}
+      {/* Embedded QR Scanner for Start */}
       {showScanner && (
         <EmbeddedQRScanner
           onScanSuccess={handleScanStartQR}
           onClose={() => setShowScanner(false)}
+        />
+      )}
+
+      {/* Embedded QR Scanner for End */}
+      {showEndScanner && (
+        <EmbeddedQRScanner
+          onScanSuccess={handleScanEndQR}
+          onClose={() => setShowEndScanner(false)}
         />
       )}
     </div>

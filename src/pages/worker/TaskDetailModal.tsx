@@ -1,6 +1,9 @@
 import { bookingsAPI } from "@/lib/api";
+import PhotoCapture from "@/components/PhotoCapture";
 import {
     ArrowLeft, Calendar,
+    Camera,
+    CheckCircle,
     DollarSign,
     Home,
     MapPin,
@@ -44,6 +47,11 @@ interface Task {
   actualEndTime?: string;
   serviceStartQRCode?: string;
   serviceEndQRCode?: string;
+  completionPhoto?: {
+    url: string;
+    timestamp: string;
+    verified: boolean;
+  };
 }
 
 interface TaskDetailModalProps {
@@ -61,6 +69,8 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   const [isScanning, setIsScanning] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [hasTimeOffset, setHasTimeOffset] = useState(false);
+  const [showPhotoCapture, setShowPhotoCapture] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   
   const OVERTIME_RATE = 2.5; // ₹2.5 per minute
 
@@ -188,6 +198,46 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
     } catch (error) {
       console.error('Error generating end QR:', error);
       alert('Failed to generate end QR code');
+    }
+  };
+
+  const handlePhotoCapture = async (file: File) => {
+    try {
+      setUploadingPhoto(true);
+      
+      // Create FormData for multipart upload
+      const formData = new FormData();
+      formData.append('completionPhoto', file);
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/bookings/${taskId}/upload-completion-photo`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Failed to upload photo');
+      }
+
+      const result = await response.json();
+      
+      // Update task with completion photo
+      setTask({ ...task!, completionPhoto: result.completionPhoto });
+      setShowPhotoCapture(false);
+      
+      alert('✅ Completion photo uploaded successfully! You can now generate the end QR code.');
+      
+      // Refresh task data
+      await fetchTaskDetail(true);
+    } catch (error) {
+      console.error('Error uploading completion photo:', error);
+      alert((error as Error).message || 'Failed to upload completion photo');
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
@@ -513,54 +563,117 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
 
           {/* End QR Code Section - Show for in-progress tasks */}
           {task.status === 'in-progress' && task.actualStartTime && (
-            <div className="card-elevated p-5 text-center bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200">
-              <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
-                <QrCode className="w-5 h-5 text-green-600" />
-                Service End QR Code
-              </h3>
-              
-              {task.serviceEndQRCode ? (
-                <div>
-                  <div className="bg-white p-4 rounded-xl inline-block mb-3 shadow-lg">
-                    <img src={qrCodeImage} alt="Service End QR" className="w-64 h-64" />
-                  </div>
-                  <p className="text-sm font-medium text-green-700 mb-2">
-                    ✅ Show this QR code to customer to end service
-                  </p>
-                  <div className="text-xs bg-green-100 text-green-800 p-3 rounded-lg space-y-1">
-                    <p className="font-semibold">Customer will scan this QR to:</p>
-                    <p>• Stop the service timer</p>
-                    <p>• Calculate final charges including overtime</p>
-                    <p>• Complete the booking</p>
-                  </div>
-                  {overtimeMinutes > 0 && (
-                    <div className="mt-3 bg-orange-100 border border-orange-300 rounded-lg p-3">
-                      <p className="text-sm font-semibold text-orange-800">
-                        ⚠️ Overtime: {overtimeMinutes} minutes
-                      </p>
-                      <p className="text-xs text-orange-700">
-                        Extra ₹{(overtimeMinutes * OVERTIME_RATE).toFixed(2)} will be added to final bill
-                      </p>
+            <div className="space-y-4">
+              {/* Completion Photo Upload Section */}
+              <div className="card-elevated p-5 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200">
+                <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
+                  <Camera className="w-5 h-5 text-blue-600" />
+                  Step 1: Upload Completion Photo 📸
+                </h3>
+                
+                {task.completionPhoto ? (
+                  <div className="space-y-3">
+                    <div className="relative rounded-lg overflow-hidden border-2 border-green-500">
+                      <img 
+                        src={`http://localhost:5000${task.completionPhoto.url}`}
+                        alt="Completion photo" 
+                        className="w-full h-auto max-h-64 object-contain bg-black mx-auto"
+                      />
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div>
-                  <button
-                    onClick={handleGenerateEndQR}
-                    className="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors shadow-md"
-                  >
-                    <QrCode className="w-5 h-5 inline-block mr-2" />
-                    Generate End QR Code
-                  </button>
-                  <p className="text-sm text-green-700 font-medium mt-3">
-                    Generate this when work is completed
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Customer will scan to finalize and calculate charges
-                  </p>
-                </div>
-              )}
+                    <div className="flex items-center justify-center gap-2 text-green-700 font-medium">
+                      <CheckCircle className="w-5 h-5" />
+                      Photo uploaded successfully!
+                    </div>
+                    <button
+                      onClick={() => setShowPhotoCapture(true)}
+                      className="w-full py-2 px-4 border-2 border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors"
+                    >
+                      Re-upload Photo
+                    </button>
+                  </div>
+                ) : showPhotoCapture ? (
+                  <PhotoCapture
+                    onPhotoCapture={handlePhotoCapture}
+                    onCancel={() => setShowPhotoCapture(false)}
+                    showPreview={true}
+                  />
+                ) : (
+                  <div>
+                    <button
+                      onClick={() => setShowPhotoCapture(true)}
+                      disabled={uploadingPhoto}
+                      className="btn-brand py-3 px-6 w-full"
+                    >
+                      <Camera className="w-5 h-5 inline-block mr-2" />
+                      {uploadingPhoto ? 'Uploading...' : 'Take Completion Photo'}
+                    </button>
+                    <div className="mt-3 text-xs bg-blue-100 text-blue-800 p-3 rounded-lg space-y-1">
+                      <p className="font-semibold">Why upload a photo?</p>
+                      <p>• Proves work was completed</p>
+                      <p>• Protects you from disputes</p>
+                      <p>• Builds customer trust</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* End QR Code Section */}
+              <div className="card-elevated p-5 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200">
+                <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
+                  <QrCode className="w-5 h-5 text-green-600" />
+                  Step 2: Service End QR Code
+                </h3>
+                
+                {task.serviceEndQRCode ? (
+                  <div>
+                    <div className="bg-white p-4 rounded-xl inline-block mb-3 shadow-lg">
+                      <img src={qrCodeImage} alt="Service End QR" className="w-64 h-64" />
+                    </div>
+                    <p className="text-sm font-medium text-green-700 mb-2">
+                      ✅ Show this QR code to customer to end service
+                    </p>
+                    <div className="text-xs bg-green-100 text-green-800 p-3 rounded-lg space-y-1">
+                      <p className="font-semibold">Customer will scan this QR to:</p>
+                      <p>• Stop the service timer</p>
+                      <p>• Calculate final charges including overtime</p>
+                      <p>• Complete the booking</p>
+                    </div>
+                    {overtimeMinutes > 0 && (
+                      <div className="mt-3 bg-orange-100 border border-orange-300 rounded-lg p-3">
+                        <p className="text-sm font-semibold text-orange-800">
+                          ⚠️ Overtime: {overtimeMinutes} minutes
+                        </p>
+                        <p className="text-xs text-orange-700">
+                          Extra ₹{(overtimeMinutes * OVERTIME_RATE).toFixed(2)} will be added to final bill
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <button
+                      onClick={handleGenerateEndQR}
+                      disabled={!task.completionPhoto}
+                      className={`font-semibold py-3 px-6 rounded-lg transition-colors shadow-md w-full ${
+                        task.completionPhoto 
+                          ? 'bg-green-600 hover:bg-green-700 text-white' 
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      }`}
+                    >
+                      <QrCode className="w-5 h-5 inline-block mr-2" />
+                      Generate End QR Code
+                    </button>
+                    {!task.completionPhoto && (
+                      <p className="text-sm text-orange-600 font-medium mt-3 text-center">
+                        ⚠️ Upload completion photo first
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-2 text-center">
+                      Customer will scan to finalize and calculate charges
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

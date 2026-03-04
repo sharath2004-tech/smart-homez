@@ -64,15 +64,14 @@ const ServiceEndModal = ({
 
     try {
       const token = localStorage.getItem('token');
+      
       const response = await fetch(`http://localhost:5000/api/bookings/${bookingId}/scan-end-qr`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          qrCode
-        })
+        body: JSON.stringify({ qrCode })
       });
 
       if (!response.ok) {
@@ -218,7 +217,10 @@ const ServiceEndModal = ({
 
           {/* QR Code Scanner */}
           <div className="space-y-3">
-            <Label>Scan End-of-Service QR Code</Label>
+            <Label className="flex items-center justify-between">
+              <span>Scan End-of-Service QR Code</span>
+              {qrCode && <CheckCircle className="w-5 h-5 text-green-600" />}
+            </Label>
             
             {showScanner ? (
               <div className="space-y-3">
@@ -331,7 +333,7 @@ const ServiceEndModal = ({
           <div className="flex items-start gap-2 text-xs text-muted-foreground bg-yellow-50 dark:bg-yellow-950 p-3 rounded-lg">
             <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
             <p>
-              Scanning the end QR code will stop the timer and calculate the final charges including any overtime. You'll be able to rate and review the service after completion.
+              Scan the worker's QR code to stop the timer and calculate final charges including any overtime. The worker should have uploaded a completion photo before generating this QR code.
             </p>
           </div>
         </div>
