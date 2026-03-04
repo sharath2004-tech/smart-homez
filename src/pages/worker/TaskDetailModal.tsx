@@ -1,6 +1,6 @@
 import { bookingsAPI } from "@/lib/api";
 import {
-    ArrowLeft, Calendar, CheckCircle,
+    ArrowLeft, Calendar,
     DollarSign,
     Home,
     MapPin,
