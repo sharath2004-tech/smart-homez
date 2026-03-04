@@ -1,9 +1,9 @@
 import AppLayout from "@/components/AppLayout";
-import { authAPI, bookingsAPI, servicesAPI } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, Droplet, Camera } from "lucide-react";
+import { authAPI, bookingsAPI, servicesAPI } from "@/lib/api";
+import { ChevronLeft, Droplet } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";

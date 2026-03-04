@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
 import { servicesAPI } from "@/lib/api";
-import CleaningServicePage from "./services/CleaningServicePage";
-import ACServicingPage from "./services/ACServicingPage";
-import PlumbingServicePage from "./services/PlumbingServicePage";
-import MaidServicePage from "./services/MaidServicePage";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import BookServicePage from "./BookServicePage"; // Fallback for other services
+import ACServicingPage from "./services/ACServicingPage";
+import CleaningServicePage from "./services/CleaningServicePage";
+import MaidServicePage from "./services/MaidServicePage";
+import PlumbingServicePage from "./services/PlumbingServicePage";
 
 const ServiceRouter = () => {
   const { id } = useParams<{ id: string }>();

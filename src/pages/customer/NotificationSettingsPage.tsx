@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
-import { Bell, MessageCircle, MessageSquare, Check, X } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Bell, Check, MessageCircle, MessageSquare, X } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface NotificationPreferences {
   inApp?: {

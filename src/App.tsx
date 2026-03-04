@@ -17,13 +17,13 @@ import RegisterPage from "./pages/auth/RegisterPage";
 
 // Customer pages
 import BookingsPage from "./pages/customer/BookingsPage";
-import ServiceRouter from "./pages/customer/ServiceRouter";
 import CustomerDashboard from "./pages/customer/CustomerDashboard";
 import NotificationSettingsPage from "./pages/customer/NotificationSettingsPage";
 import PaymentsPage from "./pages/customer/PaymentsPage";
 import PreferencesPage from "./pages/customer/PreferencesPage";
 import ProfilePage from "./pages/customer/ProfilePage";
 import ServiceAreaDemo from "./pages/customer/ServiceAreaDemo";
+import ServiceRouter from "./pages/customer/ServiceRouter";
 import ServicesPage from "./pages/customer/ServicesPage";
 
 // Worker pages

@@ -4,9 +4,9 @@
  */
 
 import express from 'express';
-const router = express.Router();
 import { authenticate } from '../middleware/auth.js';
 import User from '../models/User.js';
+const router = express.Router();
 
 // @route   GET /api/notification-preferences
 // @desc    Get user notification preferences

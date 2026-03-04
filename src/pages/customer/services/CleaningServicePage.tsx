@@ -1,9 +1,9 @@
 import AppLayout from "@/components/AppLayout";
-import { authAPI, bookingsAPI, servicesAPI } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, Home, Bath, Bed, Trash2, Sparkles } from "lucide-react";
+import { authAPI, bookingsAPI, servicesAPI } from "@/lib/api";
+import { Bath, Bed, ChevronLeft, Home, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
