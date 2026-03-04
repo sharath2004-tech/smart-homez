@@ -1,5 +1,5 @@
-import { bookingsAPI } from "@/lib/api";
 import PhotoCapture from "@/components/PhotoCapture";
+import { bookingsAPI } from "@/lib/api";
 import {
     ArrowLeft, Calendar,
     Camera,
