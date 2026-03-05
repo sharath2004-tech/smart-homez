@@ -42,5 +42,37 @@
     "back": "వెనుకకు",
     "next": "తర్వాత",
     "language": "భాష"
+  },
+  "nav": {
+    "dashboard": "డాష్‌బోర్డ్",
+    "services": "సేవలు",
+    "myBookings": "నా బుకింగ్‌లు",
+    "payments": "చెల్లింపులు",
+    "profile": "ప్రొఫైల్",
+    "myTasks": "నా పనులు",
+    "earnings": "ఆదాయం",
+    "myLeaves": "నా సెలవులు",
+    "bookings": "బుకింగ్‌లు",
+    "workforce": "కార్మిక శక్తి",
+    "leaves": "సెలవులు",
+    "workers": "కార్మికులు",
+    "locations": "స్థానాలు",
+    "settings": "సెట్టింగ్‌లు",
+    "notifications": "నోటిఫికేషన్లు",
+    "signOut": "సైన్ అవుట్",
+    "customer": "కస్టమర్",
+    "worker": "కార్మికుడు",
+    "admin": "అడ్మిన్"
+  },
+  "subscription": {
+    "mySubscriptions": "నా సబ్‌స్క్రిప్షన్‌లు",
+    "plan": "ప్రణాళిక",
+    "status": "స్థితి",
+    "active": "క్రియాశీల",
+    "paused": "పాజ్ చేయబడింది",
+    "cancelled": "రద్దు చేయబడింది",
+    "pause": "పాజ్ చేయండి",
+    "resume": "పునఃప్రారంభించండి",
+    "cancel": "రద్దు చేయండి"
   }
 }

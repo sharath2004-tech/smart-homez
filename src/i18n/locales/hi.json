@@ -42,5 +42,37 @@
     "back": "वापस",
     "next": "अगला",
     "language": "भाषा"
+  },
+  "nav": {
+    "dashboard": "डैशबोर्ड",
+    "services": "सेवाएं",
+    "myBookings": "मेरी बुकिंग",
+    "payments": "भुगतान",
+    "profile": "प्रोफ़ाइल",
+    "myTasks": "मेरे कार्य",
+    "earnings": "कमाई",
+    "myLeaves": "मेरी छुट्टियां",
+    "bookings": "बुकिंग",
+    "workforce": "कार्यबल",
+    "leaves": "छुट्टियां",
+    "workers": "कर्मचारी",
+    "locations": "स्थान",
+    "settings": "सेटिंग्स",
+    "notifications": "सूचनाएं",
+    "signOut": "साइन आउट",
+    "customer": "ग्राहक",
+    "worker": "कर्मचारी",
+    "admin": "व्यवस्थापक"
+  },
+  "subscription": {
+    "mySubscriptions": "मेरी सदस्यताएं",
+    "plan": "योजना",
+    "status": "स्थिति",
+    "active": "सक्रिय",
+    "paused": "रोका गया",
+    "cancelled": "रद्द",
+    "pause": "रोकें",
+    "resume": "फिर से शुरू करें",
+    "cancel": "रद्द करें"
   }
 }

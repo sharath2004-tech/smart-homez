@@ -42,5 +42,37 @@
     "back": "Back",
     "next": "Next",
     "language": "Language"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "services": "Services",
+    "myBookings": "My Bookings",
+    "payments": "Payments",
+    "profile": "Profile",
+    "myTasks": "My Tasks",
+    "earnings": "Earnings",
+    "myLeaves": "My Leaves",
+    "bookings": "Bookings",
+    "workforce": "Workforce",
+    "leaves": "Leaves",
+    "workers": "Workers",
+    "locations": "Locations",
+    "settings": "Settings",
+    "notifications": "Notifications",
+    "signOut": "Sign out",
+    "customer": "customer",
+    "worker": "worker",
+    "admin": "admin"
+  },
+  "subscription": {
+    "mySubscriptions": "My Subscriptions",
+    "plan": "plan",
+    "status": "Status",
+    "active": "active",
+    "paused": "paused",
+    "cancelled": "cancelled",
+    "pause": "Pause",
+    "resume": "Resume",
+    "cancel": "Cancel"
   }
 }

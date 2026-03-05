@@ -1,6 +1,7 @@
 import { Bell, Calendar, CreditCard, Home, LayoutDashboard, LogOut, MapPin, Settings, User, Users, Wrench } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { LanguageSelector } from "./LanguageSelector";
+import { useTranslation } from "react-i18next";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -10,6 +11,7 @@ interface AppLayoutProps {
 
 const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLayoutProps) => {
   const location = useLocation();
+  const { t } = useTranslation();
 
   const handleLogout = () => {
     // Clear authentication data
@@ -21,30 +23,30 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
   };
 
   const customerNav = [
-    { to: "/customer/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-    { to: "/customer/services", icon: Wrench, label: "Services" },
-    { to: "/customer/bookings", icon: Calendar, label: "My Bookings" },
-    { to: "/customer/payments", icon: CreditCard, label: "Payments" },
-    { to: "/customer/profile", icon: User, label: "Profile" },
+    { to: "/customer/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },
+    { to: "/customer/services", icon: Wrench, label: t('nav.services') },
+    { to: "/customer/bookings", icon: Calendar, label: t('nav.myBookings') },
+    { to: "/customer/payments", icon: CreditCard, label: t('nav.payments') },
+    { to: "/customer/profile", icon: User, label: t('nav.profile') },
   ];
 
   const workerNav = [
-    { to: "/worker/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-    { to: "/worker/tasks", icon: Calendar, label: "My Tasks" },
-    { to: "/worker/earnings", icon: CreditCard, label: "Earnings" },
-    { to: "/worker/leaves", icon: Bell, label: "My Leaves" },
-    { to: "/worker/profile", icon: User, label: "Profile" },
+    { to: "/worker/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },
+    { to: "/worker/tasks", icon: Calendar, label: t('nav.myTasks') },
+    { to: "/worker/earnings", icon: CreditCard, label: t('nav.earnings') },
+    { to: "/worker/leaves", icon: Bell, label: t('nav.myLeaves') },
+    { to: "/worker/profile", icon: User, label: t('nav.profile') },
   ];
 
   const adminNav = [
-    { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-    { to: "/admin/bookings", icon: Calendar, label: "Bookings" },
-    { to: "/admin/workforce", icon: Users, label: "Workforce" },
-    { to: "/admin/leaves", icon: Bell, label: "Leaves" },
-    { to: "/admin/services", icon: Wrench, label: "Services" },
-    { to: "/admin/workers", icon: User, label: "Workers" },
-    { to: "/admin/locations", icon: MapPin, label: "Locations" },
-    { to: "/admin/settings", icon: Settings, label: "Settings" },
+    { to: "/admin/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },
+    { to: "/admin/bookings", icon: Calendar, label: t('nav.bookings') },
+    { to: "/admin/workforce", icon: Users, label: t('nav.workforce') },
+    { to: "/admin/leaves", icon: Bell, label: t('nav.leaves') },
+    { to: "/admin/services", icon: Wrench, label: t('nav.services') },
+    { to: "/admin/workers", icon: User, label: t('nav.workers') },
+    { to: "/admin/locations", icon: MapPin, label: t('nav.locations') },
+    { to: "/admin/settings", icon: Settings, label: t('nav.settings') },
   ];
 
   const navItems = userType === "admin" ? adminNav : userType === "worker" ? workerNav : customerNav;
@@ -73,7 +75,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
             </div>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-foreground truncate">{userName}</p>
-              <p className="text-xs text-muted-foreground capitalize">{userType}</p>
+              <p className="text-xs text-muted-foreground capitalize">{t(`nav.${userType}`)}</p>
             </div>
           </div>
         </div>
@@ -103,7 +105,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
         <div className="p-4 border-t border-sidebar-border space-y-1">
           <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent transition-all">
             <Bell className="w-4 h-4" />
-            Notifications
+            {t('nav.notifications')}
           </button>
           <div className="w-full flex items-center gap-3 px-3 py-2.5">
             <LanguageSelector />
@@ -113,7 +115,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10 transition-all"
           >
             <LogOut className="w-4 h-4" />
-            Sign out
+            {t('nav.signOut')}
           </button>
         </div>
       </aside>
