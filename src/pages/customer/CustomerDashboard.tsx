@@ -4,8 +4,8 @@ import { authAPI, bookingsAPI, locationsAPI } from "@/lib/api";
 import { motion } from "framer-motion";
 import { ArrowRight, Bell, ChevronRight, Clock, Heart, MapPin, Settings, Sparkles, Star } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 interface Booking {
   _id: string;
