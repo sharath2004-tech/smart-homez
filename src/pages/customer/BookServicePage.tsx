@@ -440,41 +440,6 @@ const BookServicePage = () => {
           </div>
         </div>
 
-        {/* Subscription Showcase Banner */}
-        <div className="card-elevated p-6 bg-gradient-to-r from-primary/5 to-primary/10 border-2 border-primary/20">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center shrink-0">
-              <Sparkles className="w-6 h-6 text-primary" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-bold text-foreground mb-1 flex items-center gap-2">
-                Save up to 20% with Subscriptions
-                <span className="badge-primary text-xs">Popular</span>
-              </h3>
-              <p className="text-sm text-muted-foreground mb-3">
-                Book recurring services and enjoy discounts, priority booking, and flexible scheduling.
-              </p>
-              <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
-                <span className="flex items-center gap-1">
-                  ✓ Daily, Weekly & Monthly plans
-                </span>
-                <span className="flex items-center gap-1">
-                  ✓ Pause anytime
-                </span>
-                <span className="flex items-center gap-1">
-                  ✓ Priority support
-                </span>
-              </div>
-              <Link 
-                to={`/customer/subscribe/${id}`}
-                className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
-              >
-                View Subscription Plans →
-              </Link>
-            </div>
-          </div>
-        </div>
-
         {/* Booking Form */}
         <form onSubmit={handleBooking} className="space-y-6">
           {/* Booking Mode: Book Now vs Schedule */}
