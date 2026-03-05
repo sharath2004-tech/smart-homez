@@ -73,6 +73,16 @@
     "cancelled": "cancelled",
     "pause": "Pause",
     "resume": "Resume",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "manageDescription": "Manage your active subscriptions and recurring services",
+    "noSubscriptions": "No Active Subscriptions",
+    "saveTimeMoney": "Save time and money with recurring service plans",
+    "browseServices": "Browse Services",
+    "nextSteps": "Next Steps & Tips",
+    "tipSaveMore": "Save More: Subscribe to services you use regularly and save up to 20% on each booking",
+    "tipPause": "Pause Anytime: Going on vacation? Pause your subscription and resume when you're back",
+    "tipPriority": "Priority Booking: Subscription members get priority worker assignment during peak hours",
+    "tipFlexible": "Flexible Scheduling: Modify your service schedule up to 24 hours before each appointment",
+    "nextBilling": "Next"
   }
 }

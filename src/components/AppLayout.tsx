@@ -107,9 +107,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
             <Bell className="w-4 h-4" />
             {t('nav.notifications')}
           </button>
-          <div className="w-full flex items-center gap-3 px-3 py-2.5">
-            <LanguageSelector />
-          </div>
+          <LanguageSelector variant="full" />
           <button 
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10 transition-all"
