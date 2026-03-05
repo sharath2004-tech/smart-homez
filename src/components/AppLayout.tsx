@@ -1,7 +1,7 @@
 import { Bell, Calendar, CreditCard, Home, LayoutDashboard, LogOut, MapPin, Settings, User, Users, Wrench } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 import { LanguageSelector } from "./LanguageSelector";
-import { useTranslation } from "react-i18next";
 
 interface AppLayoutProps {
   children: React.ReactNode;
