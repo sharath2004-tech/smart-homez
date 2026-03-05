@@ -1,0 +1,46 @@
+{
+  "dashboard": {
+    "welcome": "స్వాగతం",
+    "quickBook": "త్వరిత బుకింగ్",
+    "allServices": "అన్ని సేవలు",
+    "upcomingBookings": "రాబోయే బుకింగ్‌లు",
+    "viewAll": "అన్నీ చూడండి",
+    "noUpcomingBookings": "రాబోయే బుకింగ్‌లు లేవు",
+    "bookService": "ప్రారంభించడానికి సేవను బుక్ చేయండి",
+    "browseServices": "సేవలను బ్రౌజ్ చేయండి",
+    "loadingBookings": "బుకింగ్‌లు లోడ్ అవుతున్నాయి...",
+    "serviceArea": "మీ ప్రాంతంలో సేవ అందుబాటులో ఉంది",
+    "nearbyWorkers": "సమీపంలోని కార్మికులు",
+    "locationUnavailable": "స్థానం అందుబాటులో లేదు",
+    "currentLocation": "ప్రస్తుత స్థానం",
+    "loadingLocation": "స్థానం లోడ్ అవుతోంది...",
+    "today": "ఈరోజు",
+    "tomorrow": "రేపు",
+    "at": "వద్ద"
+  },
+  "services": {
+    "instaMaid": "తక్షణ సహాయకుడు",
+    "instaMaidSubtitle": "ఇప్పుడు అందుబాటులో ఉంది",
+    "instaMaidBadge": "15 నిమిషాలు",
+    "deepClean": "లోతైన శుభ్రత",
+    "deepCleanSubtitle": "పూర్తి ఇల్లు",
+    "deepCleanBadge": "నిర్ణీత ధర",
+    "kitchen": "వంటగది",
+    "kitchenSubtitle": "లోతైన శుభ్రత",
+    "bathroom": "బాత్రూమ్",
+    "bathroomSubtitle": "శుభ్రపరచండి"
+  },
+  "common": {
+    "loading": "లోడ్ అవుతోంది...",
+    "error": "లోపం",
+    "success": "విజయం",
+    "cancel": "రద్దు చేయండి",
+    "confirm": "నిర్ధారించండి",
+    "save": "సేవ్ చేయండి",
+    "edit": "సవరించండి",
+    "delete": "తొలగించండి",
+    "back": "వెనుకకు",
+    "next": "తర్వాత",
+    "language": "భాష"
+  }
+}

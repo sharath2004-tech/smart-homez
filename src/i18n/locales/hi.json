@@ -1,0 +1,46 @@
+{
+  "dashboard": {
+    "welcome": "स्वागत है",
+    "quickBook": "त्वरित बुकिंग",
+    "allServices": "सभी सेवाएं",
+    "upcomingBookings": "आगामी बुकिंग",
+    "viewAll": "सभी देखें",
+    "noUpcomingBookings": "कोई आगामी बुकिंग नहीं",
+    "bookService": "शुरू करने के लिए एक सेवा बुक करें",
+    "browseServices": "सेवाएं देखें",
+    "loadingBookings": "बुकिंग लोड हो रहा है...",
+    "serviceArea": "आपके क्षेत्र में सेवा उपलब्ध है",
+    "nearbyWorkers": "पास के कर्मचारी",
+    "locationUnavailable": "स्थान अनुपलब्ध",
+    "currentLocation": "वर्तमान स्थान",
+    "loadingLocation": "स्थान लोड हो रहा है...",
+    "today": "आज",
+    "tomorrow": "कल",
+    "at": "को"
+  },
+  "services": {
+    "instaMaid": "तुरंत सहायक",
+    "instaMaidSubtitle": "अभी उपलब्ध",
+    "instaMaidBadge": "15 मिनट",
+    "deepClean": "गहरी सफाई",
+    "deepCleanSubtitle": "पूरा घर",
+    "deepCleanBadge": "निश्चित मूल्य",
+    "kitchen": "रसोई",
+    "kitchenSubtitle": "गहरी सफाई",
+    "bathroom": "बाथरूम",
+    "bathroomSubtitle": "स्वच्छ करें"
+  },
+  "common": {
+    "loading": "लोड हो रहा है...",
+    "error": "त्रुटि",
+    "success": "सफलता",
+    "cancel": "रद्द करें",
+    "confirm": "पुष्टि करें",
+    "save": "सहेजें",
+    "edit": "संपादित करें",
+    "delete": "हटाएं",
+    "back": "वापस",
+    "next": "अगला",
+    "language": "भाषा"
+  }
+}

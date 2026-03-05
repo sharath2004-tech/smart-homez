@@ -1,5 +1,6 @@
 import { Bell, Calendar, CreditCard, Home, LayoutDashboard, LogOut, MapPin, Settings, User, Users, Wrench } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { LanguageSelector } from "./LanguageSelector";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -104,6 +105,9 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
             <Bell className="w-4 h-4" />
             Notifications
           </button>
+          <div className="w-full flex items-center gap-3 px-3 py-2.5">
+            <LanguageSelector />
+          </div>
           <button 
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10 transition-all"
@@ -122,8 +126,11 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
           </div>
           <span className="font-bold text-foreground text-sm">Healthy Homez</span>
         </Link>
-        <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-bold">
-          {initials}
+        <div className="flex items-center gap-2">
+          <LanguageSelector />
+          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-bold">
+            {initials}
+          </div>
         </div>
       </div>
 

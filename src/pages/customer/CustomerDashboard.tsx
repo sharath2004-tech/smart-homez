@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Bell, ChevronRight, Clock, Heart, MapPin, Settings, Sparkles, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 interface Booking {
   _id: string;
@@ -33,19 +34,20 @@ interface UserProfile {
   };
 }
 
-const quickServices = [
-  { icon: "🧹", name: "Insta Maid", subtitle: "Available now", badge: "15 min" },
-  { icon: "✨", name: "Deep Clean", subtitle: "Full home", badge: "Fixed price" },
-  { icon: "🍳", name: "Kitchen", subtitle: "Deep clean", badge: "" },
-  { icon: "🚿", name: "Bathroom", subtitle: "Sanitize", badge: "" },
-];
-
 const CustomerDashboard = () => {
+  const { t } = useTranslation();
   const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [nearbyWorkersCount, setNearbyWorkersCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const { latitude, longitude, error: locationError } = useGeolocation();
+
+  const quickServices = [
+    { icon: "🧹", name: t('services.instaMaid'), subtitle: t('services.instaMaidSubtitle'), badge: t('services.instaMaidBadge') },
+    { icon: "✨", name: t('services.deepClean'), subtitle: t('services.deepCleanSubtitle'), badge: t('services.deepCleanBadge') },
+    { icon: "🍳", name: t('services.kitchen'), subtitle: t('services.kitchenSubtitle'), badge: "" },
+    { icon: "🚿", name: t('services.bathroom'), subtitle: t('services.bathroomSubtitle'), badge: "" },
+  ];
 
   useEffect(() => {
     fetchDashboardData();
@@ -83,10 +85,10 @@ const CustomerDashboard = () => {
   const displayAddress = defaultAddress 
     ? `${defaultAddress.area}, ${defaultAddress.city} - ${defaultAddress.zipCode}`
     : locationError
-    ? "Location unavailable"
+    ? t('dashboard.locationUnavailable')
     : latitude && longitude
-    ? "Current location"
-    : "Loading location...";
+    ? t('dashboard.currentLocation')
+    : t('dashboard.loadingLocation');
 
   const formatDate = (dateString: string, timeString?: string) => {
     const date = new Date(dateString);
@@ -96,9 +98,9 @@ const CustomerDashboard = () => {
 
     let dateText = "";
     if (date.toDateString() === today.toDateString()) {
-      dateText = "Today";
+      dateText = t('dashboard.today');
     } else if (date.toDateString() === tomorrow.toDateString()) {
-      dateText = "Tomorrow";
+      dateText = t('dashboard.tomorrow');
     } else {
       dateText = date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
     }
@@ -249,9 +251,9 @@ const CustomerDashboard = () => {
         {/* Quick Services */}
         <motion.div variants={itemVariants}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold font-heading text-foreground">Quick Book</h2>
+            <h2 className="text-lg font-bold font-heading text-foreground">{t('dashboard.quickBook')}</h2>
             <Link to="/customer/services" className="text-sm text-primary font-medium flex items-center gap-1 hover:gap-2 transition-all">
-              All services <ChevronRight className="w-3.5 h-3.5" />
+              {t('dashboard.allServices')} <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
           <motion.div 
@@ -266,7 +268,7 @@ const CustomerDashboard = () => {
                 whileTap="tap"
                 custom={index}
               >
-                <Link to="/customer/services" className="card-elevated-hover p-4 text-center group block">
+                <Link to="/customer/services" className="card-elevated-hover p-4 text-center group block h-[140px] flex flex-col justify-center">
                   <motion.div 
                     className="text-3xl mb-2"
                     whileHover={{ scale: 1.2, rotate: 10 }}
@@ -276,7 +278,7 @@ const CustomerDashboard = () => {
                   </motion.div>
                   <p className="text-sm font-semibold text-foreground">{s.name}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{s.subtitle}</p>
-                  {s.badge && <span className="badge-primary mt-2 text-xs">{s.badge}</span>}
+                  {s.badge && <span className="badge-primary mt-2 text-xs inline-block">{s.badge}</span>}
                 </Link>
               </motion.div>
             ))}
@@ -286,9 +288,9 @@ const CustomerDashboard = () => {
         {/* Upcoming Bookings */}
         <motion.div variants={itemVariants}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold font-heading text-foreground">Upcoming Bookings</h2>
+            <h2 className="text-lg font-bold font-heading text-foreground">{t('dashboard.upcomingBookings')}</h2>
             <Link to="/customer/bookings" className="text-sm text-primary font-medium flex items-center gap-1 hover:gap-2 transition-all">
-              View all <ChevronRight className="w-3.5 h-3.5" />
+              {t('dashboard.viewAll')} <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
           {loading ? (
@@ -302,7 +304,7 @@ const CustomerDashboard = () => {
                 animate={{ rotate: 360 }}
                 transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
               />
-              <p className="text-sm">Loading bookings...</p>
+              <p className="text-sm">{t('dashboard.loadingBookings')}</p>
             </motion.div>
           ) : upcomingBookings.length === 0 ? (
             <motion.div 
@@ -318,11 +320,11 @@ const CustomerDashboard = () => {
               >
                 📭
               </motion.div>
-              <p className="text-sm font-medium text-foreground">No upcoming bookings</p>
-              <p className="text-xs text-muted-foreground mt-1">Book a service to get started</p>
+              <p className="text-sm font-medium text-foreground">{t('dashboard.noUpcomingBookings')}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('dashboard.bookService')}</p>
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Link to="/customer/services" className="btn-brand mt-4 text-sm inline-flex items-center gap-2">
-                  Browse Services <ArrowRight className="w-3.5 h-3.5" />
+                  {t('dashboard.browseServices')} <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </motion.div>
             </motion.div>

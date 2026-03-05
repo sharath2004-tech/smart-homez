@@ -1,0 +1,46 @@
+{
+  "dashboard": {
+    "welcome": "Welcome",
+    "quickBook": "Quick Book",
+    "allServices": "All services",
+    "upcomingBookings": "Upcoming Bookings",
+    "viewAll": "View all",
+    "noUpcomingBookings": "No upcoming bookings",
+    "bookService": "Book a service to get started",
+    "browseServices": "Browse Services",
+    "loadingBookings": "Loading bookings...",
+    "serviceArea": "Service available in your area",
+    "nearbyWorkers": "workers nearby",
+    "locationUnavailable": "Location unavailable",
+    "currentLocation": "Current location",
+    "loadingLocation": "Loading location...",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "at": "at"
+  },
+  "services": {
+    "instaMaid": "Insta Maid",
+    "instaMaidSubtitle": "Available now",
+    "instaMaidBadge": "15 min",
+    "deepClean": "Deep Clean",
+    "deepCleanSubtitle": "Full home",
+    "deepCleanBadge": "Fixed price",
+    "kitchen": "Kitchen",
+    "kitchenSubtitle": "Deep clean",
+    "bathroom": "Bathroom",
+    "bathroomSubtitle": "Sanitize"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "back": "Back",
+    "next": "Next",
+    "language": "Language"
+  }
+}
