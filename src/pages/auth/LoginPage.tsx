@@ -96,9 +96,9 @@ const LoginPage = () => {
             </p>
             <div className="mt-8 grid grid-cols-3 gap-4">
               {[
-                { label: "Active Workers", value: "2,400+" },
-                { label: "Happy Customers", value: "18,000+" },
-                { label: "Services Done", value: "95,000+" },
+                { label: "Active Workers", value: formatNumber(stats.totalWorkers) },
+                { label: "Happy Customers", value: formatNumber(stats.totalCustomers) },
+                { label: "Services Done", value: formatNumber(stats.servicesDone) },
               ].map((stat) => (
                 <div key={stat.label} className="bg-primary-foreground/10 rounded-xl p-4 backdrop-blur-sm">
                   <div className="text-2xl font-bold font-heading">{stat.value}</div>
