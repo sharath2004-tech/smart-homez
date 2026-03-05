@@ -300,28 +300,18 @@ const ServicesPage = () => {
                     </div>
                   </div>
                   
-                  <div className="flex gap-2">
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="flex-1">
-                      <Link
-                        to={`/customer/book/${service._id}`}
-                        className={`w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors ${
-                        service.availability?.available 
-                          ? 'btn-brand'
-                          : 'bg-muted text-muted-foreground hover:bg-border'
-                      }`}
-                    >
-                      {service.availability?.available ? 'Book Now' : 'View'}
-                      </Link>
-                    </motion.div>
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="flex-1">
-                      <Link
-                        to={`/customer/subscribe/${service._id}`}
-                        className="w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors bg-primary/10 text-primary hover:bg-primary/20 border border-primary/30"
-                      >
-                        Subscribe
-                      </Link>
-                    </motion.div>
-                  </div>
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Link
+                      to={`/customer/book/${service._id}`}
+                      className={`w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors ${
+                      service.availability?.available 
+                        ? 'btn-brand'
+                        : 'bg-muted text-muted-foreground hover:bg-border'
+                    }`}
+                  >
+                    {service.availability?.available ? 'Book Now' : 'View'}
+                    </Link>
+                  </motion.div>
                 </div>
               </div>
             ))}

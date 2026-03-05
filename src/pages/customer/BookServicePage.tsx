@@ -517,12 +517,17 @@ const BookServicePage = () => {
               </div>
             </div>
           )}
-          {/* Booking Type Selection */}
+          {/* Booking Type Selection with Subscriptions */}
           <div className="card-elevated p-6">
-            <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-primary" />
-              Select Booking Type
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-foreground flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-primary" />
+                Select Booking Plan
+              </h3>
+              {bookingType !== 'oneTime' && (
+                <span className="badge-primary text-xs">Save up to 35%</span>
+              )}
+            </div>
             
             <div className="grid grid-cols-2 gap-3">
               <button
@@ -535,60 +540,88 @@ const BookServicePage = () => {
                 }`}
               >
                 <div className="font-semibold text-foreground">One Time</div>
-                <div className="text-sm text-muted-foreground mt-1">Single service</div>
+                <div className="text-xs text-muted-foreground mt-1">Single service</div>
                 <div className="text-lg font-bold text-primary mt-2">
                   ₹{service.pricingPlans?.oneTime || service.price}
                 </div>
+                <div className="text-xs text-muted-foreground mt-2">✓ Flexible scheduling</div>
               </button>
 
               <button
                 type="button"
                 onClick={() => setBookingType('daily')}
-                className={`p-4 border-2 rounded-xl transition-all ${
+                className={`p-4 border-2 rounded-xl transition-all relative ${
                   bookingType === 'daily' 
                     ? 'border-primary bg-primary/5' 
                     : 'border-border hover:border-primary/50'
                 }`}
               >
-                <div className="font-semibold text-foreground">Daily</div>
-                <div className="text-sm text-muted-foreground mt-1">Every day</div>
+                <div className="absolute top-2 right-2 text-xs font-semibold text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded">15% OFF</div>
+                <div className="font-semibold text-foreground">Daily Plan</div>
+                <div className="text-xs text-muted-foreground mt-1">Service every day</div>
                 <div className="text-lg font-bold text-primary mt-2">
                   ₹{service.pricingPlans?.daily || Math.round(service.price * 0.85)}/day
                 </div>
+                <div className="text-xs text-muted-foreground mt-2">✓ Priority booking</div>
               </button>
 
               <button
                 type="button"
                 onClick={() => setBookingType('weekly')}
-                className={`p-4 border-2 rounded-xl transition-all ${
+                className={`p-4 border-2 rounded-xl transition-all relative ${
                   bookingType === 'weekly' 
-                    ? 'border-primary bg-primary/5' 
+                    ? 'border-primary bg-primary/5 ring-2 ring-primary/30' 
                     : 'border-border hover:border-primary/50'
                 }`}
               >
-                <div className="font-semibold text-foreground">Weekly</div>
-                <div className="text-sm text-muted-foreground mt-1">7 days plan</div>
+                <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+                  <span className="text-xs font-semibold text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded">Most Popular</span>
+                  <span className="text-xs font-semibold text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded">25% OFF</span>
+                </div>
+                <div className="font-semibold text-foreground">Weekly Plan</div>
+                <div className="text-xs text-muted-foreground mt-1">Choose specific days</div>
                 <div className="text-lg font-bold text-primary mt-2">
                   ₹{service.pricingPlans?.weekly || Math.round(service.price * 0.75 * 7)}/week
                 </div>
+                <div className="text-xs text-muted-foreground mt-2">✓ Pause anytime ✓ Dedicated worker</div>
               </button>
 
               <button
                 type="button"
                 onClick={() => setBookingType('monthly')}
-                className={`p-4 border-2 rounded-xl transition-all ${
+                className={`p-4 border-2 rounded-xl transition-all relative ${
                   bookingType === 'monthly' 
                     ? 'border-primary bg-primary/5' 
                     : 'border-border hover:border-primary/50'
                 }`}
               >
-                <div className="font-semibold text-foreground">Monthly</div>
-                <div className="text-sm text-muted-foreground mt-1">30 days plan</div>
+                <div className="absolute top-2 right-2 text-xs font-semibold text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded">35% OFF</div>
+                <div className="font-semibold text-foreground">Monthly Plan</div>
+                <div className="text-xs text-muted-foreground mt-1">Best value • 30 days</div>
                 <div className="text-lg font-bold text-primary mt-2">
                   ₹{service.pricingPlans?.monthly || Math.round(service.price * 0.65 * 30)}/month
                 </div>
+                <div className="text-xs text-muted-foreground mt-2">✓ Premium support ✓ Free rescheduling</div>
               </button>
             </div>
+            
+            {/* Subscription Benefits */}
+            {bookingType !== 'oneTime' && (
+              <div className="mt-4 p-4 bg-primary/5 rounded-xl border border-primary/20">
+                <div className="flex items-start gap-2 mb-2">
+                  <Sparkles className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-foreground mb-1">Subscription Benefits</p>
+                    <ul className="text-xs text-muted-foreground space-y-1">
+                      <li>• Cancel or pause your subscription anytime with 24-hour notice</li>
+                      <li>• Priority worker assignment during peak hours</li>
+                      <li>• Dedicated support team for subscription members</li>
+                      <li>• Free unlimited rescheduling (up to 2 hours before service)</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Available Workers Section (Pronto-style) */}
