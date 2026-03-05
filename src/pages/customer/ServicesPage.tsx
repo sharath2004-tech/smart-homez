@@ -289,26 +289,41 @@ const ServicesPage = () => {
                   </div>
                 )}
 
-                <div className="mt-4 flex items-center justify-between">
-                  <div>
-                    <span className="text-sm font-bold text-foreground">₹{service.price}</span>
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <Clock className="w-3 h-3 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">{service.duration} min</span>
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <span className="text-sm font-bold text-foreground">₹{service.price}</span>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <Clock className="w-3 h-3 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">{service.duration} min</span>
+                      </div>
                     </div>
                   </div>
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Link
-                      to={`/customer/book/${service._id}`}
-                      className={`text-xs py-2 px-4 flex items-center gap-1 rounded-xl transition-colors ${
-                      service.availability?.available 
-                        ? 'btn-brand'
-                        : 'bg-muted text-muted-foreground hover:bg-border'
-                    }`}
-                  >
-                    {service.availability?.available ? 'Book' : 'View'} <ChevronRight className="w-3 h-3" />
-                    </Link>
-                  </motion.div>
+                  
+                  <div className="flex gap-2">
+                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="flex-1">
+                      <Link
+                        to={`/customer/book/${service._id}`}
+                        className={`w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors ${
+                        service.availability?.available 
+                          ? 'btn-brand'
+                          : 'bg-muted text-muted-foreground hover:bg-border'
+                      }`}
+                    >
+                      {service.availability?.available ? 'Book Now' : 'View'}
+                      </Link>
+                    </motion.div>
+                    {service.availability?.available && (
+                      <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="flex-1">
+                        <Link
+                          to={`/customer/subscribe/${service._id}`}
+                          className="w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors bg-primary/10 text-primary hover:bg-primary/20 border border-primary/30"
+                        >
+                          Subscribe
+                        </Link>
+                      </motion.div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

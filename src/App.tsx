@@ -25,6 +25,7 @@ import ProfilePage from "./pages/customer/ProfilePage";
 import ServiceAreaDemo from "./pages/customer/ServiceAreaDemo";
 import ServiceRouter from "./pages/customer/ServiceRouter";
 import ServicesPage from "./pages/customer/ServicesPage";
+import SubscriptionBookingPage from "./pages/customer/SubscriptionBookingPage";
 
 // Worker pages
 import WorkerDashboard from "./pages/worker/WorkerDashboard";
@@ -65,6 +66,7 @@ const App = () => (
           <Route path="/customer/dashboard" element={<ProtectedRoute allowedRoles={['customer']}><CustomerDashboard /></ProtectedRoute>} />
           <Route path="/customer/services" element={<ProtectedRoute allowedRoles={['customer']}><ServicesPage /></ProtectedRoute>} />
           <Route path="/customer/book/:id" element={<ProtectedRoute allowedRoles={['customer']}><ServiceRouter /></ProtectedRoute>} />
+          <Route path="/customer/subscribe/:id" element={<ProtectedRoute allowedRoles={['customer']}><SubscriptionBookingPage /></ProtectedRoute>} />
           <Route path="/customer/bookings" element={<ProtectedRoute allowedRoles={['customer']}><BookingsPage /></ProtectedRoute>} />
           <Route path="/customer/payments" element={<ProtectedRoute allowedRoles={['customer']}><PaymentsPage /></ProtectedRoute>} />
           <Route path="/customer/preferences" element={<ProtectedRoute allowedRoles={['customer']}><PreferencesPage /></ProtectedRoute>} />
