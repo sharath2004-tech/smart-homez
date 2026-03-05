@@ -412,6 +412,64 @@ const BookServicePage = () => {
     );
   }
 
+  // Use service's subscription plans or fall back to defaults
+  const subscriptionPlans = service?.subscriptionPlans && service.subscriptionPlans.length > 0
+    ? service.subscriptionPlans.filter(plan => plan.isActive).sort((a, b) => a.sortOrder - b.sortOrder)
+    : [
+        {
+          id: 'oneTime',
+          name: 'oneTime',
+          displayName: 'One-Time',
+          icon: '📅',
+          description: 'Single service',
+          price: service?.price || 500,
+          discountPercentage: 0,
+          isActive: true,
+          requiresFixedWorker: false,
+          allowDaySelection: false,
+          sortOrder: 1
+        },
+        {
+          id: 'daily',
+          name: 'daily',
+          displayName: 'Daily',
+          icon: '🌅',
+          description: 'Every day',
+          price: Math.round((service?.price || 500) * 0.85),
+          discountPercentage: 15,
+          isActive: true,
+          requiresFixedWorker: true,
+          allowDaySelection: false,
+          sortOrder: 2
+        },
+        {
+          id: 'weekly',
+          name: 'weekly',
+          displayName: 'Weekly',
+          icon: '📆',
+          description: 'Select days',
+          price: Math.round((service?.price || 500) * 0.75),
+          discountPercentage: 25,
+          isActive: true,
+          requiresFixedWorker: true,
+          allowDaySelection: true,
+          sortOrder: 3
+        },
+        {
+          id: 'monthly',
+          name: 'monthly',
+          displayName: 'Monthly',
+          icon: '🗓️',
+          description: 'Once a month',
+          price: Math.round((service?.price || 500) * 0.65),
+          discountPercentage: 35,
+          isActive: true,
+          requiresFixedWorker: true,
+          allowDaySelection: false,
+          sortOrder: 4
+        }
+      ];
+
   return (
     <AppLayout userType="customer" userName={profile?.name || "Guest"}>
       <div className="max-w-2xl mx-auto space-y-6 pb-20 md:pb-0">
@@ -560,37 +618,33 @@ const BookServicePage = () => {
             </div>
             
             <div className="grid grid-cols-2 gap-3">
-              {service.subscriptionPlans
-                ?.filter(plan => plan.isActive)
-                .sort((a, b) => a.sortOrder - b.sortOrder)
-                .map((plan) => (
-                  <button
-                    key={plan.id}
-                    type="button"
-                    onClick={() => setBookingType(plan.name as any)}
-                    className={`p-4 border-2 rounded-xl transition-all relative ${
-                      bookingType === plan.name
-                        ? 'border-primary bg-primary/5 ring-2 ring-primary/30'
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                  >
-                    {plan.discountPercentage > 0 && (
-                      <div className="absolute top-2 right-2 text-xs font-semibold text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded">
-                        {plan.discountPercentage}% OFF
-                      </div>
-                    )}
-                    <div className="text-2xl mb-2">{plan.icon}</div>
-                    <div className="font-semibold text-foreground">{plan.displayName}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{plan.description}</div>
-                    <div className="text-lg font-bold text-primary mt-2">
-                      ₹{plan.price}{plan.name !== 'oneTime' ? `/${plan.name.replace('ly', '')}` : ''}
+              {subscriptionPlans.map((plan) => (
+                <button
+                  key={plan.id}
+                  type="button"
+                  onClick={() => setBookingType(plan.name as any)}
+                  className={`p-4 border-2 rounded-xl transition-all relative ${
+                    bookingType === plan.name
+                      ? 'border-primary bg-primary/5 ring-2 ring-primary/30'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  {plan.discountPercentage > 0 && (
+                    <div className="absolute top-2 right-2 text-xs font-semibold text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded">
+                      {plan.discountPercentage}% OFF
                     </div>
-                    {plan.requiresFixedWorker && (
-                      <div className="text-xs text-muted-foreground mt-2">✓ Fixed worker</div>
-                    )}
-                  </button>
-                ))
-              }
+                  )}
+                  <div className="text-2xl mb-2">{plan.icon}</div>
+                  <div className="font-semibold text-foreground">{plan.displayName}</div>
+                  <div className="text-xs text-muted-foreground mt-1">{plan.description}</div>
+                  <div className="text-lg font-bold text-primary mt-2">
+                    ₹{plan.price}{plan.name !== 'oneTime' ? `/${plan.name.replace('ly', '')}` : ''}
+                  </div>
+                  {plan.requiresFixedWorker && (
+                    <div className="text-xs text-muted-foreground mt-2">✓ Fixed worker</div>
+                  )}
+                </button>
+              ))}
             </div>
             
             {/* Subscription Benefits */}

@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { authAPI, servicesAPI } from "@/lib/api";
-import { Edit, Plus, Save, Search, Trash2, X } from "lucide-react";
+import { Edit, Info, Plus, Save, Search, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -549,38 +549,114 @@ const AdminServices = () => {
                         Subscription Plans
                       </label>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Create custom booking plans (one-time, daily, weekly, etc.)
+                        Create custom booking plans - Each service can have unique subscription options
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newPlan = {
-                          id: `custom-${Date.now()}`,
-                          name: `custom-${Date.now()}`,
-                          displayName: 'Custom Plan',
-                          icon: '✨',
-                          description: 'Custom subscription',
-                          price: formData.price,
-                          discountPercentage: 0,
-                          isActive: true,
-                          requiresFixedWorker: false,
-                          allowDaySelection: false,
-                          sortOrder: (formData.subscriptionPlans?.length || 0) + 1
-                        };
-                        setFormData({
-                          ...formData,
-                          subscriptionPlans: [
-                            ...(formData.subscriptionPlans || []),
-                            newPlan
-                          ]
-                        });
-                      }}
-                      className="text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1"
-                    >
-                      <Plus className="w-3 h-3" />
-                      Add Plan
-                    </button>
+                    <div className="flex gap-2">
+                      <select
+                        onChange={(e) => {
+                          if (!e.target.value) return;
+                          const template = JSON.parse(e.target.value);
+                          const newPlan = {
+                            ...template,
+                            id: `${template.name}-${Date.now()}`,
+                            sortOrder: (formData.subscriptionPlans?.length || 0) + 1
+                          };
+                          setFormData({
+                            ...formData,
+                            subscriptionPlans: [
+                              ...(formData.subscriptionPlans || []),
+                              newPlan
+                            ]
+                          });
+                          e.target.value = ''; // Reset select
+                        }}
+                        className="text-xs px-3 py-1.5 bg-background border border-border rounded-lg hover:border-primary transition-colors"
+                      >
+                        <option value="">+ Add from Template</option>
+                        <optgroup label="Basic Plans">
+                          <option value={JSON.stringify({name: 'oneTime', displayName: 'One-Time', icon: '📅', description: 'Single service', price: formData.price, discountPercentage: 0, isActive: true, requiresFixedWorker: false, allowDaySelection: false})}>
+                            One-Time Booking
+                          </option>
+                          <option value={JSON.stringify({name: 'daily', displayName: 'Daily', icon: '🌅', description: 'Every day', price: Math.round(formData.price * 0.85), discountPercentage: 15, isActive: true, requiresFixedWorker: true, allowDaySelection: false})}>
+                            Daily (15% off)
+                          </option>
+                          <option value={JSON.stringify({name: 'weekly', displayName: 'Weekly', icon: '📆', description: 'Select days', price: Math.round(formData.price * 0.75), discountPercentage: 25, isActive: true, requiresFixedWorker: true, allowDaySelection: true})}>
+                            Weekly (25% off)
+                          </option>
+                          <option value={JSON.stringify({name: 'monthly', displayName: 'Monthly', icon: '🗓️', description: 'Once a month', price: Math.round(formData.price * 0.65), discountPercentage: 35, isActive: true, requiresFixedWorker: true, allowDaySelection: false})}>
+                            Monthly (35% off)
+                          </option>
+                        </optgroup>
+                        <optgroup label="Flexible Plans">
+                          <option value={JSON.stringify({name: 'biweekly', displayName: 'Bi-Weekly', icon: '📋', description: 'Every 2 weeks', price: Math.round(formData.price * 0.80), discountPercentage: 20, isActive: true, requiresFixedWorker: true, allowDaySelection: false})}>
+                            Bi-Weekly (20% off)
+                          </option>
+                          <option value={JSON.stringify({name: 'weekend', displayName: 'Weekend Only', icon: '🎉', description: 'Sat & Sun', price: Math.round(formData.price * 0.85), discountPercentage: 15, isActive: true, requiresFixedWorker: true, allowDaySelection: true})}>
+                            Weekend Only
+                          </option>
+                          <option value={JSON.stringify({name: 'weekday', displayName: 'Weekday Only', icon: '💼', description: 'Mon-Fri', price: Math.round(formData.price * 0.80), discountPercentage: 20, isActive: true, requiresFixedWorker: true, allowDaySelection: true})}>
+                            Weekday Only
+                          </option>
+                        </optgroup>
+                        <optgroup label="Premium Plans">
+                          <option value={JSON.stringify({name: 'quarterly', displayName: 'Quarterly', icon: '🎯', description: 'Every 3 months', price: Math.round(formData.price * 0.55), discountPercentage: 45, isActive: true, requiresFixedWorker: true, allowDaySelection: false})}>
+                            Quarterly (45% off)
+                          </option>
+                          <option value={JSON.stringify({name: 'annual', displayName: 'Annual', icon: '🏆', description: 'Yearly plan', price: Math.round(formData.price * 0.50), discountPercentage: 50, isActive: true, requiresFixedWorker: true, allowDaySelection: false})}>
+                            Annual (50% off)
+                          </option>
+                          <option value={JSON.stringify({name: 'trial', displayName: 'Trial', icon: '🎁', description: '3-day trial', price: Math.round(formData.price * 0.50), discountPercentage: 50, isActive: true, requiresFixedWorker: false, allowDaySelection: false})}>
+                            Trial (3 days)
+                          </option>
+                        </optgroup>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newPlan = {
+                            id: `custom-${Date.now()}`,
+                            name: `custom-${Date.now()}`,
+                            displayName: 'Custom Plan',
+                            icon: '✨',
+                            description: 'Custom subscription',
+                            price: formData.price,
+                            discountPercentage: 0,
+                            isActive: true,
+                            requiresFixedWorker: false,
+                            allowDaySelection: false,
+                            sortOrder: (formData.subscriptionPlans?.length || 0) + 1
+                          };
+                          setFormData({
+                            ...formData,
+                            subscriptionPlans: [
+                              ...(formData.subscriptionPlans || []),
+                              newPlan
+                            ]
+                          });
+                        }}
+                        className="text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1 whitespace-nowrap"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Custom Plan
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Info Banner */}
+                  <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                      <div className="text-xs text-blue-800 dark:text-blue-200">
+                        <p className="font-medium mb-1">💡 Pro Tip: Customize plans per service</p>
+                        <ul className="space-y-0.5 text-blue-700 dark:text-blue-300">
+                          <li>• <strong>Cleaning services</strong> might offer Daily, Weekly, Bi-Weekly plans</li>
+                          <li>• <strong>Health services</strong> could have Monthly check-up packages</li>
+                          <li>• <strong>Maintenance</strong> might need Quarterly or Annual plans</li>
+                          <li>• Set different prices for each plan - Not all services need the same discounts!</li>
+                        </ul>
+                      </div>
+                    </div>
                   </div>
                   
                   {formData.subscriptionPlans && formData.subscriptionPlans.length > 0 && (
