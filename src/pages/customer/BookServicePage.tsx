@@ -18,6 +18,19 @@ interface Service {
     weekly: number;
     monthly: number;
   };
+  subscriptionPlans?: Array<{
+    id: string;
+    name: string;
+    displayName: string;
+    icon: string;
+    description: string;
+    price: number;
+    discountPercentage: number;
+    isActive: boolean;
+    requiresFixedWorker: boolean;
+    allowDaySelection: boolean;
+    sortOrder: number;
+  }>;
 }
 
 interface Worker {
@@ -534,7 +547,7 @@ const BookServicePage = () => {
               </div>
             </div>
           )}
-          {/* Booking Type Selection with Subscriptions */}
+          {/* Booking Type Selection with Subscriptions - Dynamic */}
           <div className="card-elevated p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-foreground flex items-center gap-2">
@@ -547,79 +560,37 @@ const BookServicePage = () => {
             </div>
             
             <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setBookingType('oneTime')}
-                className={`p-4 border-2 rounded-xl transition-all ${
-                  bookingType === 'oneTime' 
-                    ? 'border-primary bg-primary/5' 
-                    : 'border-border hover:border-primary/50'
-                }`}
-              >
-                <div className="font-semibold text-foreground">One Time</div>
-                <div className="text-xs text-muted-foreground mt-1">Single service</div>
-                <div className="text-lg font-bold text-primary mt-2">
-                  ₹{service.pricingPlans?.oneTime || service.price}
-                </div>
-                <div className="text-xs text-muted-foreground mt-2">✓ Flexible scheduling</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setBookingType('daily')}
-                className={`p-4 border-2 rounded-xl transition-all relative ${
-                  bookingType === 'daily' 
-                    ? 'border-primary bg-primary/5' 
-                    : 'border-border hover:border-primary/50'
-                }`}
-              >
-                <div className="absolute top-2 right-2 text-xs font-semibold text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded">15% OFF</div>
-                <div className="font-semibold text-foreground">Daily Plan</div>
-                <div className="text-xs text-muted-foreground mt-1">Service every day</div>
-                <div className="text-lg font-bold text-primary mt-2">
-                  ₹{service.pricingPlans?.daily || Math.round(service.price * 0.85)}/day
-                </div>
-                <div className="text-xs text-muted-foreground mt-2">✓ Priority booking</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setBookingType('weekly')}
-                className={`p-4 border-2 rounded-xl transition-all relative ${
-                  bookingType === 'weekly' 
-                    ? 'border-primary bg-primary/5 ring-2 ring-primary/30' 
-                    : 'border-border hover:border-primary/50'
-                }`}
-              >
-                <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
-                  <span className="text-xs font-semibold text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded">Most Popular</span>
-                  <span className="text-xs font-semibold text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded">25% OFF</span>
-                </div>
-                <div className="font-semibold text-foreground">Weekly Plan</div>
-                <div className="text-xs text-muted-foreground mt-1">Choose specific days</div>
-                <div className="text-lg font-bold text-primary mt-2">
-                  ₹{service.pricingPlans?.weekly || Math.round(service.price * 0.75 * 7)}/week
-                </div>
-                <div className="text-xs text-muted-foreground mt-2">✓ Pause anytime ✓ Dedicated worker</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setBookingType('monthly')}
-                className={`p-4 border-2 rounded-xl transition-all relative ${
-                  bookingType === 'monthly' 
-                    ? 'border-primary bg-primary/5' 
-                    : 'border-border hover:border-primary/50'
-                }`}
-              >
-                <div className="absolute top-2 right-2 text-xs font-semibold text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded">35% OFF</div>
-                <div className="font-semibold text-foreground">Monthly Plan</div>
-                <div className="text-xs text-muted-foreground mt-1">Best value • 30 days</div>
-                <div className="text-lg font-bold text-primary mt-2">
-                  ₹{service.pricingPlans?.monthly || Math.round(service.price * 0.65 * 30)}/month
-                </div>
-                <div className="text-xs text-muted-foreground mt-2">✓ Premium support ✓ Free rescheduling</div>
-              </button>
+              {service.subscriptionPlans
+                ?.filter(plan => plan.isActive)
+                .sort((a, b) => a.sortOrder - b.sortOrder)
+                .map((plan) => (
+                  <button
+                    key={plan.id}
+                    type="button"
+                    onClick={() => setBookingType(plan.name as any)}
+                    className={`p-4 border-2 rounded-xl transition-all relative ${
+                      bookingType === plan.name
+                        ? 'border-primary bg-primary/5 ring-2 ring-primary/30'
+                        : 'border-border hover:border-primary/50'
+                    }`}
+                  >
+                    {plan.discountPercentage > 0 && (
+                      <div className="absolute top-2 right-2 text-xs font-semibold text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded">
+                        {plan.discountPercentage}% OFF
+                      </div>
+                    )}
+                    <div className="text-2xl mb-2">{plan.icon}</div>
+                    <div className="font-semibold text-foreground">{plan.displayName}</div>
+                    <div className="text-xs text-muted-foreground mt-1">{plan.description}</div>
+                    <div className="text-lg font-bold text-primary mt-2">
+                      ₹{plan.price}{plan.name !== 'oneTime' ? `/${plan.name.replace('ly', '')}` : ''}
+                    </div>
+                    {plan.requiresFixedWorker && (
+                      <div className="text-xs text-muted-foreground mt-2">✓ Fixed worker</div>
+                    )}
+                  </button>
+                ))
+              }
             </div>
             
             {/* Subscription Benefits */}

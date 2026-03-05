@@ -16,8 +16,26 @@ interface Service {
     weekly: number;
     monthly: number;
   };
+  subscriptionPlans?: Array<{
+    id: string;
+    name: string;
+    displayName: string;
+    icon: string;
+    description: string;
+    price: number;
+    discountPercentage: number;
+    isActive: boolean;
+    requiresFixedWorker: boolean;
+    allowDaySelection: boolean;
+    sortOrder: number;
+  }>;
   duration: number;
   isActive: boolean;
+  additionalServiceOptions?: Array<{
+    value: string;
+    label: string;
+    price: number;
+  }>;
 }
 
 interface UserProfile {
@@ -45,8 +63,63 @@ const AdminServices = () => {
       weekly: 2625,
       monthly: 9750
     },
+    subscriptionPlans: [
+      {
+        id: 'oneTime',
+        name: 'oneTime',
+        displayName: 'One-Time',
+        icon: '📅',
+        description: 'Single service',
+        price: 500,
+        discountPercentage: 0,
+        isActive: true,
+        requiresFixedWorker: false,
+        allowDaySelection: false,
+        sortOrder: 1
+      },
+      {
+        id: 'daily',
+        name: 'daily',
+        displayName: 'Daily',
+        icon: '🌅',
+        description: 'Every day',
+        price: 425,
+        discountPercentage: 15,
+        isActive: true,
+        requiresFixedWorker: true,
+        allowDaySelection: false,
+        sortOrder: 2
+      },
+      {
+        id: 'weekly',
+        name: 'weekly',
+        displayName: 'Weekly',
+        icon: '📆',
+        description: 'Select days',
+        price: 375,
+        discountPercentage: 25,
+        isActive: true,
+        requiresFixedWorker: true,
+        allowDaySelection: true,
+        sortOrder: 3
+      },
+      {
+        id: 'monthly',
+        name: 'monthly',
+        displayName: 'Monthly',
+        icon: '🗓️',
+        description: 'Once a month',
+        price: 325,
+        discountPercentage: 35,
+        isActive: true,
+        requiresFixedWorker: true,
+        allowDaySelection: false,
+        sortOrder: 4
+      }
+    ],
     duration: 60,
-    isActive: true
+    isActive: true,
+    additionalServiceOptions: []
   });
 
   useEffect(() => {
@@ -269,8 +342,18 @@ const AdminServices = () => {
                       </div>
                     </div>
 
-                    <div className="mt-3 text-sm text-muted-foreground">
-                      Duration: {service.duration} minutes
+                    <div className="mt-3 text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+                      <span>Duration: {service.duration} minutes</span>
+                      {service.subscriptionPlans && service.subscriptionPlans.filter(p => p.isActive).length > 0 && (
+                        <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-100 rounded text-xs font-medium">
+                          {service.subscriptionPlans.filter(p => p.isActive).length} subscription plan{service.subscriptionPlans.filter(p => p.isActive).length > 1 ? 's' : ''}
+                        </span>
+                      )}
+                      {service.additionalServiceOptions && service.additionalServiceOptions.length > 0 && (
+                        <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 rounded text-xs font-medium">
+                          {service.additionalServiceOptions.length} additional option{service.additionalServiceOptions.length > 1 ? 's' : ''}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -456,6 +539,315 @@ const AdminServices = () => {
                       />
                     </div>
                   </div>
+                </div>
+
+                {/* Subscription Plans Section */}
+                <div className="space-y-3 p-4 bg-gradient-to-br from-primary/5 to-accent/5 rounded-lg border-2 border-primary/20">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground">
+                        Subscription Plans
+                      </label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Create custom booking plans (one-time, daily, weekly, etc.)
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newPlan = {
+                          id: `custom-${Date.now()}`,
+                          name: `custom-${Date.now()}`,
+                          displayName: 'Custom Plan',
+                          icon: '✨',
+                          description: 'Custom subscription',
+                          price: formData.price,
+                          discountPercentage: 0,
+                          isActive: true,
+                          requiresFixedWorker: false,
+                          allowDaySelection: false,
+                          sortOrder: (formData.subscriptionPlans?.length || 0) + 1
+                        };
+                        setFormData({
+                          ...formData,
+                          subscriptionPlans: [
+                            ...(formData.subscriptionPlans || []),
+                            newPlan
+                          ]
+                        });
+                      }}
+                      className="text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Add Plan
+                    </button>
+                  </div>
+                  
+                  {formData.subscriptionPlans && formData.subscriptionPlans.length > 0 && (
+                    <div className="space-y-3 mt-3">
+                      {formData.subscriptionPlans.sort((a, b) => a.sortOrder - b.sortOrder).map((plan, index) => (
+                        <div key={plan.id} className="p-4 bg-background rounded-lg border-2 border-border hover:border-primary/50 transition-colors">
+                          <div className="grid gap-3">
+                            {/* Row 1: Display Name, Icon, Active Status */}
+                            <div className="grid grid-cols-12 gap-3">
+                              <div className="col-span-5">
+                                <label className="text-xs text-muted-foreground mb-1 block">Display Name</label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g., One-Time"
+                                  value={plan.displayName}
+                                  onChange={(e) => {
+                                    const newPlans = [...(formData.subscriptionPlans || [])];
+                                    newPlans[index] = { ...newPlans[index], displayName: e.target.value };
+                                    setFormData({ ...formData, subscriptionPlans: newPlans });
+                                  }}
+                                  className="input-clean text-sm"
+                                />
+                              </div>
+                              <div className="col-span-2">
+                                <label className="text-xs text-muted-foreground mb-1 block">Icon</label>
+                                <input
+                                  type="text"
+                                  placeholder="📅"
+                                  value={plan.icon}
+                                  onChange={(e) => {
+                                    const newPlans = [...(formData.subscriptionPlans || [])];
+                                    newPlans[index] = { ...newPlans[index], icon: e.target.value };
+                                    setFormData({ ...formData, subscriptionPlans: newPlans });
+                                  }}
+                                  className="input-clean text-sm text-center"
+                                />
+                              </div>
+                              <div className="col-span-3">
+                                <label className="text-xs text-muted-foreground mb-1 block">Price (₹)</label>
+                                <input
+                                  type="number"
+                                  value={plan.price}
+                                  onChange={(e) => {
+                                    const newPlans = [...(formData.subscriptionPlans || [])];
+                                    newPlans[index] = { ...newPlans[index], price: Number(e.target.value) };
+                                    setFormData({ ...formData, subscriptionPlans: newPlans });
+                                  }}
+                                  className="input-clean text-sm"
+                                  min="0"
+                                />
+                              </div>
+                              <div className="col-span-2">
+                                <label className="text-xs text-muted-foreground mb-1 block">Discount %</label>
+                                <input
+                                  type="number"
+                                  value={plan.discountPercentage}
+                                  onChange={(e) => {
+                                    const newPlans = [...(formData.subscriptionPlans || [])];
+                                    newPlans[index] = { ...newPlans[index], discountPercentage: Number(e.target.value) };
+                                    setFormData({ ...formData, subscriptionPlans: newPlans });
+                                  }}
+                                  className="input-clean text-sm"
+                                  min="0"
+                                  max="100"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Row 2: Description */}
+                            <div>
+                              <label className="text-xs text-muted-foreground mb-1 block">Description</label>
+                              <input
+                                type="text"
+                                placeholder="e.g., Single service"
+                                value={plan.description}
+                                onChange={(e) => {
+                                  const newPlans = [...(formData.subscriptionPlans || [])];
+                                  newPlans[index] = { ...newPlans[index], description: e.target.value };
+                                  setFormData({ ...formData, subscriptionPlans: newPlans });
+                                }}
+                                className="input-clean text-sm"
+                              />
+                            </div>
+
+                            {/* Row 3: Options */}
+                            <div className="flex items-center gap-4 flex-wrap">
+                              <label className="flex items-center gap-2 cursor-pointer text-sm">
+                                <input
+                                  type="checkbox"
+                                  checked={plan.isActive}
+                                  onChange={(e) => {
+                                    const newPlans = [...(formData.subscriptionPlans || [])];
+                                    newPlans[index] = { ...newPlans[index], isActive: e.target.checked };
+                                    setFormData({ ...formData, subscriptionPlans: newPlans });
+                                  }}
+                                  className="w-3.5 h-3.5 accent-primary"
+                                />
+                                <span className="text-xs">Active</span>
+                              </label>
+                              
+                              <label className="flex items-center gap-2 cursor-pointer text-sm">
+                                <input
+                                  type="checkbox"
+                                  checked={plan.requiresFixedWorker}
+                                  onChange={(e) => {
+                                    const newPlans = [...(formData.subscriptionPlans || [])];
+                                    newPlans[index] = { ...newPlans[index], requiresFixedWorker: e.target.checked };
+                                    setFormData({ ...formData, subscriptionPlans: newPlans });
+                                  }}
+                                  className="w-3.5 h-3.5 accent-primary"
+                                />
+                                <span className="text-xs">Fixed Worker Required</span>
+                              </label>
+                              
+                              <label className="flex items-center gap-2 cursor-pointer text-sm">
+                                <input
+                                  type="checkbox"
+                                  checked={plan.allowDaySelection}
+                                  onChange={(e) => {
+                                    const newPlans = [...(formData.subscriptionPlans || [])];
+                                    newPlans[index] = { ...newPlans[index], allowDaySelection: e.target.checked };
+                                    setFormData({ ...formData, subscriptionPlans: newPlans });
+                                  }}
+                                  className="w-3.5 h-3.5 accent-primary"
+                                />
+                                <span className="text-xs">Allow Day Selection</span>
+                              </label>
+
+                              <div className="ml-auto flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newPlans = [...(formData.subscriptionPlans || [])];
+                                    if (index > 0) {
+                                      [newPlans[index - 1], newPlans[index]] = [newPlans[index], newPlans[index - 1]];
+                                      newPlans[index - 1].sortOrder = index;
+                                      newPlans[index].sortOrder = index + 1;
+                                      setFormData({ ...formData, subscriptionPlans: newPlans });
+                                    }
+                                  }}
+                                  className="p-1.5 text-xs hover:bg-muted rounded transition-colors"
+                                  disabled={index === 0}
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newPlans = [...(formData.subscriptionPlans || [])];
+                                    if (index < newPlans.length - 1) {
+                                      [newPlans[index], newPlans[index + 1]] = [newPlans[index + 1], newPlans[index]];
+                                      newPlans[index].sortOrder = index + 1;
+                                      newPlans[index + 1].sortOrder = index + 2;
+                                      setFormData({ ...formData, subscriptionPlans: newPlans });
+                                    }
+                                  }}
+                                  className="p-1.5 text-xs hover:bg-muted rounded transition-colors"
+                                  disabled={index === (formData.subscriptionPlans?.length || 0) - 1}
+                                >
+                                  ↓
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newPlans = formData.subscriptionPlans?.filter((_, i) => i !== index);
+                                    setFormData({ ...formData, subscriptionPlans: newPlans });
+                                  }}
+                                  className="p-1.5 hover:bg-destructive/10 rounded transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Additional Services Section */}
+                <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-foreground">
+                      Additional Services (Optional)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData({
+                          ...formData,
+                          additionalServiceOptions: [
+                            ...(formData.additionalServiceOptions || []),
+                            { value: '', label: '', price: 0 }
+                          ]
+                        });
+                      }}
+                      className="text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Add Option
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Add extra service options customers can select (e.g., carpet cleaning, window cleaning)
+                  </p>
+                  
+                  {formData.additionalServiceOptions && formData.additionalServiceOptions.length > 0 && (
+                    <div className="space-y-2 mt-3">
+                      {formData.additionalServiceOptions.map((option, index) => (
+                        <div key={index} className="grid grid-cols-12 gap-2 p-3 bg-background rounded-lg border border-border">
+                          <div className="col-span-4">
+                            <input
+                              type="text"
+                              placeholder="Value (e.g., carpet)"
+                              value={option.value}
+                              onChange={(e) => {
+                                const newOptions = [...(formData.additionalServiceOptions || [])];
+                                newOptions[index] = { ...newOptions[index], value: e.target.value };
+                                setFormData({ ...formData, additionalServiceOptions: newOptions });
+                              }}
+                              className="input-clean text-sm"
+                            />
+                          </div>
+                          <div className="col-span-5">
+                            <input
+                              type="text"
+                              placeholder="Label (e.g., Carpet Cleaning)"
+                              value={option.label}
+                              onChange={(e) => {
+                                const newOptions = [...(formData.additionalServiceOptions || [])];
+                                newOptions[index] = { ...newOptions[index], label: e.target.value };
+                                setFormData({ ...formData, additionalServiceOptions: newOptions });
+                              }}
+                              className="input-clean text-sm"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <input
+                              type="number"
+                              placeholder="Price"
+                              value={option.price}
+                              onChange={(e) => {
+                                const newOptions = [...(formData.additionalServiceOptions || [])];
+                                newOptions[index] = { ...newOptions[index], price: Number(e.target.value) };
+                                setFormData({ ...formData, additionalServiceOptions: newOptions });
+                              }}
+                              className="input-clean text-sm"
+                              min="0"
+                            />
+                          </div>
+                          <div className="col-span-1 flex items-center justify-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newOptions = formData.additionalServiceOptions?.filter((_, i) => i !== index);
+                                setFormData({ ...formData, additionalServiceOptions: newOptions });
+                              }}
+                              className="p-1.5 hover:bg-destructive/10 rounded-lg transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-3">

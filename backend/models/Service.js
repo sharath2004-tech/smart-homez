@@ -20,7 +20,7 @@ const serviceSchema = new mongoose.Schema({
     required: [true, 'Price is required'],
     min: 0
   },
-  // Pricing plans for recurring bookings
+  // Pricing plans for recurring bookings (legacy - kept for backward compatibility)
   pricingPlans: {
     oneTime: {
       type: Number
@@ -35,6 +35,56 @@ const serviceSchema = new mongoose.Schema({
       type: Number
     }
   },
+  // New flexible subscription plans system
+  subscriptionPlans: [{
+    id: {
+      type: String,
+      required: true
+    },
+    name: {
+      type: String,
+      required: true
+    },
+    displayName: {
+      type: String,
+      required: true
+    },
+    icon: {
+      type: String,
+      default: '📅'
+    },
+    description: {
+      type: String,
+      default: ''
+    },
+    price: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+    discountPercentage: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100
+    },
+    isActive: {
+      type: Boolean,
+      default: true
+    },
+    requiresFixedWorker: {
+      type: Boolean,
+      default: false
+    },
+    allowDaySelection: {
+      type: Boolean,
+      default: false // For weekly plans
+    },
+    sortOrder: {
+      type: Number,
+      default: 0
+    }
+  }],
   duration: {
     type: Number, // in minutes
     required: [true, 'Duration is required']
@@ -49,6 +99,22 @@ const serviceSchema = new mongoose.Schema({
   },
   tags: [String],
   requirements: [String],
+  // Additional service options (e.g., for cleaning: carpet cleaning, window cleaning, etc.)
+  additionalServiceOptions: [{
+    value: {
+      type: String,
+      required: true
+    },
+    label: {
+      type: String,
+      required: true
+    },
+    price: {
+      type: Number,
+      required: true,
+      min: 0
+    }
+  }],
   // Location-based availability
   serviceLocations: [{
     city: String,
@@ -82,6 +148,7 @@ const serviceSchema = new mongoose.Schema({
 
 // Pre-save middleware to set pricingPlans defaults if not provided
 serviceSchema.pre('save', function(next) {
+  // Legacy pricing plans
   if (!this.pricingPlans || !this.pricingPlans.oneTime) {
     this.pricingPlans = {
       oneTime: this.price,
@@ -90,6 +157,65 @@ serviceSchema.pre('save', function(next) {
       monthly: Math.round(this.price * 0.65 * 30)
     };
   }
+  
+  // New subscription plans - initialize defaults if empty
+  if (!this.subscriptionPlans || this.subscriptionPlans.length === 0) {
+    this.subscriptionPlans = [
+      {
+        id: 'oneTime',
+        name: 'oneTime',
+        displayName: 'One-Time',
+        icon: '📅',
+        description: 'Single service',
+        price: this.price,
+        discountPercentage: 0,
+        isActive: true,
+        requiresFixedWorker: false,
+        allowDaySelection: false,
+        sortOrder: 1
+      },
+      {
+        id: 'daily',
+        name: 'daily',
+        displayName: 'Daily',
+        icon: '🌅',
+        description: 'Every day',
+        price: Math.round(this.price * 0.85),
+        discountPercentage: 15,
+        isActive: true,
+        requiresFixedWorker: true,
+        allowDaySelection: false,
+        sortOrder: 2
+      },
+      {
+        id: 'weekly',
+        name: 'weekly',
+        displayName: 'Weekly',
+        icon: '📆',
+        description: 'Select days',
+        price: Math.round(this.price * 0.75),
+        discountPercentage: 25,
+        isActive: true,
+        requiresFixedWorker: true,
+        allowDaySelection: true,
+        sortOrder: 3
+      },
+      {
+        id: 'monthly',
+        name: 'monthly',
+        displayName: 'Monthly',
+        icon: '🗓️',
+        description: 'Once a month',
+        price: Math.round(this.price * 0.65),
+        discountPercentage: 35,
+        isActive: true,
+        requiresFixedWorker: true,
+        allowDaySelection: false,
+        sortOrder: 4
+      }
+    ];
+  }
+  
   next();
 });
 
