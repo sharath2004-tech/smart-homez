@@ -102,6 +102,21 @@ export const authAPI = {
   }
 };
 
+// ====== Public APIs (no authentication required) ======
+
+export const publicAPI = {
+  getStats: async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/public/stats');
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Get public stats error:', error);
+      throw error;
+    }
+  }
+};
+
 // ====== Services APIs ======
 
 export const servicesAPI = {

@@ -1,5 +1,7 @@
+import { publicAPI } from "@/lib/api";
+import { ArrowRight, CheckCircle, ChevronRight, Clock, Home, MapPin, Shield, Sparkles, Star } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Home, Star, CheckCircle, ChevronRight, Sparkles, Shield, Clock, MapPin, ArrowRight } from "lucide-react";
 
 const services = [
   { icon: "🧹", name: "Insta Maid Service", desc: "On-demand, available in 15 min", tag: "Popular", color: "bg-accent" },
@@ -17,6 +19,39 @@ const testimonials = [
 ];
 
 const LandingPage = () => {
+  const [stats, setStats] = useState({
+    totalCustomers: 0,
+    totalWorkers: 0,
+    servicesDone: 0,
+    fulfillmentRate: 95
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await publicAPI.getStats();
+        if (response.success) {
+          setStats(response.stats);
+        }
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+        // Keep default values on error
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
+
+  const formatNumber = (num: number) => {
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K+';
+    }
+    return num.toString() + '+';
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navbar */}
@@ -89,9 +124,9 @@ const LandingPage = () => {
         <div className="relative max-w-6xl mx-auto px-6 mt-16">
           <div className="grid grid-cols-3 gap-4 md:gap-8">
             {[
-              { value: "18,000+", label: "Happy Customers" },
-              { value: "2,400+", label: "Active Workers" },
-              { value: "95%+", label: "Fulfillment Rate" },
+              { value: loading ? "..." : formatNumber(stats.totalCustomers), label: "Happy Customers" },
+              { value: loading ? "..." : formatNumber(stats.totalWorkers), label: "Active Workers" },
+              { value: loading ? "..." : `${stats.fulfillmentRate}%+`, label: "Fulfillment Rate" },
             ].map((stat) => (
               <div key={stat.label} className="text-center p-4 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.08)", backdropFilter: "blur(8px)" }}>
                 <div className="text-2xl md:text-3xl font-bold font-heading text-primary-foreground">{stat.value}</div>
@@ -190,7 +225,9 @@ const LandingPage = () => {
       <section className="py-20" style={{ background: "var(--gradient-brand)" }}>
         <div className="max-w-6xl mx-auto px-6 text-center">
           <h2 className="text-4xl font-bold font-heading text-primary-foreground mb-4">Ready for a cleaner home?</h2>
-          <p className="text-primary-foreground/70 mb-8 text-lg">Join 18,000+ customers who trust Healthy Homez every day.</p>
+          <p className="text-primary-foreground/70 mb-8 text-lg">
+            Join {loading ? "thousands" : formatNumber(stats.totalCustomers)} of customers who trust Healthy Homez every day.
+          </p>
           <Link to="/register" className="inline-flex items-center gap-2 bg-primary-foreground text-primary font-bold py-4 px-10 rounded-xl hover:opacity-90 transition-all hover:-translate-y-0.5">
             Get Started for Free <ArrowRight className="w-4 h-4" />
           </Link>

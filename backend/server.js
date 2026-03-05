@@ -29,6 +29,10 @@ import userRoutes from './routes/users.js';
 // Import utilities
 import { runBookingUpdates } from './utils/bookingStatusUpdater.js';
 
+// Import models for stats endpoint
+import Booking from './models/Booking.js';
+import User from './models/User.js';
+
 // Load environment variables
 dotenv.config();
 
@@ -90,6 +94,52 @@ app.get('/health', (req, res) => {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     timestamp: now.getTime()
   });
+});
+
+// Public statistics endpoint (no authentication required)
+app.get('/api/public/stats', async (req, res) => {
+  try {
+    // Count active customers
+    const totalCustomers = await User.countDocuments({ 
+      role: 'customer',
+      isActive: true
+    });
+
+    // Count active workers
+    const totalWorkers = await User.countDocuments({ 
+      role: 'worker',
+      isActive: true
+    });
+
+    // Count completed bookings (services done)
+    const servicesDone = await Booking.countDocuments({ 
+      status: 'completed' 
+    });
+
+    // Calculate fulfillment rate (completed / total bookings)
+    const totalBookings = await Booking.countDocuments({});
+    const fulfillmentRate = totalBookings > 0 
+      ? Math.round((servicesDone / totalBookings) * 100)
+      : 95;
+
+    res.json({
+      success: true,
+      stats: {
+        totalCustomers,
+        totalWorkers,
+        servicesDone,
+        fulfillmentRate
+      }
+    });
+  } catch (error) {
+    console.error('Get public stats error:', error);
+    res.status(500).json({ 
+      error: { 
+        message: 'Server error', 
+        status: 500 
+      } 
+    });
+  }
 });
 
 // API Routes

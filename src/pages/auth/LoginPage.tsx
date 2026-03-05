@@ -1,6 +1,6 @@
-import { authAPI } from "@/lib/api";
+import { authAPI, publicAPI } from "@/lib/api";
 import { Eye, EyeOff, Home, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 const LoginPage = () => {
@@ -9,6 +9,33 @@ const LoginPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
+  const [stats, setStats] = useState({
+    totalCustomers: 0,
+    totalWorkers: 0,
+    servicesDone: 0,
+    fulfillmentRate: 95
+  });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await publicAPI.getStats();
+        if (response.success) {
+          setStats(response.stats);
+        }
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+      }
+    };
+    fetchStats();
+  }, []);
+
+  const formatNumber = (num: number) => {
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K+';
+    }
+    return num.toString() + '+';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
