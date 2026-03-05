@@ -43,8 +43,8 @@ import AdminLocations from "./pages/admin/AdminLocations";
 import AdminServices from "./pages/admin/AdminServices";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminWorkers from "./pages/admin/AdminWorkers";
-import AdminWorkforce from "./pages/admin/AdminWorkforce";
 import AdminWorkerSchedule from "./pages/admin/AdminWorkerSchedule";
+import AdminWorkforce from "./pages/admin/AdminWorkforce";
 
 const queryClient = new QueryClient();
 
