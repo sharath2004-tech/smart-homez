@@ -309,8 +309,41 @@ router.post('/',
         notes, 
         autoAssign,
         bookingType,
-        preferences
+        preferences,
+        isSubscription,
+        subscriptionDetails
       } = req.body;
+
+      // Validate subscription bookings require a worker
+      if (isSubscription && !worker) {
+        return res.status(400).json({ 
+          error: { 
+            message: 'Subscription bookings require a worker to be selected for consistency.', 
+            status: 400,
+            code: 'WORKER_REQUIRED_FOR_SUBSCRIPTION'
+          } 
+        });
+      }
+      
+      // Validate subscription details
+      if (isSubscription && subscriptionDetails) {
+        if (!subscriptionDetails.startDate) {
+          return res.status(400).json({ 
+            error: { 
+              message: 'Subscription start date is required', 
+              status: 400 
+            } 
+          });
+        }
+        if (subscriptionDetails.frequency === 'weekly' && (!subscriptionDetails.selectedDays || subscriptionDetails.selectedDays.length === 0)) {
+          return res.status(400).json({ 
+            error: { 
+              message: 'Weekly subscriptions require at least one day to be selected', 
+              status: 400 
+            } 
+          });
+        }
+      }
 
       // ⚠️ IMPORTANT: Get customer location with fallback to saved addresses
       let customerLocation = location;
@@ -479,9 +512,9 @@ router.post('/',
         customer: req.user._id,
         worker: worker || undefined,
         service,
-        bookingDate,
-        startTime,
-        endTime,
+        bookingDate: isSubscription ? subscriptionDetails.startDate : bookingDate,
+        startTime: isSubscription ? subscriptionDetails.preferredTime : startTime,
+        endTime: isSubscription ? subscriptionDetails.preferredTime : endTime,
         totalAmount,
         location: {
           ...customerLocation,
@@ -499,8 +532,37 @@ router.post('/',
         preferences: preferences || {}
       };
 
-      // Add recurring schedule if it's a recurring booking
-      if (bookingData.isRecurring) {
+      // Add subscription details if it's a subscription booking
+      if (isSubscription && subscriptionDetails) {
+        bookingData.subscription = {
+          isSubscription: true,
+          subscriptionStartDate: new Date(subscriptionDetails.startDate),
+          subscriptionEndDate: subscriptionDetails.endDate ? new Date(subscriptionDetails.endDate) : null,
+          autoRenewal: subscriptionDetails.autoRenewal || false,
+          allowPause: subscriptionDetails.allowPause || false,
+          fixedWorker: worker, // Store the fixed worker for this subscription
+          durationPerSession: subscriptionDetails.durationPerSession || 1,
+          preferredTime: subscriptionDetails.preferredTime
+        };
+        
+        // Add recurring schedule for subscription
+        bookingData.recurringSchedule = {
+          frequency: subscriptionDetails.frequency || bookingType,
+          startDate: new Date(subscriptionDetails.startDate),
+          endDate: subscriptionDetails.endDate ? new Date(subscriptionDetails.endDate) : null,
+          nextScheduledDate: new Date(subscriptionDetails.startDate),
+          selectedDays: subscriptionDetails.selectedDays || [],
+          preferredTime: subscriptionDetails.preferredTime
+        };
+        
+        // Auto-confirm subscription bookings since worker is pre-assigned
+        bookingData.status = 'confirmed';
+        bookingData.confirmedAt = new Date();
+        bookingData.assignedAt = new Date();
+      }
+
+      // Add recurring schedule if it's a recurring booking (non-subscription)
+      else if (bookingData.isRecurring) {
         bookingData.recurringSchedule = {
           frequency: bookingType,
           startDate: new Date(bookingDate),
@@ -2110,6 +2172,203 @@ router.get('/worker-pool/forecast',
 
     } catch (error) {
       console.error('Get forecast error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// ==================== SUBSCRIPTION MANAGEMENT ROUTES ====================
+
+// @route   POST /api/bookings/:id/change-subscription-worker
+// @desc    Change the assigned worker for a subscription
+// @access  Private/Customer
+router.post('/:id/change-subscription-worker',
+  authenticate,
+  authorize('customer', 'admin'),
+  async (req, res) => {
+    try {
+      const { workerId } = req.body;
+      const booking = await Booking.findById(req.params.id);
+      
+      if (!booking) {
+        return res.status(404).json({ 
+          error: { message: 'Subscription not found', status: 404 } 
+        });
+      }
+
+      // Verify this is a subscription booking
+      if (!booking.subscription?.isSubscription) {
+        return res.status(400).json({ 
+          error: { message: 'This is not a subscription booking', status: 400 } 
+        });
+      }
+
+      // Verify customer owns this subscription
+      if (booking.customer.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+        return res.status(403).json({ 
+          error: { message: 'Not authorized to modify this subscription', status: 403 } 
+        });
+      }
+
+      // Verify new worker exists and is available
+      const newWorker = await User.findById(workerId);
+      if (!newWorker || newWorker.role !== 'worker') {
+        return res.status(400).json({ 
+          error: { message: 'Invalid worker', status: 400 } 
+        });
+      }
+
+      if (!newWorker.isActive || !newWorker.workerProfile?.availability) {
+        return res.status(400).json({ 
+          error: { message: 'Worker is not available', status: 400 } 
+        });
+      }
+
+      // Update the subscription's fixed worker
+      booking.worker = workerId;
+      booking.subscription.fixedWorker = workerId;
+      booking.assignmentMethod = 'manual';
+      booking.assignedAt = new Date();
+      
+      await booking.save();
+
+      // TODO: Update all future bookings for this subscription with the new worker
+      // This would require implementing a parent-child booking relationship
+      // For now, just update the main subscription booking
+
+      await booking.populate('worker', 'name email phone workerProfile');
+
+      res.json({ 
+        message: 'Worker changed successfully',
+        booking,
+        newWorker: {
+          _id: booking.worker._id,
+          name: booking.worker.name,
+          email: booking.worker.email,
+          phone: booking.worker.phone,
+          workerProfile: booking.worker.workerProfile
+        }
+      });
+
+    } catch (error) {
+      console.error('Change worker error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   POST /api/bookings/:id/pause-subscription
+// @desc    Pause a subscription
+// @access  Private/Customer
+router.post('/:id/pause-subscription',
+  authenticate,
+  authorize('customer', 'admin'),
+  async (req, res) => {
+    try {
+      const booking = await Booking.findById(req.params.id);
+      
+      if (!booking) {
+        return res.status(404).json({ 
+          error: { message: 'Subscription not found', status: 404 } 
+        });
+      }
+
+      // Verify this is a subscription booking
+      if (!booking.subscription?.isSubscription) {
+        return res.status(400).json({ 
+          error: { message: 'This is not a subscription booking', status: 400 } 
+        });
+      }
+
+      // Verify customer owns this subscription
+      if (booking.customer.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+        return res.status(403).json({ 
+          error: { message: 'Not authorized to modify this subscription', status: 403 } 
+        });
+      }
+
+      // Check if pause is allowed
+      if (!booking.subscription.allowPause) {
+        return res.status(400).json({ 
+          error: { message: 'This subscription does not allow pausing', status: 400 } 
+        });
+      }
+
+      // Check if already paused
+      if (booking.subscription.isPaused) {
+        return res.status(400).json({ 
+          error: { message: 'Subscription is already paused', status: 400 } 
+        });
+      }
+
+      // Pause the subscription
+      booking.subscription.isPaused = true;
+      booking.subscription.pausedAt = new Date();
+      
+      await booking.save();
+
+      res.json({ 
+        message: 'Subscription paused successfully',
+        booking
+      });
+
+    } catch (error) {
+      console.error('Pause subscription error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   POST /api/bookings/:id/resume-subscription
+// @desc    Resume a paused subscription
+// @access  Private/Customer
+router.post('/:id/resume-subscription',
+  authenticate,
+  authorize('customer', 'admin'),
+  async (req, res) => {
+    try {
+      const booking = await Booking.findById(req.params.id);
+      
+      if (!booking) {
+        return res.status(404).json({ 
+          error: { message: 'Subscription not found', status: 404 } 
+        });
+      }
+
+      // Verify this is a subscription booking
+      if (!booking.subscription?.isSubscription) {
+        return res.status(400).json({ 
+          error: { message: 'This is not a subscription booking', status: 400 } 
+        });
+      }
+
+      // Verify customer owns this subscription
+      if (booking.customer.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+        return res.status(403).json({ 
+          error: { message: 'Not authorized to modify this subscription', status: 403 } 
+        });
+      }
+
+      // Check if actually paused
+      if (!booking.subscription.isPaused) {
+        return res.status(400).json({ 
+          error: { message: 'Subscription is not paused', status: 400 } 
+        });
+      }
+
+      // Resume the subscription
+      booking.subscription.isPaused = false;
+      booking.subscription.resumedAt = new Date();
+      
+      await booking.save();
+
+      res.json({ 
+        message: 'Subscription resumed successfully',
+        booking
+      });
+
+    } catch (error) {
+      console.error('Resume subscription error:', error);
       res.status(500).json({ error: { message: 'Server error', status: 500 } });
     }
   }

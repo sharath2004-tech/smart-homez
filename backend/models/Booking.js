@@ -97,6 +97,11 @@ const bookingSchema = new mongoose.Schema({
       type: Number, // For custom day intervals
       default: null
     },
+    selectedDays: [{
+      type: String, // For weekly subscriptions: ['monday', 'tuesday', etc.]
+      enum: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+    }],
+    preferredTime: String, // Preferred time for recurring bookings
     startDate: Date,
     endDate: Date,
     nextScheduledDate: Date,
@@ -115,6 +120,29 @@ const bookingSchema = new mongoose.Schema({
     subscriptionId: String,
     subscriptionStartDate: Date,
     subscriptionEndDate: Date,
+    autoRenewal: {
+      type: Boolean,
+      default: false
+    },
+    allowPause: {
+      type: Boolean,
+      default: true
+    },
+    isPaused: {
+      type: Boolean,
+      default: false
+    },
+    pausedAt: Date,
+    resumedAt: Date,
+    fixedWorker: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User' // The assigned worker for all subscription bookings
+    },
+    durationPerSession: {
+      type: Number, // Duration in hours for each session
+      default: 1
+    },
+    preferredTime: String, // Preferred time for all bookings
     discountPercent: {
       type: Number,
       default: 0,

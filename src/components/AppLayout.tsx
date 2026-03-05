@@ -1,4 +1,4 @@
-import { Bell, Calendar, CreditCard, Home, LayoutDashboard, LogOut, MapPin, Settings, User, Users, Wrench } from "lucide-react";
+import { Bell, Calendar, CreditCard, Home, LayoutDashboard, LogOut, MapPin, RefreshCw, Settings, User, Users, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 import { LanguageSelector } from "./LanguageSelector";
@@ -26,6 +26,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
     { to: "/customer/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },
     { to: "/customer/services", icon: Wrench, label: t('nav.services') },
     { to: "/customer/bookings", icon: Calendar, label: t('nav.myBookings') },
+    { to: "/customer/subscriptions", icon: RefreshCw, label: "My Subscriptions" },
     { to: "/customer/payments", icon: CreditCard, label: t('nav.payments') },
     { to: "/customer/profile", icon: User, label: t('nav.profile') },
   ];
@@ -42,6 +43,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
     { to: "/admin/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },
     { to: "/admin/bookings", icon: Calendar, label: t('nav.bookings') },
     { to: "/admin/workforce", icon: Users, label: t('nav.workforce') },
+    { to: "/admin/worker-schedule", icon: Calendar, label: "Worker Schedule" },
     { to: "/admin/leaves", icon: Bell, label: t('nav.leaves') },
     { to: "/admin/services", icon: Wrench, label: t('nav.services') },
     { to: "/admin/workers", icon: User, label: t('nav.workers') },

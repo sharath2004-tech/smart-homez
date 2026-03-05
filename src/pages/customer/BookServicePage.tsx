@@ -76,6 +76,15 @@ const BookServicePage = () => {
     religionPreference: 'any',
     specialInstructions: ''
   });
+  
+  // Subscription details state
+  const [subscriptionStartDate, setSubscriptionStartDate] = useState('');
+  const [subscriptionEndDate, setSubscriptionEndDate] = useState('');
+  const [preferredTime, setPreferredTime] = useState('09:00');
+  const [durationPerSession, setDurationPerSession] = useState(1);
+  const [selectedDays, setSelectedDays] = useState<string[]>(['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
+  const [autoRenewal, setAutoRenewal] = useState(true);
+  const [allowPause, setAllowPause] = useState(true);
 
   useEffect(() => {
     fetchData();
@@ -217,11 +226,27 @@ const BookServicePage = () => {
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validation for subscription bookings
+    if (bookingType !== 'oneTime') {
+      if (!selectedWorker) {
+        toast.error('Please select a worker for subscription booking');
+        return;
+      }
+      if (!subscriptionStartDate) {
+        toast.error('Please select subscription start date');
+        return;
+      }
+      if (bookingType === 'weekly' && selectedDays.length === 0) {
+        toast.error('Please select at least one day for weekly subscription');
+        return;
+      }
+    }
+    
     const selectedTime = bookingMode === 'now' 
       ? getTimeFromSlot('now')
       : getTimeFromSlot(selectedTimeSlot, selectedDate);
     
-    if (bookingMode === 'schedule' && !selectedDate) {
+    if (bookingMode === 'schedule' && !selectedDate && bookingType === 'oneTime') {
       toast.error('Please select a date');
       return;
     }
@@ -257,11 +282,14 @@ const BookServicePage = () => {
         ? new Date().toISOString().split('T')[0]
         : selectedDate;
 
-      const bookingData = {
+      const baseBookingData = {
         service: service?._id,
-        bookingDate,
-        startTime: selectedTime,
-        endTime: calculateEndTime(selectedTime, service?.duration || 60),
+        bookingDate: bookingType === 'oneTime' ? bookingDate : subscriptionStartDate,
+        startTime: bookingType === 'oneTime' ? selectedTime : preferredTime,
+        endTime: calculateEndTime(
+          bookingType === 'oneTime' ? selectedTime : preferredTime, 
+          bookingType === 'oneTime' ? (service?.duration || 60) : (durationPerSession * 60)
+        ),
         totalAmount: calculatePrice(),
         bookingType,
         // If worker manually selected, assign directly; otherwise auto-assign
@@ -276,9 +304,28 @@ const BookServicePage = () => {
           area: location.area || '',
           city: location.city || ''
         } as { coordinates?: number[], address: string, area: string, city: string },
-        // Enable auto-assignment only when no worker manually selected
-        autoAssign: !selectedWorker
+        // Enable auto-assignment only when no worker manually selected AND it's one-time
+        autoAssign: !selectedWorker && bookingType === 'oneTime'
       };
+
+      // Add subscription-specific data
+      const bookingData = bookingType === 'oneTime' 
+        ? baseBookingData 
+        : {
+            ...baseBookingData,
+            isSubscription: true,
+            subscriptionDetails: {
+              startDate: subscriptionStartDate,
+              endDate: subscriptionEndDate || null,
+              preferredTime,
+              durationPerSession,
+              selectedDays: bookingType === 'weekly' ? selectedDays : [],
+              frequency: bookingType,
+              autoRenewal,
+              allowPause,
+              fixedWorker: selectedWorker // Fixed worker for all subscription bookings
+            }
+          };
 
       const response = await bookingsAPI.create(bookingData);
       
@@ -286,7 +333,12 @@ const BookServicePage = () => {
       const wasAssigned = response.booking?.worker;
       const workerName = response.booking?.worker?.name;
       
-      if (wasAssigned) {
+      if (bookingType !== 'oneTime') {
+        toast.success(
+          `Subscription created! ${workerName} is assigned to all your bookings.`,
+          { duration: 5000 }
+        );
+      } else if (wasAssigned) {
         toast.success(
           bookingMode === 'now' 
             ? `Booking confirmed! ${workerName} is on the way.`
@@ -624,6 +676,193 @@ const BookServicePage = () => {
             )}
           </div>
 
+          {/* Subscription Schedule Details */}
+          {bookingType !== 'oneTime' && (
+            <div className="card-elevated p-6">
+              <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-primary" />
+                Subscription Schedule
+              </h3>
+              
+              <div className="space-y-4">
+                {/* Start Date */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Start Date <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={subscriptionStartDate}
+                    onChange={(e) => setSubscriptionStartDate(e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="input-clean"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">When should your subscription begin?</p>
+                </div>
+
+                {/* End Date (Optional) */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    End Date <span className="text-xs text-muted-foreground">(Optional)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={subscriptionEndDate}
+                    onChange={(e) => setSubscriptionEndDate(e.target.value)}
+                    min={subscriptionStartDate || new Date().toISOString().split('T')[0]}
+                    className="input-clean"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Leave empty for ongoing subscription</p>
+                </div>
+
+                {/* Preferred Time */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Preferred Time <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={preferredTime}
+                    onChange={(e) => setPreferredTime(e.target.value)}
+                    className="input-clean"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">What time should the worker arrive?</p>
+                </div>
+
+                {/* Duration Per Session */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Duration Per Session <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    value={durationPerSession}
+                    onChange={(e) => setDurationPerSession(Number(e.target.value))}
+                    className="input-clean"
+                    required
+                  >
+                    <option value={0.5}>30 minutes</option>
+                    <option value={1}>1 hour</option>
+                    <option value={1.5}>1.5 hours</option>
+                    <option value={2}>2 hours</option>
+                    <option value={3}>3 hours</option>
+                    <option value={4}>4 hours</option>
+                  </select>
+                  <p className="text-xs text-muted-foreground mt-1">How long should each service last?</p>
+                </div>
+
+                {/* Day Selection for Weekly */}
+                {bookingType === 'weekly' && (
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Select Days <span className="text-destructive">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {[
+                        { value: 'monday', label: 'Monday' },
+                        { value: 'tuesday', label: 'Tuesday' },
+                        { value: 'wednesday', label: 'Wednesday' },
+                        { value: 'thursday', label: 'Thursday' },
+                        { value: 'friday', label: 'Friday' },
+                        { value: 'saturday', label: 'Saturday' },
+                        { value: 'sunday', label: 'Sunday' }
+                      ].map((day) => (
+                        <button
+                          key={day.value}
+                          type="button"
+                          onClick={() => {
+                            if (selectedDays.includes(day.value)) {
+                              setSelectedDays(selectedDays.filter(d => d !== day.value));
+                            } else {
+                              setSelectedDays([...selectedDays, day.value]);
+                            }
+                          }}
+                          className={`p-2 border-2 rounded-lg text-sm font-medium transition-all ${
+                            selectedDays.includes(day.value)
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-border text-muted-foreground hover:border-primary/50'
+                          }`}
+                        >
+                          {day.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {selectedDays.length > 0 
+                        ? `Selected: ${selectedDays.length} day${selectedDays.length > 1 ? 's' : ''} per week`
+                        : 'Please select at least one day'
+                      }
+                    </p>
+                  </div>
+                )}
+
+                {/* Auto-Renewal Toggle */}
+                <div className="flex items-start justify-between p-4 bg-muted/50 rounded-lg">
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground">Auto-Renewal</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Automatically renew subscription when it ends
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAutoRenewal(!autoRenewal)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      autoRenewal ? 'bg-primary' : 'bg-border'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        autoRenewal ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Allow Pause Toggle */}
+                <div className="flex items-start justify-between p-4 bg-muted/50 rounded-lg">
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground">Allow Pause</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Enable ability to pause subscription temporarily
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAllowPause(!allowPause)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      allowPause ? 'bg-primary' : 'bg-border'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        allowPause ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Subscription Summary */}
+                <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                  <p className="text-sm font-semibold text-foreground mb-2">📋 Summary</p>
+                  <div className="space-y-1 text-xs text-muted-foreground">
+                    <p>• Plan: <span className="font-medium text-foreground capitalize">{bookingType}</span></p>
+                    <p>• Frequency: <span className="font-medium text-foreground">
+                      {bookingType === 'daily' && 'Every day'}
+                      {bookingType === 'weekly' && `${selectedDays.length} days per week`}
+                      {bookingType === 'monthly' && 'Monthly (30 days)'}
+                    </span></p>
+                    <p>• Time: <span className="font-medium text-foreground">{preferredTime}</span></p>
+                    <p>• Duration: <span className="font-medium text-foreground">{durationPerSession} hour{durationPerSession > 1 ? 's' : ''}</span></p>
+                    {subscriptionStartDate && <p>• Starts: <span className="font-medium text-foreground">{new Date(subscriptionStartDate).toLocaleDateString()}</span></p>}
+                    {subscriptionEndDate && <p>• Ends: <span className="font-medium text-foreground">{new Date(subscriptionEndDate).toLocaleDateString()}</span></p>}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Available Workers Section (Pronto-style) */}
           {workers.length > 0 && (
             <div className="card-elevated p-6">
@@ -703,12 +942,26 @@ const BookServicePage = () => {
               </div>
               
               <div className="mt-3 pt-3 border-t border-border">
-                <p className="text-xs text-muted-foreground">
-                  {selectedWorker 
-                    ? '✓ Selected worker will be assigned' 
-                    : 'Leave unselected for automatic assignment based on availability and rating'
-                  }
-                </p>
+                {bookingType !== 'oneTime' ? (
+                  <div className="flex items-start gap-2">
+                    {selectedWorker ? (
+                      <p className="text-xs text-green-600 dark:text-green-400 font-medium">
+                        ✓ This worker will be assigned to all your subscription bookings
+                      </p>
+                    ) : (
+                      <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                        ⚠ Please select a worker - Required for subscription bookings
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    {selectedWorker 
+                      ? '✓ Selected worker will be assigned' 
+                      : 'Leave unselected for automatic assignment based on availability and rating'
+                    }
+                  </p>
+                )}
               </div>
             </div>
           )}

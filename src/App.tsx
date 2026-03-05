@@ -18,6 +18,7 @@ import RegisterPage from "./pages/auth/RegisterPage";
 // Customer pages
 import BookingsPage from "./pages/customer/BookingsPage";
 import CustomerDashboard from "./pages/customer/CustomerDashboard";
+import MySubscriptionsPage from "./pages/customer/MySubscriptionsPage";
 import NotificationSettingsPage from "./pages/customer/NotificationSettingsPage";
 import PaymentsPage from "./pages/customer/PaymentsPage";
 import PreferencesPage from "./pages/customer/PreferencesPage";
@@ -43,6 +44,7 @@ import AdminServices from "./pages/admin/AdminServices";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminWorkers from "./pages/admin/AdminWorkers";
 import AdminWorkforce from "./pages/admin/AdminWorkforce";
+import AdminWorkerSchedule from "./pages/admin/AdminWorkerSchedule";
 
 const queryClient = new QueryClient();
 
@@ -68,6 +70,7 @@ const App = () => (
           <Route path="/customer/book/:id" element={<ProtectedRoute allowedRoles={['customer']}><ServiceRouter /></ProtectedRoute>} />
           <Route path="/customer/subscribe/:id" element={<ProtectedRoute allowedRoles={['customer']}><SubscriptionBookingPage /></ProtectedRoute>} />
           <Route path="/customer/bookings" element={<ProtectedRoute allowedRoles={['customer']}><BookingsPage /></ProtectedRoute>} />
+          <Route path="/customer/subscriptions" element={<ProtectedRoute allowedRoles={['customer']}><MySubscriptionsPage /></ProtectedRoute>} />
           <Route path="/customer/payments" element={<ProtectedRoute allowedRoles={['customer']}><PaymentsPage /></ProtectedRoute>} />
           <Route path="/customer/preferences" element={<ProtectedRoute allowedRoles={['customer']}><PreferencesPage /></ProtectedRoute>} />
           <Route path="/customer/notifications" element={<ProtectedRoute allowedRoles={['customer']}><NotificationSettingsPage /></ProtectedRoute>} />
@@ -85,6 +88,7 @@ const App = () => (
           <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminDashboard /></ProtectedRoute>} />
           <Route path="/admin/bookings" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminBookings /></ProtectedRoute>} />
           <Route path="/admin/workforce" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminWorkforce /></ProtectedRoute>} />
+          <Route path="/admin/worker-schedule" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminWorkerSchedule /></ProtectedRoute>} />
           <Route path="/admin/leaves" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminLeaves /></ProtectedRoute>} />
           <Route path="/admin/services" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminServices /></ProtectedRoute>} />
           <Route path="/admin/workers" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminWorkers /></ProtectedRoute>} />
