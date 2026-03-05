@@ -1,9 +1,9 @@
-import { Calendar, Clock, AlertCircle, Settings2, Repeat } from "lucide-react";
-import { useTranslation } from "react-i18next";
-import { Label } from "./ui/label";
-import { Input } from "./ui/input";
-import { Button } from "./ui/button";
+import { AlertCircle, Calendar, Clock, Repeat, Settings2 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 interface RecurringSchedule {
   frequency: 'daily' | 'weekly' | 'biweekly' | 'monthly';

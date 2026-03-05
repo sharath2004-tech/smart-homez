@@ -1,13 +1,13 @@
 import AppLayout from "@/components/AppLayout";
-import { SubscriptionPlanSelector } from "@/components/SubscriptionPlanSelector";
 import { RecurringScheduleSetup } from "@/components/RecurringScheduleSetup";
+import { SubscriptionPlanSelector } from "@/components/SubscriptionPlanSelector";
 import { Button } from "@/components/ui/button";
 import { authAPI, bookingsAPI, servicesAPI } from "@/lib/api";
 import { ArrowLeft, CheckCircle2, Package } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { useTranslation } from "react-i18next";
 
 interface Service {
   _id: string;
