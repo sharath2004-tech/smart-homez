@@ -219,6 +219,8 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
 
   const handlePhotoCapture = async (file: File) => {
     try {
+      // Close photo capture view immediately
+      setShowPhotoCapture(false);
       setUploadingPhoto(true);
       
       console.log('📸 Starting photo upload:', {
@@ -245,7 +247,6 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       
       // Update task with completion photo
       setTask({ ...task!, completionPhoto: result.completionPhoto });
-      setShowPhotoCapture(false);
       
       alert('✅ Completion photo uploaded successfully! Payment QR code is now available.');
       
@@ -265,6 +266,8 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
 
   const handlePaymentProofCapture = async (file: File) => {
     try {
+      // Close photo capture view immediately
+      setShowPaymentProofCapture(false);
       setUploadingPaymentProof(true);
       
       // Use the API utility method
@@ -272,7 +275,6 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       
       // Update task with payment proof
       setTask({ ...task!, paymentProof: result.paymentProof });
-      setShowPaymentProofCapture(false);
       
       alert('✅ Payment proof uploaded successfully! Task is now fully documented.');
       
@@ -710,8 +712,15 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                   <PhotoCapture
                     onPhotoCapture={handlePhotoCapture}
                     onCancel={() => setShowPhotoCapture(false)}
-                    showPreview={true}
+                    showPreview={false}
+                    autoUpload={true}
                   />
+                ) : uploadingPhoto ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+                    <p className="text-blue-700 font-medium">Uploading photo...</p>
+                    <p className="text-xs text-muted-foreground mt-2">Please wait</p>
+                  </div>
                 ) : (
                   <div>
                     <button
@@ -720,7 +729,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                       className="btn-brand py-3 px-6 w-full"
                     >
                       <Camera className="w-5 h-5 inline-block mr-2" />
-                      {uploadingPhoto ? 'Uploading...' : 'Take Completion Photo'}
+                      Take Completion Photo
                     </button>
                     <div className="mt-3 text-xs bg-blue-100 text-blue-800 p-3 rounded-lg space-y-1">
                       <p className="font-semibold">Why upload a photo?</p>
@@ -808,8 +817,15 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                     <PhotoCapture
                       onPhotoCapture={handlePaymentProofCapture}
                       onCancel={() => setShowPaymentProofCapture(false)}
-                      showPreview={true}
+                      showPreview={false}
+                      autoUpload={true}
                     />
+                  ) : uploadingPaymentProof ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin w-12 h-12 border-4 border-amber-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+                      <p className="text-amber-700 font-medium">Uploading payment proof...</p>
+                      <p className="text-xs text-muted-foreground mt-2">Please wait</p>
+                    </div>
                   ) : (
                     <div>
                       <button
@@ -818,7 +834,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                         className="btn-brand py-3 px-6 w-full bg-amber-600 hover:bg-amber-700"
                       >
                         <Camera className="w-5 h-5 inline-block mr-2" />
-                        {uploadingPaymentProof ? 'Uploading...' : 'Upload Payment Proof'}
+                        Upload Payment Proof
                       </button>
                       <div className="mt-3 text-xs bg-amber-100 text-amber-800 p-3 rounded-lg space-y-1">
                         <p className="font-semibold">After customer makes payment:</p>

@@ -7,9 +7,10 @@ interface PhotoCaptureProps {
   onPhotoCapture: (file: File) => void;
   onCancel?: () => void;
   showPreview?: boolean;
+  autoUpload?: boolean; // If true, uploads immediately after capture without preview
 }
 
-const PhotoCapture = ({ onPhotoCapture, onCancel, showPreview = true }: PhotoCaptureProps) => {
+const PhotoCapture = ({ onPhotoCapture, onCancel, showPreview = true, autoUpload = false }: PhotoCaptureProps) => {
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [capturedFile, setCapturedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -66,13 +67,20 @@ const PhotoCapture = ({ onPhotoCapture, onCancel, showPreview = true }: PhotoCap
           const file = new File([blob], `completion-photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
           const photoUrl = URL.createObjectURL(blob);
           
-          setCapturedPhoto(photoUrl);
-          setCapturedFile(file);
-          stopCamera();
+          if (autoUpload) {
+            // Immediately upload without preview
+            stopCamera();
+            onPhotoCapture(file);
+          } else {
+            // Show preview for confirmation
+            setCapturedPhoto(photoUrl);
+            setCapturedFile(file);
+            stopCamera();
+          }
         }
       }, 'image/jpeg', 0.8);
     }
-  }, [stopCamera]);
+  }, [stopCamera, autoUpload, onPhotoCapture]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -89,10 +97,17 @@ const PhotoCapture = ({ onPhotoCapture, onCancel, showPreview = true }: PhotoCap
         return;
       }
       
-      const photoUrl = URL.createObjectURL(file);
-      setCapturedPhoto(photoUrl);
-      setCapturedFile(file);
-      setError(null);
+      if (autoUpload) {
+        // Immediately upload without preview
+        setError(null);
+        onPhotoCapture(file);
+      } else {
+        // Show preview for confirmation
+        const photoUrl = URL.createObjectURL(file);
+        setCapturedPhoto(photoUrl);
+        setCapturedFile(file);
+        setError(null);
+      }
     }
   };
 
