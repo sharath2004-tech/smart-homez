@@ -3,6 +3,7 @@ import LocationSelector, { LocationData } from "@/components/LocationSelector";
 import { authAPI } from "@/lib/api";
 import { Check, Eye, EyeOff, Home, Loader2, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 // Password validation function
@@ -26,6 +27,7 @@ const validatePassword = (password: string): { valid: boolean; message: string }
 };
 
 const RegisterPage = () => {
+  const { t } = useTranslation();
   const [showPassword, setShowPassword] = useState(false);
   const [userType, setUserType] = useState<"customer" | "worker">("customer");
   const [isLoading, setIsLoading] = useState(false);
@@ -133,11 +135,11 @@ const RegisterPage = () => {
           <div className="w-20 h-20 bg-success-light rounded-full flex items-center justify-center mx-auto mb-6">
             <Check className="w-10 h-10 text-success" />
           </div>
-          <h2 className="text-3xl font-bold font-heading text-foreground mb-3">Account Created!</h2>
+          <h2 className="text-3xl font-bold font-heading text-foreground mb-3">{t('auth.register.accountCreated')}</h2>
           <p className="text-muted-foreground mb-8">
             {userType === "customer"
-              ? "Welcome to Healthy Homez! Redirecting to your dashboard..."
-              : "Welcome to Healthy Homez! Redirecting to your worker dashboard..."}
+              ? t('auth.register.welcomeCustomer')
+              : t('auth.register.welcomeWorker')}
           </p>
         </div>
       </div>
@@ -197,9 +199,9 @@ const RegisterPage = () => {
             <span className="text-lg font-bold font-heading text-foreground">Healthy Homez</span>
           </div>
 
-          <h2 className="text-2xl font-bold font-heading text-foreground mb-1">{step === 1 ? "Create your account" : "Complete your profile"}</h2>
+          <h2 className="text-2xl font-bold font-heading text-foreground mb-1">{step === 1 ? t('auth.register.title') : t('auth.register.personalInfo')}</h2>
           <p className="text-muted-foreground mb-6">
-            {step === 1 ? "Join Healthy Homez today" : "Tell us a bit more about yourself"}
+            {step === 1 ? t('auth.register.subtitle') : t('auth.register.locationInfo')}
           </p>
 
           {error && (
@@ -211,8 +213,8 @@ const RegisterPage = () => {
           {step === 1 && (
             <div className="flex gap-2 p-1 bg-muted rounded-xl mb-6">
               {[
-                { key: "customer", label: "I need services", emoji: "🏠" },
-                { key: "worker", label: "I provide services", emoji: "🧹" },
+                { key: "customer", label: t('auth.register.customer'), emoji: "🏠" },
+                { key: "worker", label: t('auth.register.worker'), emoji: "🧹" },
               ].map((type) => (
                 <button
                   key={type.key}
@@ -233,20 +235,20 @@ const RegisterPage = () => {
               <>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">First name</label>
-                    <input className="input-clean" placeholder="John" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} required />
+                    <label className="block text-sm font-medium text-foreground mb-1.5">{t('auth.register.firstName')}</label>
+                    <input className="input-clean" placeholder={t('auth.register.firstNamePlaceholder')} value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} required />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">Last name</label>
-                    <input className="input-clean" placeholder="Doe" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} required />
+                    <label className="block text-sm font-medium text-foreground mb-1.5">{t('auth.register.lastName')}</label>
+                    <input className="input-clean" placeholder={t('auth.register.lastNamePlaceholder')} value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} required />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Email address</label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">{t('auth.register.email')}</label>
                   <input 
                     type="email" 
                     className="input-clean" 
-                    placeholder="you@example.com" 
+                    placeholder={t('auth.register.emailPlaceholder')} 
                     value={form.email} 
                     onChange={(e) => {
                       setForm({ ...form, email: e.target.value });
@@ -257,13 +259,13 @@ const RegisterPage = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Phone number</label>
-                  <input type="tel" className="input-clean" placeholder="+91 98765 43210" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required />
+                  <label className="block text-sm font-medium text-foreground mb-1.5">{t('auth.register.phone')}</label>
+                  <input type="tel" className="input-clean" placeholder={t('auth.register.phonePlaceholder')} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Password</label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">{t('auth.register.password')}</label>
                   <div className="relative">
-                    <input type={showPassword ? "text" : "password"} className="input-clean pr-12" placeholder="Create a strong password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={8} />
+                    <input type={showPassword ? "text" : "password"} className="input-clean pr-12" placeholder={t('auth.register.passwordPlaceholder')} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={8} />
                     <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -274,9 +276,9 @@ const RegisterPage = () => {
             ) : (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">City</label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">{t('auth.register.city')}</label>
                   <select className="input-clean" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} required>
-                    <option value="">Select your city</option>
+                    <option value="">{t('auth.register.cityPlaceholder')}</option>
                     {["Mumbai", "Delhi", "Bengaluru", "Hyderabad", "Chennai", "Pune", "Kolkata", "Ahmedabad"].map(c => (
                       <option key={c} value={c}>{c}</option>
                     ))}
@@ -285,7 +287,7 @@ const RegisterPage = () => {
                 
                 {/* Location Selector */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Your Location</label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">{t('auth.register.location')}</label>
                   {!locationData ? (
                     <button
                       type="button"
@@ -293,7 +295,7 @@ const RegisterPage = () => {
                       className="w-full py-3 px-4 border border-border rounded-xl hover:bg-accent transition-colors flex items-center justify-center gap-2 text-foreground"
                     >
                       <MapPin className="w-4 h-4" />
-                      <span>Set Your Location</span>
+                      <span>{t('auth.register.locationNotSet')}</span>
                     </button>
                   ) : (
                     <div className="p-4 bg-muted rounded-xl space-y-2">
@@ -323,20 +325,20 @@ const RegisterPage = () => {
 
                 {/* Gender field */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Gender</label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">{t('auth.register.gender')}</label>
                   <select className="input-clean" value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} required>
-                    <option value="">Select gender</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
+                    <option value="">{t('auth.register.genderPlaceholder')}</option>
+                    <option value="male">{t('auth.register.male')}</option>
+                    <option value="female">{t('auth.register.female')}</option>
+                    <option value="other">{t('auth.register.other')}</option>
                     <option value="prefer_not_to_say">Prefer not to say</option>
                   </select>
                 </div>
 
                 {/* Religion field (optional) */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Religion (Optional)</label>
-                  <input className="input-clean" placeholder="e.g. Hindu, Muslim, Christian, etc." value={form.religion} onChange={(e) => setForm({ ...form, religion: e.target.value })} />
+                  <label className="block text-sm font-medium text-foreground mb-1.5">{t('auth.register.religion')}</label>
+                  <input className="input-clean" placeholder={t('auth.register.religionPlaceholder')} value={form.religion} onChange={(e) => setForm({ ...form, religion: e.target.value })} />
                 </div>
 
                 {userType === "customer" ? (
@@ -348,11 +350,11 @@ const RegisterPage = () => {
                   <>
                     {/* Worker Experience */}
                     <div>
-                      <label className="block text-sm font-medium text-foreground mb-1.5">Years of Experience</label>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">{t('auth.register.experience')}</label>
                       <input 
                         type="number" 
                         className="input-clean" 
-                        placeholder="e.g. 3" 
+                        placeholder={t('auth.register.experiencePlaceholder')} 
                         value={form.experience} 
                         onChange={(e) => setForm({ ...form, experience: e.target.value })} 
                         required 
@@ -392,18 +394,18 @@ const RegisterPage = () => {
             <div className="flex gap-3">
               {step === 2 && (
                 <button type="button" onClick={() => setStep(1)} className="flex-1 py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors">
-                  Back
+                  {t('auth.register.backStep')}
                 </button>
               )}
               <button type="submit" disabled={isLoading} className="btn-brand flex-1 flex items-center justify-center gap-2">
-                {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating account...</> : step === 1 ? "Continue" : "Create account"}
+                {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> {t('auth.register.creating')}</> : step === 1 ? t('auth.register.nextStep') : t('auth.register.createAccount')}
               </button>
             </div>
           </form>
 
           <p className="text-center text-sm text-muted-foreground mt-6">
-            Already have an account?{" "}
-            <Link to="/login" className="text-primary font-semibold hover:underline">Sign in</Link>
+            {t('auth.register.haveAccount')}{" "}
+            <Link to="/login" className="text-primary font-semibold hover:underline">{t('auth.register.signIn')}</Link>
           </p>
         </div>
       </div>

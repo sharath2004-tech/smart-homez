@@ -2,9 +2,11 @@ import { LanguageSelector } from "@/components/LanguageSelector";
 import { authAPI, publicAPI } from "@/lib/api";
 import { Eye, EyeOff, Home, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 const LoginPage = () => {
+  const { t } = useTranslation();
   const [showPassword, setShowPassword] = useState(false);
   const [userType, setUserType] = useState<"customer" | "worker" | "admin">("customer");
   const [isLoading, setIsLoading] = useState(false);
@@ -68,9 +70,9 @@ const LoginPage = () => {
   };
 
   const userTypes = [
-    { key: "customer", label: "Customer", emoji: "🏠" },
-    { key: "worker", label: "Worker", emoji: "🧹" },
-    { key: "admin", label: "Admin", emoji: "⚙️" },
+    { key: "customer", label: t('auth.login.customer'), emoji: "🏠" },
+    { key: "worker", label: t('auth.login.worker'), emoji: "🧹" },
+    { key: "admin", label: t('auth.login.admin'), emoji: "⚙️" },
   ];
 
   return (
@@ -90,16 +92,16 @@ const LoginPage = () => {
           </div>
           <div>
             <h1 className="text-4xl font-bold font-heading mb-4 leading-tight">
-              Your home,<br />perfectly clean.
+              {t('auth.login.yourHome')}<br />{t('auth.login.perfectlyClean')}
             </h1>
             <p className="text-primary-foreground/70 text-lg leading-relaxed">
-              On-demand home services connecting you with trusted professionals for cleaning, maintenance, and more.
+              {t('auth.login.tagline')}
             </p>
             <div className="mt-8 grid grid-cols-3 gap-4">
               {[
-                { label: "Active Workers", value: formatNumber(stats.totalWorkers) },
-                { label: "Happy Customers", value: formatNumber(stats.totalCustomers) },
-                { label: "Services Done", value: formatNumber(stats.servicesDone) },
+                { label: t('auth.login.activeWorkers'), value: formatNumber(stats.totalWorkers) },
+                { label: t('auth.login.happyCustomers'), value: formatNumber(stats.totalCustomers) },
+                { label: t('auth.login.servicesDone'), value: formatNumber(stats.servicesDone) },
               ].map((stat) => (
                 <div key={stat.label} className="bg-primary-foreground/10 rounded-xl p-4 backdrop-blur-sm">
                   <div className="text-2xl font-bold font-heading">{stat.value}</div>
@@ -127,8 +129,8 @@ const LoginPage = () => {
             <span className="text-lg font-bold font-heading text-foreground">Healthy Homez</span>
           </div>
 
-          <h2 className="text-3xl font-bold font-heading text-foreground mb-1">Welcome back</h2>
-          <p className="text-muted-foreground mb-8">Sign in to your account</p>
+          <h2 className="text-3xl font-bold font-heading text-foreground mb-1">{t('auth.login.title')}</h2>
+          <p className="text-muted-foreground mb-8">{t('auth.login.subtitle')}</p>
 
           {error && (
             <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">
@@ -156,11 +158,11 @@ const LoginPage = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Email address</label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">{t('auth.login.email')}</label>
               <input
                 type="email"
                 className="input-clean"
-                placeholder="you@example.com"
+                placeholder={t('auth.login.emailPlaceholder')}
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 required
@@ -168,16 +170,16 @@ const LoginPage = () => {
             </div>
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-sm font-medium text-foreground">Password</label>
+                <label className="block text-sm font-medium text-foreground">{t('auth.login.password')}</label>
                 <Link to="/forgot-password" className="text-sm text-primary hover:underline font-medium">
-                  Forgot password?
+                  {t('auth.login.forgotPassword')}
                 </Link>
               </div>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
                   className="input-clean pr-12"
-                  placeholder="Enter your password"
+                  placeholder={t('auth.login.passwordPlaceholder')}
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   required
@@ -200,18 +202,18 @@ const LoginPage = () => {
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Signing in...
+                  {t('auth.login.signingIn')}
                 </>
               ) : (
-                "Sign in"
+                t('auth.login.signIn')
               )}
             </button>
           </form>
 
           <p className="text-center text-sm text-muted-foreground mt-6">
-            Don't have an account?{" "}
+            {t('auth.login.noAccount')}{" "}
             <Link to="/register" className="text-primary font-semibold hover:underline">
-              Sign up for free
+              {t('auth.login.signUpFree')}
             </Link>
           </p>
         </div>
