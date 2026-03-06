@@ -277,6 +277,28 @@ export const bookingsAPI = {
     return data;
   },
 
+  uploadPaymentProof: async (id: string, file: File) => {
+    const token = getAuthToken();
+    const formData = new FormData();
+    formData.append('paymentProof', file);
+
+    const response = await fetch(`${API_BASE_URL}/bookings/${id}/upload-payment-proof`, {
+      method: 'POST',
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` })
+      },
+      body: formData
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error?.message || 'Failed to upload payment proof');
+    }
+
+    return data;
+  },
+
   getCompletionPhotoUrl: (photoPath: string) => {
     if (!photoPath) return '';
     // Remove /api/ from API_BASE_URL if present and remove /uploads prefix from photoPath if it starts with it

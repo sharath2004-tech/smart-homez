@@ -428,6 +428,26 @@ const bookingSchema = new mongoose.Schema({
       default: false
     }
   },
+  // Payment Proof Photo
+  paymentProof: {
+    url: {
+      type: String,
+      default: null
+    },
+    timestamp: {
+      type: Date,
+      default: null
+    },
+    uploadedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    verified: {
+      type: Boolean,
+      default: false
+    }
+  },
   // Work Documentation (REQ-C-012)
   workDocumentation: {
     photos: [{

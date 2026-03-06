@@ -1703,6 +1703,78 @@ router.post('/:id/upload-completion-photo',
   }
 );
 
+// @route   POST /api/bookings/:id/upload-payment-proof
+// @desc    Worker uploads payment proof photo from customer
+// @access  Private/Worker
+router.post('/:id/upload-payment-proof',
+  authenticate,
+  authorize('worker', 'admin'),
+  upload.single('paymentProof'),
+  async (req, res) => {
+    try {
+      const booking = await Booking.findById(req.params.id);
+      
+      if (!booking) {
+        return res.status(404).json({ 
+          error: { message: 'Booking not found', status: 404 } 
+        });
+      }
+
+      // Verify worker is assigned to this booking
+      if (booking.worker.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+        return res.status(403).json({ 
+          error: { message: 'You are not assigned to this booking', status: 403 } 
+        });
+      }
+
+      // Check if service is completed
+      if (booking.status !== 'completed') {
+        return res.status(400).json({ 
+          error: { message: 'Service must be completed to upload payment proof', status: 400 } 
+        });
+      }
+
+      // Check if completion photo exists
+      if (!booking.completionPhoto || !booking.completionPhoto.url) {
+        return res.status(400).json({ 
+          error: { message: 'Please upload completion photo first', status: 400 } 
+        });
+      }
+
+      // Validate file was uploaded
+      if (!req.file) {
+        return res.status(400).json({ 
+          error: { message: 'Payment proof photo is required', status: 400 } 
+        });
+      }
+
+      // Save payment proof photo
+      const photoUrl = `/uploads/completion-photos/${req.file.filename}`;
+      const isReupload = booking.paymentProof && booking.paymentProof.url;
+      
+      booking.paymentProof = {
+        url: photoUrl,
+        timestamp: new Date(),
+        uploadedBy: req.user._id,
+        verified: true
+      };
+
+      await booking.save();
+
+      console.log(`✅ Worker ${isReupload ? 're-uploaded' : 'uploaded'} payment proof:`, photoUrl);
+
+      res.json({ 
+        message: 'Payment proof uploaded successfully',
+        paymentProof: booking.paymentProof
+      });
+
+    } catch (error) {
+      console.error('Upload payment proof error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
 // @desc    Customer scans QR code to end service
 // @access  Private/Customer
 router.post('/:id/scan-end-qr',

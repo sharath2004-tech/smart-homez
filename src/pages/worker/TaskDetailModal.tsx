@@ -51,6 +51,11 @@ interface Task {
     timestamp: string;
     verified: boolean;
   };
+  paymentProof?: {
+    url: string;
+    timestamp: string;
+    verified: boolean;
+  };
 }
 
 interface TaskDetailModalProps {
@@ -71,6 +76,8 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   const [showPhotoCapture, setShowPhotoCapture] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [adminPaymentQR, setAdminPaymentQR] = useState<string>("");
+  const [showPaymentProofCapture, setShowPaymentProofCapture] = useState(false);
+  const [uploadingPaymentProof, setUploadingPaymentProof] = useState(false);
   
   const OVERTIME_RATE = 2.5; // ₹2.5 per minute
 
@@ -233,6 +240,30 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       alert((error as Error).message || 'Failed to upload completion photo');
     } finally {
       setUploadingPhoto(false);
+    }
+  };
+
+  const handlePaymentProofCapture = async (file: File) => {
+    try {
+      setUploadingPaymentProof(true);
+      
+      // Use the API utility method
+      const result = await bookingsAPI.uploadPaymentProof(taskId, file);
+      
+      // Update task with payment proof
+      setTask({ ...task!, paymentProof: result.paymentProof });
+      setShowPaymentProofCapture(false);
+      
+      alert('✅ Payment proof uploaded successfully! Task is now fully documented.');
+      
+      // Refresh task data
+      await fetchTaskDetail(true);
+      onRefresh(); // Refresh parent list
+    } catch (error) {
+      console.error('Error uploading payment proof:', error);
+      alert((error as Error).message || 'Failed to upload payment proof');
+    } finally {
+      setUploadingPaymentProof(false);
     }
   };
 
@@ -716,6 +747,66 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                         <DollarSign className="w-5 h-5 inline-block mr-2" />
                         Show Payment QR
                       </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Step 4: Payment Proof Upload - Show after payment QR is displayed */}
+              {task.completionPhoto && paymentQRImage && (
+                <div className="card-elevated p-5 bg-gradient-to-br from-amber-50 to-yellow-50 border-2 border-amber-200">
+                  <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
+                    <Camera className="w-5 h-5 text-amber-600" />
+                    Step 4: Upload Payment Proof 📸✅
+                  </h3>
+                  
+                  {task.paymentProof ? (
+                    <div className="space-y-3">
+                      <div className="relative rounded-lg overflow-hidden border-2 border-green-500">
+                        <img 
+                          src={bookingsAPI.getCompletionPhotoUrl(task.paymentProof.url)}
+                          alt="Payment proof" 
+                          className="w-full h-auto max-h-64 object-contain bg-black mx-auto"
+                        />
+                      </div>
+                      <div className="flex items-center justify-center gap-2 text-green-700 font-medium">
+                        <CheckCircle className="w-5 h-5" />
+                        Payment proof uploaded successfully!
+                      </div>
+                      <div className="bg-green-100 border border-green-300 rounded-lg p-3 text-center">
+                        <p className="text-green-800 font-semibold">🎉 Task Fully Completed!</p>
+                        <p className="text-xs text-green-700 mt-1">All documentation has been submitted</p>
+                      </div>
+                      <button
+                        onClick={() => setShowPaymentProofCapture(true)}
+                        className="w-full py-2 px-4 border-2 border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50 transition-colors"
+                      >
+                        Re-upload Payment Proof
+                      </button>
+                    </div>
+                  ) : showPaymentProofCapture ? (
+                    <PhotoCapture
+                      onPhotoCapture={handlePaymentProofCapture}
+                      onCancel={() => setShowPaymentProofCapture(false)}
+                      showPreview={true}
+                    />
+                  ) : (
+                    <div>
+                      <button
+                        onClick={() => setShowPaymentProofCapture(true)}
+                        disabled={uploadingPaymentProof}
+                        className="btn-brand py-3 px-6 w-full bg-amber-600 hover:bg-amber-700"
+                      >
+                        <Camera className="w-5 h-5 inline-block mr-2" />
+                        {uploadingPaymentProof ? 'Uploading...' : 'Upload Payment Proof'}
+                      </button>
+                      <div className="mt-3 text-xs bg-amber-100 text-amber-800 p-3 rounded-lg space-y-1">
+                        <p className="font-semibold">After customer makes payment:</p>
+                        <p>• Ask customer to show payment confirmation</p>
+                        <p>• Take a photo of the payment screen/receipt</p>
+                        <p>• Upload as proof of payment completion</p>
+                        <p className="text-green-700 font-medium mt-2">✓ Protects both you and the customer</p>
+                      </div>
                     </div>
                   )}
                 </div>
