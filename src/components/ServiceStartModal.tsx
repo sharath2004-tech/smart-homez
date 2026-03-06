@@ -60,7 +60,7 @@ const ServiceStartModal = ({
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/bookings/${bookingId}/scan-start-qr`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/bookings/${bookingId}/scan-start-qr`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

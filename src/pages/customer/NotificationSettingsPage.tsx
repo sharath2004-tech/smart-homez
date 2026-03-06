@@ -39,7 +39,7 @@ const NotificationSettingsPage = () => {
   const fetchPreferences = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/notification-preferences', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/notification-preferences`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -62,7 +62,7 @@ const NotificationSettingsPage = () => {
     setSaving(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/notification-preferences', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/notification-preferences`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

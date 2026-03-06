@@ -107,7 +107,7 @@ export const authAPI = {
 export const publicAPI = {
   getStats: async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/public/stats');
+      const response = await fetch(`${API_BASE_URL}/public/stats`);
       const data = await response.json();
       return data;
     } catch (error) {
