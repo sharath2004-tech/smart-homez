@@ -1,5 +1,5 @@
 import PhotoCapture from "@/components/PhotoCapture";
-import { bookingsAPI } from "@/lib/api";
+import { bookingsAPI, settingsAPI } from "@/lib/api";
 import {
     ArrowLeft, Calendar,
     Camera,
@@ -63,12 +63,14 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   const [task, setTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
   const [qrCodeImage, setQrCodeImage] = useState<string>("");
+  const [paymentQRImage, setPaymentQRImage] = useState<string>("");
   const [elapsedTime, setElapsedTime] = useState(0);
   const [overtimeMinutes, setOvertimeMinutes] = useState(0);
   const [isScanning, setIsScanning] = useState(false);
   const [hasTimeOffset, setHasTimeOffset] = useState(false);
   const [showPhotoCapture, setShowPhotoCapture] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [adminPaymentQR, setAdminPaymentQR] = useState<string>("");
   
   const OVERTIME_RATE = 2.5; // ₹2.5 per minute
 
@@ -97,6 +99,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
 
   useEffect(() => {
     fetchTaskDetail(false); // Initial load with loading spinner
+    fetchPaymentSettings(); // Fetch admin payment QR
     
     // Auto-refresh every 5 seconds for real-time updates (silent refresh)
     const interval = setInterval(() => {
@@ -159,6 +162,14 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
     }
   }, [task?.status, task?.actualStartTime, task?.bookingDate, task?.endTime]);
 
+  // Generate payment QR when task is completed and has completion photo
+  useEffect(() => {
+    if (task?.status === 'completed' && task.completionPhoto && !paymentQRImage) {
+      generatePaymentQR();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.status, task?.completionPhoto]);
+
   const generateQRCode = async (code: string) => {
     try {
       const qrDataUrl = await QRCode.toDataURL(code, {
@@ -210,7 +221,10 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       setTask({ ...task!, completionPhoto: result.completionPhoto });
       setShowPhotoCapture(false);
       
-      alert('✅ Completion photo uploaded successfully! You can now generate the end QR code.');
+      alert('✅ Completion photo uploaded successfully! Payment QR code is now available.');
+      
+      // Generate payment QR code
+      await generatePaymentQR();
       
       // Refresh task data
       await fetchTaskDetail(true);
@@ -219,6 +233,45 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       alert((error as Error).message || 'Failed to upload completion photo');
     } finally {
       setUploadingPhoto(false);
+    }
+  };
+
+  const fetchPaymentSettings = async () => {
+    try {
+      const response = await settingsAPI.getSettings();
+      if (response.settings?.payment?.qrCodeImage) {
+        setAdminPaymentQR(response.settings.payment.qrCodeImage);
+      }
+    } catch (error) {
+      console.error('Error fetching payment settings:', error);
+    }
+  };
+
+  const generatePaymentQR = async () => {
+    // If admin has uploaded a payment QR, use that
+    if (adminPaymentQR) {
+      setPaymentQRImage(adminPaymentQR);
+      return;
+    }
+    
+    // Otherwise generate a dynamic one (fallback)
+    try {
+      const paymentData = JSON.stringify({
+        type: 'payment',
+        bookingId: taskId,
+        amount: calculateTotalAmount(),
+        timestamp: new Date().toISOString()
+      });
+      
+      const qrDataUrl = await QRCode.toDataURL(paymentData, {
+        width: 256,
+        margin: 2,
+        errorCorrectionLevel: 'H'
+      });
+      
+      setPaymentQRImage(qrDataUrl);
+    } catch (error) {
+      console.error('Error generating payment QR:', error);
     }
   };
 
@@ -522,11 +575,64 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
           {/* End QR Code Section - Show for in-progress tasks */}
           {task.status === 'in-progress' && task.actualStartTime && (
             <div className="space-y-4">
+              {/* Step 1: End QR Code Section */}
+              <div className="card-elevated p-5 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200">
+                <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
+                  <QrCode className="w-5 h-5 text-green-600" />
+                  Step 1: Service End QR Code
+                </h3>
+                
+                {task.serviceEndQRCode ? (
+                  <div>
+                    <div className="bg-white p-4 rounded-xl inline-block mb-3 shadow-lg">
+                      <img src={qrCodeImage} alt="Service End QR" className="w-64 h-64" />
+                    </div>
+                    <p className="text-sm font-medium text-green-700 mb-2">
+                      ✅ Show this QR code to customer to end service
+                    </p>
+                    <div className="text-xs bg-green-100 text-green-800 p-3 rounded-lg space-y-1">
+                      <p className="font-semibold">Customer will scan this QR to:</p>
+                      <p>• Stop the service timer</p>
+                      <p>• Calculate final charges including overtime</p>
+                      <p>• Complete the booking</p>
+                    </div>
+                    {overtimeMinutes > 0 && (
+                      <div className="mt-3 bg-orange-100 border border-orange-300 rounded-lg p-3">
+                        <p className="text-sm font-semibold text-orange-800">
+                          ⚠️ Overtime: {overtimeMinutes} minutes
+                        </p>
+                        <p className="text-xs text-orange-700">
+                          Extra ₹{(overtimeMinutes * OVERTIME_RATE).toFixed(2)} will be added to final bill
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <button
+                      onClick={handleGenerateEndQR}
+                      className="font-semibold py-3 px-6 rounded-lg transition-colors shadow-md w-full bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      <QrCode className="w-5 h-5 inline-block mr-2" />
+                      Generate End QR Code
+                    </button>
+                    <p className="text-xs text-muted-foreground mt-2 text-center">
+                      Customer will scan to end service and calculate charges
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Completion Photo Upload - Show for completed tasks after QR scan */}
+          {task.status === 'completed' && task.actualEndTime && (
+            <div className="space-y-4">
               {/* Completion Photo Upload Section */}
               <div className="card-elevated p-5 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200">
                 <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
                   <Camera className="w-5 h-5 text-blue-600" />
-                  Step 1: Upload Completion Photo 📸
+                  Step 2: Upload Completion Photo 📸
                 </h3>
                 
                 {task.completionPhoto ? (
@@ -575,63 +681,45 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                 )}
               </div>
 
-              {/* End QR Code Section */}
-              <div className="card-elevated p-5 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200">
-                <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
-                  <QrCode className="w-5 h-5 text-green-600" />
-                  Step 2: Service End QR Code
-                </h3>
-                
-                {task.serviceEndQRCode ? (
-                  <div>
-                    <div className="bg-white p-4 rounded-xl inline-block mb-3 shadow-lg">
-                      <img src={qrCodeImage} alt="Service End QR" className="w-64 h-64" />
-                    </div>
-                    <p className="text-sm font-medium text-green-700 mb-2">
-                      ✅ Show this QR code to customer to end service
-                    </p>
-                    <div className="text-xs bg-green-100 text-green-800 p-3 rounded-lg space-y-1">
-                      <p className="font-semibold">Customer will scan this QR to:</p>
-                      <p>• Stop the service timer</p>
-                      <p>• Calculate final charges including overtime</p>
-                      <p>• Complete the booking</p>
-                    </div>
-                    {overtimeMinutes > 0 && (
-                      <div className="mt-3 bg-orange-100 border border-orange-300 rounded-lg p-3">
-                        <p className="text-sm font-semibold text-orange-800">
-                          ⚠️ Overtime: {overtimeMinutes} minutes
-                        </p>
-                        <p className="text-xs text-orange-700">
-                          Extra ₹{(overtimeMinutes * OVERTIME_RATE).toFixed(2)} will be added to final bill
-                        </p>
+              {/* Step 3: Payment QR Code - Show after photo upload */}
+              {task.completionPhoto && (
+                <div className="card-elevated p-5 bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200">
+                  <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
+                    <DollarSign className="w-5 h-5 text-purple-600" />
+                    Step 3: Payment QR Code 💳
+                  </h3>
+                  
+                  {paymentQRImage ? (
+                    <div>
+                      <div className="bg-white p-4 rounded-xl inline-block mb-3 shadow-lg">
+                        <img src={paymentQRImage} alt="Payment QR" className="w-64 h-64 object-contain" />
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <button
-                      onClick={handleGenerateEndQR}
-                      disabled={!task.completionPhoto}
-                      className={`font-semibold py-3 px-6 rounded-lg transition-colors shadow-md w-full ${
-                        task.completionPhoto 
-                          ? 'bg-green-600 hover:bg-green-700 text-white' 
-                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      }`}
-                    >
-                      <QrCode className="w-5 h-5 inline-block mr-2" />
-                      Generate End QR Code
-                    </button>
-                    {!task.completionPhoto && (
-                      <p className="text-sm text-orange-600 font-medium mt-3 text-center">
-                        ⚠️ Upload completion photo first
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-2 text-center">
-                      Customer will scan to finalize and calculate charges
-                    </p>
-                  </div>
-                )}
-              </div>
+                      
+                      <div className="text-xs bg-purple-100 text-purple-800 p-3 rounded-lg space-y-1">
+                        <p className="font-semibold">Show this QR to customer for payment:</p>
+                        <p>• Total Amount: ₹{calculateTotalAmount().toFixed(2)}</p>
+                        {overtimeMinutes > 0 && (
+                          <p>• Includes ₹{(overtimeMinutes * OVERTIME_RATE).toFixed(2)} overtime charges</p>
+                        )}
+                        <p>• Customer can scan to complete payment</p>
+                        {adminPaymentQR && (
+                          <p className="text-green-700 font-medium mt-2">✓ Using admin's payment QR code</p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <button
+                        onClick={generatePaymentQR}
+                        className="btn-brand py-3 px-6"
+                      >
+                        <DollarSign className="w-5 h-5 inline-block mr-2" />
+                        Show Payment QR
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

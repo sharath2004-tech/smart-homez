@@ -1662,10 +1662,10 @@ router.post('/:id/upload-completion-photo',
         });
       }
 
-      // Check if service is in progress
-      if (booking.status !== 'in-progress') {
+      // Check if service is in progress or completed
+      if (booking.status !== 'in-progress' && booking.status !== 'completed') {
         return res.status(400).json({ 
-          error: { message: 'Service must be in progress to upload completion photo', status: 400 } 
+          error: { message: 'Service must be in progress or completed to upload completion photo', status: 400 } 
         });
       }
 
