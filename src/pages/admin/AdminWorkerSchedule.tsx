@@ -1,8 +1,9 @@
 import AppLayout from "@/components/AppLayout";
-import { authAPI } from "@/lib/api";
-import { Calendar, Clock, Download, Filter, LayoutGrid, MapPin, RefreshCw, Table2, TrendingDown, TrendingUp, User, Users } from "lucide-react";
+import { API_BASE_URL, authAPI } from "@/lib/api";
+import { Calendar, Clock, FileSpreadsheet, Filter, LayoutGrid, MapPin, RefreshCw, Table2, TrendingDown, TrendingUp, User, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import * as XLSX from 'xlsx';
 
 interface Booking {
   _id: string;
@@ -64,7 +65,7 @@ const AdminWorkerSchedule = () => {
   const [dateRange, setDateRange] = useState<string>('default'); // default, custom
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table'); // Default to table view
+  const [viewMode, setViewMode] = useState<'cards' | 'table' | 'daily'>('table'); // Default to table view
   const [summary, setSummary] = useState<{
     totalWorkers: number;
     totalBookings: number;
@@ -88,9 +89,15 @@ const AdminWorkerSchedule = () => {
       
       const [profileData, scheduleData] = await Promise.all([
         authAPI.getProfile(),
-        fetch(`/api/admin/worker-schedule-comprehensive?${params}`, {
+        fetch(`${API_BASE_URL}/admin/worker-schedule-comprehensive?${params}`, {
           headers: { 'Authorization': `Bearer ${token}` }
-        }).then(res => res.json())
+        }).then(async res => {
+          if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`API request failed: ${res.status} - ${errorText.substring(0, 100)}`);
+          }
+          return res.json();
+        })
       ]);
       
       setProfile(profileData.user || profileData);
@@ -100,7 +107,8 @@ const AdminWorkerSchedule = () => {
       setSummary(scheduleData.summary || {});
     } catch (error) {
       console.error('Fetch error:', error);
-      toast.error('Failed to load worker schedules');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load worker schedules';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -110,32 +118,39 @@ const AdminWorkerSchedule = () => {
     fetchData();
   }, [fetchData]);
 
-  const handleExport = async () => {
+  const handleExport = async (format: 'csv' | 'xlsx' = 'xlsx') => {
     try {
       setExporting(true);
-      const token = localStorage.getItem('token');
       
-      // Build query params
-      const params = new URLSearchParams();
-      if (selectedWorker !== 'all') params.append('workerId', selectedWorker);
-      if (dateRange === 'custom' && startDate) params.append('startDate', startDate);
-      if (dateRange === 'custom' && endDate) params.append('endDate', endDate);
-      
-      const response = await fetch(`/api/admin/worker-schedule-export?${params}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (!response.ok) throw new Error('Export failed');
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `worker-schedule-${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      if (format === 'xlsx') {
+        // Export to Excel using xlsx library
+        exportToExcel();
+      } else {
+        // Export CSV from backend
+        const token = localStorage.getItem('token');
+        
+        // Build query params
+        const params = new URLSearchParams();
+        if (selectedWorker !== 'all') params.append('workerId', selectedWorker);
+        if (dateRange === 'custom' && startDate) params.append('startDate', startDate);
+        if (dateRange === 'custom' && endDate) params.append('endDate', endDate);
+        
+        const response = await fetch(`${API_BASE_URL}/admin/worker-schedule-export?${params}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) throw new Error('Export failed');
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `worker-schedule-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
       
       toast.success('Schedule exported successfully');
     } catch (error) {
@@ -144,6 +159,154 @@ const AdminWorkerSchedule = () => {
     } finally {
       setExporting(false);
     }
+  };
+
+  const exportToExcel = () => {
+    try {
+      // Prepare data for Excel export
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const excelData: Record<string, string | number>[] = [];
+      
+      filteredSchedules.forEach((schedule) => {
+        schedule.bookings.forEach((booking) => {
+          const bookingDate = new Date(booking.bookingDate);
+          bookingDate.setHours(0, 0, 0, 0);
+          
+          let period = 'Future';
+          if (bookingDate < today) period = 'Past';
+          else if (bookingDate.getTime() === today.getTime()) period = 'Today';
+          
+          const dayName = bookingDate.toLocaleDateString('en-US', { weekday: 'long' });
+          const dateStr = bookingDate.toLocaleDateString('en-US');
+
+          excelData.push({
+            'Worker Name': schedule.worker.name,
+            'Worker Phone': schedule.worker.phone,
+            'Specialization': schedule.worker.specialization,
+            'Date': dateStr,
+            'Day': dayName,
+            'Start Time': booking.startTime,
+            'End Time': booking.endTime,
+            'Status': booking.status,
+            'Period': period,
+            'Booking Type': booking.isSubscription ? 'Subscription' : 'One-Time',
+            'Frequency': booking.subscriptionFrequency || 'N/A',
+            'Service': booking.service.name,
+            'Category': booking.service.category,
+            'Customer Name': booking.customer.name,
+            'Customer Phone': booking.customer.phone,
+            'Location': booking.location.apartmentName,
+            'Area': booking.location.area,
+            'City': booking.location.city
+          });
+        });
+      });
+
+      // Create workbook and add main data sheet
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      
+      // Set column widths
+      const colWidths = [
+        { wch: 20 }, // Worker Name
+        { wch: 15 }, // Worker Phone
+        { wch: 15 }, // Specialization
+        { wch: 12 }, // Date
+        { wch: 12 }, // Day
+        { wch: 10 }, // Start Time
+        { wch: 10 }, // End Time
+        { wch: 12 }, // Status
+        { wch: 10 }, // Period
+        { wch: 15 }, // Booking Type
+        { wch: 12 }, // Frequency
+        { wch: 25 }, // Service
+        { wch: 15 }, // Category
+        { wch: 20 }, // Customer Name
+        { wch: 15 }, // Customer Phone
+        { wch: 25 }, // Location
+        { wch: 15 }, // Area
+        { wch: 12 }  // City
+      ];
+      ws['!cols'] = colWidths;
+      
+      XLSX.utils.book_append_sheet(wb, ws, 'Worker Schedule');
+
+      // Add daily summary sheet
+      const dailySummary = calculateDailySummary();
+      const wsSummary = XLSX.utils.json_to_sheet(dailySummary);
+      wsSummary['!cols'] = [
+        { wch: 15 }, // Date
+        { wch: 12 }, // Day
+        { wch: 15 }, // Workers Count
+        { wch: 15 }, // Bookings Count
+        { wch: 15 }  // Subscriptions
+      ];
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Daily Summary');
+
+      // Add statistics sheet
+      const statsData = [
+        { Metric: 'Total Workers', Value: summary?.totalWorkers || 0 },
+        { Metric: 'Total Bookings', Value: summary?.totalBookings || 0 },
+        { Metric: 'Past Bookings', Value: summary?.pastBookings || 0 },
+        { Metric: 'Today Bookings', Value: summary?.todayBookings || 0 },
+        { Metric: 'Future Bookings', Value: summary?.futureBookings || 0 },
+        { Metric: 'Subscription Bookings', Value: summary?.subscriptionBookings || 0 },
+        { Metric: 'One-Time Bookings', Value: summary?.oneTimeBookings || 0 }
+      ];
+      const wsStats = XLSX.utils.json_to_sheet(statsData);
+      wsStats['!cols'] = [{ wch: 25 }, { wch: 15 }];
+      XLSX.utils.book_append_sheet(wb, wsStats, 'Statistics');
+      
+      // Generate and download Excel file
+      const fileName = `worker-schedule-${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      
+    } catch (error) {
+      console.error('Excel export error:', error);
+      throw error;
+    }
+  };
+
+  const calculateDailySummary = () => {
+    const dailyMap = new Map<string, {
+      date: Date;
+      workerIds: Set<string>;
+      bookings: number;
+      subscriptions: number;
+    }>();
+
+    filteredSchedules.forEach((schedule) => {
+      schedule.bookings.forEach((booking) => {
+        const dateKey = new Date(booking.bookingDate).toISOString().split('T')[0];
+        
+        if (!dailyMap.has(dateKey)) {
+          dailyMap.set(dateKey, {
+            date: new Date(booking.bookingDate),
+            workerIds: new Set(),
+            bookings: 0,
+            subscriptions: 0
+          });
+        }
+        
+        const dayData = dailyMap.get(dateKey)!;
+        dayData.workerIds.add(schedule.worker._id);
+        dayData.bookings++;
+        if (booking.isSubscription) dayData.subscriptions++;
+      });
+    });
+
+    // Convert to array and sort by date
+    return Array.from(dailyMap.entries())
+      .map(([dateKey, data]) => ({
+        'Date': data.date.toLocaleDateString('en-US'),
+        'Day': data.date.toLocaleDateString('en-US', { weekday: 'long' }),
+        'Workers Count': data.workerIds.size,
+        'Bookings Count': data.bookings,
+        'Subscriptions': data.subscriptions
+      }))
+      .sort((a, b) => new Date(a.Date).getTime() - new Date(b.Date).getTime());
   };
 
   // Get unique workers
@@ -256,6 +419,17 @@ const AdminWorkerSchedule = () => {
                   Table
                 </button>
                 <button
+                  onClick={() => setViewMode('daily')}
+                  className={`px-4 py-2 flex items-center gap-2 transition-colors border-l border-border ${
+                    viewMode === 'daily' 
+                      ? 'bg-primary text-white' 
+                      : 'bg-background text-foreground hover:bg-muted'
+                  }`}
+                >
+                  <Calendar className="w-4 h-4" />
+                  Daily
+                </button>
+                <button
                   onClick={() => setViewMode('cards')}
                   className={`px-4 py-2 flex items-center gap-2 transition-colors border-l border-border ${
                     viewMode === 'cards' 
@@ -268,11 +442,11 @@ const AdminWorkerSchedule = () => {
                 </button>
               </div>
               <button
-                onClick={handleExport}
+                onClick={() => handleExport('xlsx')}
                 disabled={exporting}
                 className="btn-outline flex items-center gap-2"
               >
-                <Download className="w-4 h-4" />
+                <FileSpreadsheet className="w-4 h-4" />
                 {exporting ? 'Exporting...' : 'Export Excel'}
               </button>
               <button
@@ -452,7 +626,7 @@ const AdminWorkerSchedule = () => {
           </div>
         )}
 
-        {/* Worker Schedule - Table or Card View */}
+        {/* Worker Schedule - Table, Daily, or Card View */}
         {filteredSchedules.length === 0 ? (
           <div className="card-elevated p-12 text-center">
             <Calendar className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
@@ -460,6 +634,136 @@ const AdminWorkerSchedule = () => {
             <p className="text-muted-foreground">
               No bookings found for the selected filters.
             </p>
+          </div>
+        ) : viewMode === 'daily' ? (
+          /* Daily Summary View - Shows worker count by day */
+          <div className="card-elevated overflow-hidden">
+            <div className="p-4 bg-muted/30 border-b border-border">
+              <h3 className="font-semibold text-foreground flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-primary" />
+                Daily Worker Summary - Easy to see how many workers per day
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                View the count of workers performing on each day
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-muted/50 border-b-2 border-border">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground uppercase tracking-wider">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground uppercase tracking-wider">Day</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-foreground uppercase tracking-wider">Workers Count</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-foreground uppercase tracking-wider">Bookings</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-foreground uppercase tracking-wider">Subscriptions</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-foreground uppercase tracking-wider">One-Time</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-foreground uppercase tracking-wider">Period</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {(() => {
+                    // Calculate daily summary
+                    const dailyMap = new Map<string, {
+                      date: Date;
+                      workerIds: Set<string>;
+                      bookings: Booking[];
+                    }>();
+
+                    filteredSchedules.forEach((schedule) => {
+                      schedule.bookings.forEach((booking) => {
+                        const dateKey = new Date(booking.bookingDate).toISOString().split('T')[0];
+                        
+                        if (!dailyMap.has(dateKey)) {
+                          dailyMap.set(dateKey, {
+                            date: new Date(booking.bookingDate),
+                            workerIds: new Set(),
+                            bookings: []
+                          });
+                        }
+                        
+                        const dayData = dailyMap.get(dateKey)!;
+                        dayData.workerIds.add(schedule.worker._id);
+                        dayData.bookings.push(booking);
+                      });
+                    });
+
+                    // Convert to sorted array
+                    return Array.from(dailyMap.entries())
+                      .map(([dateKey, data]) => ({
+                        dateKey,
+                        ...data,
+                        subscriptions: data.bookings.filter(b => b.isSubscription).length,
+                        oneTime: data.bookings.filter(b => !b.isSubscription).length
+                      }))
+                      .sort((a, b) => a.date.getTime() - b.date.getTime())
+                      .map((day) => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const dayDate = new Date(day.date);
+                        dayDate.setHours(0, 0, 0, 0);
+
+                        return (
+                          <tr key={day.dateKey} className="hover:bg-muted/30 transition-colors">
+                            <td className="px-4 py-3">
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium text-foreground">
+                                  {day.date.toLocaleDateString('en-US', { 
+                                    month: 'short', 
+                                    day: 'numeric',
+                                    year: 'numeric'
+                                  })}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-sm text-foreground">
+                                {day.date.toLocaleDateString('en-US', { weekday: 'long' })}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 rounded-lg">
+                                <Users className="w-4 h-4 text-primary" />
+                                <span className="text-lg font-bold text-primary">{day.workerIds.size}</span>
+                                <span className="text-xs text-muted-foreground">workers</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className="text-sm font-semibold text-foreground">{day.bookings.length}</span>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">
+                                📋 {day.subscriptions}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className="text-sm text-gray-600 dark:text-gray-400">
+                                {day.oneTime}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              {dayDate < today ? (
+                                <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">Past</span>
+                              ) : dayDate.getTime() === today.getTime() ? (
+                                <span className="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">Today</span>
+                              ) : (
+                                <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">Future</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      });
+                  })()}
+                </tbody>
+              </table>
+            </div>
+            <div className="bg-muted/30 px-4 py-3 border-t border-border">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  📊 Total: {filteredSchedules.reduce((sum, s) => sum + s.bookings.length, 0)} bookings 
+                  across {filteredSchedules.length} workers
+                </span>
+              </div>
+            </div>
           </div>
         ) : viewMode === 'table' ? (
           /* Table View - Excel-like format */
