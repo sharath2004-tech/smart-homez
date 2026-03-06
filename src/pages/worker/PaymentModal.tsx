@@ -1,5 +1,5 @@
-import { bookingsAPI, qrPaymentsAPI } from "@/lib/api";
-import { ArrowLeft, Camera, CheckCircle, DollarSign, QrCode, Upload } from "lucide-react";
+import { bookingsAPI, locationsAPI, qrPaymentsAPI } from "@/lib/api";
+import { ArrowLeft, Camera, CheckCircle, DollarSign, MapPin, QrCode, Upload } from "lucide-react";
 import QRCodeLib from "qrcode";
 import { useCallback, useEffect, useState } from "react";
 
@@ -11,6 +11,21 @@ interface QRPayment {
   status: string;
 }
 
+interface LocationPaymentQR {
+  upiId?: string;
+  upiName?: string;
+  qrCodeImage?: string;
+  phoneNumber?: string;
+  isGlobal?: boolean;
+}
+
+interface LocationInfo {
+  id: string;
+  name: string;
+  area: string;
+  city: string;
+}
+
 interface PaymentModalProps {
   bookingId: string;
   onClose: () => void;
@@ -20,21 +35,59 @@ interface PaymentModalProps {
 const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalProps) => {
   const [loading, setLoading] = useState(true);
   const [qrPayment, setQrPayment] = useState<QRPayment | null>(null);
+  const [locationPaymentQR, setLocationPaymentQR] = useState<LocationPaymentQR | null>(null);
+  const [locationInfo, setLocationInfo] = useState<LocationInfo | null>(null);
   const [qrCodeImage, setQrCodeImage] = useState<string>("");
   const [transactionId, setTransactionId] = useState("");
   const [screenshot, setScreenshot] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const [step, setStep] = useState<'show-qr' | 'upload-proof'>('show-qr');
+  const [usingLocationQR, setUsingLocationQR] = useState(false);
 
   const fetchOrGeneratePayment = useCallback(async () => {
     try {
       setLoading(true);
       
-      // Try to get existing payment first
+      // Fetch the booking to get location and amount info
       const booking = await bookingsAPI.getById(bookingId);
+      const bookingData = booking.booking;
       
-      if (booking.booking.qrPayment) {
-        const paymentResponse = await qrPaymentsAPI.getById(booking.booking.qrPayment);
+      // Try to fetch location-specific payment QR if location exists
+      if (bookingData.location && (typeof bookingData.location === 'object' && '_id' in bookingData.location)) {
+        try {
+          const locationId = typeof bookingData.location === 'string' ? bookingData.location : bookingData.location._id;
+          const locationQRResponse = await locationsAPI.getPaymentQR(locationId);
+          
+          if (locationQRResponse.success && locationQRResponse.paymentQR) {
+            setLocationPaymentQR(locationQRResponse.paymentQR);
+            setLocationInfo(locationQRResponse.location);
+            
+            // Use location QR if available
+            if (locationQRResponse.paymentQR.qrCodeImage) {
+              setQrCodeImage(locationQRResponse.paymentQR.qrCodeImage);
+              setUsingLocationQR(true);
+              
+              // Create a mock QRPayment object for the amount
+              setQrPayment({
+                _id: 'location-qr',
+                qrCodeData: '',
+                amount: bookingData.totalAmount || 0,
+                upiId: locationQRResponse.paymentQR.upiId || 'N/A',
+                status: 'pending'
+              });
+              
+              setLoading(false);
+              return;
+            }
+          }
+        } catch (error) {
+          console.log('No location-specific QR found, falling back to generated QR');
+        }
+      }
+      
+      // Fallback to original QR payment generation
+      if (bookingData.qrPayment) {
+        const paymentResponse = await qrPaymentsAPI.getById(bookingData.qrPayment);
         setQrPayment(paymentResponse.qrPayment);
         generateQRCodeImage(paymentResponse.qrPayment.qrCodeData);
       } else {
@@ -51,7 +104,7 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookingId]); // Removed onClose from dependencies to prevent re-render loop
+  }, [bookingId]);
 
   useEffect(() => {
     fetchOrGeneratePayment();
@@ -110,8 +163,17 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
 
     try {
       setUploading(true);
-      await qrPaymentsAPI.workerConfirm(qrPayment._id, transactionId, screenshot);
-      alert('Payment confirmed successfully! Admin will verify it soon.');
+      
+      if (usingLocationQR) {
+        // For location QR, we need to create a payment record first, then confirm
+        const response = await qrPaymentsAPI.generate(bookingId);
+        await qrPaymentsAPI.workerConfirm(response.qrPayment._id, transactionId, screenshot);
+      } else {
+        // Normal flow with existing QRPayment
+        await qrPaymentsAPI.workerConfirm(qrPayment!._id, transactionId, screenshot);
+      }
+      
+      alert('✅ Payment confirmed successfully! Admin will verify it soon.');
       onPaymentConfirmed();
     } catch (error) {
       console.error('Error confirming payment:', error);
@@ -177,18 +239,68 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
                   </ol>
                 </div>
 
+                {/* Location Info - Show when using location-specific QR */}
+                {usingLocationQR && locationInfo && (
+                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <MapPin className="w-5 h-5 text-purple-600" />
+                      <h3 className="font-semibold text-purple-900">
+                        Admin's Payment QR for this Location
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-purple-700">
+                      <span className="font-medium">{locationInfo.name}</span>
+                      <span>•</span>
+                      <span>{locationInfo.area}, {locationInfo.city}</span>
+                    </div>
+                    {locationPaymentQR?.upiName && (
+                      <p className="text-xs text-purple-600 mt-1">
+                        Payee: {locationPaymentQR.upiName}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* QR Code Display */}
                 {qrCodeImage && (
                   <div className="bg-white border-2 border-primary rounded-xl p-6 text-center">
-                    <p className="text-sm text-muted-foreground mb-4">Customer scans this QR code to pay</p>
+                    {usingLocationQR ? (
+                      <div className="mb-4">
+                        <p className="text-sm font-semibold text-purple-700 mb-1 flex items-center justify-center gap-2">
+                          <QrCode className="w-4 h-4" />
+                          Admin's Custom QR Code
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          This QR is specifically assigned to this location by the admin
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground mb-4">Customer scans this QR code to pay</p>
+                    )}
                     <img 
                       src={qrCodeImage} 
                       alt="Payment QR Code" 
-                      className="mx-auto w-full max-w-sm"
+                      className="mx-auto w-full max-w-sm rounded-lg shadow-lg"
                     />
                     <div className="mt-4 p-3 bg-muted rounded-lg">
-                      <p className="text-xs text-muted-foreground">UPI ID</p>
-                      <p className="text-sm font-mono font-semibold">{qrPayment.upiId}</p>
+                      {locationPaymentQR?.upiName && usingLocationQR ? (
+                        <>
+                          <p className="text-xs text-muted-foreground">Payee Name</p>
+                          <p className="text-sm font-semibold">{locationPaymentQR.upiName}</p>
+                        </>
+                      ) : null}
+                      {qrPayment?.upiId && qrPayment.upiId !== 'N/A' ? (
+                        <div className={locationPaymentQR?.upiName && usingLocationQR ? 'mt-2 pt-2 border-t border-border' : ''}>
+                          <p className="text-xs text-muted-foreground">UPI ID</p>
+                          <p className="text-sm font-mono font-semibold">{qrPayment.upiId}</p>
+                        </div>
+                      ) : null}
+                      {locationPaymentQR?.phoneNumber && usingLocationQR && (
+                        <div className="mt-2 pt-2 border-t border-border">
+                          <p className="text-xs text-muted-foreground">Contact</p>
+                          <p className="text-sm font-semibold">{locationPaymentQR.phoneNumber}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

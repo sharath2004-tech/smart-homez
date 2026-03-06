@@ -337,6 +337,30 @@ export const locationsAPI = {
       method: 'POST',
       body: JSON.stringify({ workerId })
     });
+  },
+
+  getPaymentQR: async (locationId: string) => {
+    return apiCall(`/locations/${locationId}/payment-qr`);
+  },
+
+  updatePaymentQR: async (locationId: string, qrData: {
+    upiId?: string;
+    upiName?: string;
+    qrCodeImage?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+    phoneNumber?: string;
+  }) => {
+    return apiCall(`/locations/${locationId}/payment-qr`, {
+      method: 'PUT',
+      body: JSON.stringify(qrData)
+    });
+  },
+
+  deletePaymentQR: async (locationId: string) => {
+    return apiCall(`/locations/${locationId}/payment-qr`, {
+      method: 'DELETE'
+    });
   }
 };
 

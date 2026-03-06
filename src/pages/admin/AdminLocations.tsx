@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { adminAPI, authAPI, locationsAPI } from "@/lib/api";
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Building, MapPin, Plus, Search, Shield, UserPlus, X } from "lucide-react";
+import { Building, MapPin, Plus, QrCode, Search, Shield, Trash2, Upload, UserPlus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface Location {
@@ -69,6 +69,17 @@ const AdminLocations = () => {
   const mapInstance = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
   
+  // Payment QR state
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+  const [qrFormData, setQRFormData] = useState({
+    upiId: '',
+    upiName: '',
+    phoneNumber: '',
+    qrCodeImage: ''
+  });
+  const [uploadingQR, setUploadingQR] = useState(false);
+  
   const [locationForm, setLocationForm] = useState({
     apartmentName: "",
     building: "",
@@ -129,6 +140,103 @@ const AdminLocations = () => {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to delete admin';
       alert(message);
+    }
+  };
+
+  const handleOpenQRModal = async (location: Location) => {
+    setSelectedLocation(location);
+    setShowQRModal(true);
+    
+    // Fetch existing QR if available
+    try {
+      const response = await locationsAPI.getPaymentQR(location._id);
+      if (response.success && response.paymentQR && !response.paymentQR.isGlobal) {
+        setQRFormData({
+          upiId: response.paymentQR.upiId || '',
+          upiName: response.paymentQR.upiName || '',
+          phoneNumber: response.paymentQR.phoneNumber || '',
+          qrCodeImage: response.paymentQR.qrCodeImage || ''
+        });
+      } else {
+        // Reset form for new QR
+        setQRFormData({
+          upiId: '',
+          upiName: '',
+          phoneNumber: '',
+          qrCodeImage: ''
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching payment QR:', error);
+      setQRFormData({
+        upiId: '',
+        upiName: '',
+        phoneNumber: '',
+        qrCodeImage: ''
+      });
+    }
+  };
+
+  const handleQRImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      alert('File size must be less than 2MB');
+      return;
+    }
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload an image file');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setQRFormData(prev => ({ ...prev, qrCodeImage: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSavePaymentQR = async () => {
+    if (!selectedLocation) return;
+
+    if (!qrFormData.qrCodeImage) {
+      alert('Please upload a QR code image');
+      return;
+    }
+
+    try {
+      setUploadingQR(true);
+      await locationsAPI.updatePaymentQR(selectedLocation._id, qrFormData);
+      alert('✅ Payment QR updated successfully! Workers will see this QR when collecting payment at this location.');
+      setShowQRModal(false);
+      fetchData();
+    } catch (error) {
+      console.error('Error updating payment QR:', error);
+      alert('Failed to update payment QR');
+    } finally {
+      setUploadingQR(false);
+    }
+  };
+
+  const handleDeletePaymentQR = async () => {
+    if (!selectedLocation) return;
+    
+    if (!confirm('Remove custom payment QR? Workers will use the default payment method.')) {
+      return;
+    }
+
+    try {
+      await locationsAPI.deletePaymentQR(selectedLocation._id);
+      alert('Payment QR removed successfully');
+      setShowQRModal(false);
+      fetchData();
+    } catch (error) {
+      console.error('Error deleting payment QR:', error);
+      alert('Failed to delete payment QR');
     }
   };
 
@@ -482,11 +590,20 @@ const AdminLocations = () => {
                     </div>
 
                     {location.assignedAdmin && (
-                      <div className="text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg flex items-center gap-2">
+                      <div className="text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg flex items-center gap-2 mb-3">
                         <Shield className="w-3 h-3 shrink-0" />
                         <span className="truncate"><strong>Admin:</strong> {location.assignedAdmin.name}</span>
                       </div>
                     )}
+
+                    {/* Payment QR Button */}
+                    <button
+                      onClick={() => handleOpenQRModal(location)}
+                      className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-lg transition-colors text-sm font-medium"
+                    >
+                      <QrCode className="w-4 h-4" />
+                      Manage Payment QR
+                    </button>
                   </div>
                 ))}
               </div>
@@ -910,6 +1027,141 @@ const AdminLocations = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Payment QR Modal */}
+        {showQRModal && selectedLocation && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-card rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="sticky top-0 bg-gradient-to-r from-purple-500 to-pink-500 text-white p-6 rounded-t-2xl flex items-center gap-4">
+                <button
+                  onClick={() => setShowQRModal(false)}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                <div className="flex-1">
+                  <h2 className="text-xl font-bold">Payment QR Code</h2>
+                  <p className="text-sm opacity-90">{selectedLocation.apartmentName}</p>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {/* Info Box */}
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm">
+                  <p className="font-semibold text-blue-900 mb-2">💡 Location-Specific Payment QR</p>
+                  <p className="text-blue-800">
+                    Upload your custom payment QR code for this location. Workers assigned here will automatically show
+                    this QR to customers when collecting payment after completing work.
+                  </p>
+                </div>
+
+                {/* QR Image Upload */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    QR Code Image *
+                  </label>
+                  {qrFormData.qrCodeImage ? (
+                    <div className="relative">
+                      <img 
+                        src={qrFormData.qrCodeImage} 
+                        alt="Payment QR" 
+                        className="w-full max-w-sm mx-auto rounded-lg border-2 border-purple-300 shadow-lg"
+                      />
+                      <button
+                        onClick={() => setQRFormData(prev => ({ ...prev, qrCodeImage: '' }))}
+                        className="absolute top-2 right-2 bg-red-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-red-600"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-border rounded-xl cursor-pointer hover:bg-muted transition-colors bg-muted/30">
+                      <Upload className="w-12 h-12 text-muted-foreground mb-2" />
+                      <p className="text-sm text-foreground font-medium">Click to upload QR code</p>
+                      <p className="text-xs text-muted-foreground mt-1">PNG, JPG up to 2MB</p>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleQRImageUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div>
+
+                {/* UPI Details */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      UPI ID (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g., yourname@upi"
+                      className="input-clean"
+                      value={qrFormData.upiId}
+                      onChange={(e) => setQRFormData(prev => ({ ...prev, upiId: e.target.value }))}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Payee Name (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g., John Doe"
+                      className="input-clean"
+                      value={qrFormData.upiName}
+                      onChange={(e) => setQRFormData(prev => ({ ...prev, upiName: e.target.value }))}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Contact Phone (Optional)
+                    </label>
+                    <input
+                      type="tel"
+                      placeholder="e.g., +91 98765 43210"
+                      className="input-clean"
+                      value={qrFormData.phoneNumber}
+                      onChange={(e) => setQRFormData(prev => ({ ...prev, phoneNumber: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3">
+                  {qrFormData.qrCodeImage && (
+                    <button
+                      onClick={handleDeletePaymentQR}
+                      className="flex items-center gap-2 px-4 py-2 border-2 border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete QR
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowQRModal(false)}
+                    className="flex-1 btn-secondary py-2"
+                    disabled={uploadingQR}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSavePaymentQR}
+                    disabled={uploadingQR || !qrFormData.qrCodeImage}
+                    className="flex-1 btn-brand py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {uploadingQR ? 'Saving...' : 'Save QR Code'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
