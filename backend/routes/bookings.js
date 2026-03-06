@@ -1014,34 +1014,22 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
     // Validate timing constraints
     const now = new Date();
     
-    // Combine bookingDate and startTime to get current scheduled datetime
+    // Combine bookingDate and startTime to get current scheduled datetime for comparison
     const currentBookingDate = new Date(booking.bookingDate);
     const [startHour, startMinute] = booking.startTime.split(':').map(Number);
     currentBookingDate.setHours(startHour, startMinute, 0, 0);
-    
-    // Check 1: Must reschedule at least 1 hour before the CURRENT scheduled time
-    const hoursUntilBooking = (currentBookingDate - now) / (1000 * 60 * 60);
-
-    if (hoursUntilBooking < 1) {
-      return res.status(400).json({ 
-        error: { 
-          message: 'You must reschedule at least 1 hour before the current scheduled time', 
-          status: 400 
-        } 
-      });
-    }
 
     // Parse new schedule
     const newScheduledDate = new Date(`${newDate}T${newTime}`);
     
-    // Check 2: New date/time cannot be in the past
-    if (newScheduledDate < now) {
+    // Check 1: New date/time cannot be in the past
+    if (newScheduledDate <= now) {
       return res.status(400).json({ 
         error: { message: 'Cannot reschedule to past date/time', status: 400 } 
       });
     }
 
-    // Check 3: New date/time must be at least 1 hour from now (worker prep/travel time)
+    // Check 2: New date/time must be at least 1 hour from now (worker prep/travel time)
     const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
     if (newScheduledDate < oneHourFromNow) {
       return res.status(400).json({ 
@@ -1052,7 +1040,7 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
       });
     }
 
-    // Check 4: Must change either date or time
+    // Check 3: Must change either date or time
     const oldDateStr = booking.bookingDate.toISOString().split('T')[0];
     if (newDate === oldDateStr && newTime === booking.startTime) {
       return res.status(400).json({ 

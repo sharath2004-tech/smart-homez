@@ -36,19 +36,10 @@ const RescheduleModal = ({
     // Create date objects for comparison
     const now = new Date();
     const selectedDateTime = new Date(`${newDate}T${newTime}`);
-    const currentDateTime = new Date(`${currentDate}T${currentTime}`);
 
     // Check if the new date/time is in the past
-    if (selectedDateTime < now) {
+    if (selectedDateTime <= now) {
       setError("Cannot reschedule to a past date/time");
-      return false;
-    }
-
-    // Check if rescheduling is being done at least 1 hour before the CURRENT scheduled time
-    const oneHourBeforeBooking = new Date(currentDateTime.getTime() - 60 * 60 * 1000);
-    
-    if (now > oneHourBeforeBooking) {
-      setError("You must reschedule at least 1 hour before the current scheduled time");
       return false;
     }
 
@@ -104,7 +95,7 @@ const RescheduleModal = ({
             Reschedule Booking
           </DialogTitle>
           <DialogDescription>
-            Choose a new date and time for your booking. You can reschedule anytime before the booking, but the new time must be at least 1 hour from now to allow worker preparation.
+            Choose a new date and time for your booking. The new time must be at least 1 hour from now to allow worker preparation and travel time.
           </DialogDescription>
         </DialogHeader>
 
@@ -160,11 +151,12 @@ const RescheduleModal = ({
 
           {/* Helper Info */}
           <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 p-3 rounded-lg space-y-2">
-            <p className="text-xs font-medium text-blue-900 dark:text-blue-300">Quick Tips:</p>
+            <p className="text-xs font-medium text-blue-900 dark:text-blue-300">📋 Requirements:</p>
             <ul className="text-xs text-blue-800 dark:text-blue-400 space-y-1">
-              <li>• Must be at least 1 hour from now</li>
-              <li>• Either date or time must be different</li>
-              <li>• Worker will be auto-reassigned if not available</li>
+              <li>✓ Reschedule anytime before your booking starts</li>
+              <li>✓ New time must be at least 1 hour from now</li>
+              <li>✓ Must change either date or time (or both)</li>
+              <li>✓ Worker auto-reassigned if unavailable at new time</li>
             </ul>
           </div>
 
