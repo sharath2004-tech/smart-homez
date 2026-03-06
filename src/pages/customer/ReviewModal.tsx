@@ -1,33 +1,59 @@
-import { bookingsAPI } from "@/lib/api";
+import { bookingsAPI, reviewsAPI } from "@/lib/api";
 import { ArrowLeft, Star } from "lucide-react";
 import { useState } from "react";
 
 interface ReviewModalProps {
   bookingId: string;
+  workerId: string;
   workerName: string;
   onClose: () => void;
   onReviewSubmitted: () => void;
 }
 
-const ReviewModal = ({ bookingId, workerName, onClose, onReviewSubmitted }: ReviewModalProps) => {
-  const [rating, setRating] = useState(0);
+const ReviewModal = ({ bookingId, workerId, workerName, onClose, onReviewSubmitted }: ReviewModalProps) => {
+  const [overallRating, setOverallRating] = useState(0);
+  const [qualityRating, setQualityRating] = useState(0);
+  const [timelinessRating, setTimelinessRating] = useState(0);
+  const [professionalismRating, setProfessionalismRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
-  const [review, setReview] = useState("");
+  const [comment, setComment] = useState("");
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmitReview = async () => {
-    if (rating === 0) {
-      alert('Please select a rating');
+    if (overallRating === 0) {
+      alert('Please select an overall rating');
+      return;
+    }
+    if (qualityRating === 0 || timelinessRating === 0 || professionalismRating === 0) {
+      alert('Please rate all categories: Quality, Timeliness, and Professionalism');
       return;
     }
 
     try {
       setSubmitting(true);
-      await bookingsAPI.update(bookingId, {
-        rating,
-        review: review.trim()
+      
+      // Create review using the proper API that updates worker stats
+      await reviewsAPI.createReview({
+        booking: bookingId,
+        worker: workerId,
+        overallRating,
+        categoryRatings: {
+          quality: qualityRating,
+          timeliness: timelinessRating,
+          professionalism: professionalismRating
+        },
+        comment: comment.trim() || undefined,
+        isAnonymous
       });
-      alert('Thank you for your review!');
+      
+      // Also update the booking record for quick reference
+      await bookingsAPI.update(bookingId, {
+        rating: overallRating,
+        review: comment.trim() || undefined
+      });
+      
+      alert('✅ Thank you for your review! Your feedback helps improve our service.');
       onReviewSubmitted();
     } catch (error) {
       console.error('Error submitting review:', error);
@@ -68,20 +94,21 @@ const ReviewModal = ({ bookingId, workerName, onClose, onReviewSubmitted }: Revi
               <p className="text-xl font-bold text-foreground">{workerName}?</p>
             </div>
 
-            {/* Star Rating */}
-            <div className="flex flex-col items-center gap-4 py-6">
+            {/* Overall Rating */}
+            <div className="flex flex-col items-center gap-4 py-4">
+              <p className="text-sm font-medium text-muted-foreground">Overall Rating</p>
               <div className="flex gap-2">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
                     key={star}
-                    onClick={() => setRating(star)}
+                    onClick={() => setOverallRating(star)}
                     onMouseEnter={() => setHoveredRating(star)}
                     onMouseLeave={() => setHoveredRating(0)}
                     className="transition-transform hover:scale-110 focus:outline-none"
                   >
                     <Star
                       className={`w-12 h-12 ${
-                        star <= (hoveredRating || rating)
+                        star <= (hoveredRating || overallRating)
                           ? 'fill-yellow-400 text-yellow-400'
                           : 'text-gray-300'
                       }`}
@@ -89,18 +116,89 @@ const ReviewModal = ({ bookingId, workerName, onClose, onReviewSubmitted }: Revi
                   </button>
                 ))}
               </div>
-              {rating > 0 && (
+              {overallRating > 0 && (
                 <p className="text-sm font-medium text-foreground">
-                  {rating === 1 && "Poor"}
-                  {rating === 2 && "Fair"}
-                  {rating === 3 && "Good"}
-                  {rating === 4 && "Very Good"}
-                  {rating === 5 && "Excellent"}
+                  {overallRating === 1 && "Poor"}
+                  {overallRating === 2 && "Fair"}
+                  {overallRating === 3 && "Good"}
+                  {overallRating === 4 && "Very Good"}
+                  {overallRating === 5 && "Excellent"}
                 </p>
               )}
             </div>
 
-            {/* Review Text */}
+            {/* Category Ratings */}
+            <div className="space-y-4 bg-muted/50 p-4 rounded-xl">
+              <h3 className="text-sm font-semibold text-foreground">Rate by Category</h3>
+              
+              {/* Quality */}
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Quality of Work</label>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      onClick={() => setQualityRating(star)}
+                      className="transition-transform hover:scale-110 focus:outline-none"
+                    >
+                      <Star
+                        className={`w-6 h-6 ${
+                          star <= qualityRating
+                            ? 'fill-yellow-400 text-yellow-400'
+                            : 'text-gray-300'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Timeliness */}
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Timeliness</label>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      onClick={() => setTimelinessRating(star)}
+                      className="transition-transform hover:scale-110 focus:outline-none"
+                    >
+                      <Star
+                        className={`w-6 h-6 ${
+                          star <= timelinessRating
+                            ? 'fill-yellow-400 text-yellow-400'
+                            : 'text-gray-300'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Professionalism */}
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Professionalism</label>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      onClick={() => setProfessionalismRating(star)}
+                      className="transition-transform hover:scale-110 focus:outline-none"
+                    >
+                      <Star
+                        className={`w-6 h-6 ${
+                          star <= professionalismRating
+                            ? 'fill-yellow-400 text-yellow-400'
+                            : 'text-gray-300'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Comment */}
             <div>
               <label className="block mb-2">
                 <span className="text-sm font-medium text-foreground">
@@ -108,23 +206,37 @@ const ReviewModal = ({ bookingId, workerName, onClose, onReviewSubmitted }: Revi
                 </span>
               </label>
               <textarea
-                value={review}
-                onChange={(e) => setReview(e.target.value)}
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
                 placeholder="Tell us about your experience..."
                 rows={4}
                 maxLength={500}
                 className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary resize-none"
               />
               <p className="text-xs text-muted-foreground mt-1 text-right">
-                {review.length}/500 characters
+                {comment.length}/500 characters
               </p>
+            </div>
+
+            {/* Anonymous Option */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="anonymous"
+                checked={isAnonymous}
+                onChange={(e) => setIsAnonymous(e.target.checked)}
+                className="w-4 h-4 text-primary border-border rounded focus:ring-2 focus:ring-primary"
+              />
+              <label htmlFor="anonymous" className="text-sm text-muted-foreground">
+                Submit anonymously
+              </label>
             </div>
 
             {/* Action Buttons */}
             <div className="flex flex-col gap-3">
               <button
                 onClick={handleSubmitReview}
-                disabled={submitting || rating === 0}
+                disabled={submitting || overallRating === 0 || qualityRating === 0 || timelinessRating === 0 || professionalismRating === 0}
                 className="w-full btn-brand py-3 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? (

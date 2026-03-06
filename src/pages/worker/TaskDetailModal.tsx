@@ -205,25 +205,8 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
     try {
       setUploadingPhoto(true);
       
-      // Create FormData for multipart upload
-      const formData = new FormData();
-      formData.append('completionPhoto', file);
-
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/bookings/${taskId}/upload-completion-photo`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Failed to upload photo');
-      }
-
-      const result = await response.json();
+      // Use the API utility method
+      const result = await bookingsAPI.uploadCompletionPhoto(taskId, file);
       
       // Update task with completion photo
       setTask({ ...task!, completionPhoto: result.completionPhoto });
@@ -575,7 +558,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                   <div className="space-y-3">
                     <div className="relative rounded-lg overflow-hidden border-2 border-green-500">
                       <img 
-                        src={`http://localhost:5000${task.completionPhoto.url}`}
+                        src={bookingsAPI.getCompletionPhotoUrl(task.completionPhoto.url)}
                         alt="Completion photo" 
                         className="w-full h-auto max-h-64 object-contain bg-black mx-auto"
                       />

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { bookingsAPI } from "@/lib/api";
 import { AlertCircle, CheckCircle, DollarSign, QrCode, Timer } from "lucide-react";
 import { useState } from "react";
 import EmbeddedQRScanner from "./EmbeddedQRScanner";
@@ -63,23 +64,7 @@ const ServiceEndModal = ({
     setError("");
 
     try {
-      const token = localStorage.getItem('token');
-      
-      const response = await fetch(`http://localhost:5000/api/bookings/${bookingId}/scan-end-qr`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ qrCode })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Failed to end service');
-      }
-
-      const result = await response.json();
+      const result = await bookingsAPI.scanEndQR(bookingId, qrCode);
       
       setCompletionData(result.booking);
       setSuccess(true);

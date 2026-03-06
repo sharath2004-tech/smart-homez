@@ -253,6 +253,35 @@ export const bookingsAPI = {
       method: 'POST',
       body: JSON.stringify({ qrCode })
     });
+  },
+
+  uploadCompletionPhoto: async (id: string, file: File) => {
+    const token = getAuthToken();
+    const formData = new FormData();
+    formData.append('completionPhoto', file);
+
+    const response = await fetch(`${API_BASE_URL}/bookings/${id}/upload-completion-photo`, {
+      method: 'POST',
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` })
+      },
+      body: formData
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error?.message || 'Failed to upload photo');
+    }
+
+    return data;
+  },
+
+  getCompletionPhotoUrl: (photoPath: string) => {
+    if (!photoPath) return '';
+    // Remove /api/ from API_BASE_URL if present and remove /uploads prefix from photoPath if it starts with it
+    const baseUrl = API_BASE_URL.replace('/api', '');
+    return `${baseUrl}${photoPath}`;
   }
 };
 
@@ -814,6 +843,34 @@ export const leavesAPI = {
   }
 };
 
+// ====== Reviews APIs ======
+
+export const reviewsAPI = {
+  // Submit a review for a completed booking
+  createReview: async (reviewData: {
+    booking: string;
+    worker: string;
+    overallRating: number;
+    categoryRatings: {
+      quality: number;
+      timeliness: number;
+      professionalism: number;
+    };
+    comment?: string;
+    isAnonymous?: boolean;
+  }) => {
+    return apiCall('/reviews', {
+      method: 'POST',
+      body: JSON.stringify(reviewData)
+    });
+  },
+
+  // Get reviews for a specific worker
+  getWorkerReviews: async (workerId: string) => {
+    return apiCall(`/reviews/worker/${workerId}`);
+  }
+};
+
 // Export all
 export default {
   auth: authAPI,
@@ -826,5 +883,6 @@ export default {
   admin: adminAPI,
   settings: settingsAPI,
   preferences: preferencesAPI,
-  leaves: leavesAPI
+  leaves: leavesAPI,
+  reviews: reviewsAPI
 };

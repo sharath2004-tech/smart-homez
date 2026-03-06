@@ -491,7 +491,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                 <div className="bg-muted p-4 rounded-xl space-y-3">
                   <div className="relative rounded-lg overflow-hidden border-2 border-green-500">
                     <img 
-                      src={`http://localhost:5000${booking.completionPhoto.url}`}
+                      src={bookingsAPI.getCompletionPhotoUrl(booking.completionPhoto.url)}
                       alt="Service completion verification" 
                       className="w-full h-auto max-h-96 object-contain bg-black"
                       onError={(e) => {
@@ -598,6 +598,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
       {showReviewModal && booking.worker && (
         <ReviewModal
           bookingId={bookingId}
+          workerId={typeof booking.worker === 'string' ? booking.worker : booking.worker._id}
           workerName={booking.worker.name}
           onClose={() => setShowReviewModal(false)}
           onReviewSubmitted={() => {
