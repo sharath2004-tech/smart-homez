@@ -1170,20 +1170,20 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
 
     await booking.save();
 
+    // Format dates for display (used in notifications and response)
+    const formatDate = (date) => new Date(date).toLocaleDateString('en-IN', { 
+      day: '2-digit', 
+      month: 'short', 
+      year: 'numeric' 
+    });
+    const formatTime = (date) => new Date(date).toLocaleTimeString('en-IN', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+
     // Send notifications (wrapped in try-catch to prevent notification failures from breaking reschedule)
     try {
       const notificationService = require('../utils/notificationService');
-      
-      // Format dates for display
-      const formatDate = (date) => new Date(date).toLocaleDateString('en-IN', { 
-        day: '2-digit', 
-        month: 'short', 
-        year: 'numeric' 
-      });
-      const formatTime = (date) => new Date(date).toLocaleTimeString('en-IN', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      });
 
       // Notify customer about reschedule
       await notificationService.sendTemplatedNotification(
