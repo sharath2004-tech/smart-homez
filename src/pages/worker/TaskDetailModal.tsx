@@ -221,8 +221,27 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
     try {
       setUploadingPhoto(true);
       
+      console.log('📸 Starting photo upload:', {
+        taskId,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        taskStatus: task?.status
+      });
+      
+      // Validate file
+      if (!file || file.size === 0) {
+        throw new Error('Invalid file selected');
+      }
+      
+      if (file.size > 5 * 1024 * 1024) {
+        throw new Error('File size must be less than 5MB');
+      }
+      
       // Use the API utility method
       const result = await bookingsAPI.uploadCompletionPhoto(taskId, file);
+      
+      console.log('✅ Photo upload successful:', result);
       
       // Update task with completion photo
       setTask({ ...task!, completionPhoto: result.completionPhoto });
@@ -236,8 +255,9 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       // Refresh task data
       await fetchTaskDetail(true);
     } catch (error) {
-      console.error('Error uploading completion photo:', error);
-      alert((error as Error).message || 'Failed to upload completion photo');
+      console.error('❌ Error uploading completion photo:', error);
+      const errorMessage = (error as Error).message || 'Failed to upload completion photo';
+      alert(`Upload failed: ${errorMessage}`);
     } finally {
       setUploadingPhoto(false);
     }

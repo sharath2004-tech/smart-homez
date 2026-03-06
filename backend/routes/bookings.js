@@ -24,6 +24,30 @@ import {
 
 const router = express.Router();
 
+// Multer error handler middleware
+const handleMulterError = (err, req, res, next) => {
+  if (err) {
+    console.error('❌ Multer error:', err);
+    
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ 
+        error: { message: 'File size too large. Maximum 5MB allowed.', status: 400 } 
+      });
+    }
+    
+    if (err.message && err.message.includes('Only image files')) {
+      return res.status(400).json({ 
+        error: { message: err.message, status: 400 } 
+      });
+    }
+    
+    return res.status(400).json({ 
+      error: { message: err.message || 'File upload error', status: 400 } 
+    });
+  }
+  next();
+};
+
 // @route   GET /api/bookings
 // @desc    Get bookings (filtered by user role and location)
 // @access  Private
@@ -1644,19 +1668,42 @@ router.post('/:id/generate-end-qr',
 router.post('/:id/upload-completion-photo',
   authenticate,
   authorize('worker', 'admin'),
-  upload.single('completionPhoto'),
+  (req, res, next) => {
+    upload.single('completionPhoto')(req, res, (err) => {
+      if (err) {
+        return handleMulterError(err, req, res, next);
+      }
+      next();
+    });
+  },
   async (req, res) => {
     try {
+      console.log('📸 Completion photo upload request:', {
+        bookingId: req.params.id,
+        userId: req.user._id,
+        userRole: req.user.role,
+        hasFile: !!req.file,
+        fileName: req.file?.filename
+      });
+      
       const booking = await Booking.findById(req.params.id);
       
       if (!booking) {
+        console.error('❌ Booking not found:', req.params.id);
         return res.status(404).json({ 
           error: { message: 'Booking not found', status: 404 } 
         });
       }
 
+      console.log('📋 Booking details:', {
+        status: booking.status,
+        workerId: booking.worker,
+        requestUserId: req.user._id
+      });
+
       // Verify worker is assigned to this booking
       if (booking.worker.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+        console.error('❌ Worker not assigned to booking');
         return res.status(403).json({ 
           error: { message: 'You are not assigned to this booking', status: 403 } 
         });
@@ -1664,13 +1711,15 @@ router.post('/:id/upload-completion-photo',
 
       // Check if service is in progress or completed
       if (booking.status !== 'in-progress' && booking.status !== 'completed') {
+        console.error('❌ Invalid booking status:', booking.status);
         return res.status(400).json({ 
-          error: { message: 'Service must be in progress or completed to upload completion photo', status: 400 } 
+          error: { message: `Service must be in progress or completed to upload completion photo. Current status: ${booking.status}`, status: 400 } 
         });
       }
 
       // Validate file was uploaded
       if (!req.file) {
+        console.error('❌ No file uploaded');
         return res.status(400).json({ 
           error: { message: 'Completion photo is required', status: 400 } 
         });
@@ -1697,8 +1746,24 @@ router.post('/:id/upload-completion-photo',
       });
 
     } catch (error) {
-      console.error('Upload completion photo error:', error);
-      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+      console.error('❌ Upload completion photo error:', error);
+      
+      // Handle multer errors
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ 
+          error: { message: 'File size too large. Maximum 5MB allowed.', status: 400 } 
+        });
+      }
+      
+      if (error.message && error.message.includes('Only image files')) {
+        return res.status(400).json({ 
+          error: { message: error.message, status: 400 } 
+        });
+      }
+      
+      res.status(500).json({ 
+        error: { message: error.message || 'Server error', status: 500 } 
+      });
     }
   }
 );
@@ -1709,7 +1774,14 @@ router.post('/:id/upload-completion-photo',
 router.post('/:id/upload-payment-proof',
   authenticate,
   authorize('worker', 'admin'),
-  upload.single('paymentProof'),
+  (req, res, next) => {
+    upload.single('paymentProof')(req, res, (err) => {
+      if (err) {
+        return handleMulterError(err, req, res, next);
+      }
+      next();
+    });
+  },
   async (req, res) => {
     try {
       const booking = await Booking.findById(req.params.id);
