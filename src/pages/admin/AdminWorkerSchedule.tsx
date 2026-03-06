@@ -93,6 +93,8 @@ const AdminWorkerSchedule = () => {
       ]);
       
       setProfile(profileData.user || profileData);
+      console.log('📊 Worker schedules loaded:', scheduleData.workerSchedules?.length || 0, 'workers');
+      console.log('📊 Summary:', scheduleData.summary);
       setWorkerSchedules(scheduleData.workerSchedules || []);
       setSummary(scheduleData.summary || {});
     } catch (error) {

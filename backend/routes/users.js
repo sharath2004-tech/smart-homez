@@ -299,9 +299,9 @@ router.get('/workers/available', authenticate, async (req, res) => {
       isActive: true
     };
 
-    // Specialization is an array, so use $in for matching
+    // Specialization is an array field, check if it contains the value
     if (specialization) {
-      query['workerProfile.specialization'] = { $in: [specialization] };
+      query['workerProfile.specialization'] = specialization;
     }
     if (minRating) {
       query['workerProfile.rating'] = { $gte: parseFloat(minRating) };
