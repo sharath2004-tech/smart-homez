@@ -2,8 +2,8 @@ import { LanguageSelector } from "@/components/LanguageSelector";
 import { publicAPI } from "@/lib/api";
 import { ArrowRight, CheckCircle, ChevronRight, Clock, Home, MapPin, Shield, Sparkles, Star } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 const LandingPage = () => {
   const { t } = useTranslation();
