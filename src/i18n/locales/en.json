@@ -194,5 +194,83 @@
     "fri": "Fri",
     "sat": "Sat",
     "sun": "Sun"
+  },
+  "landing": {
+    "nav": {
+      "services": "Services",
+      "howItWorks": "How it works",
+      "reviews": "Reviews",
+      "login": "Login",
+      "getStarted": "Get Started"
+    },
+    "hero": {
+      "badge": "On-demand home services in 15 mins",
+      "title": "Your home,\nprofessionally clean.",
+      "subtitle": "Book trusted maids and home cleaning professionals. Transparent pricing, verified workers, real-time tracking.",
+      "bookService": "Book a Service",
+      "becomeWorker": "Become a Worker",
+      "verifiedWorkers": "Verified workers",
+      "safeSure": "100% safe & secure",
+      "realTimeTracking": "Real-time tracking"
+    },
+    "stats": {
+      "happyCustomers": "Happy Customers",
+      "activeWorkers": "Active Workers",
+      "fulfillmentRate": "Fulfillment Rate"
+    },
+    "services": {
+      "title": "Our Services",
+      "subtitle": "From quick cleaning to deep home maintenance, we've got everything covered.",
+      "instaMaid": "Insta Maid Service",
+      "instaMaidDesc": "On-demand, available in 15 min",
+      "deepCleaning": "Deep Cleaning",
+      "deepCleaningDesc": "Full-home professional cleaning",
+      "kitchenCleaning": "Kitchen Cleaning",
+      "kitchenCleaningDesc": "Thorough kitchen sanitization",
+      "bathroomCleaning": "Bathroom Cleaning",
+      "bathroomCleaningDesc": "Deep clean & disinfection",
+      "windowCleaning": "Window Cleaning",
+      "windowCleaningDesc": "Streak-free window cleaning",
+      "sofaCleaning": "Sofa Cleaning",
+      "sofaCleaningDesc": "Professional upholstery care",
+      "popular": "Popular",
+      "bestValue": "Best Value",
+      "bookNow": "Book now"
+    },
+    "howItWorks": {
+      "title": "How It Works",
+      "subtitle": "Getting help for your home is as easy as 1-2-3.",
+      "step1Title": "Choose your service",
+      "step1Desc": "Browse from our range of home cleaning and maintenance services. Select type, time, and preferences.",
+      "step2Title": "Get matched",
+      "step2Desc": "Our smart system assigns the nearest available verified worker based on your preferences.",
+      "step3Title": "Track & review",
+      "step3Desc": "Track your worker in real-time, verify with QR code, and pay after the service is done."
+    },
+    "testimonials": {
+      "title": "What Customers Say",
+      "subtitle": "Thousands of happy homes trust Healthy Homez.",
+      "review1": "Amazing service! The maid arrived on time and cleaned everything spotlessly.",
+      "review2": "I've been using monthly subscription for 6 months now. Absolutely worth it!",
+      "review3": "Very professional workers and transparent pricing. Highly recommended.",
+      "name1": "Priya Sharma",
+      "name2": "Rahul Gupta",
+      "name3": "Anita Mehta",
+      "city1": "Mumbai",
+      "city2": "Delhi",
+      "city3": "Bengaluru"
+    },
+    "cta": {
+      "title": "Ready for a cleaner home?",
+      "subtitle": "Join {{count}} of customers who trust Healthy Homez every day.",
+      "subtitleFallback": "Join thousands of customers who trust Healthy Homez every day.",
+      "button": "Get Started for Free"
+    },
+    "footer": {
+      "copyright": "© 2026 Healthy Homez. All rights reserved.",
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "support": "Support"
+    }
   }
 }
