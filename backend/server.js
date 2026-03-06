@@ -44,8 +44,28 @@ const PORT = process.env.PORT || 5000;
 
 // CORS Configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',')
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
   : ['http://localhost:5173', 'http://localhost:8080', 'http://localhost:8081', 'http://localhost:8082'];
+
+console.log('🔒 CORS Allowed Origins:', allowedOrigins);
+
+// Helper function to check if origin matches (supports wildcards)
+function isOriginAllowed(origin) {
+  // Check exact matches
+  if (allowedOrigins.includes(origin)) return true;
+  
+  // Check wildcard patterns (e.g., https://smart-homez-*.vercel.app)
+  return allowedOrigins.some(allowedOrigin => {
+    if (allowedOrigin.includes('*')) {
+      const pattern = allowedOrigin
+        .replace(/\./g, '\\.')
+        .replace(/\*/g, '.*');
+      const regex = new RegExp(`^${pattern}$`);
+      return regex.test(origin);
+    }
+    return false;
+  });
+}
 
 // Middleware
 app.use(cors({
@@ -53,7 +73,7 @@ app.use(cors({
     // Allow requests with no origin (mobile apps, curl, etc.)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    if (isOriginAllowed(origin)) {
       callback(null, true);
     } else {
       console.warn(`⚠️  CORS blocked request from origin: ${origin}`);

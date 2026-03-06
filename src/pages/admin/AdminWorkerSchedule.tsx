@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { authAPI } from "@/lib/api";
-import { Calendar, Clock, Download, Filter, MapPin, RefreshCw, TrendingDown, TrendingUp, User, Users } from "lucide-react";
+import { Calendar, Clock, Download, Filter, LayoutGrid, MapPin, RefreshCw, Table2, TrendingDown, TrendingUp, User, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -64,6 +64,7 @@ const AdminWorkerSchedule = () => {
   const [dateRange, setDateRange] = useState<string>('default'); // default, custom
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table'); // Default to table view
   const [summary, setSummary] = useState<{
     totalWorkers: number;
     totalBookings: number;
@@ -242,6 +243,30 @@ const AdminWorkerSchedule = () => {
               <p className="text-muted-foreground mt-1">View past, present, and future worker assignments with subscription tracking</p>
             </div>
             <div className="flex gap-2">
+              <div className="btn-group flex border border-border rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`px-4 py-2 flex items-center gap-2 transition-colors ${
+                    viewMode === 'table' 
+                      ? 'bg-primary text-white' 
+                      : 'bg-background text-foreground hover:bg-muted'
+                  }`}
+                >
+                  <Table2 className="w-4 h-4" />
+                  Table
+                </button>
+                <button
+                  onClick={() => setViewMode('cards')}
+                  className={`px-4 py-2 flex items-center gap-2 transition-colors border-l border-border ${
+                    viewMode === 'cards' 
+                      ? 'bg-primary text-white' 
+                      : 'bg-background text-foreground hover:bg-muted'
+                  }`}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                  Cards
+                </button>
+              </div>
               <button
                 onClick={handleExport}
                 disabled={exporting}
@@ -427,7 +452,7 @@ const AdminWorkerSchedule = () => {
           </div>
         )}
 
-        {/* Worker Schedule Cards */}
+        {/* Worker Schedule - Table or Card View */}
         {filteredSchedules.length === 0 ? (
           <div className="card-elevated p-12 text-center">
             <Calendar className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
@@ -436,7 +461,146 @@ const AdminWorkerSchedule = () => {
               No bookings found for the selected filters.
             </p>
           </div>
+        ) : viewMode === 'table' ? (
+          /* Table View - Excel-like format */
+          <div className="card-elevated overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-muted/50 border-b-2 border-border">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground uppercase tracking-wider sticky left-0 bg-muted/50 z-10">Worker</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground uppercase tracking-wider">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground uppercase tracking-wider">Time Slot</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground uppercase tracking-wider">Service</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground uppercase tracking-wider">Customer</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground uppercase tracking-wider">Location</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground uppercase tracking-wider">Type</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-foreground uppercase tracking-wider">Period</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredSchedules.map((schedule) => (
+                    schedule.bookings.map((booking, idx) => (
+                      <tr 
+                        key={booking._id} 
+                        className={`hover:bg-muted/30 transition-colors ${
+                          idx === 0 ? 'border-t-2 border-primary/20' : ''
+                        }`}
+                      >
+                        <td className="px-4 py-3 sticky left-0 bg-background z-10">
+                          {idx === 0 && (
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                                {schedule.worker.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="font-semibold text-foreground text-sm">{schedule.worker.name}</p>
+                                <p className="text-xs text-muted-foreground capitalize">{schedule.worker.specialization}</p>
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-foreground">
+                              {new Date(booking.bookingDate).toLocaleDateString('en-US', { 
+                                month: 'short', 
+                                day: 'numeric',
+                                year: 'numeric'
+                              })}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(booking.bookingDate).toLocaleDateString('en-US', { weekday: 'short' })}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1 text-sm text-foreground">
+                            <Clock className="w-3 h-3 text-muted-foreground" />
+                            <span className="font-mono">{booking.startTime}</span>
+                            <span className="text-muted-foreground">-</span>
+                            <span className="font-mono">{booking.endTime}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-foreground">{booking.service.name}</span>
+                            <span className="text-xs text-muted-foreground capitalize">{booking.service.category}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col">
+                            <span className="text-sm text-foreground">{booking.customer.name}</span>
+                            <span className="text-xs text-muted-foreground">{booking.customer.phone}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col max-w-[200px]">
+                            <span className="text-sm text-foreground truncate">{booking.location.apartmentName}</span>
+                            <span className="text-xs text-muted-foreground truncate">{booking.location.area}, {booking.location.city}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {booking.isSubscription ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                              📋 {booking.subscriptionFrequency}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                              One-Time
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                            booking.status === 'completed' 
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                              : booking.status === 'confirmed' 
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                              : booking.status === 'in-progress'
+                              ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+                              : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
+                          }`}>
+                            {booking.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {getPeriodBadge(booking.bookingDate)}
+                        </td>
+                      </tr>
+                    ))
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Table Summary Footer */}
+            <div className="bg-muted/30 px-4 py-3 border-t border-border">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  Showing {filteredSchedules.reduce((sum, s) => sum + s.bookings.length, 0)} bookings 
+                  across {filteredSchedules.length} workers
+                </span>
+                <div className="flex items-center gap-4 text-xs">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-gray-500"></div>
+                    <span className="text-muted-foreground">Past: {summary?.pastBookings || 0}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                    <span className="text-muted-foreground">Today: {summary?.todayBookings || 0}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                    <span className="text-muted-foreground">Future: {summary?.futureBookings || 0}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         ) : (
+          /* Card View - Original format */
           <div className="space-y-6">
             {filteredSchedules.map((schedule) => (
               <div key={schedule.worker._id} className="card-elevated p-6">
