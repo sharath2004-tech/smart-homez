@@ -1,3 +1,4 @@
+import { LanguageSelector } from "@/components/LanguageSelector";
 import { publicAPI } from "@/lib/api";
 import { ArrowRight, CheckCircle, ChevronRight, Clock, Home, MapPin, Shield, Sparkles, Star } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -69,6 +70,7 @@ const LandingPage = () => {
             <a href="#reviews" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Reviews</a>
           </div>
           <div className="flex items-center gap-3">
+            <LanguageSelector />
             <Link to="/login" className="text-sm font-semibold text-foreground hover:text-primary transition-colors px-4 py-2">
               Login
             </Link>

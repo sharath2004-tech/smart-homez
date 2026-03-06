@@ -1,3 +1,4 @@
+import { LanguageSelector } from "@/components/LanguageSelector";
 import { authAPI, publicAPI } from "@/lib/api";
 import { Eye, EyeOff, Home, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -111,7 +112,12 @@ const LoginPage = () => {
       </div>
 
       {/* Right Panel */}
-      <div className="flex-1 flex items-center justify-center p-6 bg-background">
+      <div className="flex-1 flex items-center justify-center p-6 bg-background relative">
+        {/* Language Selector - Top Right */}
+        <div className="absolute top-6 right-6">
+          <LanguageSelector />
+        </div>
+        
         <div className="w-full max-w-md animate-fade-in">
           {/* Mobile Logo */}
           <div className="lg:hidden flex items-center gap-2 mb-8">

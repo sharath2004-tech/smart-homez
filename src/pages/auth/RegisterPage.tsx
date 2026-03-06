@@ -1,3 +1,4 @@
+import { LanguageSelector } from "@/components/LanguageSelector";
 import LocationSelector, { LocationData } from "@/components/LocationSelector";
 import { authAPI } from "@/lib/api";
 import { Check, Eye, EyeOff, Home, Loader2, MapPin } from "lucide-react";
@@ -182,7 +183,12 @@ const RegisterPage = () => {
       </div>
 
       {/* Right Panel */}
-      <div className="flex-1 flex items-center justify-center p-6 bg-background overflow-y-auto">
+      <div className="flex-1 flex items-center justify-center p-6 bg-background overflow-y-auto relative">
+        {/* Language Selector - Top Right */}
+        <div className="absolute top-6 right-6 z-10">
+          <LanguageSelector />
+        </div>
+        
         <div className="w-full max-w-md animate-fade-in py-8">
           <div className="lg:hidden flex items-center gap-2 mb-6">
             <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center">
@@ -191,9 +197,7 @@ const RegisterPage = () => {
             <span className="text-lg font-bold font-heading text-foreground">Healthy Homez</span>
           </div>
 
-          <h2 className="text-2xl font-bold font-heading text-foreground mb-1">
-            {step === 1 ? "Create your account" : "Complete your profile"}
-          </h2>
+          <h2 className="text-2xl font-bold font-heading text-foreground mb-1">{step === 1 ? "Create your account" : "Complete your profile"}</h2>
           <p className="text-muted-foreground mb-6">
             {step === 1 ? "Join Healthy Homez today" : "Tell us a bit more about yourself"}
           </p>
