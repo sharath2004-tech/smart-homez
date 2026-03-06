@@ -1669,13 +1669,6 @@ router.post('/:id/upload-completion-photo',
         });
       }
 
-      // Check if photo already uploaded
-      if (booking.completionPhoto && booking.completionPhoto.url) {
-        return res.status(400).json({ 
-          error: { message: 'Completion photo already uploaded', status: 400 } 
-        });
-      }
-
       // Validate file was uploaded
       if (!req.file) {
         return res.status(400).json({ 
@@ -1685,6 +1678,8 @@ router.post('/:id/upload-completion-photo',
 
       // Save completion photo
       const photoUrl = `/uploads/completion-photos/${req.file.filename}`;
+      const isReupload = booking.completionPhoto && booking.completionPhoto.url;
+      
       booking.completionPhoto = {
         url: photoUrl,
         timestamp: new Date(),
@@ -1694,7 +1689,7 @@ router.post('/:id/upload-completion-photo',
 
       await booking.save();
 
-      console.log('✅ Worker uploaded completion photo:', photoUrl);
+      console.log(`✅ Worker ${isReupload ? 're-uploaded' : 'uploaded'} completion photo:`, photoUrl);
 
       res.json({ 
         message: 'Completion photo uploaded successfully',

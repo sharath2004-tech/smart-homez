@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
-import PaymentModal from "./PaymentModal";
 interface Task {
   _id: string;
   service: {
@@ -67,7 +66,6 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   const [elapsedTime, setElapsedTime] = useState(0);
   const [overtimeMinutes, setOvertimeMinutes] = useState(0);
   const [isScanning, setIsScanning] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [hasTimeOffset, setHasTimeOffset] = useState(false);
   const [showPhotoCapture, setShowPhotoCapture] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -222,29 +220,6 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
     } finally {
       setUploadingPhoto(false);
     }
-  };
-
-  const handleCompleteTask = async () => {
-    if (!confirm('Mark this task as completed and collect payment?')) {
-      return;
-    }
-
-    try {
-      await bookingsAPI.update(taskId, { 
-        status: 'completed', 
-        actualEndTime: new Date().toISOString() 
-      });
-      setShowPaymentModal(true);
-    } catch (error) {
-      console.error('Error completing task:', error);
-      alert('Failed to complete task');
-    }
-  };
-
-  const handlePaymentConfirmed = () => {
-    setShowPaymentModal(false);
-    alert('Payment submitted successfully! You can now close this screen.');
-    onRefresh();
   };
 
   const openMapsNavigation = () => {
@@ -681,18 +656,6 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
           </div>
         </div>
       </div>
-
-      {/* Payment Modal */}
-      {showPaymentModal && (
-        <PaymentModal
-          bookingId={taskId}
-          onClose={() => {
-            setShowPaymentModal(false);
-            onClose();
-          }}
-          onPaymentConfirmed={handlePaymentConfirmed}
-        />
-      )}
     </div>
   );
 };
