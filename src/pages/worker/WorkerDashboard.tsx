@@ -4,6 +4,7 @@ import { authAPI, bookingsAPI, workersAPI } from "@/lib/api";
 import { Bell, CheckCircle, ChevronRight, Clock, MapPin, QrCode, Star, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import TaskDetailModal from "./TaskDetailModal";
 
 interface Stats {
@@ -47,6 +48,7 @@ interface Profile {
 }
 
 const WorkerDashboard = () => {
+  const { t } = useTranslation();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [stats, setStats] = useState<Stats>({ today: 0, thisWeek: 0, thisMonth: 0 });
   const [currentTask, setCurrentTask] = useState<Task | null>(null);
@@ -166,7 +168,7 @@ const WorkerDashboard = () => {
 
   if (loading) {
     return (
-      <AppLayout userType="worker" userName="Loading...">
+      <AppLayout userType="worker" userName={t('common.loading')}>
         <div className="max-w-3xl mx-auto flex items-center justify-center py-20">
           <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full"></div>
         </div>
@@ -193,9 +195,9 @@ const WorkerDashboard = () => {
         {/* Earnings summary */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: "Today", value: `₹${stats.today}`, icon: TrendingUp, color: "text-primary", bg: "bg-primary-light" },
-            { label: "This Week", value: `₹${stats.thisWeek}`, icon: CheckCircle, color: "text-success", bg: "bg-success-light" },
-            { label: "This Month", value: `₹${stats.thisMonth}`, icon: Star, color: "text-warning", bg: "bg-warning-light" },
+            { label: t('worker.dashboard.today'), value: `₹${stats.today}`, icon: TrendingUp, color: "text-primary", bg: "bg-primary-light" },
+            { label: t('worker.dashboard.thisWeek'), value: `₹${stats.thisWeek}`, icon: CheckCircle, color: "text-success", bg: "bg-success-light" },
+            { label: t('worker.dashboard.thisMonth'), value: `₹${stats.thisMonth}`, icon: Star, color: "text-warning", bg: "bg-warning-light" },
           ].map((card) => (
             <div key={card.label} className="card-elevated p-4">
               <div className={`w-8 h-8 ${card.bg} rounded-lg flex items-center justify-center mb-2`}>
@@ -212,7 +214,7 @@ const WorkerDashboard = () => {
           <div className="rounded-2xl overflow-hidden border-2 border-warning">
             <div className="bg-warning-light px-5 py-3 flex items-center gap-2">
               <div className="w-2 h-2 bg-warning rounded-full animate-pulse" />
-              <span className="text-sm font-semibold text-warning-foreground">Active Service in Progress</span>
+              <span className="text-sm font-semibold text-warning-foreground">{t('worker.tasks.workInProgress')}</span>
             </div>
             <div className="bg-card p-5">
               <div className="flex items-start gap-4 mb-4">
@@ -221,10 +223,10 @@ const WorkerDashboard = () => {
                 </div>
                 <div className="flex-1">
                   <p className="font-bold text-foreground">{currentTask.service.name}</p>
-                  <p className="text-sm text-muted-foreground">Customer: {currentTask.customer.name}</p>
+                  <p className="text-sm text-muted-foreground">{t('worker.dashboard.customer')}: {currentTask.customer.name}</p>
                   <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
                     <MapPin className="w-3 h-3" />
-                    {currentTask.location ? [currentTask.location.address, currentTask.location.city].filter(Boolean).join(', ') : 'Location TBD'}
+                    {currentTask.location ? [currentTask.location.address, currentTask.location.city].filter(Boolean).join(', ') : t('worker.dashboard.location')}
                   </div>
                 </div>
                 <span className="text-base font-bold text-primary">₹{currentTask.totalAmount}</span>
@@ -235,7 +237,7 @@ const WorkerDashboard = () => {
                 {taskTimer > 0 && (
                   <div className="ml-auto flex items-center gap-1.5">
                     <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
-                    <span className="text-success font-semibold text-xs">Timer running: {taskTimer} min</span>
+                    <span className="text-success font-semibold text-xs">{taskTimer} {t('worker.dashboard.mins')}</span>
                   </div>
                 )}
               </div>
@@ -245,13 +247,13 @@ const WorkerDashboard = () => {
                   className="py-2.5 border border-border rounded-xl text-sm font-medium text-foreground hover:bg-muted transition-colors flex items-center justify-center gap-2"
                 >
                   <QrCode className="w-4 h-4" />
-                  Show QR Code
+                  {t('worker.tasks.serviceStartQR')}
                 </button>
                 <button
                   onClick={handleCompleteService}
                   className="btn-brand py-2.5 text-sm"
                 >
-                  Complete Service
+                  {t('worker.tasks.completeBooking')}
                 </button>
               </div>
             </div>
@@ -262,9 +264,9 @@ const WorkerDashboard = () => {
         {profile?.workerProfile?.availability && !currentTask && upcomingTasks.length === 0 && (
           <div className="card-elevated p-8 text-center">
             <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
-            <h3 className="text-lg font-bold text-foreground mb-1">No Active Task</h3>
+            <h3 className="text-lg font-bold text-foreground mb-1">{t('worker.dashboard.noActiveTask')}</h3>
             <p className="text-sm text-muted-foreground">
-              You'll be notified when a new task is assigned
+              {t('worker.dashboard.notified')}
             </p>
           </div>
         )}
@@ -273,9 +275,9 @@ const WorkerDashboard = () => {
         {profile?.workerProfile?.availability && !currentTask && upcomingTasks.length > 0 && (
           <div className="card-elevated p-8 text-center border-2 border-primary/20">
             <CheckCircle className="w-12 h-12 text-primary mx-auto mb-3" />
-            <h3 className="text-lg font-bold text-foreground mb-1">Ready to Work!</h3>
+            <h3 className="text-lg font-bold text-foreground mb-1">{t('worker.dashboard.activeTask')}</h3>
             <p className="text-sm text-muted-foreground">
-              You have {upcomingTasks.length} upcoming {upcomingTasks.length === 1 ? 'task' : 'tasks'} assigned
+              {upcomingTasks.length} {t('worker.dashboard.upcomingTasks')}
             </p>
           </div>
         )}
@@ -284,9 +286,9 @@ const WorkerDashboard = () => {
         {!profile?.workerProfile?.availability && (
           <div className="card-elevated p-8 text-center">
             <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
-            <h3 className="text-lg font-bold text-foreground mb-1">You're Offline</h3>
+            <h3 className="text-lg font-bold text-foreground mb-1">{t('worker.dashboard.offline')}</h3>
             <p className="text-sm text-muted-foreground">
-              Use the toggle above to go online and receive task assignments
+              {t('worker.dashboard.online')}
             </p>
           </div>
         )}
@@ -295,9 +297,9 @@ const WorkerDashboard = () => {
         {upcomingTasks.length > 0 && (
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold font-heading text-foreground">Upcoming Tasks</h2>
+              <h2 className="text-lg font-bold font-heading text-foreground">{t('worker.dashboard.upcomingTasks')}</h2>
               <Link to="/worker/tasks" className="text-sm text-primary font-medium flex items-center gap-1">
-                All tasks <ChevronRight className="w-3.5 h-3.5" />
+                {t('worker.tasks.title')} <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             </div>
             <div className="space-y-3">
@@ -336,8 +338,8 @@ const WorkerDashboard = () => {
               <TrendingUp className="w-5 h-5 text-success" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-foreground">My Earnings</p>
-              <p className="text-xs text-muted-foreground">View & withdraw</p>
+              <p className="text-sm font-semibold text-foreground">{t('worker.dashboard.myEarnings')}</p>
+              <p className="text-xs text-muted-foreground">{t('worker.dashboard.viewWithdraw')}</p>
             </div>
           </Link>
           <Link to="/worker/leaves" className="card-elevated-hover p-4 flex items-center gap-3">
@@ -345,8 +347,8 @@ const WorkerDashboard = () => {
               <Bell className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-foreground">Apply Leave</p>
-              <p className="text-xs text-muted-foreground">Request time off</p>
+              <p className="text-sm font-semibold text-foreground">{t('worker.dashboard.applyLeave')}</p>
+              <p className="text-xs text-muted-foreground">{t('worker.dashboard.requestTimeOff')}</p>
             </div>
           </Link>
         </div>

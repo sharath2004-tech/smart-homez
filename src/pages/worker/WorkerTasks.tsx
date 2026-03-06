@@ -2,6 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { authAPI, bookingsAPI, workersAPI } from "@/lib/api";
 import { Calendar, CheckCircle, Clock, MapPin, Package, User } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import TaskDetailModal from "./TaskDetailModal";
 
 interface Task {
@@ -38,6 +39,7 @@ interface Profile {
 }
 
 const WorkerTasks = () => {
+  const { t } = useTranslation();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [currentTask, setCurrentTask] = useState<Task | null>(null);
   const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
@@ -129,7 +131,7 @@ const WorkerTasks = () => {
 
   if (loading) {
     return (
-      <AppLayout userType="worker" userName="Loading...">
+      <AppLayout userType="worker" userName={t('common.loading')}>
         <div className="max-w-3xl mx-auto flex items-center justify-center py-20">
           <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full"></div>
         </div>
@@ -161,8 +163,8 @@ const WorkerTasks = () => {
               task.status === 'in-progress' ? 'bg-primary-light text-primary' :
               'bg-warning-light text-warning'
             }`}>
-              {task.status === 'completed' ? 'Completed' :
-               task.status === 'in-progress' ? 'In Progress' : 'Scheduled'}
+              {task.status === 'completed' ? t('worker.tasks.completed') :
+               task.status === 'in-progress' ? t('worker.tasks.workInProgress') : t('worker.tasks.upcoming')}
             </span>
           </div>
 
@@ -170,7 +172,7 @@ const WorkerTasks = () => {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <MapPin className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate">
-                {task.location ? [task.location.address, task.location.city, task.location.state].filter(Boolean).join(', ') : 'Location TBD'}
+                {task.location ? [task.location.address, task.location.city, task.location.state].filter(Boolean).join(', ') : t('worker.dashboard.location')}
               </span>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -203,8 +205,8 @@ const WorkerTasks = () => {
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
               <Calendar className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h3 className="font-bold text-foreground mb-2">No Active Task</h3>
-            <p className="text-muted-foreground text-sm">You don't have any task in progress right now.</p>
+            <h3 className="font-bold text-foreground mb-2">{t('worker.tasks.noActiveTask')}</h3>
+            <p className="text-muted-foreground text-sm">{t('worker.tasks.noActiveTasks')}</p>
           </div>
         );
       }
@@ -218,8 +220,8 @@ const WorkerTasks = () => {
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
               <Calendar className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h3 className="font-bold text-foreground mb-2">No Upcoming Tasks</h3>
-            <p className="text-muted-foreground text-sm">You don't have any scheduled tasks yet.</p>
+            <h3 className="font-bold text-foreground mb-2">{t('worker.tasks.noUpcomingTasks')}</h3>
+            <p className="text-muted-foreground text-sm">{t('worker.tasks.allCaughtUp')}</p>
           </div>
         );
       }
@@ -237,8 +239,8 @@ const WorkerTasks = () => {
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h3 className="font-bold text-foreground mb-2">No Completed Tasks</h3>
-            <p className="text-muted-foreground text-sm">You haven't completed any tasks yet.</p>
+            <h3 className="font-bold text-foreground mb-2">{t('worker.tasks.noCompletedTasks')}</h3>
+            <p className="text-muted-foreground text-sm">{t('worker.tasks.completedWillAppear')}</p>
           </div>
         );
       }
@@ -254,16 +256,16 @@ const WorkerTasks = () => {
     <AppLayout userType="worker" userName={profile?.name || "Worker"}>
       <div className="max-w-3xl mx-auto space-y-6 animate-fade-in pb-20 md:pb-0">
         <div>
-          <h1 className="text-2xl font-bold font-heading text-foreground mb-1">My Tasks</h1>
-          <p className="text-muted-foreground text-sm">Manage and track your assigned work</p>
+          <h1 className="text-2xl font-bold font-heading text-foreground mb-1">{t('worker.tasks.title')}</h1>
+          <p className="text-muted-foreground text-sm">{t('worker.tasks.subtitle')}</p>
         </div>
 
         {/* Tabs */}
         <div className="flex gap-1 p-1 bg-muted rounded-xl">
           {[
-            { key: "current", label: "Current" },
-            { key: "upcoming", label: "Upcoming" },
-            { key: "completed", label: "Completed" }
+            { key: "current", label: t('worker.tasks.current') },
+            { key: "upcoming", label: t('worker.tasks.upcoming') },
+            { key: "completed", label: t('worker.tasks.completed') }
           ].map((tab) => (
             <button
               key={tab.key}
