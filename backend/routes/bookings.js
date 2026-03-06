@@ -980,6 +980,14 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
   try {
     const { newDate, newTime } = req.body;
     
+    console.log('📅 Reschedule request received:', {
+      bookingId: req.params.id,
+      newDate,
+      newTime,
+      userId: req.user._id,
+      userRole: req.user.role
+    });
+    
     if (!newDate || !newTime) {
       return res.status(400).json({ 
         error: { message: 'New date and time are required', status: 400 } 
@@ -1026,8 +1034,48 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
     const [startHour, startMinute] = booking.startTime.split(':').map(Number);
     currentBookingDate.setHours(startHour, startMinute, 0, 0);
 
-    // Parse new schedule
-    const newScheduledDate = new Date(`${newDate}T${newTime}`);
+    // Parse and validate new schedule date
+    // Handle various date formats: YYYY-MM-DD, DD-MM-YYYY, etc.
+    let parsedNewDate;
+    
+    // Try ISO format first (YYYY-MM-DD)
+    if (newDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      parsedNewDate = newDate;
+    } 
+    // Handle DD-MM-YYYY format
+    else if (newDate.match(/^\d{2}-\d{2}-\d{4}$/)) {
+      const [day, month, year] = newDate.split('-');
+      parsedNewDate = `${year}-${month}-${day}`;
+    }
+    // Handle MM/DD/YYYY format
+    else if (newDate.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+      const [month, day, year] = newDate.split('/');
+      parsedNewDate = `${year}-${month}-${day}`;
+    }
+    else {
+      console.error('Invalid date format received:', newDate);
+      return res.status(400).json({ 
+        error: { message: `Invalid date format: ${newDate}. Expected YYYY-MM-DD`, status: 400 } 
+      });
+    }
+
+    const newScheduledDate = new Date(`${parsedNewDate}T${newTime}`);
+    
+    // Validate the date is valid
+    if (isNaN(newScheduledDate.getTime())) {
+      console.error('Failed to parse date:', { newDate, newTime, parsedNewDate });
+      return res.status(400).json({ 
+        error: { message: 'Invalid date or time provided', status: 400 } 
+      });
+    }
+    
+    console.log('Reschedule validation:', {
+      originalDate: newDate,
+      parsedDate: parsedNewDate,
+      newTime,
+      scheduledDate: newScheduledDate.toISOString(),
+      now: now.toISOString()
+    });
     
     // Check 1: New date/time cannot be in the past
     if (newScheduledDate <= now) {
@@ -1049,7 +1097,7 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
 
     // Check 3: Must change either date or time
     const oldDateStr = booking.bookingDate.toISOString().split('T')[0];
-    if (newDate === oldDateStr && newTime === booking.startTime) {
+    if (parsedNewDate === oldDateStr && newTime === booking.startTime) {
       return res.status(400).json({ 
         error: { message: 'Please select a different date or time', status: 400 } 
       });
@@ -1059,7 +1107,7 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
     const oldWorker = booking.worker;
     
     // Update booking schedule - update bookingDate and startTime
-    booking.bookingDate = new Date(newDate);
+    booking.bookingDate = new Date(parsedNewDate);
     booking.startTime = newTime;
     
     // Calculate and update endTime based on duration
@@ -1205,6 +1253,13 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
       console.error('Notification error during reschedule:', notificationError);
       // Don't fail the reschedule if notifications fail
     }
+
+    console.log('✅ Booking rescheduled successfully:', {
+      bookingId: booking._id,
+      oldDate: oldDate.toISOString(),
+      newDate: newScheduledDate.toISOString(),
+      workerReassigned
+    });
 
     res.json({ 
       message: 'Booking rescheduled successfully', 

@@ -21,10 +21,40 @@ const RescheduleModal = ({
   currentDate, 
   currentTime 
 }: RescheduleModalProps) => {
-  const [newDate, setNewDate] = useState(currentDate);
+  // Ensure date is in YYYY-MM-DD format for input
+  const formatDateForInput = (date: string) => {
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return date;
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    } catch {
+      return date;
+    }
+  };
+
+  // Format time to 12-hour format for display
+  const formatTimeDisplay = (timeString: string) => {
+    if (!timeString) return '';
+    const [hours, minutes] = timeString.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
+  };
+
+  const [newDate, setNewDate] = useState(formatDateForInput(currentDate));
   const [newTime, setNewTime] = useState(currentTime);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  console.log('RescheduleModal initialized:', { 
+    currentDate, 
+    formattedDate: formatDateForInput(currentDate),
+    currentTime 
+  });
 
   const validateReschedule = () => {
     // Check if date and time are provided
@@ -51,7 +81,8 @@ const RescheduleModal = ({
     }
 
     // Check if the new time is different from current (must change either date or time)
-    if (newDate === currentDate && newTime === currentTime) {
+    const formattedCurrentDate = formatDateForInput(currentDate);
+    if (newDate === formattedCurrentDate && newTime === currentTime) {
       setError("Please select a different date or time");
       return false;
     }
@@ -67,9 +98,11 @@ const RescheduleModal = ({
 
     setLoading(true);
     try {
+      console.log('Submitting reschedule:', { newDate, newTime });
       await onConfirm(newDate, newTime);
       onClose();
     } catch (err) {
+      console.error('Reschedule error:', err);
       setError("Failed to reschedule. Please try again.");
     } finally {
       setLoading(false);
@@ -78,7 +111,7 @@ const RescheduleModal = ({
 
   const handleClose = () => {
     setError("");
-    setNewDate(currentDate);
+    setNewDate(formatDateForInput(currentDate));
     setNewTime(currentTime);
     onClose();
   };
@@ -114,7 +147,7 @@ const RescheduleModal = ({
             </div>
             <div className="flex items-center gap-2 text-sm">
               <Clock className="w-4 h-4" />
-              <span>{currentTime}</span>
+              <span>{formatTimeDisplay(currentTime)}</span>
             </div>
           </div>
 
