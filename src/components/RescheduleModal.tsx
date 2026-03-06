@@ -38,21 +38,28 @@ const RescheduleModal = ({
     const selectedDateTime = new Date(`${newDate}T${newTime}`);
     const currentDateTime = new Date(`${currentDate}T${currentTime}`);
 
-    // Check if the new date is in the past
+    // Check if the new date/time is in the past
     if (selectedDateTime < now) {
       setError("Cannot reschedule to a past date/time");
       return false;
     }
 
-    // Check if reschedule is at least 1 hour before the original booking
+    // Check if rescheduling is being done at least 1 hour before the CURRENT scheduled time
     const oneHourBeforeBooking = new Date(currentDateTime.getTime() - 60 * 60 * 1000);
     
     if (now > oneHourBeforeBooking) {
-      setError("Rescheduling must be done at least 1 hour before the scheduled time");
+      setError("You must reschedule at least 1 hour before the current scheduled time");
       return false;
     }
 
-    // Check if the new time is different from current
+    // Ensure the new date/time is at least 1 hour in the future (gives worker time to prepare/travel)
+    const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
+    if (selectedDateTime < oneHourFromNow) {
+      setError("Please schedule at least 1 hour from now to allow worker preparation and travel time");
+      return false;
+    }
+
+    // Check if the new time is different from current (must change either date or time)
     if (newDate === currentDate && newTime === currentTime) {
       setError("Please select a different date or time");
       return false;
@@ -97,7 +104,7 @@ const RescheduleModal = ({
             Reschedule Booking
           </DialogTitle>
           <DialogDescription>
-            Choose a new date and time for your booking. Rescheduling must be done at least 1 hour before the scheduled time.
+            Choose a new date and time for your booking. You can reschedule anytime before the booking, but the new time must be at least 1 hour from now to allow worker preparation.
           </DialogDescription>
         </DialogHeader>
 
@@ -149,6 +156,16 @@ const RescheduleModal = ({
               onChange={(e) => setNewTime(e.target.value)}
               className="w-full"
             />
+          </div>
+
+          {/* Helper Info */}
+          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 p-3 rounded-lg space-y-2">
+            <p className="text-xs font-medium text-blue-900 dark:text-blue-300">Quick Tips:</p>
+            <ul className="text-xs text-blue-800 dark:text-blue-400 space-y-1">
+              <li>• Must be at least 1 hour from now</li>
+              <li>• Either date or time must be different</li>
+              <li>• Worker will be auto-reassigned if not available</li>
+            </ul>
           </div>
 
           {/* Error Message */}

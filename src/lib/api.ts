@@ -441,6 +441,14 @@ export const usersAPI = {
 
   getStats: async () => {
     return apiCall('/users/stats');
+  },
+
+  getAvailableWorkers: async (specialization?: string, minRating?: number) => {
+    const params = new URLSearchParams();
+    if (specialization) params.append('specialization', specialization);
+    if (minRating) params.append('minRating', minRating.toString());
+    const queryString = params.toString();
+    return apiCall(`/users/workers/available${queryString ? `?${queryString}` : ''}`);
   }
 };
 

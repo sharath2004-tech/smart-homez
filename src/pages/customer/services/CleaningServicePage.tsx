@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { authAPI, bookingsAPI, servicesAPI } from "@/lib/api";
+import { authAPI, bookingsAPI, servicesAPI, usersAPI } from "@/lib/api";
 import { Bath, Bed, ChevronLeft, Home, Sparkles, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -77,8 +77,9 @@ const CleaningServicePage = () => {
   const [allowPause, setAllowPause] = useState(true);
 
   // Worker selection states
-  const [selectedWorker, setSelectedWorker] = useState<string>('');
+  const [selectedWorker, setSelectedWorker] = useState<string>('auto-assign');
   const [availableWorkers, setAvailableWorkers] = useState<any[]>([]);
+  const [loadingWorkers, setLoadingWorkers] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -106,14 +107,19 @@ const CleaningServicePage = () => {
     const fetchWorkers = async () => {
       if (bookingType !== 'oneTime' && service) {
         try {
-          const response = await fetch(`http://localhost:3000/api/users/workers/service/${service._id}`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-          });
-          const data = await response.json();
+          setLoadingWorkers(true);
+          const data = await usersAPI.getAvailableWorkers(service.category, 3.0);
           setAvailableWorkers(data.workers || []);
         } catch (error) {
           console.error('Error fetching workers:', error);
+          toast.error('Failed to load available workers');
+        } finally {
+          setLoadingWorkers(false);
         }
+      } else {
+        // Clear workers when switching back to one-time
+        setAvailableWorkers([]);
+        setSelectedWorker('auto-assign');
       }
     };
     fetchWorkers();
@@ -278,8 +284,8 @@ const CleaningServicePage = () => {
         toast.error('Please select at least one day for this subscription');
         return;
       }
-      if (currentPlan?.requiresFixedWorker && !selectedWorker) {
-        toast.error('Please select a worker for your subscription. Fixed worker assignment is required for this plan.');
+      if (currentPlan?.requiresFixedWorker && (!selectedWorker || selectedWorker === '')) {
+        toast.error('Please select a worker for your subscription or choose auto-assign.');
         return;
       }
     }
@@ -341,7 +347,7 @@ const CleaningServicePage = () => {
           endDate: subscriptionEndDate,
           preferredTime: preferredTime,
           durationPerSession: durationPerSession,
-          fixedWorker: selectedWorker,
+          fixedWorker: selectedWorker !== 'auto-assign' ? selectedWorker : undefined,
           autoRenewal: autoRenewal,
           allowPause: allowPause
         };
@@ -352,7 +358,10 @@ const CleaningServicePage = () => {
           };
         }
 
-        bookingData.assignedWorker = selectedWorker;
+        // Only set assigned worker if not auto-assign
+        if (selectedWorker !== 'auto-assign') {
+          bookingData.assignedWorker = selectedWorker;
+        }
       }
 
       const response = await bookingsAPI.create(bookingData);
@@ -618,11 +627,43 @@ const CleaningServicePage = () => {
                 <span className="text-sm font-normal text-amber-600 dark:text-amber-400">(Required for subscription)</span>
               </h2>
               <p className="text-sm text-muted-foreground mb-4">
-                For subscription plans, you must select a fixed worker who will be assigned to all your sessions. This ensures consistency and builds a trusted relationship.
+                For subscription plans, select a fixed worker for all sessions. You can choose a specific worker or let us auto-assign the best match for you.
               </p>
               
-              {availableWorkers.length > 0 ? (
+              {loadingWorkers ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  <Users className="w-12 h-12 mx-auto mb-3 opacity-50 animate-pulse" />
+                  <p>Loading available workers...</p>
+                </div>
+              ) : (
                 <div className="grid md:grid-cols-2 gap-3">
+                  {/* Auto-assign option */}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedWorker('auto-assign')}
+                    className={`p-4 rounded-lg border-2 text-left transition-all ${
+                      selectedWorker === 'auto-assign'
+                        ? 'border-primary bg-primary/10 shadow-md'
+                        : 'border-border hover:border-primary/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center font-bold text-white">
+                        ⚡
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-semibold">Auto-Assign Worker</div>
+                        <div className="text-sm text-muted-foreground">
+                          System will assign the best match
+                        </div>
+                      </div>
+                      {selectedWorker === 'auto-assign' && (
+                        <div className="text-primary">✓</div>
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Available workers */}
                   {availableWorkers.map((worker) => (
                     <button
                       key={worker._id}
@@ -641,7 +682,7 @@ const CleaningServicePage = () => {
                         <div className="flex-1">
                           <div className="font-semibold">{worker.name}</div>
                           <div className="text-sm text-muted-foreground">
-                            ⭐ {worker.rating?.toFixed(1) || 'New'} • {worker.completedServices || 0} jobs
+                            ⭐ {worker.workerProfile?.rating?.toFixed(1) || 'New'} • {worker.workerProfile?.totalReviews || 0} reviews
                           </div>
                         </div>
                         {selectedWorker === worker._id && (
@@ -650,11 +691,6 @@ const CleaningServicePage = () => {
                       </div>
                     </button>
                   ))}
-                </div>
-              ) : (
-                <div className="text-center py-6 text-muted-foreground">
-                  <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>Loading available workers...</p>
                 </div>
               )}
             </div>
