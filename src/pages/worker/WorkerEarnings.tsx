@@ -2,6 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { authAPI, workersAPI } from "@/lib/api";
 import { Calendar, Clock, Download, IndianRupee, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface Earning {
   _id: string;
@@ -29,6 +30,7 @@ interface Profile {
 }
 
 const WorkerEarnings = () => {
+  const { t } = useTranslation();
   const [period, setPeriod] = useState<"today" | "week" | "month">("week");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [stats, setStats] = useState<Stats>({ today: 0, thisWeek: 0, thisMonth: 0 });
@@ -130,7 +132,7 @@ const WorkerEarnings = () => {
 
   if (loading) {
     return (
-      <AppLayout userType="worker" userName="Loading...">
+      <AppLayout userType="worker" userName={t('common.loading')}>
         <div className="max-w-3xl mx-auto flex items-center justify-center py-20">
           <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full"></div>
         </div>
@@ -142,8 +144,8 @@ const WorkerEarnings = () => {
     <AppLayout userType="worker" userName={profile?.name || "Worker"}>
       <div className="max-w-3xl mx-auto space-y-6 animate-fade-in pb-20 md:pb-0">
         <div>
-          <h1 className="text-2xl font-bold font-heading text-foreground mb-1">My Earnings</h1>
-          <p className="text-muted-foreground text-sm">Track your income and payment history</p>
+          <h1 className="text-2xl font-bold font-heading text-foreground mb-1">{t('worker.earnings.title')}</h1>
+          <p className="text-muted-foreground text-sm">{t('worker.earnings.subtitle')}</p>
         </div>
 
         {/* Period toggle */}
@@ -156,7 +158,7 @@ const WorkerEarnings = () => {
                 period === p ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {p === "today" ? "Today" : p === "week" ? "This Week" : "This Month"}
+              {p === "today" ? t('worker.dashboard.today') : p === "week" ? t('worker.dashboard.thisWeek') : t('worker.dashboard.thisMonth')}
             </button>
           ))}
         </div>
@@ -164,7 +166,7 @@ const WorkerEarnings = () => {
         {/* Main earnings card */}
         <div className="rounded-2xl p-6 relative overflow-hidden" style={{ background: "var(--gradient-brand)" }}>
           <div className="absolute right-4 top-4 opacity-20 text-6xl">💰</div>
-          <p className="text-primary-foreground/70 text-sm mb-1">Total Earned</p>
+          <p className="text-primary-foreground/70 text-sm mb-1">{t('worker.earnings.totalEarnings')}</p>
           <p className="text-4xl font-bold font-heading text-primary-foreground mb-4">{displayStats[period].earned}</p>
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-primary-foreground/10 rounded-xl p-3 backdrop-blur-sm">
@@ -213,8 +215,8 @@ const WorkerEarnings = () => {
               <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
                 <IndianRupee className="w-8 h-8 text-muted-foreground" />
               </div>
-              <h3 className="font-bold text-foreground mb-2">No Earnings Yet</h3>
-              <p className="text-muted-foreground text-sm">Complete your first job to see earnings here.</p>
+              <h3 className="font-bold text-foreground mb-2">{t('worker.earnings.noEarnings')}</h3>
+              <p className="text-muted-foreground text-sm">{t('worker.earnings.startCompleting')}</p>
             </div>
           ) : (
             <div className="space-y-3">

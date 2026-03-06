@@ -2,6 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { authAPI, bookingsAPI } from "@/lib/api";
 import { CheckCircle, CreditCard, Download, TrendingUp, Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface Payment {
   _id: string;
@@ -24,6 +25,7 @@ interface Stats {
 }
 
 const PaymentsPage = () => {
+  const { t } = useTranslation();
   const [transactions, setTransactions] = useState<any[]>([]);
   const [stats, setStats] = useState<Stats>({ thisMonth: 0, totalServices: 0, savedAmount: 0 });
   const [profile, setProfile] = useState<any>(null);

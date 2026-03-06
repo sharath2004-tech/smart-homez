@@ -3,6 +3,7 @@ import { useGeolocation } from "@/hooks/useGeolocation";
 import { authAPI, locationsAPI, usersAPI } from "@/lib/api";
 import { Bell, Check, ChevronRight, Edit2, MapPin, Plus, Shield, Star, Trash2, User, Users } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface Address {
   _id: string;
@@ -37,6 +38,7 @@ interface Stats {
 }
 
 const ProfilePage = () => {
+  const { t } = useTranslation();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<Stats>({ totalBookings: 0, preferredWorkers: [], monthsActive: 0 });
   const [loading, setLoading] = useState(true);

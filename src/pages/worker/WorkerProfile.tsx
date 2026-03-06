@@ -2,6 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { authAPI, workersAPI } from "@/lib/api";
 import { Briefcase, CheckCircle, Clock, Mail, MapPin, Phone, Star, User } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface Profile {
   name: string;
@@ -29,6 +30,7 @@ interface Profile {
 }
 
 const WorkerProfile = () => {
+  const { t } = useTranslation();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [stats, setStats] = useState({ today: 0, thisWeek: 0, thisMonth: 0 });
   const [loading, setLoading] = useState(true);
@@ -56,7 +58,7 @@ const WorkerProfile = () => {
 
   if (loading) {
     return (
-      <AppLayout userType="worker" userName="Loading...">
+      <AppLayout userType="worker" userName={t('common.loading')}>
         <div className="max-w-2xl mx-auto flex items-center justify-center py-20">
           <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full"></div>
         </div>
@@ -87,8 +89,8 @@ const WorkerProfile = () => {
     <AppLayout userType="worker" userName={profile.name}>
       <div className="max-w-2xl mx-auto space-y-6 animate-fade-in pb-20 md:pb-0">
         <div>
-          <h1 className="text-2xl font-bold font-heading text-foreground mb-1">My Profile</h1>
-          <p className="text-muted-foreground text-sm">Manage your personal information</p>
+          <h1 className="text-2xl font-bold font-heading text-foreground mb-1">{t('worker.profile.title')}</h1>
+          <p className="text-muted-foreground text-sm">{t('worker.profile.subtitle')}</p>
         </div>
 
         {/* Profile Header Card */}
@@ -122,7 +124,7 @@ const WorkerProfile = () => {
         <div className="card-elevated p-6">
           <h3 className="font-bold font-heading text-foreground mb-4 flex items-center gap-2">
             <User className="w-4 h-4 text-primary" />
-            Contact Information
+            {t('worker.profile.personalInfo')}
           </h3>
           <div className="space-y-4">
             <div className="flex items-start gap-3">
@@ -151,7 +153,7 @@ const WorkerProfile = () => {
             <div className="card-elevated p-6">
               <h3 className="font-bold font-heading text-foreground mb-4 flex items-center gap-2">
                 <Briefcase className="w-4 h-4 text-primary" />
-                Specialization
+                {t('worker.profile.specialization')}
               </h3>
               {profile.workerProfile.specialization && profile.workerProfile.specialization.length > 0 ? (
                 <div className="flex flex-wrap gap-2">

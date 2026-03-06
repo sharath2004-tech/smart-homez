@@ -36,6 +36,7 @@ import {
     X
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface Worker {
   _id: string;
@@ -79,6 +80,8 @@ interface Preferences {
 }
 
 const PreferencesPage = () => {
+  const { t } = useTranslation();
+  const [profile, setProfile] = useState<{ name: string } | null>(null);
   const [preferences, setPreferences] = useState<Preferences>({});
   const [availableWorkers, setAvailableWorkers] = useState<Worker[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,8 +99,12 @@ const PreferencesPage = () => {
   const fetchPreferences = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await preferencesAPI.getPreferences();
-      setPreferences(data.preferences || {});
+      const [prefData, profileData] = await Promise.all([
+        preferencesAPI.getPreferences(),
+        import('@/lib/api').then(m => m.authAPI.getProfile())
+      ]);
+      setPreferences(prefData.preferences || {});
+      setProfile(profileData.user || profileData);
     } catch (error: unknown) {
       const err = error as Error;
       console.error('Error fetching preferences:', error);

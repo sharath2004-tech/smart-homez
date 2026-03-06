@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { bookingsAPI } from "@/lib/api";
 import { Calendar, Clock, MapPin, Phone, QrCode, RefreshCw, Star } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import BookingDetailModal from "./BookingDetailModal";
 
 interface Worker {
@@ -59,6 +60,7 @@ const statusConfig: Record<string, { label: string; bg: string; text: string }> 
 };
 
 const BookingsPage = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<"upcoming" | "ongoing" | "past">("upcoming");
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);

@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { authAPI, leavesAPI } from '@/lib/api';
 import { Calendar as CalendarIcon, CheckCircle, Clock, Info, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface Leave {
   _id: string;
@@ -25,6 +26,7 @@ interface WorkerProfile {
 }
 
 const WorkerLeaves = () => {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [reason, setReason] = useState('');
@@ -105,11 +107,11 @@ const WorkerLeaves = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
-        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200"><Clock className="w-3 h-3 mr-1" /> Pending</Badge>;
+        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200"><Clock className="w-3 h-3 mr-1" /> {t('worker.leaves.pending')}</Badge>;
       case 'approved':
-        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200"><CheckCircle className="w-3 h-3 mr-1" /> Approved</Badge>;
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200"><CheckCircle className="w-3 h-3 mr-1" /> {t('worker.leaves.approved')}</Badge>;
       case 'rejected':
-        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200"><XCircle className="w-3 h-3 mr-1" /> Rejected</Badge>;
+        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200"><XCircle className="w-3 h-3 mr-1" /> {t('worker.leaves.rejected')}</Badge>;
       default:
         return null;
     }
@@ -150,8 +152,8 @@ const WorkerLeaves = () => {
           {/* Apply for Leave */}
           <Card>
             <CardHeader>
-              <CardTitle>Apply for Leave</CardTitle>
-              <CardDescription>Select a date and provide a reason</CardDescription>
+              <CardTitle>{t('worker.leaves.applyForLeave')}</CardTitle>
+              <CardDescription>{t('worker.leaves.reason')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex justify-center">
@@ -198,8 +200,8 @@ const WorkerLeaves = () => {
           {/* Leave History */}
           <Card>
             <CardHeader>
-              <CardTitle>Leave History</CardTitle>
-              <CardDescription>Your past and pending leave requests</CardDescription>
+              <CardTitle>{t('worker.leaves.leaveHistory')}</CardTitle>
+              <CardDescription>{t('worker.leaves.subtitle')}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3 max-h-[500px] overflow-y-auto">
