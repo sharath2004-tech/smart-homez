@@ -602,7 +602,6 @@ router.get('/worker/upcoming-tasks', authenticate, authorize('worker'), async (r
 // @access  Private/Worker
 router.get('/worker/earnings', authenticate, authorize('worker'), async (req, res) => {
   try {
-    const Booking = (await import('../models/Booking.js')).default;
     const workerId = req.user._id;
     const { startDate, endDate, page = 1, limit = 20 } = req.query;
     
@@ -622,7 +621,7 @@ router.get('/worker/earnings', authenticate, authorize('worker'), async (req, re
     const earnings = await Booking.find(query)
       .populate('customer', 'name')
       .populate('service', 'name')
-      .select('service customer completedAt totalAmount bookingDate startTime')
+      .select('service customer completedAt totalAmount bookingDate startTime actualStartTime actualEndTime actualDurationMinutes overtimeMinutes overtimeCharges')
       .sort({ completedAt: -1 })
       .limit(parseInt(limit))
       .skip((parseInt(page) - 1) * parseInt(limit));
