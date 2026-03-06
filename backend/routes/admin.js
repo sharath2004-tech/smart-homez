@@ -1744,4 +1744,289 @@ router.get('/payouts/stats', authenticate, authorize('admin', 'super_admin'), as
   }
 });
 
+// @route   GET /api/admin/worker-schedule-comprehensive
+// @desc    Get worker schedules with past, present, and future bookings
+// @access  Private/Admin
+router.get('/worker-schedule-comprehensive',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  async (req, res) => {
+    try {
+      const { workerId, startDate, endDate } = req.query;
+      
+      // Default date range: 1 month in past to 3 months in future
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const defaultStartDate = new Date(today);
+      defaultStartDate.setMonth(defaultStartDate.getMonth() - 1);
+      
+      const defaultEndDate = new Date(today);
+      defaultEndDate.setMonth(defaultEndDate.getMonth() + 3);
+      
+      const queryStartDate = startDate ? new Date(startDate) : defaultStartDate;
+      const queryEndDate = endDate ? new Date(endDate) : defaultEndDate;
+      
+      // Build query
+      const bookingQuery = {
+        bookingDate: {
+          $gte: queryStartDate,
+          $lte: queryEndDate
+        },
+        status: { $in: ['pending', 'confirmed', 'in-progress', 'completed'] }
+      };
+      
+      if (workerId && workerId !== 'all') {
+        bookingQuery.worker = workerId;
+      } else {
+        // Only show bookings with assigned workers
+        bookingQuery.worker = { $ne: null };
+      }
+      
+      // Get all bookings in range
+      const bookings = await Booking.find(bookingQuery)
+        .populate('worker', 'name email phone workerProfile')
+        .populate('customer', 'name phone email')
+        .populate('service', 'name category')
+        .populate('location', 'apartmentName area city')
+        .sort({ bookingDate: 1, startTime: 1 });
+      
+      // Get unique workers
+      const workerIds = [...new Set(bookings.map(b => b.worker?._id.toString()).filter(Boolean))];
+      const workers = await User.find({ 
+        _id: { $in: workerIds },
+        role: 'worker'
+      }).select('name email phone workerProfile');
+      
+      // Categorize bookings
+      const pastBookings = [];
+      const presentBookings = [];
+      const futureBookings = [];
+      
+      bookings.forEach(booking => {
+        const bookingDate = new Date(booking.bookingDate);
+        bookingDate.setHours(0, 0, 0, 0);
+        
+        if (bookingDate < today) {
+          pastBookings.push(booking);
+        } else if (bookingDate.getTime() === today.getTime()) {
+          presentBookings.push(booking);
+        } else {
+          futureBookings.push(booking);
+        }
+      });
+      
+      // Group by worker
+      const workerSchedules = workers.map(worker => {
+        const workerBookings = bookings.filter(b => 
+          b.worker?._id.toString() === worker._id.toString()
+        );
+        
+        return {
+          worker: {
+            _id: worker._id,
+            name: worker.name,
+            email: worker.email,
+            phone: worker.phone,
+            specialization: worker.workerProfile?.specialization || '',
+            rating: worker.workerProfile?.rating || 0,
+            completedJobs: worker.workerProfile?.completedJobs || 0
+          },
+          statistics: {
+            totalBookings: workerBookings.length,
+            pastBookings: workerBookings.filter(b => {
+              const bookingDate = new Date(b.bookingDate);
+              bookingDate.setHours(0, 0, 0, 0);
+              return bookingDate < today;
+            }).length,
+            todayBookings: workerBookings.filter(b => {
+              const bookingDate = new Date(b.bookingDate);
+              bookingDate.setHours(0, 0, 0, 0);
+              return bookingDate.getTime() === today.getTime();
+            }).length,
+            futureBookings: workerBookings.filter(b => {
+              const bookingDate = new Date(b.bookingDate);
+              bookingDate.setHours(0, 0, 0, 0);
+              return bookingDate > today;
+            }).length,
+            subscriptionBookings: workerBookings.filter(b => 
+              b.subscription?.isSubscription
+            ).length,
+            oneTimeBookings: workerBookings.filter(b => 
+              !b.subscription?.isSubscription
+            ).length,
+            completedBookings: workerBookings.filter(b => 
+              b.status === 'completed'
+            ).length
+          },
+          bookings: workerBookings.map(b => ({
+            _id: b._id,
+            bookingDate: b.bookingDate,
+            startTime: b.startTime,
+            endTime: b.endTime,
+            status: b.status,
+            bookingType: b.bookingType,
+            isSubscription: b.subscription?.isSubscription || false,
+            subscriptionFrequency: b.recurringSchedule?.frequency || null,
+            subscriptionDays: b.recurringSchedule?.selectedDays || [],
+            subscriptionEndDate: b.subscription?.subscriptionEndDate || null,
+            autoRenewal: b.subscription?.autoRenewal || false,
+            service: {
+              name: b.service?.name,
+              category: b.service?.category
+            },
+            customer: {
+              name: b.customer?.name,
+              phone: b.customer?.phone
+            },
+            location: {
+              apartmentName: b.location?.apartmentName,
+              area: b.location?.area,
+              city: b.location?.city
+            }
+          }))
+        };
+      });
+      
+      res.json({
+        success: true,
+        dateRange: {
+          start: queryStartDate,
+          end: queryEndDate
+        },
+        summary: {
+          totalWorkers: workers.length,
+          totalBookings: bookings.length,
+          pastBookings: pastBookings.length,
+          todayBookings: presentBookings.length,
+          futureBookings: futureBookings.length,
+          subscriptionBookings: bookings.filter(b => b.subscription?.isSubscription).length,
+          oneTimeBookings: bookings.filter(b => !b.subscription?.isSubscription).length
+        },
+        workerSchedules
+      });
+    } catch (error) {
+      console.error('Get comprehensive worker schedule error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   GET /api/admin/worker-schedule-export
+// @desc    Export worker schedules to Excel/CSV
+// @access  Private/Admin
+router.get('/worker-schedule-export',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  async (req, res) => {
+    try {
+      const { workerId, startDate, endDate } = req.query;
+      
+      // Default date range: 1 month in past to 3 months in future
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const defaultStartDate = new Date(today);
+      defaultStartDate.setMonth(defaultStartDate.getMonth() - 1);
+      
+      const defaultEndDate = new Date(today);
+      defaultEndDate.setMonth(defaultEndDate.getMonth() + 3);
+      
+      const queryStartDate = startDate ? new Date(startDate) : defaultStartDate;
+      const queryEndDate = endDate ? new Date(endDate) : defaultEndDate;
+      
+      // Build query
+      const bookingQuery = {
+        bookingDate: {
+          $gte: queryStartDate,
+          $lte: queryEndDate
+        },
+        status: { $in: ['pending', 'confirmed', 'in-progress', 'completed'] }
+      };
+      
+      if (workerId && workerId !== 'all') {
+        bookingQuery.worker = workerId;
+      } else {
+        bookingQuery.worker = { $ne: null };
+      }
+      
+      // Get all bookings in range
+      const bookings = await Booking.find(bookingQuery)
+        .populate('worker', 'name email phone workerProfile')
+        .populate('customer', 'name phone email')
+        .populate('service', 'name category')
+        .populate('location', 'apartmentName area city')
+        .sort({ 'worker.name': 1, bookingDate: 1, startTime: 1 });
+      
+      // Create CSV content
+      const csvHeader = [
+        'Worker Name',
+        'Worker Phone',
+        'Worker Specialization',
+        'Date',
+        'Day',
+        'Start Time',
+        'End Time',
+        'Status',
+        'Period',
+        'Booking Type',
+        'Subscription',
+        'Frequency',
+        'Service',
+        'Category',
+        'Customer Name',
+        'Customer Phone',
+        'Location',
+        'Area',
+        'City'
+      ].join(',');
+      
+      const csvRows = bookings.map(booking => {
+        const bookingDate = new Date(booking.bookingDate);
+        bookingDate.setHours(0, 0, 0, 0);
+        
+        let period = 'Future';
+        if (bookingDate < today) period = 'Past';
+        else if (bookingDate.getTime() === today.getTime()) period = 'Today';
+        
+        const dayName = bookingDate.toLocaleDateString('en-US', { weekday: 'long' });
+        const dateStr = bookingDate.toLocaleDateString('en-US');
+        
+        return [
+          booking.worker?.name || 'N/A',
+          booking.worker?.phone || 'N/A',
+          booking.worker?.workerProfile?.specialization || 'N/A',
+          dateStr,
+          dayName,
+          booking.startTime,
+          booking.endTime,
+          booking.status,
+          period,
+          booking.bookingType || 'oneTime',
+          booking.subscription?.isSubscription ? 'Yes' : 'No',
+          booking.recurringSchedule?.frequency || 'N/A',
+          booking.service?.name || 'N/A',
+          booking.service?.category || 'N/A',
+          booking.customer?.name || 'N/A',
+          booking.customer?.phone || 'N/A',
+          booking.location?.apartmentName || 'N/A',
+          booking.location?.area || 'N/A',
+          booking.location?.city || 'N/A'
+        ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',');
+      });
+      
+      const csv = [csvHeader, ...csvRows].join('\n');
+      
+      // Set headers for file download
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="worker-schedule-${new Date().toISOString().split('T')[0]}.csv"`);
+      
+      res.send(csv);
+    } catch (error) {
+      console.error('Export worker schedule error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
 export default router;
