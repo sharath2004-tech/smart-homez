@@ -1014,6 +1014,13 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
     // Validate timing constraints
     const now = new Date();
     
+    // Validate booking has required fields
+    if (!booking.bookingDate || !booking.startTime) {
+      return res.status(400).json({ 
+        error: { message: 'Booking has invalid date/time data', status: 400 } 
+      });
+    }
+    
     // Combine bookingDate and startTime to get current scheduled datetime for comparison
     const currentBookingDate = new Date(booking.bookingDate);
     const [startHour, startMinute] = booking.startTime.split(':').map(Number);
@@ -1056,17 +1063,36 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
     booking.startTime = newTime;
     
     // Calculate and update endTime based on duration
-    if (booking.duration) {
-      const [newStartHour, newStartMinute] = newTime.split(':').map(Number);
-      const durationMinutes = booking.duration * 60; // duration is in hours
-      const totalMinutes = newStartHour * 60 + newStartMinute + durationMinutes;
-      const endHour = Math.floor(totalMinutes / 60) % 24;
-      const endMinute = totalMinutes % 60;
-      booking.endTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+    // Note: duration is in hours, estimatedDuration is in minutes
+    let durationMinutes;
+    if (booking.estimatedDuration) {
+      durationMinutes = booking.estimatedDuration; // Already in minutes
+    } else if (booking.duration) {
+      durationMinutes = booking.duration * 60; // Convert hours to minutes
+    } else {
+      durationMinutes = 120; // Default 2 hours
     }
     
+    const [newStartHour, newStartMinute] = newTime.split(':').map(Number);
+    const totalMinutes = newStartHour * 60 + newStartMinute + durationMinutes;
+    
+    // Handle day wrap-around properly
+    let endHour = Math.floor(totalMinutes / 60);
+    const endMinute = totalMinutes % 60;
+    
+    // If endHour >= 24, we crossed midnight
+    if (endHour >= 24) {
+      endHour = endHour % 24;
+      // Note: If booking crosses midnight, you may want to track this differently
+      // For now, we'll just modulo the hours
+    }
+    
+    booking.endTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+    
     // Check if original worker is available at new time
-    const workerAvailable = oldWorker ? await checkWorkerAvailability(oldWorker._id, newScheduledDate, booking.duration) : false;
+    // checkWorkerAvailability expects duration in hours
+    const durationHours = durationMinutes / 60;
+    const workerAvailable = oldWorker ? await checkWorkerAvailability(oldWorker._id, newScheduledDate, durationHours) : false;
     
     let workerReassigned = false;
     let newWorkerInfo = null;
@@ -1096,83 +1122,88 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
 
     await booking.save();
 
-    // Send notifications
-    const notificationService = require('../utils/notificationService');
-    
-    // Format dates for display
-    const formatDate = (date) => new Date(date).toLocaleDateString('en-IN', { 
-      day: '2-digit', 
-      month: 'short', 
-      year: 'numeric' 
-    });
-    const formatTime = (date) => new Date(date).toLocaleTimeString('en-IN', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
+    // Send notifications (wrapped in try-catch to prevent notification failures from breaking reschedule)
+    try {
+      const notificationService = require('../utils/notificationService');
+      
+      // Format dates for display
+      const formatDate = (date) => new Date(date).toLocaleDateString('en-IN', { 
+        day: '2-digit', 
+        month: 'short', 
+        year: 'numeric' 
+      });
+      const formatTime = (date) => new Date(date).toLocaleTimeString('en-IN', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
 
-    // Notify customer about reschedule
-    await notificationService.sendTemplatedNotification(
-      booking.customer._id,
-      'SCHEDULE_CHANGE',
-      {
-        bookingId: booking._id,
-        serviceName: booking.service.name,
-        newDate: formatDate(newScheduledDate),
-        newTime: formatTime(newScheduledDate)
-      }
-    );
-
-    // If worker was reassigned, send additional notifications
-    if (workerReassigned && newWorkerInfo) {
-      // Notify customer about worker reassignment
+      // Notify customer about reschedule
       await notificationService.sendTemplatedNotification(
         booking.customer._id,
-        'WORKER_REASSIGNMENT',
+        'SCHEDULE_CHANGE',
         {
           bookingId: booking._id,
-          newWorkerName: newWorkerInfo.name,
-          reason: 'Original worker was not available at the new scheduled time.'
+          serviceName: booking.service.name,
+          newDate: formatDate(newScheduledDate),
+          newTime: formatTime(newScheduledDate)
         }
       );
 
-      // Notify old worker about booking removal
-      if (oldWorker) {
+      // If worker was reassigned, send additional notifications
+      if (workerReassigned && newWorkerInfo) {
+        // Notify customer about worker reassignment
+        await notificationService.sendTemplatedNotification(
+          booking.customer._id,
+          'WORKER_REASSIGNMENT',
+          {
+            bookingId: booking._id,
+            newWorkerName: newWorkerInfo.name,
+            reason: 'Original worker was not available at the new scheduled time.'
+          }
+        );
+
+        // Notify old worker about booking removal
+        if (oldWorker) {
+          await notificationService.sendNotification({
+            userId: oldWorker._id,
+            type: 'schedule-change',
+            title: '📅 Booking Rescheduled',
+            message: `Customer rescheduled booking for ${booking.service.name}. Booking reassigned to another worker.`,
+            priority: 'medium',
+            data: { bookingId: booking._id }
+          });
+        }
+
+        // Notify new worker about assignment
+        await notificationService.sendTemplatedNotification(
+          newWorkerInfo._id,
+          'WORKER_ASSIGNED',
+          {
+            bookingId: booking._id,
+            workerName: newWorkerInfo.name,
+            serviceName: booking.service.name,
+            date: formatDate(newScheduledDate),
+            time: formatTime(newScheduledDate)
+          }
+        );
+      } else if (oldWorker) {
+        // Same worker, just notify about time change
         await notificationService.sendNotification({
           userId: oldWorker._id,
           type: 'schedule-change',
           title: '📅 Booking Rescheduled',
-          message: `Customer rescheduled booking for ${booking.service.name}. Booking reassigned to another worker.`,
+          message: `Customer rescheduled booking for ${booking.service.name} to ${formatDate(newScheduledDate)} at ${formatTime(newScheduledDate)}.`,
           priority: 'medium',
-          data: { bookingId: booking._id }
+          data: { 
+            bookingId: booking._id,
+            newDate: formatDate(newScheduledDate),
+            newTime: formatTime(newScheduledDate)
+          }
         });
       }
-
-      // Notify new worker about assignment
-      await notificationService.sendTemplatedNotification(
-        newWorkerInfo._id,
-        'WORKER_ASSIGNED',
-        {
-          bookingId: booking._id,
-          workerName: newWorkerInfo.name,
-          serviceName: booking.service.name,
-          date: formatDate(newScheduledDate),
-          time: formatTime(newScheduledDate)
-        }
-      );
-    } else if (oldWorker) {
-      // Same worker, just notify about time change
-      await notificationService.sendNotification({
-        userId: oldWorker._id,
-        type: 'schedule-change',
-        title: '📅 Booking Rescheduled',
-        message: `Customer rescheduled booking for ${booking.service.name} to ${formatDate(newScheduledDate)} at ${formatTime(newScheduledDate)}.`,
-        priority: 'medium',
-        data: { 
-          bookingId: booking._id,
-          newDate: formatDate(newScheduledDate),
-          newTime: formatTime(newScheduledDate)
-        }
-      });
+    } catch (notificationError) {
+      console.error('Notification error during reschedule:', notificationError);
+      // Don't fail the reschedule if notifications fail
     }
 
     res.json({ 
@@ -1192,7 +1223,19 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('Reschedule booking error:', error);
-    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', {
+      bookingId: req.params.id,
+      newDate: req.body.newDate,
+      newTime: req.body.newTime,
+      errorMessage: error.message
+    });
+    res.status(500).json({ 
+      error: { 
+        message: `Failed to reschedule: ${error.message}`, 
+        status: 500 
+      } 
+    });
   }
 });
 
@@ -1226,7 +1269,10 @@ async function checkWorkerAvailability(workerId, scheduledDate, duration) {
       existingDate.setHours(existingStartHour, existingStartMinute, 0, 0);
       
       const existingEndDate = new Date(existingDate);
-      if (existingBooking.duration) {
+      // Handle both duration (hours) and estimatedDuration (minutes)
+      if (existingBooking.estimatedDuration) {
+        existingEndDate.setTime(existingEndDate.getTime() + existingBooking.estimatedDuration * 60 * 1000);
+      } else if (existingBooking.duration) {
         existingEndDate.setTime(existingEndDate.getTime() + existingBooking.duration * 60 * 60 * 1000);
       }
       
