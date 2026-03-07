@@ -162,7 +162,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // @route   POST /api/services
-// @desc    Create a new service
+// @desc    Create a new service (with all dynamic parameters)
 // @access  Private/Admin
 router.post('/',
   authenticate,
@@ -182,18 +182,43 @@ router.post('/',
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { name, description, category, price, pricingPlans, duration, image, tags, requirements } = req.body;
+      const { 
+        name, description, category, serviceType, price, pricingPlans, subscriptionPlans,
+        duration, image, tags, requirements, additionalServiceOptions,
+        serviceLocations, availableInAllLocations,
+        // New parameter fields
+        sizeParameters, durationOptions, subscriptionOptions, addons,
+        equipmentRequired, pricingTiers, workerPreferences, serviceFields,
+        timeSlotRestrictions, cancellationPolicy, specialInstructionsTemplate
+      } = req.body;
 
       const service = new Service({
         name,
         description,
         category,
+        serviceType,
         price,
         pricingPlans,
+        subscriptionPlans,
         duration,
         image,
         tags,
         requirements,
+        additionalServiceOptions,
+        serviceLocations,
+        availableInAllLocations,
+        // New parameter fields
+        sizeParameters,
+        durationOptions,
+        subscriptionOptions,
+        addons,
+        equipmentRequired,
+        pricingTiers,
+        workerPreferences,
+        serviceFields,
+        timeSlotRestrictions,
+        cancellationPolicy,
+        specialInstructionsTemplate,
         createdBy: req.user._id
       });
 
@@ -211,23 +236,61 @@ router.post('/',
 );
 
 // @route   PUT/PATCH /api/services/:id
-// @desc    Update service
-// @access  Private/Admin
-router.patch('/:id', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+// @desc    Update service (including all dynamic parameters)
+// Shared update handler with proper validation and field clearing
+const handleServiceUpdate = async (req, res) => {
   try {
-    const { name, description, category, price, pricingPlans, duration, image, tags, requirements, isActive } = req.body;
+    const { 
+      name, description, category, serviceType, price, pricingPlans, subscriptionPlans,
+      duration, image, tags, requirements, isActive, additionalServiceOptions,
+      serviceLocations, availableInAllLocations,
+      // New parameter fields
+      sizeParameters, durationOptions, subscriptionOptions, addons,
+      equipmentRequired, pricingTiers, workerPreferences, serviceFields,
+      timeSlotRestrictions, cancellationPolicy, specialInstructionsTemplate
+    } = req.body;
 
+    // Validation for subscription plans
+    if (subscriptionPlans && Array.isArray(subscriptionPlans)) {
+      const ids = subscriptionPlans.map(plan => plan.id);
+      const uniqueIds = new Set(ids);
+      if (ids.length !== uniqueIds.size) {
+        return res.status(400).json({
+          error: { message: 'Subscription plan IDs must be unique', status: 400 }
+        });
+      }
+    }
+
+    // Build update data with consistent conditional checks (using 'in' operator for proper undefined handling)
     const updateData = {};
-    if (name) updateData.name = name;
-    if (description) updateData.description = description;
-    if (category) updateData.category = category;
-    if (price !== undefined) updateData.price = price;
-    if (pricingPlans) updateData.pricingPlans = pricingPlans;
-    if (duration !== undefined) updateData.duration = duration;
-    if (image !== undefined) updateData.image = image;
-    if (tags) updateData.tags = tags;
-    if (requirements) updateData.requirements = requirements;
-    if (isActive !== undefined) updateData.isActive = isActive;
+    if ('name' in req.body) updateData.name = name;
+    if ('description' in req.body) updateData.description = description;
+    if ('category' in req.body) updateData.category = category;
+    if ('serviceType' in req.body) updateData.serviceType = serviceType;
+    if ('price' in req.body) updateData.price = price;
+    if ('pricingPlans' in req.body) updateData.pricingPlans = pricingPlans;
+    if ('subscriptionPlans' in req.body) updateData.subscriptionPlans = subscriptionPlans;
+    if ('duration' in req.body) updateData.duration = duration;
+    if ('image' in req.body) updateData.image = image;
+    if ('tags' in req.body) updateData.tags = tags;
+    if ('requirements' in req.body) updateData.requirements = requirements;
+    if ('isActive' in req.body) updateData.isActive = isActive;
+    if ('additionalServiceOptions' in req.body) updateData.additionalServiceOptions = additionalServiceOptions;
+    if ('serviceLocations' in req.body) updateData.serviceLocations = serviceLocations;
+    if ('availableInAllLocations' in req.body) updateData.availableInAllLocations = availableInAllLocations;
+    
+    // New parameter fields with consistent checks
+    if ('sizeParameters' in req.body) updateData.sizeParameters = sizeParameters;
+    if ('durationOptions' in req.body) updateData.durationOptions = durationOptions;
+    if ('subscriptionOptions' in req.body) updateData.subscriptionOptions = subscriptionOptions;
+    if ('addons' in req.body) updateData.addons = addons;
+    if ('equipmentRequired' in req.body) updateData.equipmentRequired = equipmentRequired;
+    if ('pricingTiers' in req.body) updateData.pricingTiers = pricingTiers;
+    if ('workerPreferences' in req.body) updateData.workerPreferences = workerPreferences;
+    if ('serviceFields' in req.body) updateData.serviceFields = serviceFields;
+    if ('timeSlotRestrictions' in req.body) updateData.timeSlotRestrictions = timeSlotRestrictions;
+    if ('cancellationPolicy' in req.body) updateData.cancellationPolicy = cancellationPolicy;
+    if ('specialInstructionsTemplate' in req.body) updateData.specialInstructionsTemplate = specialInstructionsTemplate;
 
     const service = await Service.findByIdAndUpdate(
       req.params.id,
@@ -244,45 +307,23 @@ router.patch('/:id', authenticate, authorize('admin', 'super_admin'), async (req
     res.json({ message: 'Service updated successfully', service });
   } catch (error) {
     console.error('Update service error:', error);
+    
+    // More specific error messages
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ 
+        error: { message: error.message, status: 400 } 
+      });
+    }
+    
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
   }
-});
+};
+
+// @access  Private/Admin
+router.patch('/:id', authenticate, authorize('admin', 'super_admin'), handleServiceUpdate);
 
 // Support PUT as well for compatibility
-router.put('/:id', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
-  try {
-    const { name, description, category, price, pricingPlans, duration, image, tags, requirements, isActive } = req.body;
-
-    const updateData = {};
-    if (name) updateData.name = name;
-    if (description) updateData.description = description;
-    if (category) updateData.category = category;
-    if (price !== undefined) updateData.price = price;
-    if (pricingPlans) updateData.pricingPlans = pricingPlans;
-    if (duration !== undefined) updateData.duration = duration;
-    if (image !== undefined) updateData.image = image;
-    if (tags) updateData.tags = tags;
-    if (requirements) updateData.requirements = requirements;
-    if (isActive !== undefined) updateData.isActive = isActive;
-
-    const service = await Service.findByIdAndUpdate(
-      req.params.id,
-      { $set: updateData },
-      { new: true, runValidators: true }
-    );
-
-    if (!service) {
-      return res.status(404).json({ 
-        error: { message: 'Service not found', status: 404 } 
-      });
-    }
-
-    res.json({ message: 'Service updated successfully', service });
-  } catch (error) {
-    console.error('Update service error:', error);
-    res.status(500).json({ error: { message: 'Server error', status: 500 } });
-  }
-});
+router.put('/:id', authenticate, authorize('admin', 'super_admin'), handleServiceUpdate);
 
 // @route   DELETE /api/services/:id
 // @desc    Delete service

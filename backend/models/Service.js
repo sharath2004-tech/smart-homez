@@ -15,6 +15,27 @@ const serviceSchema = new mongoose.Schema({
     required: [true, 'Category is required'],
     enum: ['health', 'cleaning', 'maintenance', 'consultation', 'therapy', 'other']
   },
+  // Service type determines which parameters are applicable
+  serviceType: {
+    type: String,
+    enum: [
+      'instant_hourly',           // On-demand maid service
+      'monthly_subscription',     // Recurring maid service
+      'deep_cleaning_full_house', // Full house deep cleaning
+      'deep_cleaning_room',       // Room-specific deep cleaning
+      'deep_cleaning_kitchen',    // Kitchen deep cleaning
+      'deep_cleaning_bathroom',   // Bathroom deep cleaning
+      'fixed_washroom_basic',     // Basic washroom cleaning
+      'fixed_washroom_deep',      // Washroom deep cleaning
+      'fixed_fan_cleaning',       // Fan cleaning
+      'fixed_window_cleaning',    // Window cleaning
+      'fixed_sofa_cleaning',      // Sofa cleaning
+      'fixed_carpet_cleaning',    // Carpet cleaning
+      'fixed_balcony_cleaning',   // Balcony cleaning
+      'other'                     // Custom services
+    ],
+    default: 'other'
+  },
   price: {
     type: Number,
     required: [true, 'Price is required'],
@@ -129,6 +150,214 @@ const serviceSchema = new mongoose.Schema({
     type: Boolean,
     default: false // If true, service available everywhere; if false, check serviceLocations
   },
+  
+  // ==================== NEW DYNAMIC PARAMETERS ====================
+  
+  // Size-based parameters (for deep cleaning, etc.)
+  sizeParameters: {
+    enabled: {
+      type: Boolean,
+      default: false
+    },
+    sizeType: {
+      type: String,
+      enum: ['house_size', 'room_size', 'area_sqft', 'quantity'],
+      default: 'quantity'
+    },
+    options: [{
+      value: String,          // e.g., '1BHK', 'Small', '100sqft'
+      label: String,          // Display name
+      price: Number,          // Price for this size
+      duration: Number,       // Duration in minutes
+      workersRequired: Number // Number of workers needed
+    }]
+  },
+  
+  // Duration options (for hourly services)
+  durationOptions: [{
+    hours: Number,            // e.g., 1, 2, 3, 4
+    price: Number,            // Total price for this duration
+    isDefault: Boolean,
+    minimumHours: Number      // Minimum booking hours
+  }],
+  
+  // Subscription-specific options
+  subscriptionOptions: {
+    enabled: {
+      type: Boolean,
+      default: false
+    },
+    minContractMonths: {
+      type: Number,
+      default: 1
+    },
+    maxContractMonths: {
+      type: Number,
+      default: 12
+    },
+    allowedFrequencies: [{
+      type: String,
+      enum: ['daily', 'weekly', 'biweekly', 'custom']
+    }],
+    discountPercentage: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100
+    },
+    autoRenewal: {
+      type: Boolean,
+      default: true
+    },
+    requiresSameWorker: {
+      type: Boolean,
+      default: true
+    }
+  },
+  
+  // Add-ons and extras
+  addons: [{
+    id: String,
+    name: String,
+    description: String,
+    price: Number,
+    duration: Number,          // Additional minutes
+    optional: Boolean,
+    category: String,          // e.g., 'equipment', 'additional_service', 'priority'
+    icon: String,
+    isActive: {
+      type: Boolean,
+      default: true
+    }
+  }],
+  
+  // Equipment requirements
+  equipmentRequired: {
+    providedBy: {
+      type: String,
+      enum: ['worker', 'customer', 'both', 'optional'],
+      default: 'worker'
+    },
+    items: [{
+      name: String,
+      required: Boolean,
+      providedBy: String
+    }],
+    notes: String
+  },
+  
+  // Pricing tiers (for quantity-based services like fans, windows)
+  pricingTiers: [{
+    quantityFrom: Number,      // e.g., 1
+    quantityTo: Number,        // e.g., 3
+    pricePerUnit: Number,
+    totalPrice: Number,
+    duration: Number           // Total duration in minutes
+  }],
+  
+  // Worker preferences
+  workerPreferences: {
+    genderPreference: {
+      type: Boolean,
+      default: true              // Allow customers to choose gender
+    },
+    languagePreference: {
+      type: Boolean,
+      default: true
+    },
+    ratingMinimum: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5
+    },
+    experienceRequired: {
+      type: Number,
+      default: 0                 // Months of experience
+    },
+    certificationRequired: {
+      type: Boolean,
+      default: false
+    }
+  },
+  
+  // Service-specific fields
+  serviceFields: [{
+    fieldName: String,           // e.g., 'numberOfBathrooms', 'petAtHome'
+    fieldLabel: String,          // Display label
+    fieldType: {
+      type: String,
+      enum: ['text', 'number', 'select', 'multiselect', 'checkbox', 'radio', 'textarea'],
+      default: 'text'
+    },
+    options: [String],           // For select/radio/multiselect
+    required: Boolean,
+    defaultValue: mongoose.Schema.Types.Mixed,
+    placeholder: String,
+    helpText: String,
+    validation: {
+      min: Number,
+      max: Number,
+      pattern: String
+    },
+    affectsPricing: Boolean,     // If true, value affects final price
+    pricingMultiplier: Number    // Multiplier for price calculation
+  }],
+  
+  // Time slot restrictions
+  timeSlotRestrictions: {
+    allowedTimeSlots: [{
+      label: String,             // e.g., 'Morning', 'Afternoon'
+      startTime: String,         // HH:MM format
+      endTime: String,
+      extraCharge: Number        // Additional cost for this slot
+    }],
+    bookingWindow: {
+      minHoursAdvance: {
+        type: Number,
+        default: 2               // Minimum hours before service
+      },
+      maxDaysAdvance: {
+        type: Number,
+        default: 30              // Maximum days in advance
+      }
+    },
+    sameDayBooking: {
+      enabled: Boolean,
+      extraCharge: Number
+    }
+  },
+  
+  // Cancellation policy
+  cancellationPolicy: {
+    allowCancellation: {
+      type: Boolean,
+      default: true
+    },
+    freeCancelHoursBeforeService: {
+      type: Number,
+      default: 24
+    },
+    cancellationChargePercentage: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100
+    },
+    refundPolicy: String
+  },
+  
+  // Special instructions template
+  specialInstructionsTemplate: {
+    enabled: Boolean,
+    placeholder: String,
+    maxLength: {
+      type: Number,
+      default: 500
+    },
+    suggestions: [String]        // Predefined instruction options
+  },
+  
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -146,8 +375,25 @@ const serviceSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Pre-save middleware to set pricingPlans defaults if not provided
+// Validation: Ensure subscription plan IDs are unique
+serviceSchema.pre('validate', function(next) {
+  if (this.subscriptionPlans && this.subscriptionPlans.length > 0) {
+    const ids = this.subscriptionPlans.map(plan => plan.id);
+    const uniqueIds = new Set(ids);
+    if (ids.length !== uniqueIds.size) {
+      return next(new Error('Subscription plan IDs must be unique'));
+    }
+  }
+  next();
+});
+
+// Pre-save middleware to set defaults only for new documents
 serviceSchema.pre('save', function(next) {
+  // Only set defaults for new documents
+  if (!this.isNew) {
+    return next();
+  }
+  
   // Legacy pricing plans
   if (!this.pricingPlans || !this.pricingPlans.oneTime) {
     this.pricingPlans = {
@@ -158,7 +404,7 @@ serviceSchema.pre('save', function(next) {
     };
   }
   
-  // New subscription plans - initialize defaults if empty
+  // New subscription plans - initialize defaults if empty (only for new docs)
   if (!this.subscriptionPlans || this.subscriptionPlans.length === 0) {
     this.subscriptionPlans = [
       {
