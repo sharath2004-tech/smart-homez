@@ -1,29 +1,18 @@
-import { LanguageSelector } from "@/components/LanguageSelector";
+﻿import { LanguageSelector } from "@/components/LanguageSelector";
 import { API_BASE_URL, authAPI } from "@/lib/api";
-import { firebaseAuth } from "@/lib/firebase";
 import {
-    ConfirmationResult,
-    RecaptchaVerifier,
-    signInWithPhoneNumber,
-} from "firebase/auth";
-import {
-    CheckCircle,
-    Home,
-    Loader2,
-    MapPin,
-    Navigation,
-    Phone,
+  CheckCircle,
+  Eye,
+  EyeOff,
+  Home,
+  Loader2,
+  MapPin,
+  Navigation,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
-declare global {
-  interface Window {
-    workerRecaptchaVerifier?: RecaptchaVerifier;
-  }
-}
-
-type Step = "phone" | "otp" | "profile" | "skills" | "location" | "done";
+type Step = "form" | "skills" | "location" | "done";
 
 const SKILLS = [
   "General Cleaning",
@@ -37,6 +26,8 @@ const SKILLS = [
 ];
 
 interface GeoResult {
+  lat: number;
+  lng: number;
   address: string;
   area: string;
   city: string;
@@ -44,160 +35,111 @@ interface GeoResult {
 }
 
 const WorkerSignUp = () => {
-  const [step, setStep] = useState<Step>("phone");
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [name, setName] = useState("");
-  const [gender, setGender] = useState("");
-  const [experience, setExperience] = useState("");
+  const [step, setStep] = useState<Step>("form");
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
+    gender: "",
+    experience: "",
+  });
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
-  const [firebaseIdToken, setFirebaseIdToken] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [locLoading, setLocLoading] = useState(false);
   const [error, setError] = useState("");
   const [manualAddress, setManualAddress] = useState("");
-  const recaptchaRef = useRef<HTMLDivElement>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
-  const setupRecaptcha = () => {
-    if (window.workerRecaptchaVerifier) return window.workerRecaptchaVerifier;
-    const v = new RecaptchaVerifier(firebaseAuth, "worker-recaptcha", {
-      size: "invisible",
-      callback: () => {},
-    });
-    window.workerRecaptchaVerifier = v;
-    return v;
+  const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+
+  const toggleSkill = (skill: string) =>
+    setSelectedSkills((prev) => prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill]);
+
+  // ── Step 1: basic details ───────────────────────────────────────────────
+  const handleFormNext = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim()) { setError("Name is required"); return; }
+    if (!form.email.trim()) { setError("Email is required"); return; }
+    if (!form.phone.trim() || form.phone.replace(/\D/g, "").length < 10) {
+      setError("Enter a valid 10-digit mobile number"); return;
+    }
+    if (form.password.length < 8) { setError("Password must be at least 8 characters"); return; }
+    if (form.password !== form.confirmPassword) { setError("Passwords do not match"); return; }
+    setError("");
+    setStep("skills");
   };
 
+  // ── Step 2: skills ─────────────────────────────────────────────────────
+  const handleSkillsNext = () => {
+    if (selectedSkills.length === 0) { setError("Please select at least one skill"); return; }
+    if (!termsAccepted) { setError("Please accept the Terms of Service to continue"); return; }
+    setError("");
+    setStep("location");
+  };
+
+  // ── Geocoding helpers ──────────────────────────────────────────────────
   const reverseGeocode = async (lat: number, lng: number): Promise<GeoResult> => {
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
-      );
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
       const data = await res.json();
       const addr = data.address || {};
       return {
+        lat, lng,
         address: data.display_name || "",
         area: addr.suburb || addr.neighbourhood || addr.residential || addr.village || "",
         city: addr.city || addr.town || addr.district || "",
         zipCode: addr.postcode || "",
       };
     } catch {
-      return { address: "", area: "", city: "", zipCode: "" };
+      return { lat, lng, address: "", area: "", city: "", zipCode: "" };
     }
   };
 
-  const checkAvailability = async (lat: number, lng: number) => {
-    const res = await fetch(`${API_BASE_URL}/service-areas/validate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ latitude: lat, longitude: lng }),
-    });
-    if (!res.ok) return { isAvailable: false };
-    return res.json();
-  };
-
-  // ── OTP send ─────────────────────────────────────────────────────────────
-  const handleSendOTP = async () => {
-    const cleaned = phone.replace(/\D/g, "");
-    if (cleaned.length < 10) { setError("Enter a valid 10-digit mobile number"); return; }
+  // ── Register ───────────────────────────────────────────────────────────
+  const registerAccount = async (geo: GeoResult | null) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      setError("");
-      const v = setupRecaptcha();
-      const result = await signInWithPhoneNumber(firebaseAuth, `+91${cleaned}`, v);
-      setConfirmation(result);
-      setStep("otp");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "";
-      setError(msg.includes("TOO_MANY_REQUESTS")
-        ? "Too many attempts. Please wait a few minutes."
-        : "Could not send OTP. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+      const payload: Record<string, unknown> = {
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+        phone: "+91" + form.phone.replace(/\D/g, "").slice(-10),
+        role: "worker",
+        gender: form.gender || "prefer_not_to_say",
+        workerProfile: {
+          experience: parseInt(form.experience) || 0,
+          skills: selectedSkills,
+        },
+      };
 
-  // ── OTP verify ───────────────────────────────────────────────────────────
-  const handleVerifyOTP = async () => {
-    if (!confirmation || otp.length < 6) { setError("Enter the 6-digit OTP"); return; }
-    try {
-      setLoading(true);
-      setError("");
-      const cred = await confirmation.confirm(otp);
-      const token = await cred.user.getIdToken();
-      setFirebaseIdToken(token);
-      setStep("profile");
-    } catch {
-      setError("Wrong OTP or session expired. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ── Save profile → go to skills ───────────────────────────────────────────
-  const handleProfileNext = () => {
-    if (!name.trim()) { setError("Please enter your name"); return; }
-    setError("");
-    setStep("skills");
-  };
-
-  // ── Skills → location ────────────────────────────────────────────────────
-  const handleSkillsNext = () => {
-    if (selectedSkills.length === 0) { setError("Please select at least one skill"); return; }
-    setError("");
-    setStep("location");
-  };
-
-  const toggleSkill = (skill: string) => {
-    setSelectedSkills((prev) =>
-      prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill]
-    );
-  };
-
-  // ── Register with location ────────────────────────────────────────────────
-  const finishSignup = async (lat: number, lng: number, geo: GeoResult, avail: { isAvailable: boolean; serviceArea?: { id: string } }) => {
-    try {
-      setLoading(true);
-      const response = await authAPI.firebaseVerify(firebaseIdToken, "worker", name, gender);
-      localStorage.setItem("token", response.token);
-      localStorage.setItem("user", JSON.stringify(response.user));
-
-      // Update worker profile with full details
-      try {
-        await authAPI.updateProfile({
-          name,
-          gender: gender || "prefer_not_to_say",
-          workerProfile: {
-            experience: parseInt(experience) || 0,
-            skills: selectedSkills,
-          },
-          addresses: [{
-            label: "Home",
-            street: geo.address,
-            area: geo.area,
-            city: geo.city,
-            zipCode: geo.zipCode,
-            location: { type: "Point", coordinates: [lng, lat] },
-            isDefault: true,
-          }],
-        });
-      } catch { /* non-fatal */ }
-
-      if (avail.isAvailable) {
-        localStorage.setItem("userLocation", JSON.stringify({ lat, lng, ...geo, isAvailable: true }));
+      if (geo) {
+        payload.location = {
+          address: geo.address,
+          area: geo.area,
+          city: geo.city,
+          zipCode: geo.zipCode,
+          coordinates: [geo.lng, geo.lat],
+        };
       }
 
+      const response = await authAPI.register(payload);
+      localStorage.setItem("token", response.token);
+      localStorage.setItem("user", JSON.stringify(response.user));
       setStep("done");
       setTimeout(() => { window.location.href = "/worker/dashboard"; }, 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed");
+      setError(err instanceof Error ? err.message : "Registration failed. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGPSLocation = () => {
+  const handleGPS = () => {
     if (!navigator.geolocation) { setError("Geolocation not supported"); return; }
     setLocLoading(true);
     setError("");
@@ -205,22 +147,21 @@ const WorkerSignUp = () => {
       async (pos) => {
         const { latitude: lat, longitude: lng } = pos.coords;
         const geo = await reverseGeocode(lat, lng);
-        const avail = await checkAvailability(lat, lng);
         setLocLoading(false);
-        await finishSignup(lat, lng, geo, avail);
+        await registerAccount(geo);
       },
       () => {
         setLocLoading(false);
-        setError("Location access denied. Please allow it or enter your address manually.");
+        setError("Location access denied. Please allow it or enter your area.");
       }
     );
   };
 
   const handleManualLocation = async () => {
-    if (!manualAddress.trim()) { setError("Please enter an address"); return; }
+    if (!manualAddress.trim()) { setError("Please enter your area"); return; }
+    setLocLoading(true);
+    setError("");
     try {
-      setLocLoading(true);
-      setError("");
       const enc = encodeURIComponent(manualAddress + ", India");
       const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${enc}`);
       const results = await res.json();
@@ -228,67 +169,36 @@ const WorkerSignUp = () => {
       const lat = parseFloat(results[0].lat);
       const lng = parseFloat(results[0].lon);
       const geo = await reverseGeocode(lat, lng);
-      const avail = await checkAvailability(lat, lng);
-      await finishSignup(lat, lng, geo, avail);
-    } catch {
-      setError("Location lookup failed. Please try again.");
-    } finally {
       setLocLoading(false);
+      await registerAccount(geo);
+    } catch {
+      setLocLoading(false);
+      setError("Location lookup failed. Please try again.");
     }
   };
 
-  // ── Left panel ─────────────────────────────────────────────────────────────
-  const stepLabels: { s: Step; label: string }[] = [
-    { s: "phone", label: "Verify mobile number" },
-    { s: "profile", label: "Your details" },
-    { s: "skills", label: "Skills & experience" },
-    { s: "location", label: "Your service area" },
-  ];
-  const stepOrder: Step[] = ["phone", "otp", "profile", "skills", "location", "done"];
-  const currentIdx = stepOrder.indexOf(step);
+  const handleSkipLocation = () => registerAccount(null);
 
-  const LeftPanel = () => (
-    <div className="hidden lg:flex lg:w-2/5 relative overflow-hidden" style={{ background: "var(--gradient-hero)" }}>
-      <div className="relative z-10 flex flex-col justify-between p-12 text-primary-foreground h-full">
-        <Link to="/" className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary-foreground/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-            <Home className="w-5 h-5" />
-          </div>
-          <span className="text-xl font-bold font-heading">Smart Homez</span>
-        </Link>
-        <div>
-          <h1 className="text-3xl font-bold font-heading mb-4 leading-tight">
-            Grow your income with<br />flexible hours
-          </h1>
-          <p className="text-primary-foreground/70 leading-relaxed">
-            Join our network of trusted home service professionals. Earn more, work on your schedule.
-          </p>
-          <div className="mt-8 space-y-3">
-            {stepLabels.map(({ s, label }, i) => {
-              const targetIdx = stepOrder.indexOf(s);
-              const done = currentIdx > targetIdx;
-              const active = (["phone", "otp"].includes(step) && s === "phone")
-                || (step === "profile" && s === "profile")
-                || (step === "skills" && s === "skills")
-                || (["location", "done"].includes(step) && s === "location");
-              return (
-                <div key={s} className="flex items-center gap-3">
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                    done ? "bg-primary-foreground text-primary"
-                    : active ? "bg-primary-foreground/80 text-primary"
-                    : "bg-primary-foreground/20 text-primary-foreground/50"
-                  }`}>
-                    {done ? "✓" : i + 1}
-                  </div>
-                  <span className={`text-sm ${active || done ? "text-primary-foreground" : "text-primary-foreground/50"}`}>{label}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  // ── Validate service area availability (used only to inform, not block) ─
+  const checkAvailability = async (lat: number, lng: number) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/service-areas/validate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ latitude: lat, longitude: lng }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      return data.isAvailable === true;
+    } catch {
+      return false;
+    }
+  };
+  void checkAvailability; // suppress unused warning
+
+  // ── Steps for left panel ───────────────────────────────────────────────
+  const stepLabels = ["Your details", "Skills", "Service area"];
+  const stepIdx = step === "form" ? 0 : step === "skills" ? 1 : 2;
 
   if (step === "done") {
     return (
@@ -306,14 +216,47 @@ const WorkerSignUp = () => {
 
   return (
     <div className="min-h-screen flex">
-      <LeftPanel />
+      {/* Left panel */}
+      <div className="hidden lg:flex lg:w-2/5 relative overflow-hidden" style={{ background: "var(--gradient-hero)" }}>
+        <div className="relative z-10 flex flex-col justify-between p-12 text-primary-foreground h-full">
+          <Link to="/" className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-primary-foreground/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+              <Home className="w-5 h-5" />
+            </div>
+            <span className="text-xl font-bold font-heading">Smart Homez</span>
+          </Link>
+          <div>
+            <h1 className="text-3xl font-bold font-heading mb-4 leading-tight">
+              Grow your income with<br />flexible hours
+            </h1>
+            <p className="text-primary-foreground/70 leading-relaxed mb-8">
+              Join our network of trusted home service professionals.
+            </p>
+            <div className="space-y-3">
+              {stepLabels.map((label, i) => (
+                <div key={label} className="flex items-center gap-3">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    i < stepIdx ? "bg-primary-foreground text-primary"
+                    : i === stepIdx ? "bg-primary-foreground/80 text-primary"
+                    : "bg-primary-foreground/20 text-primary-foreground/50"
+                  }`}>
+                    {i < stepIdx ? "✓" : i + 1}
+                  </div>
+                  <span className={`text-sm ${i <= stepIdx ? "text-primary-foreground" : "text-primary-foreground/50"}`}>
+                    {label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
 
+      {/* Right panel */}
       <div className="flex-1 flex items-center justify-center p-6 bg-background relative overflow-y-auto">
         <div className="absolute top-6 right-6 z-10"><LanguageSelector /></div>
-        <div id="worker-recaptcha" ref={recaptchaRef} />
 
         <div className="w-full max-w-md animate-fade-in py-8">
-          {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2 mb-6">
             <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center">
               <Home className="w-4 h-4 text-primary-foreground" />
@@ -327,12 +270,23 @@ const WorkerSignUp = () => {
             </div>
           )}
 
-          {/* ── STEP: phone ── */}
-          {step === "phone" && (
+          {/* ── STEP: form ── */}
+          {step === "form" && (
             <>
               <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Join as a Worker</h2>
-              <p className="text-muted-foreground mb-6">Verify your mobile number to get started</p>
-              <div className="space-y-4">
+              <p className="text-muted-foreground mb-6">Create your free worker account</p>
+
+              <form onSubmit={handleFormNext} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Full Name</label>
+                  <input className="input-clean" placeholder="e.g. Ravi Kumar" value={form.name} onChange={set("name")} required />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Email Address</label>
+                  <input type="email" className="input-clean" placeholder="you@example.com" value={form.email} onChange={set("email")} required autoComplete="email" />
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">Mobile Number</label>
                   <div className="relative">
@@ -343,84 +297,81 @@ const WorkerSignUp = () => {
                       maxLength={10}
                       className="input-clean pl-12"
                       placeholder="98765 43210"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
-                      onKeyDown={(e) => e.key === "Enter" && handleSendOTP()}
+                      value={form.phone}
+                      onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value.replace(/\D/g, "") }))}
+                      required
                     />
                   </div>
                 </div>
-                <button onClick={handleSendOTP} disabled={loading} className="btn-brand w-full flex items-center justify-center gap-2">
-                  {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</> : <><Phone className="w-4 h-4" /> Send OTP</>}
-                </button>
-                <p className="text-center text-sm text-muted-foreground">
-                  Already have an account?{" "}
-                  <Link to="/login" className="text-primary font-semibold hover:underline">Log in</Link>
-                </p>
-              </div>
-            </>
-          )}
 
-          {/* ── STEP: otp ── */}
-          {step === "otp" && (
-            <>
-              <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Enter OTP</h2>
-              <p className="text-muted-foreground mb-6">
-                Sent to <strong>+91 {phone}</strong>{" "}
-                <button className="text-primary hover:underline text-sm" onClick={() => { setStep("phone"); setOtp(""); setError(""); }}>Change</button>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Gender <span className="text-muted-foreground font-normal">(opt.)</span></label>
+                    <select className="input-clean" value={form.gender} onChange={set("gender")}>
+                      <option value="">Select</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                      <option value="prefer_not_to_say">Prefer not to say</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Experience (yrs)</label>
+                    <input
+                      type="number"
+                      className="input-clean"
+                      placeholder="0"
+                      min="0"
+                      max="50"
+                      value={form.experience}
+                      onChange={set("experience")}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Password</label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      className="input-clean pr-12"
+                      placeholder="Min. 8 characters"
+                      value={form.password}
+                      onChange={set("password")}
+                      required
+                      autoComplete="new-password"
+                    />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Confirm Password</label>
+                  <div className="relative">
+                    <input
+                      type={showConfirm ? "text" : "password"}
+                      className="input-clean pr-12"
+                      placeholder="Re-enter your password"
+                      value={form.confirmPassword}
+                      onChange={set("confirmPassword")}
+                      required
+                      autoComplete="new-password"
+                    />
+                    <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <button type="submit" className="btn-brand w-full mt-2">Continue</button>
+              </form>
+
+              <p className="text-center text-sm text-muted-foreground mt-6">
+                Already have an account?{" "}
+                <Link to="/login" className="text-primary font-semibold hover:underline">Log in</Link>
               </p>
-              <div className="space-y-4">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  className="input-clean tracking-[0.4em] text-center text-xl font-bold"
-                  placeholder="• • • • • •"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                  onKeyDown={(e) => e.key === "Enter" && handleVerifyOTP()}
-                />
-                <button onClick={handleVerifyOTP} disabled={loading || otp.length < 6} className="btn-brand w-full flex items-center justify-center gap-2">
-                  {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</> : "Verify OTP"}
-                </button>
-                <button className="w-full text-sm text-primary hover:underline" onClick={() => { setStep("phone"); setOtp(""); setError(""); }}>Resend OTP</button>
-              </div>
-            </>
-          )}
-
-          {/* ── STEP: profile ── */}
-          {step === "profile" && (
-            <>
-              <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Your details</h2>
-              <p className="text-muted-foreground mb-6">Tell us about yourself</p>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Full Name</label>
-                  <input className="input-clean" placeholder="e.g. Ravi Kumar" value={name} onChange={(e) => setName(e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Gender</label>
-                  <select className="input-clean" value={gender} onChange={(e) => setGender(e.target.value)}>
-                    <option value="">Select gender</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
-                    <option value="prefer_not_to_say">Prefer not to say</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Years of experience</label>
-                  <input
-                    type="number"
-                    className="input-clean"
-                    placeholder="e.g. 2"
-                    min="0"
-                    max="50"
-                    value={experience}
-                    onChange={(e) => setExperience(e.target.value)}
-                  />
-                </div>
-                <button onClick={handleProfileNext} className="btn-brand w-full">Continue</button>
-              </div>
             </>
           )}
 
@@ -428,8 +379,9 @@ const WorkerSignUp = () => {
           {step === "skills" && (
             <>
               <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Your skills</h2>
-              <p className="text-muted-foreground mb-6">Select the services you can provide</p>
-              <div className="grid grid-cols-2 gap-2 mb-6">
+              <p className="text-muted-foreground mb-6">Select all services you can provide</p>
+
+              <div className="grid grid-cols-2 gap-2 mb-5">
                 {SKILLS.map((skill) => (
                   <label
                     key={skill}
@@ -441,25 +393,31 @@ const WorkerSignUp = () => {
                   >
                     <input
                       type="checkbox"
-                      className="accent-primary w-4 h-4"
+                      className="accent-primary w-4 h-4 shrink-0"
                       checked={selectedSkills.includes(skill)}
                       onChange={() => toggleSkill(skill)}
                     />
-                    <span className="text-sm font-medium">{skill}</span>
+                    <span className="text-sm font-medium leading-tight">{skill}</span>
                   </label>
                 ))}
               </div>
-              <div className="flex items-start gap-3 p-3 bg-muted rounded-xl mb-4">
-                <input type="checkbox" className="accent-primary w-4 h-4 mt-0.5" required id="worker-terms" />
-                <label htmlFor="worker-terms" className="text-sm text-muted-foreground cursor-pointer">
+
+              <label className="flex items-start gap-3 p-3 bg-muted rounded-xl mb-4 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="accent-primary w-4 h-4 mt-0.5 shrink-0"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                />
+                <span className="text-sm text-muted-foreground">
                   I agree to the{" "}
-                  <span className="text-primary hover:underline font-medium">Terms of Service</span>{" "}
-                  and{" "}
-                  <span className="text-primary hover:underline font-medium">Privacy Policy</span>
-                </label>
-              </div>
+                  <span className="text-primary font-medium">Terms of Service</span> and{" "}
+                  <span className="text-primary font-medium">Privacy Policy</span>
+                </span>
+              </label>
+
               <div className="flex gap-3">
-                <button onClick={() => setStep("profile")} className="flex-1 py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors">
+                <button onClick={() => { setStep("form"); setError(""); }} className="flex-1 py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors">
                   Back
                 </button>
                 <button onClick={handleSkillsNext} className="btn-brand flex-1">Continue</button>
@@ -472,11 +430,11 @@ const WorkerSignUp = () => {
             <>
               <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Your service area</h2>
               <p className="text-muted-foreground mb-6">
-                Share your location so we can match you with nearby bookings. We do <strong>not</strong> require a specific city — just your area.
+                Tell us where you're based so we can match you with nearby bookings.
               </p>
               <div className="space-y-4">
                 <button
-                  onClick={handleGPSLocation}
+                  onClick={handleGPS}
                   disabled={locLoading}
                   className="w-full flex items-center justify-center gap-3 py-4 px-4 bg-primary/10 border-2 border-primary rounded-xl text-primary font-semibold hover:bg-primary/20 transition-colors"
                 >
@@ -501,17 +459,26 @@ const WorkerSignUp = () => {
                   <button
                     onClick={handleManualLocation}
                     disabled={locLoading}
-                    className="px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors flex items-center gap-1"
+                    className="px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors"
                   >
                     {locLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
                   </button>
                 </div>
 
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800">
-                  💡 Workers outside current service areas may still be registered and notified when we expand nearby.
+                  💡 You can update your service area anytime from your profile settings.
                 </div>
 
-                <button onClick={() => setStep("skills")} className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm">
+                <button
+                  onClick={handleSkipLocation}
+                  disabled={loading}
+                  className="w-full py-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> : null}
+                  Skip for now
+                </button>
+
+                <button onClick={() => { setStep("skills"); setError(""); }} className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm">
                   Back
                 </button>
               </div>
@@ -524,3 +491,4 @@ const WorkerSignUp = () => {
 };
 
 export default WorkerSignUp;
+

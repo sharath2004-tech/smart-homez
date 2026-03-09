@@ -1,163 +1,63 @@
 ﻿import { LanguageSelector } from "@/components/LanguageSelector";
 import { authAPI, publicAPI } from "@/lib/api";
-import { firebaseAuth } from "@/lib/firebase";
-import { ConfirmationResult, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
-import { Eye, EyeOff, Home, Loader2, Phone, Shield } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Eye, EyeOff, Home, Loader2, Shield } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-
-declare global {
-  interface Window { recaptchaVerifier?: RecaptchaVerifier; }
-}
 
 const LoginPage = () => {
   const { t } = useTranslation();
   const [tab, setTab] = useState<"customer" | "worker" | "admin">("customer");
-
-  // OTP flow state (customer & worker tabs)
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [step, setStep] = useState<"phone" | "otp">("phone");
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [otpError, setOtpError] = useState("");
-  const recaptchaContainerRef = useRef<HTMLDivElement>(null);
-
-  // Admin email/password state
+  const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
-  const [adminForm, setAdminForm] = useState({ email: "", password: "" });
-  const [adminLoading, setAdminLoading] = useState(false);
-  const [adminError, setAdminError] = useState("");
-
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [stats, setStats] = useState({ totalCustomers: 0, totalWorkers: 0, servicesDone: 0 });
 
   useEffect(() => {
     publicAPI.getStats().then((r) => { if (r.success) setStats(r.stats); }).catch(() => {});
   }, []);
 
-  // Reset OTP state when tab changes
   useEffect(() => {
-    setStep("phone");
-    setPhone("");
-    setOtp("");
-    setOtpError("");
-    setConfirmationResult(null);
-    if (window.recaptchaVerifier) {
-      window.recaptchaVerifier.clear();
-      window.recaptchaVerifier = undefined;
-    }
+    setForm({ email: "", password: "" });
+    setError("");
   }, [tab]);
 
   const formatNumber = (n: number) => (n >= 1000 ? (n / 1000).toFixed(1) + "K+" : n + "+");
 
-  const setupRecaptcha = () => {
-    if (window.recaptchaVerifier) return window.recaptchaVerifier;
-    const verifier = new RecaptchaVerifier(firebaseAuth, "recaptcha-container", {
-      size: "invisible",
-      callback: () => {},
-    });
-    window.recaptchaVerifier = verifier;
-    return verifier;
-  };
-
-  const handleSendOTP = async () => {
-    const cleaned = phone.trim().replace(/\s+/g, "");
-    if (!cleaned) { setOtpError("Please enter your mobile number"); return; }
-
-    // Ensure E.164 format
-    const formatted = cleaned.startsWith("+") ? cleaned : `+91${cleaned}`;
-    if (!/^\+\d{10,15}$/.test(formatted)) {
-      setOtpError("Enter a valid mobile number (10 digits)");
-      return;
-    }
-
-    try {
-      setOtpLoading(true);
-      setOtpError("");
-      const verifier = setupRecaptcha();
-      const result = await signInWithPhoneNumber(firebaseAuth, formatted, verifier);
-      setConfirmationResult(result);
-      setStep("otp");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("TOO_SHORT") || msg.includes("INVALID_PHONE_NUMBER")) {
-        setOtpError("Invalid phone number. Include country code or use 10-digit Indian number.");
-      } else if (msg.includes("TOO_MANY_REQUESTS")) {
-        setOtpError("Too many attempts. Please wait a few minutes and try again.");
-      } else if (msg.includes("not-initialized") || msg.includes("Firebase")) {
-        setOtpError("Auth service not configured. Please contact support.");
-      } else {
-        setOtpError("Failed to send OTP. Please try again.");
-      }
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  const handleVerifyOTP = async () => {
-    if (!confirmationResult) return;
-    if (otp.length < 6) { setOtpError("Enter the 6-digit OTP"); return; }
-
-    try {
-      setOtpLoading(true);
-      setOtpError("");
-      const credential = await confirmationResult.confirm(otp);
-      const idToken = await credential.user.getIdToken();
-
-      const response = await authAPI.firebaseVerify(idToken, tab);
-      localStorage.setItem("token", response.token);
-      localStorage.setItem("user", JSON.stringify(response.user));
-
-      const role = response.user.role;
-      if (role === "customer") window.location.href = "/customer/dashboard";
-      else if (role === "worker") window.location.href = "/worker/dashboard";
-      else window.location.href = "/";
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("invalid-verification-code") || msg.includes("INVALID_CODE")) {
-        setOtpError("Wrong OTP. Please check and try again.");
-      } else if (msg.includes("expired") || msg.includes("session-expired")) {
-        setOtpError("OTP has expired. Please request a new one.");
-      } else {
-        setOtpError(msg || "Verification failed. Please try again.");
-      }
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  const handleAdminLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setAdminLoading(true);
-    setAdminError("");
+    if (!form.email || !form.password) { setError("Please enter email and password"); return; }
+    setLoading(true);
+    setError("");
     try {
-      const response = await authAPI.login(adminForm.email, adminForm.password);
+      const response = await authAPI.login(form.email, form.password);
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
+
       if (response.requirePasswordChange || response.user.isFirstLogin) {
         window.location.href = "/change-password";
         return;
       }
+
       const role = response.user.role;
       if (role === "super_admin") window.location.href = "/super-admin/dashboard";
       else if (role === "admin") window.location.href = "/admin/dashboard";
-      else if (role === "customer") window.location.href = "/customer/dashboard";
       else if (role === "worker") window.location.href = "/worker/dashboard";
-      else window.location.href = "/";
+      else window.location.href = "/customer/dashboard";
     } catch (err) {
-      setAdminError(err instanceof Error ? err.message : "Login failed.");
-      setAdminLoading(false);
+      setError(err instanceof Error ? err.message : "Login failed. Please check your credentials.");
+      setLoading(false);
     }
   };
 
   const tabs = [
-    { key: "customer", label: "Customer", emoji: "ðŸ " },
-    { key: "worker", label: "Worker", emoji: "ðŸ§¹" },
-    { key: "admin", label: "Admin", emoji: "âš™ï¸" },
+    { key: "customer", label: "Customer", emoji: "🏠" },
+    { key: "worker", label: "Worker", emoji: "🧹" },
+    { key: "admin", label: "Admin", emoji: "⚙️" },
   ] as const;
 
-  const signupLink = tab === "customer" ? "/register/customer" : "/register/worker";
+  const signupLink = tab === "customer" ? "/register/customer" : tab === "worker" ? "/register/worker" : null;
 
   return (
     <div className="min-h-screen flex">
@@ -201,11 +101,7 @@ const LoginPage = () => {
           <LanguageSelector />
         </div>
 
-        {/* invisible recaptcha mount point */}
-        <div id="recaptcha-container" ref={recaptchaContainerRef} />
-
         <div className="w-full max-w-md animate-fade-in">
-          {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2 mb-8">
             <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center">
               <Home className="w-4 h-4 text-primary-foreground" />
@@ -223,7 +119,9 @@ const LoginPage = () => {
                 key={t_.key}
                 onClick={() => setTab(t_.key)}
                 className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  tab === t_.key ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground"
+                  tab === t_.key
+                    ? "bg-card text-foreground shadow-card"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <span>{t_.emoji}</span>
@@ -232,167 +130,84 @@ const LoginPage = () => {
             ))}
           </div>
 
-          {/* OTP login â€” Customer / Worker */}
-          {tab !== "admin" && (
-            <div className="space-y-4">
-              {otpError && (
-                <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">
-                  {otpError}
-                </div>
-              )}
-
-              {step === "phone" ? (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">
-                      Mobile Number
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">
-                        +91
-                      </span>
-                      <input
-                        type="tel"
-                        inputMode="numeric"
-                        maxLength={10}
-                        className="input-clean pl-12"
-                        placeholder="98765 43210"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
-                        onKeyDown={(e) => e.key === "Enter" && handleSendOTP()}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">We'll send a 6-digit OTP to this number</p>
-                  </div>
-                  <button
-                    onClick={handleSendOTP}
-                    disabled={otpLoading}
-                    className="btn-brand w-full flex items-center justify-center gap-2"
-                  >
-                    {otpLoading ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTP...</>
-                    ) : (
-                      <><Phone className="w-4 h-4" /> Send OTP</>
-                    )}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800">
-                    OTP sent to <strong>+91 {phone}</strong>{" "}
-                    <button
-                      className="underline text-primary ml-1"
-                      onClick={() => { setStep("phone"); setOtp(""); setOtpError(""); }}
-                    >
-                      Change
-                    </button>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">Enter OTP</label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={6}
-                      className="input-clean tracking-[0.4em] text-center text-xl font-bold"
-                      placeholder="â€¢ â€¢ â€¢ â€¢ â€¢ â€¢"
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                      onKeyDown={(e) => e.key === "Enter" && handleVerifyOTP()}
-                    />
-                  </div>
-                  <button
-                    onClick={handleVerifyOTP}
-                    disabled={otpLoading || otp.length < 6}
-                    className="btn-brand w-full flex items-center justify-center gap-2"
-                  >
-                    {otpLoading ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" /> Verifying...</>
-                    ) : (
-                      "Verify & Login"
-                    )}
-                  </button>
-                  <button
-                    className="w-full text-sm text-primary hover:underline"
-                    onClick={() => { setStep("phone"); setOtp(""); setOtpError(""); }}
-                  >
-                    Resend OTP
-                  </button>
-                </>
-              )}
-
-              <p className="text-center text-sm text-muted-foreground pt-2">
-                New here?{" "}
-                <Link to={signupLink} className="text-primary font-semibold hover:underline">
-                  Sign up for free
-                </Link>
-              </p>
+          {tab === "admin" && (
+            <div className="flex items-center gap-2 mb-5 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+              <Shield className="w-4 h-4 shrink-0" />
+              Admin &amp; Super Admin access only
             </div>
           )}
 
-          {/* Admin email/password login */}
-          {tab === "admin" && (
-            <div>
-              <div className="flex items-center gap-2 mb-5 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
-                <Shield className="w-4 h-4 shrink-0" />
-                Admin & Super Admin login only
-              </div>
-
-              {adminError && (
-                <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">
-                  {adminError}
-                </div>
-              )}
-
-              <form onSubmit={handleAdminLogin} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">{t("auth.login.email")}</label>
-                  <input
-                    type="email"
-                    className="input-clean"
-                    placeholder={t("auth.login.emailPlaceholder")}
-                    value={adminForm.email}
-                    onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-sm font-medium text-foreground">{t("auth.login.password")}</label>
-                    <Link to="/forgot-password" className="text-sm text-primary hover:underline font-medium">
-                      {t("auth.login.forgotPassword")}
-                    </Link>
-                  </div>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      className="input-clean pr-12"
-                      placeholder={t("auth.login.passwordPlaceholder")}
-                      value={adminForm.password}
-                      onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-                <button
-                  type="submit"
-                  disabled={adminLoading}
-                  className="btn-brand w-full flex items-center justify-center gap-2 mt-2"
-                >
-                  {adminLoading ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> {t("auth.login.signingIn")}</>
-                  ) : (
-                    t("auth.login.signIn")
-                  )}
-                </button>
-              </form>
+          {error && (
+            <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">
+              {error}
             </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                {t("auth.login.email")}
+              </label>
+              <input
+                type="email"
+                className="input-clean"
+                placeholder={t("auth.login.emailPlaceholder")}
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                required
+                autoComplete="email"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-medium text-foreground">
+                  {t("auth.login.password")}
+                </label>
+                <Link to="/forgot-password" className="text-sm text-primary hover:underline font-medium">
+                  {t("auth.login.forgotPassword")}
+                </Link>
+              </div>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  className="input-clean pr-12"
+                  placeholder={t("auth.login.passwordPlaceholder")}
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  required
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-brand w-full flex items-center justify-center gap-2 mt-2"
+            >
+              {loading ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> {t("auth.login.signingIn")}</>
+              ) : (
+                t("auth.login.signIn")
+              )}
+            </button>
+          </form>
+
+          {signupLink && (
+            <p className="text-center text-sm text-muted-foreground mt-6">
+              {t("auth.login.noAccount")}{" "}
+              <Link to={signupLink} className="text-primary font-semibold hover:underline">
+                {t("auth.login.signUpFree")}
+              </Link>
+            </p>
           )}
         </div>
       </div>
@@ -401,3 +216,4 @@ const LoginPage = () => {
 };
 
 export default LoginPage;
+
