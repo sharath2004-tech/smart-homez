@@ -5,7 +5,7 @@ import { LanguageSelector } from "./LanguageSelector";
 
 interface AppLayoutProps {
   children: React.ReactNode;
-  userType?: "customer" | "worker" | "admin";
+  userType?: "customer" | "worker" | "admin" | "super_admin";
   userName?: string;
 }
 
@@ -50,9 +50,18 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
     { to: "/admin/settings", icon: Settings, label: t('nav.settings') },
   ];
 
-  const navItems = userType === "admin" ? adminNav : userType === "worker" ? workerNav : customerNav;
+  const superAdminNav = [
+    { to: "/super-admin/dashboard", icon: LayoutDashboard, label: "Overview" },
+    { to: "/admin/locations", icon: MapPin, label: t('nav.locations') },
+    { to: "/admin/workers", icon: Users, label: t('nav.workers') },
+    { to: "/admin/bookings", icon: Calendar, label: t('nav.bookings') },
+    { to: "/admin/services", icon: Wrench, label: t('nav.services') },
+    { to: "/admin/settings", icon: Settings, label: t('nav.settings') },
+  ];
+
+  const navItems = userType === "admin" ? adminNav : userType === "super_admin" ? superAdminNav : userType === "worker" ? workerNav : customerNav;
   const initials = userName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
-  const dashboardPath = userType === "admin" ? "/admin/dashboard" : userType === "worker" ? "/worker/dashboard" : "/customer/dashboard";
+  const dashboardPath = userType === "admin" ? "/admin/dashboard" : userType === "super_admin" ? "/super-admin/dashboard" : userType === "worker" ? "/worker/dashboard" : "/customer/dashboard";
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -76,7 +85,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
             </div>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-foreground truncate">{userName}</p>
-              <p className="text-xs text-muted-foreground capitalize">{t(`nav.${userType}`)}</p>
+              <p className="text-xs text-muted-foreground capitalize">{userType === 'super_admin' ? 'Super Admin' : t(`nav.${userType}`)}</p>
             </div>
           </div>
         </div>

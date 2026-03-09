@@ -61,7 +61,7 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
       customer: '/customer/dashboard',
       worker: '/worker/dashboard',
       admin: '/admin/dashboard',
-      super_admin: '/admin/dashboard'
+      super_admin: '/super-admin/dashboard'
     };
     
     return <Navigate to={dashboardMap[user.role] || '/'} replace />;

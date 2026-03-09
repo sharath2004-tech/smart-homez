@@ -600,18 +600,24 @@ export const workersAPI = {
 
 export const adminAPI = {
   // Dashboard
-  getDashboardStats: async () => {
-    return apiCall('/admin/dashboard-stats');
+  getDashboardStats: async (locationId?: string) => {
+    const params = locationId ? `?locationId=${locationId}` : '';
+    return apiCall(`/admin/dashboard-stats${params}`);
   },
 
-  getRecentBookings: async (limit?: number) => {
+  getRecentBookings: async (limit?: number, locationId?: string) => {
     const params = new URLSearchParams();
     if (limit) params.append('limit', limit.toString());
+    if (locationId) params.append('locationId', locationId);
     return apiCall(`/admin/recent-bookings${params.toString() ? `?${params.toString()}` : ''}`);
   },
 
   getAlerts: async () => {
     return apiCall('/admin/alerts');
+  },
+
+  getLocationOverview: async () => {
+    return apiCall('/admin/location-overview');
   },
 
   // Location Management (Super Admin)
@@ -714,8 +720,8 @@ export const adminAPI = {
     });
   },
 
-  getWorkers: async () => {
-    return apiCall('/admin/workers');
+  getWorkers: async (locationId?: string) => {
+    return apiCall(locationId ? `/admin/workers?locationId=${locationId}` : '/admin/workers');
   },
 
   archiveWorker: async (workerId: string) => {

@@ -171,6 +171,54 @@ router.post('/create-admin',
   }
 );
 
+// @route   GET /api/admin/location-overview
+// @desc    Get all locations with aggregate stats (worker count, bookings, revenue) - Super Admin only
+// @access  Private/Super Admin
+router.get('/location-overview', authenticate, authorize('super_admin'), async (req, res) => {
+  try {
+    const locations = await Location.find({ isActive: true })
+      .populate('assignedAdmin', 'name email')
+      .lean();
+
+    const overviewData = await Promise.all(
+      locations.map(async (loc) => {
+        const workers = await User.find({
+          role: 'worker',
+          isActive: true,
+          'workerProfile.assignedApartments.locationId': loc._id
+        }).select('_id workerProfile.availability workerProfile.rating').lean();
+
+        const workerIds = workers.map((w) => w._id);
+
+        const [activeBookings, completedBookings, revenueResult] = await Promise.all([
+          Booking.countDocuments({ worker: { $in: workerIds }, status: { $in: ['pending', 'confirmed', 'in-progress'] } }),
+          Booking.countDocuments({ worker: { $in: workerIds }, status: 'completed' }),
+          Booking.aggregate([
+            { $match: { worker: { $in: workerIds }, status: 'completed' } },
+            { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+          ])
+        ]);
+
+        return {
+          ...loc,
+          stats: {
+            workerCount: workers.length,
+            onlineWorkers: workers.filter((w) => w.workerProfile?.availability).length,
+            activeBookings,
+            completedBookings,
+            revenue: revenueResult[0]?.total || 0
+          }
+        };
+      })
+    );
+
+    res.json({ success: true, locations: overviewData });
+  } catch (error) {
+    console.error('Location overview error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
 // @route   GET /api/admin/locations
 // @desc    Get all locations - Super Admin sees all, Admin sees assigned
 // @access  Private/Admin
@@ -752,7 +800,17 @@ router.get('/workers', authenticate, authorize('admin', 'super_admin'), async (r
         console.log(`📊 Admin ${req.user.name} sees ${workers.length} workers`);
       }
     } else {
-      console.log(`👑 Super Admin sees all ${workers.length} workers`);
+      // Super Admin: optionally filter by locationId query param
+      if (req.query.locationId) {
+        const { locationId } = req.query;
+        workers = workers.filter((worker) => {
+          const locIds = worker.workerProfile?.assignedApartments?.map((a) => a.locationId?.toString()).filter(Boolean) || [];
+          return locIds.includes(locationId.toString());
+        });
+        console.log(`👑 Super Admin filtered to ${workers.length} workers for location ${locationId}`);
+      } else {
+        console.log(`👑 Super Admin sees all ${workers.length} workers`);
+      }
     }
 
     console.log('✅ Returning', workers.length, 'workers to', req.user.role);
@@ -872,6 +930,14 @@ router.get('/dashboard-stats', authenticate, authorize('admin', 'super_admin'), 
       });
 
       console.log(`📊 Dashboard: Admin sees ${workers.length} workers`);
+    } else if (req.query.locationId) {
+      // Super Admin filtering by specific location
+      const { locationId } = req.query;
+      workers = workers.filter((worker) => {
+        const locIds = worker.workerProfile?.assignedApartments?.map((a) => a.locationId?.toString()).filter(Boolean) || [];
+        return locIds.includes(locationId.toString());
+      });
+      console.log(`👑 Dashboard: Super Admin filtered to ${workers.length} workers for location ${locationId}`);
     } else {
       console.log(`👑 Dashboard: Super Admin sees all ${workers.length} workers`);
     }
@@ -936,26 +1002,33 @@ router.get('/recent-bookings', authenticate, authorize('admin', 'super_admin'), 
       .sort({ createdAt: -1 })
       .limit(parseInt(limit) * 5); // Fetch more to filter
 
-    // Filter bookings by admin's assigned locations
+    // Filter bookings by location scope
     if (req.user.role === 'admin') {
       const adminLocationIds = req.user.adminProfile?.assignedLocations?.map(loc => loc.locationId.toString()) || [];
-      
-      // Filter bookings where worker is assigned to admin's locations
+
       bookings = await Promise.all(
         bookings.map(async (booking) => {
-          if (!booking.worker) return booking; // Include unassigned bookings
-          
+          if (!booking.worker) return booking;
           const worker = await User.findById(booking.worker._id);
           if (!worker) return null;
-          
           const workerLocationIds = worker.workerProfile?.assignedApartments?.map(apt => apt.locationId?.toString()).filter(Boolean) || [];
-          const hasMatch = workerLocationIds.some(locId => adminLocationIds.includes(locId));
-          
-          return hasMatch ? booking : null;
+          return workerLocationIds.some(locId => adminLocationIds.includes(locId)) ? booking : null;
         })
       );
-      
       bookings = bookings.filter(b => b !== null).slice(0, parseInt(limit));
+    } else if (req.user.role === 'super_admin' && req.query.locationId) {
+      // Super Admin: filter bookings by specific locationId via worker assignment
+      const { locationId } = req.query;
+      const workersInLocation = await User.find({
+        role: 'worker',
+        'workerProfile.assignedApartments.locationId': locationId
+      }).select('_id').lean();
+      const workerIds = new Set(workersInLocation.map((w) => w._id.toString()));
+      bookings = bookings
+        .filter((b) => b.worker && workerIds.has(b.worker._id?.toString() || b.worker.toString()))
+        .slice(0, parseInt(limit));
+    } else {
+      bookings = bookings.slice(0, parseInt(limit));
     }
 
     res.json({

@@ -47,6 +47,7 @@ import AdminSettings from "./pages/admin/AdminSettings";
 import AdminWorkers from "./pages/admin/AdminWorkers";
 import AdminWorkerSchedule from "./pages/admin/AdminWorkerSchedule";
 import AdminWorkforce from "./pages/admin/AdminWorkforce";
+import SuperAdminDashboard from "./pages/admin/SuperAdminDashboard";
 
 const queryClient = new QueryClient();
 
@@ -98,6 +99,9 @@ const App = () => (
           <Route path="/admin/locations" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminLocations /></ProtectedRoute>} />
           <Route path="/admin/service-areas" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminServiceAreas /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminSettings /></ProtectedRoute>} />
+
+          {/* Super Admin */}
+          <Route path="/super-admin/dashboard" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminDashboard /></ProtectedRoute>} />
 
           {/* Catch-all */}
           <Route path="*" element={<NotFound />} />
