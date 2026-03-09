@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
-import { bookingsAPI } from "@/lib/api";
-import { Download, Eye, Search, X } from "lucide-react";
+import { bookingsAPI, superAdminAPI } from "@/lib/api";
+import { Download, Eye, MapPin, Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface ProofPhoto {
@@ -36,23 +36,50 @@ const statusConfig: Record<string, string> = {
   cancelled: "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold bg-destructive/10 text-destructive",
 };
 
+interface Location {
+  _id: string;
+  apartmentName: string;
+  area: string;
+  city: string;
+}
+
 const AdminBookings = () => {
-  const { role, name } = useAdminRole();
+  const { role, name, isSuperAdmin } = useAdminRole();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProofBooking, setSelectedProofBooking] = useState<Booking | null>(null);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState("");
+
+  useEffect(() => {
+    if (isSuperAdmin) {
+      superAdminAPI.getLocations().then((res: { locations: Location[] }) => {
+        setLocations(res.locations || []);
+      }).catch(console.error);
+    }
+  }, [isSuperAdmin]);
 
   useEffect(() => {
     fetchBookings();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperAdmin, selectedLocation]);
 
   const fetchBookings = async () => {
     try {
       setLoading(true);
-      const response = await bookingsAPI.getAll({ limit: 1000 });
-      setBookings(response.bookings || []);
+      if (isSuperAdmin) {
+        const response = await superAdminAPI.getBookings({
+          locationId: selectedLocation || undefined,
+          limit: 1000,
+        });
+        setBookings(response.bookings || []);
+      } else {
+        // admin role — backend scopes to their assigned locations automatically
+        const response = await bookingsAPI.getAll({ limit: 1000 });
+        setBookings(response.bookings || []);
+      }
     } catch (error) {
       console.error('Error fetching bookings:', error);
     } finally {
@@ -109,7 +136,13 @@ const AdminBookings = () => {
       <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold font-heading text-foreground">All Bookings</h1>
+            <h1 className="text-2xl font-bold font-heading text-foreground">
+              {isSuperAdmin
+                ? selectedLocation
+                  ? `${locations.find(l => l._id === selectedLocation)?.apartmentName || 'Location'} Bookings`
+                  : 'All Bookings'
+                : 'My Region Bookings'}
+            </h1>
             <p className="text-muted-foreground text-sm mt-1">{bookings.length} total bookings</p>
           </div>
           <button className="flex items-center gap-2 btn-brand text-sm py-2.5 px-4">
@@ -123,6 +156,23 @@ const AdminBookings = () => {
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input className="input-clean pl-10" placeholder="Search by customer, ID, or service..." value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
+          {isSuperAdmin && (
+            <div className="relative sm:w-56">
+              <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <select
+                className="input-clean pl-10"
+                value={selectedLocation}
+                onChange={(e) => setSelectedLocation(e.target.value)}
+              >
+                <option value="">All Locations</option>
+                {locations.map((loc) => (
+                  <option key={loc._id} value={loc._id}>
+                    {loc.apartmentName}, {loc.city}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <select className="input-clean sm:w-48" value={filter} onChange={(e) => setFilter(e.target.value)}>
             <option value="all">All Status</option>
             <option value="pending">Pending</option>
