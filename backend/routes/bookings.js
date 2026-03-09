@@ -265,6 +265,44 @@ router.post('/:id/accept-order', authenticate, authorize('worker'), async (req, 
   }
 });
 
+// @route   GET /api/bookings/booked-slots
+// @desc    Get booked time ranges for a specific date (for slot availability UI)
+// @access  Private/Customer
+router.get('/booked-slots', authenticate, async (req, res) => {
+  try {
+    const { date } = req.query;
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ error: { message: 'date query param required (YYYY-MM-DD)', status: 400 } });
+    }
+
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // All active bookings on this date
+    const bookings = await Booking.find({
+      bookingDate: { $gte: startOfDay, $lte: endOfDay },
+      status: { $in: ['pending', 'confirmed', 'in-progress'] }
+    }).select('worker startTime endTime').lean();
+
+    // Build per-worker booked ranges
+    const bookedRanges = bookings.map(b => ({
+      workerId: b.worker ? b.worker.toString() : null,
+      startTime: b.startTime,
+      endTime: b.endTime
+    }));
+
+    // Count total active workers in the system
+    const totalWorkers = await User.countDocuments({ role: 'worker', isActive: true });
+
+    res.json({ success: true, bookedRanges, totalWorkers });
+  } catch (error) {
+    console.error('Get booked slots error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
 // @route   GET /api/bookings/:id
 // @desc    Get booking by ID
 // @access  Private

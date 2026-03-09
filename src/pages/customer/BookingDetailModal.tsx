@@ -427,14 +427,14 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                 <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 p-4 rounded-xl space-y-3">
                   <h4 className="font-semibold text-green-800 text-center flex items-center justify-center gap-2">
                     <QrCode className="w-5 h-5" />
-                    End Service Options
+                    End Service
                   </h4>
-                  
+
                   <p className="text-xs text-green-700 text-center">
-                    Choose how you want to end the service:
+                    Scan the worker's QR code to confirm service completion.
                   </p>
 
-                  {/* Option 1: Scan Worker's End QR */}
+                  {/* Scan Worker's End QR */}
                   <button
                     onClick={() => setShowEndScanner(true)}
                     className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
@@ -442,38 +442,6 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                     <QrCode className="w-5 h-5" />
                     Scan Worker's End QR Code
                   </button>
-
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-green-300"></div>
-                    </div>
-                    <div className="relative flex justify-center text-xs">
-                      <span className="bg-gradient-to-br from-green-50 to-emerald-50 px-2 text-green-600">OR</span>
-                    </div>
-                  </div>
-
-                  {/* Option 2: Direct End Service */}
-                  <button
-                    onClick={handleDirectEndService}
-                    disabled={endingService}
-                    className="w-full bg-white hover:bg-green-50 text-green-700 font-semibold py-3 px-4 rounded-lg border-2 border-green-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {endingService ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
-                        Ending Service...
-                      </>
-                    ) : (
-                      <>
-                        <Timer className="w-5 h-5" />
-                        End Service Now
-                      </>
-                    )}
-                  </button>
-
-                  <p className="text-xs text-green-600 text-center italic">
-                    💡 Tip: Scanning worker's QR is recommended for verification
-                  </p>
                 </div>
               </div>
             )}

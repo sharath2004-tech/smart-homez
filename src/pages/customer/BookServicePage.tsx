@@ -84,6 +84,9 @@ const BookServicePage = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('morning');
   const [selectedExactTime, setSelectedExactTime] = useState<string>('');
   const [selectedWorker, setSelectedWorker] = useState<string | null>(null);
+  const [bookedRanges, setBookedRanges] = useState<{ workerId: string | null; startTime: string; endTime: string }[]>([]);
+  const [totalWorkersCount, setTotalWorkersCount] = useState(0);
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const [preferences, setPreferences] = useState<Preferences>({
     workerGenderPreference: 'any',
     languagePreference: 'any',
@@ -102,7 +105,13 @@ const BookServicePage = () => {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    if (selectedDate) fetchBookedSlots(selectedDate);
+    setSelectedExactTime('');
+  }, [selectedDate]); // fetchBookedSlots is stable
 
   const fetchData = async () => {
     try {
@@ -200,6 +209,12 @@ const BookServicePage = () => {
       distance: Math.round(distance * 10) / 10, // Round to 1 decimal
       eta: calculateETA(distance)
     };
+  };
+
+  // Local today helper (timezone-safe)
+  const localToday = (): string => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
   // Generate 15-min slots for a period
@@ -395,10 +410,80 @@ const BookServicePage = () => {
     return `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
   };
 
-  const getTomorrowDate = () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split('T')[0];
+  const getTodayDate = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  // Fetch booked slots for the selected date
+  const fetchBookedSlots = async (date: string) => {
+    if (!date) return;
+    setLoadingSlots(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/bookings/booked-slots?date=${date}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setBookedRanges(data.bookedRanges || []);
+        setTotalWorkersCount(data.totalWorkers || 0);
+      }
+    } catch (err) {
+      console.error('Fetch booked slots error:', err);
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
+
+  // Convert HH:MM string to minutes
+  const toMinutes = (t: string): number => {
+    const [h, m] = t.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  // Is a slot in the past (only relevant for today)
+  const isSlotInPast = (time: string): boolean => {
+    if (!selectedDate || selectedDate !== getTodayDate()) return false;
+    const now = new Date();
+    const nowMins = now.getHours() * 60 + now.getMinutes() + 30; // 30-min buffer
+    return toMinutes(time) <= nowMins;
+  };
+
+  // How many workers are available for a given slot (not booked)
+  const getAvailableWorkersForSlot = (time: string): number => {
+    if (totalWorkersCount === 0) return workers.length;
+    const slotStart = toMinutes(time);
+    const slotEnd = slotStart + (service?.duration || 60);
+    // Count workers who have a conflict at this time
+    const busyWorkerIds = new Set<string>();
+    for (const range of bookedRanges) {
+      const rangeStart = toMinutes(range.startTime);
+      const rangeEnd = toMinutes(range.endTime);
+      // Overlap check
+      if (slotStart < rangeEnd && slotEnd > rangeStart && range.workerId) {
+        busyWorkerIds.add(range.workerId);
+      }
+    }
+    return Math.max(0, totalWorkersCount - busyWorkerIds.size);
+  };
+
+  // Is a slot fully booked (no workers left) or conflicts with selected worker
+  const isSlotUnavailable = (time: string): boolean => {
+    if (isSlotInPast(time)) return true;
+    const slotStart = toMinutes(time);
+    const slotEnd = slotStart + (service?.duration || 60);
+    // If a specific worker is selected, check only that worker's conflicts
+    if (selectedWorker) {
+      return bookedRanges.some(
+        r => r.workerId === selectedWorker &&
+          slotStart < toMinutes(r.endTime) &&
+          slotEnd > toMinutes(r.startTime)
+      );
+    }
+    // Auto-assign: slot is unavailable if all workers are busy
+    return totalWorkersCount > 0 && getAvailableWorkersForSlot(time) === 0;
   };
 
   if (loading) {
@@ -586,7 +671,7 @@ const BookServicePage = () => {
                     type="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    min={getTomorrowDate()}
+                    min={getTodayDate()}
                     className="input-clean"
                     required={bookingMode === 'schedule'}
                   />
@@ -618,25 +703,50 @@ const BookServicePage = () => {
 
                   {/* 15-min slot grid */}
                   <div className="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
-                    {generateSlots(selectedPeriod).map((time) => (
-                      <button
-                        key={time}
-                        type="button"
-                        onClick={() => setSelectedExactTime(time)}
-                        className={`flex flex-col items-center py-3 px-1 rounded-2xl border text-center transition-all ${
-                          selectedExactTime === time
-                            ? 'bg-muted border-muted-foreground/40 shadow-inner'
-                            : 'border-border hover:border-primary/60 hover:bg-primary/5'
-                        }`}
-                      >
-                        <span className="text-sm font-bold text-foreground leading-tight">
-                          {formatSlotTime(time)}
-                        </span>
-                        <span className="text-xs text-primary font-medium mt-0.5">
-                          {workers.length} {workers.length === 1 ? 'worker' : 'workers'}
-                        </span>
-                      </button>
-                    ))}
+                    {!selectedDate ? (
+                      <p className="col-span-4 text-sm text-muted-foreground py-4 text-center">Select a date first to see available slots</p>
+                    ) : loadingSlots ? (
+                      <p className="col-span-4 text-sm text-muted-foreground py-4 text-center">Loading slots...</p>
+                    ) : (
+                      generateSlots(selectedPeriod).map((time) => {
+                        const unavailable = isSlotUnavailable(time);
+                        const isPast = isSlotInPast(time);
+                        const available = !unavailable ? getAvailableWorkersForSlot(time) : 0;
+                        const isSelected = selectedExactTime === time;
+                        return (
+                          <button
+                            key={time}
+                            type="button"
+                            disabled={unavailable}
+                            onClick={() => !unavailable && setSelectedExactTime(time)}
+                            className={`flex flex-col items-center py-3 px-1 rounded-2xl border text-center transition-all ${
+                              unavailable
+                                ? 'border-border bg-muted/40 opacity-40 cursor-not-allowed'
+                                : isSelected
+                                ? 'bg-muted border-muted-foreground/40 shadow-inner'
+                                : 'border-border hover:border-primary/60 hover:bg-primary/5'
+                            }`}
+                          >
+                            <span className={`text-sm font-bold leading-tight ${
+                              unavailable ? 'text-muted-foreground line-through' : 'text-foreground'
+                            }`}>
+                              {formatSlotTime(time)}
+                            </span>
+                            <span className={`text-xs font-medium mt-0.5 ${
+                              unavailable
+                                ? 'text-muted-foreground'
+                                : available > 0
+                                ? 'text-primary'
+                                : 'text-muted-foreground'
+                            }`}>
+                              {unavailable
+                                ? (isPast ? 'Past' : 'Full')
+                                : `${available} free`}
+                            </span>
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
 
                   {selectedExactTime && (
@@ -727,7 +837,7 @@ const BookServicePage = () => {
                     type="date"
                     value={subscriptionStartDate}
                     onChange={(e) => setSubscriptionStartDate(e.target.value)}
-                    min={new Date().toISOString().split('T')[0]}
+                    min={getTodayDate()}
                     className="input-clean"
                     required
                   />
