@@ -758,14 +758,17 @@ router.get('/workers', authenticate, authorize('admin', 'super_admin'), async (r
     console.log('👤 User:', req.user.name, '| Role:', req.user.role, '| ID:', req.user._id);
     console.log('📋 Admin Profile:', JSON.stringify(req.user.adminProfile, null, 2));
     
-    let query = { role: 'worker', isActive: true };
+    // Super admin sees all workers (including archived); regular admin only sees active workers
+    let query = req.user.role === 'super_admin'
+      ? { role: 'worker' }
+      : { role: 'worker', isActive: true };
 
     // Get all workers first
     let workers = await User.find(query)
-      .select('name email phone workerProfile.specialization workerProfile.assignedApartments workerProfile.rating workerProfile.availability workerProfile.experience currentLocation addresses createdAt')
+      .select('name email phone isActive isArchived workerProfile.specialization workerProfile.assignedApartments workerProfile.rating workerProfile.availability workerProfile.completedJobs workerProfile.totalEarnings workerProfile.experience currentLocation addresses createdAt')
       .sort({ createdAt: -1 });
 
-    console.log(`🔍 Total active workers in database: ${workers.length}`);
+    console.log(`🔍 Total workers in database (for ${req.user.role}): ${workers.length}`);
 
     // If regular admin, filter workers by assigned locations
     if (req.user.role === 'admin') {

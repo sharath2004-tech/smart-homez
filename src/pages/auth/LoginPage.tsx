@@ -61,7 +61,8 @@ const LoginPage = () => {
       const role = response.user.role;
       if (role === 'customer') window.location.href = "/customer/dashboard";
       else if (role === 'worker') window.location.href = "/worker/dashboard";
-      else if (role === 'admin' || role === 'super_admin') window.location.href = "/admin/dashboard";
+      else if (role === 'super_admin') window.location.href = "/super-admin/dashboard";
+      else if (role === 'admin') window.location.href = "/admin/dashboard";
       else window.location.href = "/";
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed. Please check your credentials.');

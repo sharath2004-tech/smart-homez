@@ -1,5 +1,5 @@
 import AppLayout from "@/components/AppLayout";
-import { adminAPI } from "@/lib/api";
+import { adminAPI, authAPI } from "@/lib/api";
 import {
     Archive,
     ArchiveRestore,
@@ -96,6 +96,7 @@ const statusBadge: Record<string, string> = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const SuperAdminDashboard = () => {
+  const [userName, setUserName] = useState("Super Admin");
   const [overview, setOverview] = useState<LocationOverview[]>([]);
   const [globalStats, setGlobalStats] = useState<GlobalStats>({
     todayBookings: 0,
@@ -137,6 +138,10 @@ const SuperAdminDashboard = () => {
   }, []);
 
   useEffect(() => {
+    authAPI.getProfile().then(res => {
+      const name = res?.user?.name || res?.name;
+      if (name) setUserName(name);
+    }).catch(() => {});
     fetchOverview();
   }, [fetchOverview]);
 
@@ -207,7 +212,7 @@ const SuperAdminDashboard = () => {
 
   if (loading) {
     return (
-      <AppLayout userType="super_admin" userName="Super Admin">
+      <AppLayout userType="super_admin" userName={userName}>
         <div className="max-w-6xl mx-auto flex items-center justify-center py-24">
           <div className="flex flex-col items-center gap-4">
             <Loader2 className="w-10 h-10 animate-spin text-primary" />
@@ -221,7 +226,7 @@ const SuperAdminDashboard = () => {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <AppLayout userType="super_admin" userName="Super Admin">
+    <AppLayout userType="super_admin" userName={userName}>
       <div className="max-w-6xl mx-auto space-y-6 animate-fade-in pb-20 md:pb-0">
 
         {/* ── Header bar ── */}
