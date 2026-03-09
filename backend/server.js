@@ -10,6 +10,7 @@ import adminRoutes from './routes/admin.js';
 import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import earningsRoutes from './routes/earnings.js';
+import firebaseAuthRoutes from './routes/firebaseAuth.js';
 import leavesRoutes from './routes/leaves.js';
 import locationRoutes from './routes/locations.js';
 import notificationPreferencesRoutes from './routes/notificationPreferences.js';
@@ -168,6 +169,7 @@ app.get('/api/public/stats', async (req, res) => {
 app.use('/api/admin', adminRoutes);
 app.use('/api/super-admin', superAdminRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/auth', firebaseAuthRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/bookings', bookingRoutes);

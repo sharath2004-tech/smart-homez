@@ -11,10 +11,12 @@ import NotFound from "./pages/NotFound";
 
 // Auth pages
 import ChangePasswordPage from "./pages/auth/ChangePasswordPage";
+import CustomerSignUp from "./pages/auth/CustomerSignUp";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
+import WorkerSignUp from "./pages/auth/WorkerSignUp";
 
 // Customer pages
 import BookingsPage from "./pages/customer/BookingsPage";
@@ -66,6 +68,8 @@ const App = () => (
           {/* Auth */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/register/customer" element={<CustomerSignUp />} />
+          <Route path="/register/worker" element={<WorkerSignUp />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/change-password" element={<ChangePasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />

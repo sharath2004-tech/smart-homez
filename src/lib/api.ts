@@ -113,6 +113,14 @@ export const authAPI = {
       method: 'POST',
       body: JSON.stringify({ token, newPassword })
     });
+  },
+
+  // Firebase phone OTP verification — exchanges Firebase ID token for platform JWT
+  firebaseVerify: async (idToken: string, role: string, name?: string, gender?: string) => {
+    return apiCall('/auth/firebase-verify', {
+      method: 'POST',
+      body: JSON.stringify({ idToken, role, name, gender })
+    });
   }
 };
 

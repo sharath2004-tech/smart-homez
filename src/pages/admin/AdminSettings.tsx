@@ -1,6 +1,7 @@
+import { useAdminRole } from "@/hooks/useAdminRole";
 import { settingsAPI } from "@/lib/api";
 import { cropQRFromImage } from "@/utils/cropQRFromImage";
-import { Building, CreditCard, DollarSign, FileText, Save, Upload } from "lucide-react";
+import { Building, CreditCard, DollarSign, FileText, Lock, Save, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -24,6 +25,7 @@ interface Settings {
 
 const AdminSettings = () => {
   const navigate = useNavigate();
+  const { isSuperAdmin } = useAdminRole();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingQR, setUploadingQR] = useState(false);
@@ -201,50 +203,70 @@ const AdminSettings = () => {
                 />
               </div>
 
-              {/* QR Code Upload */}
+              {/* QR Code Upload — Super Admin only */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
                   Static QR Code (Optional)
                 </label>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Upload a QR code image for workers to show customers. Workers will see this constant QR code.
+                  {isSuperAdmin
+                    ? 'Upload a QR code image for workers to show customers. Workers will see this constant QR code.'
+                    : 'The global payment QR is managed by Super Admin. Workers at your locations inherit it automatically.'}
                 </p>
-                
-                {uploadingQR ? (
-                  <div className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-primary rounded-xl bg-primary/5">
-                    <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full mb-3"></div>
-                    <p className="text-sm text-foreground font-medium">Detecting QR code...</p>
-                    <p className="text-xs text-muted-foreground mt-1">Cropping to QR region</p>
-                  </div>
-                ) : settings.payment.qrCodeImage ? (
-                  <div className="relative inline-block">
-                    <img 
-                      src={settings.payment.qrCodeImage} 
-                      alt="Payment QR Code" 
-                      className="w-64 h-64 object-contain border-2 border-primary rounded-xl"
-                    />
-                    <button
-                      onClick={() => setSettings(prev => ({
-                        ...prev,
-                        payment: { ...prev.payment, qrCodeImage: null }
-                      }))}
-                      className="absolute top-2 right-2 bg-red-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-red-600"
-                    >
-                      Remove
-                    </button>
-                  </div>
+
+                {isSuperAdmin ? (
+                  uploadingQR ? (
+                    <div className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-primary rounded-xl bg-primary/5">
+                      <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full mb-3"></div>
+                      <p className="text-sm text-foreground font-medium">Detecting QR code...</p>
+                      <p className="text-xs text-muted-foreground mt-1">Cropping to QR region</p>
+                    </div>
+                  ) : settings.payment.qrCodeImage ? (
+                    <div className="relative inline-block">
+                      <img
+                        src={settings.payment.qrCodeImage}
+                        alt="Payment QR Code"
+                        className="w-64 h-64 object-contain border-2 border-primary rounded-xl"
+                      />
+                      <button
+                        onClick={() => setSettings(prev => ({
+                          ...prev,
+                          payment: { ...prev.payment, qrCodeImage: null }
+                        }))}
+                        className="absolute top-2 right-2 bg-red-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-red-600"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-border rounded-xl cursor-pointer hover:bg-muted transition-colors">
+                      <Upload className="w-12 h-12 text-muted-foreground mb-2" />
+                      <p className="text-sm text-muted-foreground">Click to upload QR code</p>
+                      <p className="text-xs text-muted-foreground mt-1">Max 2MB, JPG/PNG (will be compressed)</p>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleQRUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  )
                 ) : (
-                  <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-border rounded-xl cursor-pointer hover:bg-muted transition-colors">
-                    <Upload className="w-12 h-12 text-muted-foreground mb-2" />
-                    <p className="text-sm text-muted-foreground">Click to upload QR code</p>
-                    <p className="text-xs text-muted-foreground mt-1">Max 2MB, JPG/PNG (will be compressed)</p>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleQRUpload}
-                      className="hidden"
-                    />
-                  </label>
+                  <div className="flex flex-col items-center justify-center w-full border-2 border-dashed border-border rounded-xl p-6 bg-muted/30">
+                    {settings.payment.qrCodeImage ? (
+                      <img
+                        src={settings.payment.qrCodeImage}
+                        alt="Payment QR Code"
+                        className="w-48 h-48 object-contain mb-3"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 bg-muted rounded-xl flex items-center justify-center mb-3">
+                        <Lock className="w-8 h-8 text-muted-foreground" />
+                      </div>
+                    )}
+                    <p className="text-sm text-muted-foreground text-center">QR management is restricted to Super Admin</p>
+                    <p className="text-xs text-muted-foreground text-center mt-1">New workers and admins automatically inherit this QR</p>
+                  </div>
                 )}
               </div>
             </div>

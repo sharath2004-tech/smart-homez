@@ -621,14 +621,16 @@ const AdminLocations = () => {
                       </div>
                     )}
 
-                    {/* Payment QR Button */}
-                    <button
-                      onClick={() => handleOpenQRModal(location)}
-                      className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-lg transition-colors text-sm font-medium"
-                    >
-                      <QrCode className="w-4 h-4" />
-                      Manage Payment QR
-                    </button>
+                    {/* Payment QR Button — Super Admin only */}
+                    {isSuperAdmin && (
+                      <button
+                        onClick={() => handleOpenQRModal(location)}
+                        className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-lg transition-colors text-sm font-medium"
+                      >
+                        <QrCode className="w-4 h-4" />
+                        Manage Payment QR
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
