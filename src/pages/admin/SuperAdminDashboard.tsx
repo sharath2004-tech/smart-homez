@@ -1,24 +1,23 @@
 import AppLayout from "@/components/AppLayout";
 import { adminAPI } from "@/lib/api";
 import {
-  AlertCircle,
-  Archive,
-  ArchiveRestore,
-  BarChart2,
-  BookOpen,
-  Building2,
-  Calendar,
-  CheckCircle,
-  ChevronRight,
-  IndianRupee,
-  Loader2,
-  MapPin,
-  RefreshCw,
-  Settings,
-  Star,
-  TrendingUp,
-  User,
-  Users,
+    Archive,
+    ArchiveRestore,
+    BarChart2,
+    BookOpen,
+    Building2,
+    Calendar,
+    CheckCircle,
+    ChevronRight,
+    IndianRupee,
+    Loader2,
+    MapPin,
+    RefreshCw,
+    Settings,
+    Star,
+    TrendingUp,
+    User,
+    Users
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
