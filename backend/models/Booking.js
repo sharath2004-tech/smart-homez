@@ -446,6 +446,14 @@ const bookingSchema = new mongoose.Schema({
     verified: {
       type: Boolean,
       default: false
+    },
+    transactionId: {
+      type: String,
+      default: null
+    },
+    transactionTime: {
+      type: Date,
+      default: null
     }
   },
   // Work Documentation (REQ-C-012)

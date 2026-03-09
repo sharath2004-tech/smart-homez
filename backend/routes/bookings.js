@@ -1877,17 +1877,21 @@ router.post('/:id/upload-payment-proof',
       // Save payment proof photo
       const photoUrl = `/uploads/completion-photos/${req.file.filename}`;
       const isReupload = booking.paymentProof && booking.paymentProof.url;
-      
+
+      const { transactionId, transactionTime } = req.body;
+
       booking.paymentProof = {
         url: photoUrl,
         timestamp: new Date(),
         uploadedBy: req.user._id,
-        verified: true
+        verified: true,
+        transactionId: transactionId ? transactionId.trim() : null,
+        transactionTime: transactionTime ? new Date(transactionTime) : new Date()
       };
 
       await booking.save();
 
-      console.log(`✅ Worker ${isReupload ? 're-uploaded' : 'uploaded'} payment proof:`, photoUrl);
+      console.log(`✅ Worker ${isReupload ? 're-uploaded' : 'uploaded'} payment proof:`, photoUrl, transactionId ? `| TxnID: ${transactionId}` : '');
 
       res.json({ 
         message: 'Payment proof uploaded successfully',

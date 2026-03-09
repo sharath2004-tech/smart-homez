@@ -55,6 +55,8 @@ interface Task {
     url: string;
     timestamp: string;
     verified: boolean;
+    transactionId?: string;
+    transactionTime?: string;
   };
 }
 
@@ -78,6 +80,8 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   const [adminPaymentQR, setAdminPaymentQR] = useState<string>("");
   const [showPaymentProofCapture, setShowPaymentProofCapture] = useState(false);
   const [uploadingPaymentProof, setUploadingPaymentProof] = useState(false);
+  const [paymentTransactionId, setPaymentTransactionId] = useState('');
+  const [paymentTransactionTime, setPaymentTransactionTime] = useState('');
   
   const OVERTIME_RATE = 2.5; // ₹2.5 per minute
 
@@ -270,11 +274,14 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       setShowPaymentProofCapture(false);
       setUploadingPaymentProof(true);
       
-      // Use the API utility method
-      const result = await bookingsAPI.uploadPaymentProof(taskId, file);
+      // Use the API utility method with transaction ID and time
+      const txnTime = paymentTransactionTime || new Date().toISOString();
+      const result = await bookingsAPI.uploadPaymentProof(taskId, file, paymentTransactionId.trim() || undefined, txnTime);
       
       // Update task with payment proof
       setTask({ ...task!, paymentProof: result.paymentProof });
+      setPaymentTransactionId('');
+      setPaymentTransactionTime('');
       
       alert('✅ Payment proof uploaded successfully! Task is now fully documented.');
       
@@ -287,6 +294,15 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
     } finally {
       setUploadingPaymentProof(false);
     }
+  };
+
+  const handleOpenPaymentProofCapture = () => {
+    if (!paymentTransactionId.trim()) {
+      alert('Please enter the Transaction ID before uploading payment proof.');
+      return;
+    }
+    setPaymentTransactionTime(new Date().toISOString());
+    setShowPaymentProofCapture(true);
   };
 
   const fetchPaymentSettings = async () => {
@@ -802,6 +818,20 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                         <CheckCircle className="w-5 h-5" />
                         Payment proof uploaded successfully!
                       </div>
+                      {task.paymentProof.transactionId && (
+                        <div className="bg-white border border-amber-200 rounded-lg p-3 space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-amber-700 font-medium">Transaction ID:</span>
+                            <span className="font-mono font-semibold text-foreground">{task.paymentProof.transactionId}</span>
+                          </div>
+                          {task.paymentProof.transactionTime && (
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-amber-700 font-medium">Transaction Time:</span>
+                              <span className="text-foreground">{new Date(task.paymentProof.transactionTime).toLocaleString('en-IN')}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <div className="bg-green-100 border border-green-300 rounded-lg p-3 text-center">
                         <p className="text-green-800 font-semibold">🎉 Task Fully Completed!</p>
                         <p className="text-xs text-green-700 mt-1">All documentation has been submitted</p>
@@ -816,7 +846,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                   ) : showPaymentProofCapture ? (
                     <PhotoCapture
                       onPhotoCapture={handlePaymentProofCapture}
-                      onCancel={() => setShowPaymentProofCapture(false)}
+                      onCancel={() => { setShowPaymentProofCapture(false); }}
                       showPreview={false}
                       autoUpload={true}
                     />
@@ -827,20 +857,36 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                       <p className="text-xs text-muted-foreground mt-2">Please wait</p>
                     </div>
                   ) : (
-                    <div>
+                    <div className="space-y-4">
+                      {/* Transaction ID input - required before upload */}
+                      <div>
+                        <label className="block text-sm font-semibold text-amber-800 mb-1">
+                          Transaction ID <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={paymentTransactionId}
+                          onChange={(e) => setPaymentTransactionId(e.target.value)}
+                          placeholder="Enter UPI / GPay / Bank reference number"
+                          className="w-full px-3 py-2.5 border-2 border-amber-200 rounded-lg focus:border-amber-500 focus:outline-none text-sm bg-white"
+                        />
+                        <p className="text-xs text-amber-600 mt-1">
+                          🕐 Transaction time will be captured automatically when you upload
+                        </p>
+                      </div>
                       <button
-                        onClick={() => setShowPaymentProofCapture(true)}
+                        onClick={handleOpenPaymentProofCapture}
                         disabled={uploadingPaymentProof}
                         className="btn-brand py-3 px-6 w-full bg-amber-600 hover:bg-amber-700"
                       >
                         <Camera className="w-5 h-5 inline-block mr-2" />
-                        Upload Payment Proof
+                        Take & Upload Payment Proof
                       </button>
-                      <div className="mt-3 text-xs bg-amber-100 text-amber-800 p-3 rounded-lg space-y-1">
+                      <div className="text-xs bg-amber-100 text-amber-800 p-3 rounded-lg space-y-1">
                         <p className="font-semibold">After customer makes payment:</p>
-                        <p>• Ask customer to show payment confirmation</p>
-                        <p>• Take a photo of the payment screen/receipt</p>
-                        <p>• Upload as proof of payment completion</p>
+                        <p>• Enter the UPI / transaction reference number above</p>
+                        <p>• Take a photo of the payment confirmation screen</p>
+                        <p>• Transaction ID + time will be recorded with the proof</p>
                         <p className="text-green-700 font-medium mt-2">✓ Protects both you and the customer</p>
                       </div>
                     </div>

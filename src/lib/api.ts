@@ -291,10 +291,14 @@ export const bookingsAPI = {
     return data;
   },
 
-  uploadPaymentProof: async (id: string, file: File) => {
+  uploadPaymentProof: async (id: string, file: File, transactionId?: string, transactionTime?: string) => {
     const token = getAuthToken();
     const formData = new FormData();
     formData.append('paymentProof', file);
+    if (transactionId) {
+      formData.append('transactionId', transactionId);
+    }
+    formData.append('transactionTime', transactionTime || new Date().toISOString());
 
     const response = await fetch(`${API_BASE_URL}/bookings/${id}/upload-payment-proof`, {
       method: 'POST',
