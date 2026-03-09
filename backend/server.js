@@ -23,6 +23,7 @@ import serviceRoutes from './routes/services.js';
 import settingsRoutes from './routes/settings.js';
 import sosRoutes from './routes/sos.js';
 import subscriptionRoutes from './routes/subscriptions.js';
+import superAdminRoutes from './routes/superAdmin.js';
 import trackingRoutes from './routes/tracking.js';
 import userRoutes from './routes/users.js';
 
@@ -164,6 +165,7 @@ app.get('/api/public/stats', async (req, res) => {
 
 // API Routes
 app.use('/api/admin', adminRoutes);
+app.use('/api/super-admin', superAdminRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/services', serviceRoutes);

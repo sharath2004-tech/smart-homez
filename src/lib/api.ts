@@ -888,6 +888,28 @@ export const leavesAPI = {
   // Get leave statistics (Admin)
   getLeaveStatistics: async () => {
     return apiCall('/leaves/statistics');
+  },
+
+  // ─── Admin leave self-service ─────────────────────────────────────────
+
+  // Apply for leave as admin (date range)
+  applyAdminLeave: async (fromDate: string, toDate: string, reason?: string) => {
+    return apiCall('/leaves/admin/apply', {
+      method: 'POST',
+      body: JSON.stringify({ fromDate, toDate, reason })
+    });
+  },
+
+  // Get admin's own leave requests
+  getAdminMyLeaves: async () => {
+    return apiCall('/leaves/admin/my-leaves');
+  },
+
+  // Cancel an admin's pending leave
+  cancelAdminLeave: async (leaveId: string) => {
+    return apiCall(`/leaves/admin/${leaveId}`, {
+      method: 'DELETE'
+    });
   }
 };
 
@@ -919,6 +941,153 @@ export const reviewsAPI = {
   }
 };
 
+// ====== Super Admin APIs (/api/super-admin/*) ======
+// Dedicated endpoints exclusively for the super_admin role.
+
+export const superAdminAPI = {
+  // Location overview with aggregate stats
+  getOverview: async () => {
+    return apiCall('/super-admin/overview');
+  },
+
+  // Global or location-filtered dashboard stats
+  getStats: async (locationId?: string) => {
+    const params = locationId ? `?locationId=${locationId}` : '';
+    return apiCall(`/super-admin/stats${params}`);
+  },
+
+  // Workers — all (incl. archived). Optional locationId filter.
+  getWorkers: async (locationId?: string) => {
+    const params = locationId ? `?locationId=${locationId}` : '';
+    return apiCall(`/super-admin/workers${params}`);
+  },
+
+  createWorker: async (workerData: {
+    name: string;
+    email: string;
+    phone: string;
+    gender?: string;
+    religion?: string;
+    experience?: number;
+    specialization: string[];
+    hourlyRate?: number;
+    assignedApartmentIds: string[];
+  }) => {
+    return apiCall('/super-admin/workers', {
+      method: 'POST',
+      body: JSON.stringify(workerData)
+    });
+  },
+
+  archiveWorker: async (workerId: string) => {
+    return apiCall(`/super-admin/workers/${workerId}/archive`, { method: 'PATCH' });
+  },
+
+  unarchiveWorker: async (workerId: string) => {
+    return apiCall(`/super-admin/workers/${workerId}/unarchive`, { method: 'PATCH' });
+  },
+
+  // Bookings — all. Optional ?locationId= and ?status= filters.
+  getBookings: async (params?: { locationId?: string; status?: string; limit?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.locationId) q.append('locationId', params.locationId);
+    if (params?.status) q.append('status', params.status);
+    if (params?.limit) q.append('limit', String(params.limit));
+    return apiCall(`/super-admin/bookings${q.toString() ? `?${q.toString()}` : ''}`);
+  },
+
+  // Locations
+  getLocations: async () => {
+    return apiCall('/super-admin/locations');
+  },
+
+  createLocation: async (locationData: {
+    apartmentName: string;
+    building?: string;
+    area: string;
+    city: string;
+    state?: string;
+    zipCode?: string;
+    coordinates: number[];
+    maxServiceRadius?: number;
+  }) => {
+    return apiCall('/super-admin/locations', {
+      method: 'POST',
+      body: JSON.stringify(locationData)
+    });
+  },
+
+  updateLocation: async (locationId: string, locationData: {
+    apartmentName?: string;
+    building?: string;
+    area?: string;
+    city?: string;
+    state?: string;
+    coordinates?: number[];
+    maxServiceRadius?: number;
+    isServiceAvailable?: boolean;
+  }) => {
+    return apiCall(`/super-admin/locations/${locationId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(locationData)
+    });
+  },
+
+  deleteLocation: async (locationId: string) => {
+    return apiCall(`/super-admin/locations/${locationId}`, { method: 'DELETE' });
+  },
+
+  // Admins
+  getAdmins: async (city?: string) => {
+    const params = city ? `?city=${encodeURIComponent(city)}` : '';
+    return apiCall(`/super-admin/admins${params}`);
+  },
+
+  createAdmin: async (adminData: {
+    name: string;
+    email: string;
+    password: string;
+    phone: string;
+    assignedLocationIds?: string[];
+  }) => {
+    return apiCall('/super-admin/admins', {
+      method: 'POST',
+      body: JSON.stringify(adminData)
+    });
+  },
+
+  updateAdmin: async (adminId: string, adminData: {
+    name?: string;
+    phone?: string;
+    assignedLocationIds?: string[];
+  }) => {
+    return apiCall(`/super-admin/admins/${adminId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(adminData)
+    });
+  },
+
+  deleteAdmin: async (adminId: string) => {
+    return apiCall(`/super-admin/admins/${adminId}`, { method: 'DELETE' });
+  },
+
+  // ─── Admin Leave Approval ─────────────────────────────────────────────
+
+  // Get all admin leave requests. Optional status filter.
+  getAdminLeaves: async (status?: string) => {
+    const params = status ? `?status=${status}` : '';
+    return apiCall(`/super-admin/admin-leaves${params}`);
+  },
+
+  // Approve or reject an admin leave
+  updateAdminLeaveStatus: async (adminId: string, leaveId: string, status: 'approved' | 'rejected') => {
+    return apiCall(`/super-admin/admin-leaves/${adminId}/${leaveId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status })
+    });
+  }
+};
+
 // ====== Generic API wrapper (axios-like convenience object) ======
 // Used by pages that call api.get(), api.patch(), etc. directly.
 export const api = {
@@ -942,8 +1111,10 @@ export default {
   qrPayments: qrPaymentsAPI,
   workers: workersAPI,
   admin: adminAPI,
+  superAdmin: superAdminAPI,
   settings: settingsAPI,
   preferences: preferencesAPI,
   leaves: leavesAPI,
   reviews: reviewsAPI
 };
+

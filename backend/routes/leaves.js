@@ -423,4 +423,154 @@ router.get(
   }
 );
 
+// ─── Admin Leave Routes ────────────────────────────────────────────────────────
+
+/**
+ * Admin applies for leave (date range)
+ * POST /api/leaves/admin/apply
+ */
+router.post(
+  '/admin/apply',
+  authenticate,
+  authorize('admin'),
+  [
+    body('fromDate').isISO8601().withMessage('Valid fromDate is required'),
+    body('toDate').isISO8601().withMessage('Valid toDate is required'),
+    body('reason').optional().isString().isLength({ max: 500 }).withMessage('Reason must be less than 500 characters')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { fromDate, toDate, reason } = req.body;
+      const adminId = req.user._id;
+
+      const from = new Date(fromDate);
+      const to = new Date(toDate);
+      from.setHours(0, 0, 0, 0);
+      to.setHours(23, 59, 59, 999);
+
+      if (to < from) {
+        return res.status(400).json({ message: 'toDate must be on or after fromDate' });
+      }
+
+      const admin = await User.findById(adminId);
+      if (!admin) {
+        return res.status(404).json({ message: 'Admin not found' });
+      }
+
+      // Check for overlapping pending/approved leaves
+      const overlapping = (admin.adminProfile.leaves || []).find(leave => {
+        if (leave.status === 'rejected') return false;
+        const lFrom = new Date(leave.fromDate);
+        const lTo = new Date(leave.toDate);
+        return from <= lTo && to >= lFrom;
+      });
+
+      if (overlapping) {
+        return res.status(400).json({ message: 'A leave request already exists for overlapping dates' });
+      }
+
+      admin.adminProfile.leaves.push({
+        fromDate: from,
+        toDate: to,
+        reason: reason || '',
+        status: 'pending',
+        requestedAt: new Date()
+      });
+
+      await admin.save();
+
+      res.status(201).json({
+        message: 'Leave request submitted successfully',
+        leave: admin.adminProfile.leaves[admin.adminProfile.leaves.length - 1]
+      });
+    } catch (error) {
+      console.error('Admin apply leave error:', error);
+      res.status(500).json({ message: 'Server error', error: error.message });
+    }
+  }
+);
+
+/**
+ * Admin views their own leave requests
+ * GET /api/leaves/admin/my-leaves
+ */
+router.get(
+  '/admin/my-leaves',
+  authenticate,
+  authorize('admin'),
+  async (req, res) => {
+    try {
+      const adminId = req.user._id;
+
+      const admin = await User.findById(adminId)
+        .select('adminProfile.leaves')
+        .populate('adminProfile.leaves.approvedBy', 'name email');
+
+      if (!admin) {
+        return res.status(404).json({ message: 'Admin not found' });
+      }
+
+      const leaves = (admin.adminProfile.leaves || [])
+        .slice()
+        .sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
+
+      res.json({ leaves });
+    } catch (error) {
+      console.error('Admin get my leaves error:', error);
+      res.status(500).json({ message: 'Server error', error: error.message });
+    }
+  }
+);
+
+/**
+ * Admin cancels their own pending leave
+ * DELETE /api/leaves/admin/:leaveId
+ */
+router.delete(
+  '/admin/:leaveId',
+  authenticate,
+  authorize('admin'),
+  [
+    param('leaveId').isMongoId().withMessage('Valid leave ID is required')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { leaveId } = req.params;
+      const adminId = req.user._id;
+
+      const admin = await User.findById(adminId);
+      if (!admin) {
+        return res.status(404).json({ message: 'Admin not found' });
+      }
+
+      const leave = admin.adminProfile.leaves.id(leaveId);
+      if (!leave) {
+        return res.status(404).json({ message: 'Leave request not found' });
+      }
+
+      if (leave.status !== 'pending') {
+        return res.status(400).json({ message: `Cannot cancel a ${leave.status} leave request` });
+      }
+
+      admin.adminProfile.leaves.pull(leaveId);
+      await admin.save();
+
+      res.json({ message: 'Leave request cancelled successfully' });
+    } catch (error) {
+      console.error('Admin cancel leave error:', error);
+      res.status(500).json({ message: 'Server error', error: error.message });
+    }
+  }
+);
+
 export default router;

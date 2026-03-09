@@ -1,5 +1,5 @@
 import AppLayout from "@/components/AppLayout";
-import { adminAPI, authAPI } from "@/lib/api";
+import { authAPI, superAdminAPI } from "@/lib/api";
 import {
     Archive,
     ArchiveRestore,
@@ -125,8 +125,8 @@ const SuperAdminDashboard = () => {
     try {
       setLoading(true);
       const [overviewRes, statsRes] = await Promise.all([
-        adminAPI.getLocationOverview(),
-        adminAPI.getDashboardStats(),
+        superAdminAPI.getOverview(),
+        superAdminAPI.getStats(),
       ]);
       setOverview(overviewRes.locations || []);
       if (statsRes.stats) setGlobalStats(statsRes.stats);
@@ -151,9 +151,9 @@ const SuperAdminDashboard = () => {
     try {
       setTabLoading(true);
       const [workersRes, bookingsRes, statsRes] = await Promise.all([
-        adminAPI.getWorkers(locationId),
-        adminAPI.getRecentBookings(30, locationId),
-        adminAPI.getDashboardStats(locationId),
+        superAdminAPI.getWorkers(locationId),
+        superAdminAPI.getBookings({ locationId, limit: 30 }),
+        superAdminAPI.getStats(locationId),
       ]);
       setWorkers(workersRes.workers || []);
       setBookings(bookingsRes.bookings || []);
@@ -178,7 +178,7 @@ const SuperAdminDashboard = () => {
   const handleArchiveWorker = async (workerId: string) => {
     if (!confirm("Archive this worker? They will be deactivated but their history is preserved.")) return;
     try {
-      await adminAPI.archiveWorker(workerId);
+      await superAdminAPI.archiveWorker(workerId);
       fetchLocationData(selectedLocationId);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to archive worker");
@@ -188,7 +188,7 @@ const SuperAdminDashboard = () => {
   const handleUnarchiveWorker = async (workerId: string) => {
     if (!confirm("Restore this worker? They will be reactivated.")) return;
     try {
-      await adminAPI.unarchiveWorker(workerId);
+      await superAdminAPI.unarchiveWorker(workerId);
       fetchLocationData(selectedLocationId);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to restore worker");

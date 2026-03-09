@@ -1,18 +1,29 @@
-import AppLayout from "@/components/AppLayout";
+﻿import AppLayout from "@/components/AppLayout";
 import { toast } from "@/hooks/use-toast";
 import { useAdminRole } from "@/hooks/useAdminRole";
-import { leavesAPI } from "@/lib/api";
-import { Calendar, CheckCircle, Clock, User, Users, XCircle } from "lucide-react";
+import { leavesAPI, superAdminAPI } from "@/lib/api";
+import { Calendar, CheckCircle, Clock, Plus, User, Users, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 
-interface Leave {
+// â”€â”€â”€ Interfaces â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+interface WorkerLeave {
   _id: string;
   date: string;
   reason: string;
   status: 'pending' | 'approved' | 'rejected';
   requestedAt: string;
   approvedBy?: string;
-  responseAt?: string;
+}
+
+interface AdminLeave {
+  _id: string;
+  fromDate: string;
+  toDate: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requestedAt: string;
+  approvedBy?: { name: string; email: string } | string;
 }
 
 interface PendingLeaveRequest {
@@ -20,7 +31,15 @@ interface PendingLeaveRequest {
   workerName: string;
   workerEmail: string;
   workerPhone?: string;
-  leaves: Leave[];
+  leaves: WorkerLeave[];
+}
+
+interface AdminLeaveRequest {
+  adminId: string;
+  adminName: string;
+  adminEmail: string;
+  adminPhone?: string;
+  leaves: AdminLeave[];
 }
 
 interface LeaveStatistics {
@@ -37,75 +56,149 @@ interface LeaveStatistics {
   }>;
 }
 
+// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
 const AdminLeaves = () => {
-  const { role, name } = useAdminRole();
+  const { role, name, isSuperAdmin } = useAdminRole();
+
+  // Tabs: 'my-leaves' (admin only) | 'worker-leaves' | 'admin-leaves' (super_admin only) | 'statistics'
+  const defaultTab = isSuperAdmin ? 'admin-leaves' : 'my-leaves';
+  const [selectedTab, setSelectedTab] = useState<string>(defaultTab);
+
+  // Worker leaves (admin manages)
   const [pendingLeaves, setPendingLeaves] = useState<PendingLeaveRequest[]>([]);
   const [statistics, setStatistics] = useState<LeaveStatistics | null>(null);
+
+  // Admin's own leaves
+  const [myLeaves, setMyLeaves] = useState<AdminLeave[]>([]);
+
+  // Super admin: admin leave requests
+  const [adminLeaveRequests, setAdminLeaveRequests] = useState<AdminLeaveRequest[]>([]);
+
+  // Apply-leave form (admin)
+  const [applyForm, setApplyForm] = useState({ fromDate: '', toDate: '', reason: '' });
+  const [applyLoading, setApplyLoading] = useState(false);
+  const [showApplyForm, setShowApplyForm] = useState(false);
+
   const [loading, setLoading] = useState(true);
-  const [selectedTab, setSelectedTab] = useState<'pending' | 'statistics'>('pending');
 
   useEffect(() => {
-    fetchLeavesData();
+    fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchLeavesData = async () => {
+  const fetchAll = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const [pendingRes, statsRes] = await Promise.all([
+      const promises: Promise<unknown>[] = [
         leavesAPI.getPendingLeaves(),
         leavesAPI.getLeaveStatistics()
-      ]);
-      setPendingLeaves(pendingRes.pendingRequests || []);
-      setStatistics(statsRes);
+      ];
+      if (!isSuperAdmin) promises.push(leavesAPI.getAdminMyLeaves());
+      if (isSuperAdmin) promises.push(superAdminAPI.getAdminLeaves());
+
+      const results = await Promise.allSettled(promises);
+
+      if (results[0].status === 'fulfilled') {
+        const data = results[0].value as { pendingRequests?: PendingLeaveRequest[] };
+        setPendingLeaves(data.pendingRequests || []);
+      }
+      if (results[1].status === 'fulfilled') {
+        setStatistics(results[1].value as LeaveStatistics);
+      }
+      if (!isSuperAdmin && results[2] && results[2].status === 'fulfilled') {
+        const data = results[2].value as { leaves?: AdminLeave[] };
+        setMyLeaves(data.leaves || []);
+      }
+      if (isSuperAdmin && results[2] && results[2].status === 'fulfilled') {
+        const data = results[2].value as { adminLeaves?: AdminLeaveRequest[] };
+        setAdminLeaveRequests(data.adminLeaves || []);
+      }
     } catch (error) {
       console.error('Error fetching leaves data:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to fetch leaves data",
-        variant: "destructive"
-      });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLeaveAction = async (workerId: string, leaveId: string, action: 'approved' | 'rejected') => {
+  const formatDate = (ds: string) =>
+    new Date(ds).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  const formatDateTime = (ds: string) =>
+    new Date(ds).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+  const statusBadge = (status: 'pending' | 'approved' | 'rejected') => {
+    const map = {
+      pending: 'bg-orange-100 text-orange-700',
+      approved: 'bg-green-100 text-green-700',
+      rejected: 'bg-red-100 text-red-700'
+    };
+    return (
+      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold capitalize ${map[status]}`}>
+        {status === 'pending' && <Clock className="w-3 h-3" />}
+        {status === 'approved' && <CheckCircle className="w-3 h-3" />}
+        {status === 'rejected' && <XCircle className="w-3 h-3" />}
+        {status}
+      </span>
+    );
+  };
+
+  // â”€â”€ Worker leave actions (admin) â”€â”€
+  const handleWorkerLeaveAction = async (workerId: string, leaveId: string, action: 'approved' | 'rejected') => {
     try {
       await leavesAPI.updateLeaveStatus(workerId, leaveId, action);
-      toast({
-        title: "Success",
-        description: `Leave request ${action} successfully`,
-        variant: "default"
-      });
-      fetchLeavesData();
+      toast({ title: 'Success', description: `Leave ${action}`, variant: 'default' });
+      fetchAll();
     } catch (error) {
-      console.error('Error updating leave status:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : `Failed to ${action} leave`,
-        variant: "destructive"
-      });
+      toast({ title: 'Error', description: error instanceof Error ? error.message : `Failed to ${action} leave`, variant: 'destructive' });
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', { 
-      day: 'numeric', 
-      month: 'short', 
-      year: 'numeric' 
-    });
+  // â”€â”€ Admin own leave actions â”€â”€
+  const handleApplyLeave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!applyForm.fromDate || !applyForm.toDate) {
+      toast({ title: 'Error', description: 'Please select from and to dates', variant: 'destructive' });
+      return;
+    }
+    setApplyLoading(true);
+    try {
+      await leavesAPI.applyAdminLeave(applyForm.fromDate, applyForm.toDate, applyForm.reason);
+      toast({ title: 'Success', description: 'Leave request submitted. Awaiting super admin approval.' });
+      setApplyForm({ fromDate: '', toDate: '', reason: '' });
+      setShowApplyForm(false);
+      fetchAll();
+    } catch (error) {
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Failed to submit leave', variant: 'destructive' });
+    } finally {
+      setApplyLoading(false);
+    }
   };
 
-  const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-IN', { 
-      day: 'numeric', 
-      month: 'short', 
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const handleCancelMyLeave = async (leaveId: string) => {
+    try {
+      await leavesAPI.cancelAdminLeave(leaveId);
+      toast({ title: 'Success', description: 'Leave request cancelled' });
+      fetchAll();
+    } catch (error) {
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Failed to cancel leave', variant: 'destructive' });
+    }
   };
+
+  // â”€â”€ Super admin: admin leave approval â”€â”€
+  const handleAdminLeaveAction = async (adminId: string, leaveId: string, action: 'approved' | 'rejected') => {
+    try {
+      await superAdminAPI.updateAdminLeaveStatus(adminId, leaveId, action);
+      toast({ title: 'Success', description: `Leave ${action} successfully` });
+      fetchAll();
+    } catch (error) {
+      toast({ title: 'Error', description: error instanceof Error ? error.message : `Failed to ${action} leave`, variant: 'destructive' });
+    }
+  };
+
+  // â”€â”€ Pending counts â”€â”€
+  const workerPendingCount = pendingLeaves.reduce((s, w) => s + w.leaves.length, 0);
+  const adminPendingCount = adminLeaveRequests.reduce((s, a) => s + a.leaves.filter(l => l.status === 'pending').length, 0);
 
   if (loading) {
     return (
@@ -121,45 +214,179 @@ const AdminLeaves = () => {
   return (
     <AppLayout userType={role} userName={name}>
       <div className="max-w-6xl mx-auto space-y-8 animate-fade-in pb-20 md:pb-0">
-        {/* Header with gradient */}
+        {/* Header */}
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent rounded-2xl -z-10"></div>
           <div className="p-6">
             <h1 className="text-3xl font-bold font-heading text-foreground mb-2">Leave Management</h1>
-            <p className="text-muted-foreground">Manage worker leave requests and view statistics</p>
+            <p className="text-muted-foreground">
+              {isSuperAdmin ? 'Approve admin leaves and manage worker leave requests' : 'Apply for leaves and manage worker leave requests'}
+            </p>
           </div>
         </div>
 
-        {/* Tabs - Enhanced Design */}
-        <div className="bg-muted/30 rounded-xl p-1 inline-flex gap-1">
+        {/* Tabs */}
+        <div className="bg-muted/30 rounded-xl p-1 inline-flex flex-wrap gap-1">
+          {!isSuperAdmin && (
+            <button
+              className={`px-5 py-2.5 font-semibold rounded-lg transition-all duration-200 text-sm ${selectedTab === 'my-leaves' ? 'bg-white shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+              onClick={() => setSelectedTab('my-leaves')}
+            >
+              My Leave Requests
+            </button>
+          )}
           <button
-            className={`px-6 py-2.5 font-semibold rounded-lg transition-all duration-200 ${
-              selectedTab === 'pending'
-                ? 'bg-white shadow-sm text-primary'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-            onClick={() => setSelectedTab('pending')}
+            className={`px-5 py-2.5 font-semibold rounded-lg transition-all duration-200 text-sm ${selectedTab === 'worker-leaves' ? 'bg-white shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+            onClick={() => setSelectedTab('worker-leaves')}
           >
-            Pending Requests {pendingLeaves.length > 0 && (
-              <span className="ml-2 px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-bold">
-                {pendingLeaves.reduce((sum, w) => sum + w.leaves.length, 0)}
-              </span>
+            Worker Leaves
+            {workerPendingCount > 0 && (
+              <span className="ml-2 px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-bold">{workerPendingCount}</span>
             )}
           </button>
+          {isSuperAdmin && (
+            <button
+              className={`px-5 py-2.5 font-semibold rounded-lg transition-all duration-200 text-sm ${selectedTab === 'admin-leaves' ? 'bg-white shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+              onClick={() => setSelectedTab('admin-leaves')}
+            >
+              Admin Leave Requests
+              {adminPendingCount > 0 && (
+                <span className="ml-2 px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-bold">{adminPendingCount}</span>
+              )}
+            </button>
+          )}
           <button
-            className={`px-6 py-2.5 font-semibold rounded-lg transition-all duration-200 ${
-              selectedTab === 'statistics'
-                ? 'bg-white shadow-sm text-primary'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+            className={`px-5 py-2.5 font-semibold rounded-lg transition-all duration-200 text-sm ${selectedTab === 'statistics' ? 'bg-white shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}
             onClick={() => setSelectedTab('statistics')}
           >
-            Statistics & Upcoming
+            Statistics
           </button>
         </div>
 
-        {/* Pending Requests Tab */}
-        {selectedTab === 'pending' && (
+        {/* â”€â”€ My Leave Requests (admin only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {selectedTab === 'my-leaves' && !isSuperAdmin && (
+          <div className="space-y-5">
+            {/* Apply Leave Toggle */}
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowApplyForm(!showApplyForm)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-xl font-semibold shadow-md hover:bg-primary/90 transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                {showApplyForm ? 'Cancel' : 'Apply for Leave'}
+              </button>
+            </div>
+
+            {/* Apply Leave Form */}
+            {showApplyForm && (
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-md p-6">
+                <h3 className="text-lg font-bold text-foreground mb-5 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-primary" />
+                  New Leave Request
+                </h3>
+                <form onSubmit={handleApplyLeave} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-foreground mb-1.5">From Date <span className="text-red-500">*</span></label>
+                      <input
+                        type="date"
+                        min={new Date().toISOString().split('T')[0]}
+                        value={applyForm.fromDate}
+                        onChange={e => setApplyForm(f => ({ ...f, fromDate: e.target.value }))}
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-foreground mb-1.5">To Date <span className="text-red-500">*</span></label>
+                      <input
+                        type="date"
+                        min={applyForm.fromDate || new Date().toISOString().split('T')[0]}
+                        value={applyForm.toDate}
+                        onChange={e => setApplyForm(f => ({ ...f, toDate: e.target.value }))}
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-foreground mb-1.5">Reason (optional)</label>
+                    <textarea
+                      rows={3}
+                      value={applyForm.reason}
+                      onChange={e => setApplyForm(f => ({ ...f, reason: e.target.value }))}
+                      placeholder="Provide a reason for your leave request..."
+                      maxLength={500}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm resize-none"
+                    />
+                    <p className="text-xs text-muted-foreground text-right mt-1">{applyForm.reason.length}/500</p>
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={applyLoading}
+                      className="inline-flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl font-semibold shadow-md hover:bg-primary/90 disabled:opacity-60 transition-all"
+                    >
+                      {applyLoading ? <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> : <CheckCircle className="w-4 h-4" />}
+                      Submit Request
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* My Leaves List */}
+            {myLeaves.length === 0 ? (
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl text-center py-16 shadow-sm">
+                <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Calendar className="w-10 h-10 text-blue-600" />
+                </div>
+                <h3 className="text-xl font-bold text-foreground mb-2">No Leave Requests</h3>
+                <p className="text-muted-foreground">You haven't applied for any leaves yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {myLeaves.map((leave) => (
+                  <div key={leave._id} className="bg-white rounded-2xl border border-gray-200 shadow-md p-5 hover:shadow-lg transition-shadow">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-4 flex-1">
+                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <Calendar className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-bold text-foreground text-base">
+                            {formatDate(leave.fromDate)}
+                            {leave.fromDate !== leave.toDate && ` â†’ ${formatDate(leave.toDate)}`}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">Requested {formatDateTime(leave.requestedAt)}</p>
+                          {leave.reason && (
+                            <p className="text-sm text-foreground mt-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                              <span className="font-semibold text-muted-foreground">Reason:</span> {leave.reason}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        {statusBadge(leave.status)}
+                        {leave.status === 'pending' && (
+                          <button
+                            onClick={() => handleCancelMyLeave(leave._id)}
+                            className="text-xs text-red-500 hover:text-red-700 font-semibold underline underline-offset-2"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* â”€â”€ Worker Leaves (existing admin view) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {selectedTab === 'worker-leaves' && (
           <div className="space-y-5">
             {pendingLeaves.length === 0 ? (
               <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-2xl text-center py-16 shadow-sm">
@@ -167,12 +394,11 @@ const AdminLeaves = () => {
                   <CheckCircle className="w-10 h-10 text-green-600" />
                 </div>
                 <h3 className="text-xl font-bold text-foreground mb-2">All Caught Up!</h3>
-                <p className="text-muted-foreground">No pending leave requests at the moment.</p>
+                <p className="text-muted-foreground">No pending worker leave requests at the moment.</p>
               </div>
             ) : (
               pendingLeaves.map((workerLeave) => (
-                <div key={workerLeave.workerId} className="bg-white rounded-2xl border border-gray-200 shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden">
-                  {/* Worker Header */}
+                <div key={workerLeave.workerId} className="bg-white rounded-2xl border border-gray-200 shadow-md hover:shadow-lg transition-shadow overflow-hidden">
                   <div className="bg-gradient-to-r from-primary/5 to-primary/10 p-5 border-b border-gray-100">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -181,24 +407,16 @@ const AdminLeaves = () => {
                         </div>
                         <div>
                           <h3 className="text-lg font-bold text-foreground">{workerLeave.workerName}</h3>
-                          <p className="text-sm text-muted-foreground flex items-center gap-1">
-                            {workerLeave.workerEmail}
-                          </p>
-                          {workerLeave.workerPhone && (
-                            <p className="text-sm text-muted-foreground mt-0.5">{workerLeave.workerPhone}</p>
-                          )}
+                          <p className="text-sm text-muted-foreground">{workerLeave.workerEmail}</p>
+                          {workerLeave.workerPhone && <p className="text-sm text-muted-foreground mt-0.5">{workerLeave.workerPhone}</p>}
                         </div>
                       </div>
-                      <div className="text-right">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-100 text-orange-700 rounded-full text-sm font-semibold">
-                          <Clock className="w-4 h-4" />
-                          {workerLeave.leaves.length} Pending
-                        </span>
-                      </div>
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-100 text-orange-700 rounded-full text-sm font-semibold">
+                        <Clock className="w-4 h-4" />
+                        {workerLeave.leaves.length} Pending
+                      </span>
                     </div>
                   </div>
-
-                  {/* Leave Requests */}
                   <div className="p-5 space-y-3">
                     {workerLeave.leaves.map((leave) => (
                       <div key={leave._id} className="bg-gradient-to-r from-gray-50 to-white rounded-xl p-5 border border-gray-200 hover:border-primary/50 transition-colors">
@@ -210,30 +428,26 @@ const AdminLeaves = () => {
                               </div>
                               <div>
                                 <span className="text-lg font-bold text-foreground">{formatDate(leave.date)}</span>
-                                <p className="text-xs text-muted-foreground">
-                                  Requested {formatDateTime(leave.requestedAt)}
-                                </p>
+                                <p className="text-xs text-muted-foreground">Requested {formatDateTime(leave.requestedAt)}</p>
                               </div>
                             </div>
                             {leave.reason && (
                               <div className="bg-white rounded-lg p-3 border border-gray-100">
-                                <p className="text-sm text-foreground">
-                                  <span className="font-semibold text-muted-foreground">Reason:</span> {leave.reason}
-                                </p>
+                                <p className="text-sm text-foreground"><span className="font-semibold text-muted-foreground">Reason:</span> {leave.reason}</p>
                               </div>
                             )}
                           </div>
                           <div className="flex flex-col gap-2">
                             <button
-                              onClick={() => handleLeaveAction(workerLeave.workerId, leave._id, 'approved')}
-                              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 shadow-md hover:shadow-lg transition-all duration-200"
+                              onClick={() => handleWorkerLeaveAction(workerLeave.workerId, leave._id, 'approved')}
+                              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 shadow-md hover:shadow-lg transition-all"
                             >
                               <CheckCircle className="w-4 h-4" />
                               Approve
                             </button>
                             <button
-                              onClick={() => handleLeaveAction(workerLeave.workerId, leave._id, 'rejected')}
-                              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl bg-white border-2 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 transition-all duration-200"
+                              onClick={() => handleWorkerLeaveAction(workerLeave.workerId, leave._id, 'rejected')}
+                              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl bg-white border-2 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 transition-all"
                             >
                               <XCircle className="w-4 h-4" />
                               Reject
@@ -249,10 +463,96 @@ const AdminLeaves = () => {
           </div>
         )}
 
-        {/* Statistics Tab */}
+        {/* â”€â”€ Admin Leave Requests (super_admin only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {selectedTab === 'admin-leaves' && isSuperAdmin && (
+          <div className="space-y-5">
+            {adminLeaveRequests.length === 0 ? (
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-2xl text-center py-16 shadow-sm">
+                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle className="w-10 h-10 text-green-600" />
+                </div>
+                <h3 className="text-xl font-bold text-foreground mb-2">No Admin Leave Requests</h3>
+                <p className="text-muted-foreground">No admin leave requests to review at the moment.</p>
+              </div>
+            ) : (
+              adminLeaveRequests.map((adminReq) => (
+                <div key={adminReq.adminId} className="bg-white rounded-2xl border border-gray-200 shadow-md hover:shadow-lg transition-shadow overflow-hidden">
+                  <div className="bg-gradient-to-r from-purple-50 to-purple-100/50 p-5 border-b border-gray-100">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
+                          <User className="w-7 h-7 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-foreground">{adminReq.adminName}</h3>
+                          <p className="text-sm text-muted-foreground">{adminReq.adminEmail}</p>
+                          {adminReq.adminPhone && <p className="text-sm text-muted-foreground mt-0.5">{adminReq.adminPhone}</p>}
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-full text-sm font-semibold">
+                        <Users className="w-4 h-4" />
+                        Admin
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-5 space-y-3">
+                    {adminReq.leaves.map((leave) => (
+                      <div key={leave._id} className="bg-gradient-to-r from-gray-50 to-white rounded-xl p-5 border border-gray-200 hover:border-purple-300 transition-colors">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                                <Calendar className="w-5 h-5 text-purple-600" />
+                              </div>
+                              <div>
+                                <span className="text-base font-bold text-foreground">
+                                  {formatDate(leave.fromDate)}
+                                  {leave.fromDate !== leave.toDate && ` â†’ ${formatDate(leave.toDate)}`}
+                                </span>
+                                <p className="text-xs text-muted-foreground">Requested {formatDateTime(leave.requestedAt)}</p>
+                              </div>
+                            </div>
+                            {leave.reason && (
+                              <div className="bg-white rounded-lg p-3 border border-gray-100">
+                                <p className="text-sm text-foreground"><span className="font-semibold text-muted-foreground">Reason:</span> {leave.reason}</p>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col items-end gap-2">
+                            {leave.status === 'pending' ? (
+                              <>
+                                <button
+                                  onClick={() => handleAdminLeaveAction(adminReq.adminId, leave._id, 'approved')}
+                                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 shadow-md hover:shadow-lg transition-all"
+                                >
+                                  <CheckCircle className="w-4 h-4" />
+                                  Approve
+                                </button>
+                                <button
+                                  onClick={() => handleAdminLeaveAction(adminReq.adminId, leave._id, 'rejected')}
+                                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl bg-white border-2 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 transition-all"
+                                >
+                                  <XCircle className="w-4 h-4" />
+                                  Reject
+                                </button>
+                              </>
+                            ) : (
+                              statusBadge(leave.status)
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* â”€â”€ Statistics Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         {selectedTab === 'statistics' && statistics && (
           <div className="space-y-8">
-            {/* Stats Cards - Enhanced */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
               <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-6 border border-blue-200 shadow-md">
                 <div className="flex items-center justify-between mb-3">
@@ -288,7 +588,6 @@ const AdminLeaves = () => {
               </div>
             </div>
 
-            {/* Upcoming Leaves - Enhanced */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-md overflow-hidden">
               <div className="bg-gradient-to-r from-primary/5 to-primary/10 p-6 border-b border-gray-100">
                 <h3 className="text-xl font-bold text-foreground flex items-center gap-3">

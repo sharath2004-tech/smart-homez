@@ -58,7 +58,19 @@ const userSchema = new mongoose.Schema({
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User' // Reference to super_admin who created this admin
-    }
+    },
+    leaves: [{
+      fromDate: { type: Date, required: true },
+      toDate: { type: Date, required: true },
+      reason: { type: String, maxlength: 500 },
+      status: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected'],
+        default: 'pending'
+      },
+      requestedAt: { type: Date, default: Date.now },
+      approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+    }]
   },
   phone: {
     type: String,
