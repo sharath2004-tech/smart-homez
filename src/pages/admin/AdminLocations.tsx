@@ -470,7 +470,7 @@ const AdminLocations = () => {
 
   if (loading) {
     return (
-      <AppLayout userType="admin" userName="Admin Team">
+      <AppLayout userType={isSuperAdmin ? 'super_admin' : 'admin'} userName={profile?.name || "Admin"}>
         <div className="text-center py-12">
           <p className="text-muted-foreground">Loading...</p>
         </div>
@@ -479,7 +479,7 @@ const AdminLocations = () => {
   }
 
   return (
-    <AppLayout userType="admin" userName="Admin Team">
+    <AppLayout userType={isSuperAdmin ? 'super_admin' : 'admin'} userName={profile?.name || "Admin"}>
       <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
         <div className="flex items-start justify-between">
           <div>

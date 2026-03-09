@@ -252,7 +252,7 @@ const AdminServices = () => {
   );
 
   return (
-    <AppLayout userType="admin" userName={profile?.name || "Admin"}>
+    <AppLayout userType={profile?.role === 'super_admin' ? 'super_admin' : 'admin'} userName={profile?.name || "Admin"}>
       <div className="space-y-6 pb-20 md:pb-0">
         {/* Header */}
         <div className="flex items-center justify-between">

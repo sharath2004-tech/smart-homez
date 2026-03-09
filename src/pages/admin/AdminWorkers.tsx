@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useAdminRole } from "@/hooks/useAdminRole";
 import { adminAPI } from "@/lib/api";
 import { Archive, ArchiveRestore, CheckCircle, Loader2, MapPin, Plus, Search, Star, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -58,6 +59,7 @@ const specializationOptions = [
 ];
 
 const AdminWorkers = () => {
+  const { role, name } = useAdminRole();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [workers, setWorkers] = useState<Worker[]>([]);
@@ -213,7 +215,7 @@ const AdminWorkers = () => {
 
   if (loading) {
     return (
-      <AppLayout userType="admin" userName="Admin Team">
+      <AppLayout userType={role} userName={name}>
         <div className="text-center py-12">
           <p className="text-muted-foreground">Loading workers...</p>
         </div>
@@ -222,7 +224,7 @@ const AdminWorkers = () => {
   }
 
   return (
-    <AppLayout userType="admin" userName="Admin Team">
+    <AppLayout userType={role} userName={name}>
       <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
         <div className="flex items-start justify-between">
           <div>

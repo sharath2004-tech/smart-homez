@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useAdminRole } from "@/hooks/useAdminRole";
 import { bookingsAPI } from "@/lib/api";
 import { Download, Search } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -26,6 +27,7 @@ const statusConfig: Record<string, string> = {
 };
 
 const AdminBookings = () => {
+  const { role, name } = useAdminRole();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -73,7 +75,7 @@ const AdminBookings = () => {
 
   if (loading) {
     return (
-      <AppLayout userType="admin" userName="Admin Team">
+      <AppLayout userType={role} userName={name}>
         <div className="text-center py-12">
           <p className="text-muted-foreground">Loading bookings...</p>
         </div>
@@ -82,7 +84,7 @@ const AdminBookings = () => {
   }
 
   return (
-    <AppLayout userType="admin" userName="Admin Team">
+    <AppLayout userType={role} userName={name}>
       <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
         <div className="flex items-start justify-between">
           <div>

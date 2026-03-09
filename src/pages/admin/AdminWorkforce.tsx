@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useAdminRole } from "@/hooks/useAdminRole";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { adminAPI, bookingsAPI } from "@/lib/api";
@@ -65,6 +66,7 @@ interface Booking {
 }
 
 const AdminWorkforce = () => {
+  const { role, name } = useAdminRole();
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [summary, setSummary] = useState<Summary>({ total: 0, free: 0, working: 0, onLeave: 0, offline: 0 });
   const [loading, setLoading] = useState(true);
@@ -160,7 +162,7 @@ const AdminWorkforce = () => {
 
   if (loading) {
     return (
-      <AppLayout userType="admin" userName="Admin Team">
+      <AppLayout userType={role} userName={name}>
         <div className="max-w-7xl mx-auto">
           <div className="text-center py-20">
             <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
@@ -172,7 +174,7 @@ const AdminWorkforce = () => {
   }
 
   return (
-    <AppLayout userType="admin" userName="Admin Team">
+    <AppLayout userType={role} userName={name}>
       <div className="max-w-7xl mx-auto space-y-8 animate-fade-in pb-20 md:pb-0">
         {/* Header with gradient */}
         <div className="relative">

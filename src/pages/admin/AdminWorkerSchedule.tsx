@@ -55,7 +55,7 @@ interface WorkerSchedule {
 }
 
 const AdminWorkerSchedule = () => {
-  const [profile, setProfile] = useState<{ name: string } | null>(null);
+  const [profile, setProfile] = useState<{ name: string; role?: string } | null>(null);
   const [workerSchedules, setWorkerSchedules] = useState<WorkerSchedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -386,7 +386,7 @@ const AdminWorkerSchedule = () => {
 
   if (loading) {
     return (
-      <AppLayout userType="admin" userName={profile?.name || "Admin"}>
+      <AppLayout userType={profile?.role === 'super_admin' ? 'super_admin' : 'admin'} userName={profile?.name || "Admin"}>
         <div className="max-w-7xl mx-auto py-12 text-center">
           <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full mx-auto mb-3"></div>
           <p className="text-sm text-muted-foreground">Loading comprehensive worker schedules...</p>
@@ -396,7 +396,7 @@ const AdminWorkerSchedule = () => {
   }
 
   return (
-    <AppLayout userType="admin" userName={profile?.name || "Admin"}>
+    <AppLayout userType={profile?.role === 'super_admin' ? 'super_admin' : 'admin'} userName={profile?.name || "Admin"}>
       <div className="max-w-7xl mx-auto p-4 sm:p-6">
         {/* Header */}
         <div className="mb-6">

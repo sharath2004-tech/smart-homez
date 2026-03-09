@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useAdminRole } from "@/hooks/useAdminRole";
 import { adminAPI } from "@/lib/api";
 import { AlertCircle, BarChart2, Calendar, CheckCircle, ChevronRight, Settings, TrendingUp, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -47,6 +48,7 @@ const statusConfig: Record<string, string> = {
 };
 
 const AdminDashboard = () => {
+  const { role, name } = useAdminRole();
   const [stats, setStats] = useState<Stats>({
     todayBookings: 0,
     bookingsChange: '+0%',
@@ -114,7 +116,7 @@ const AdminDashboard = () => {
 
   if (loading) {
     return (
-      <AppLayout userType="admin" userName="Admin Team">
+      <AppLayout userType={role} userName={name}>
         <div className="max-w-5xl mx-auto flex items-center justify-center py-20">
           <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full"></div>
         </div>
@@ -123,7 +125,7 @@ const AdminDashboard = () => {
   }
 
   return (
-    <AppLayout userType="admin" userName="Admin Team">
+    <AppLayout userType={role} userName={name}>
       <div className="max-w-5xl mx-auto space-y-8 animate-fade-in pb-20 md:pb-0">
         <div className="flex items-start justify-between">
           <div>

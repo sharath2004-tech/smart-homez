@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useAdminRole } from "@/hooks/useAdminRole";
 import { toast } from "@/hooks/use-toast";
 import { leavesAPI } from "@/lib/api";
 import { Calendar, CheckCircle, Clock, User, Users, XCircle } from "lucide-react";
@@ -37,6 +38,7 @@ interface LeaveStatistics {
 }
 
 const AdminLeaves = () => {
+  const { role, name } = useAdminRole();
   const [pendingLeaves, setPendingLeaves] = useState<PendingLeaveRequest[]>([]);
   const [statistics, setStatistics] = useState<LeaveStatistics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -107,7 +109,7 @@ const AdminLeaves = () => {
 
   if (loading) {
     return (
-      <AppLayout userType="admin" userName="Admin Team">
+      <AppLayout userType={role} userName={name}>
         <div className="text-center py-12">
           <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full mx-auto"></div>
           <p className="text-muted-foreground mt-4">Loading leaves data...</p>
@@ -117,7 +119,7 @@ const AdminLeaves = () => {
   }
 
   return (
-    <AppLayout userType="admin" userName="Admin Team">
+    <AppLayout userType={role} userName={name}>
       <div className="max-w-6xl mx-auto space-y-8 animate-fade-in pb-20 md:pb-0">
         {/* Header with gradient */}
         <div className="relative">

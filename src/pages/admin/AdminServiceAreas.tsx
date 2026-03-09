@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useAdminRole } from "@/hooks/useAdminRole";
 import { API_BASE_URL } from "@/lib/api";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -30,6 +31,7 @@ interface ServiceArea {
 }
 
 const AdminServiceAreas = () => {
+  const { role, name } = useAdminRole();
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<Map<string, { marker: L.Marker; circle: L.Circle }>>(new Map());
@@ -298,7 +300,7 @@ const AdminServiceAreas = () => {
   };
 
   return (
-    <AppLayout userType="admin" userName="Admin">
+    <AppLayout userType={role} userName={name}>
       <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
         {/* Header */}
         <div className="flex items-start justify-between">
