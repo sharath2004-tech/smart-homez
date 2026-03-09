@@ -34,6 +34,7 @@ import WorkerDashboard from "./pages/worker/WorkerDashboard";
 import WorkerEarnings from "./pages/worker/WorkerEarnings";
 import WorkerLeaves from "./pages/worker/WorkerLeaves";
 import WorkerProfile from "./pages/worker/WorkerProfile";
+import WorkerSalaryRequest from "./pages/worker/WorkerSalaryRequest";
 import WorkerTasks from "./pages/worker/WorkerTasks";
 
 // Admin pages
@@ -41,6 +42,7 @@ import AdminBookings from "./pages/admin/AdminBookings";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminLeaves from "./pages/admin/AdminLeaves";
 import AdminLocations from "./pages/admin/AdminLocations";
+import AdminSalarySettlements from "./pages/admin/AdminSalarySettlements";
 import AdminServiceAreas from "./pages/admin/AdminServiceAreas";
 import AdminServices from "./pages/admin/AdminServices";
 import AdminSettings from "./pages/admin/AdminSettings";
@@ -86,6 +88,7 @@ const App = () => (
           <Route path="/worker/tasks" element={<ProtectedRoute allowedRoles={['worker']}><WorkerTasks /></ProtectedRoute>} />
           <Route path="/worker/earnings" element={<ProtectedRoute allowedRoles={['worker']}><WorkerEarnings /></ProtectedRoute>} />
           <Route path="/worker/leaves" element={<ProtectedRoute allowedRoles={['worker']}><WorkerLeaves /></ProtectedRoute>} />
+          <Route path="/worker/salary" element={<ProtectedRoute allowedRoles={['worker']}><WorkerSalaryRequest /></ProtectedRoute>} />
           <Route path="/worker/profile" element={<ProtectedRoute allowedRoles={['worker']}><WorkerProfile /></ProtectedRoute>} />
 
           {/* Admin */}
@@ -99,6 +102,7 @@ const App = () => (
           <Route path="/admin/locations" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminLocations /></ProtectedRoute>} />
           <Route path="/admin/service-areas" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminServiceAreas /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminSettings /></ProtectedRoute>} />
+          <Route path="/admin/salary-settlements" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminSalarySettlements /></ProtectedRoute>} />
 
           {/* Super Admin */}
           <Route path="/super-admin/dashboard" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminDashboard /></ProtectedRoute>} />

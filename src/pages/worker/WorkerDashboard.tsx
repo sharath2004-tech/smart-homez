@@ -11,6 +11,9 @@ interface Stats {
   today: number;
   thisWeek: number;
   thisMonth: number;
+  minutesToday: number;
+  minutesThisWeek: number;
+  minutesThisMonth: number;
 }
 
 interface Task {
@@ -50,7 +53,10 @@ interface Profile {
 const WorkerDashboard = () => {
   const { t } = useTranslation();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [stats, setStats] = useState<Stats>({ today: 0, thisWeek: 0, thisMonth: 0 });
+  const [stats, setStats] = useState<Stats>({
+    today: 0, thisWeek: 0, thisMonth: 0,
+    minutesToday: 0, minutesThisWeek: 0, minutesThisMonth: 0
+  });
   const [currentTask, setCurrentTask] = useState<Task | null>(null);
   const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -149,6 +155,14 @@ const WorkerDashboard = () => {
     }
   };
 
+  const formatMinutes = (mins: number) => {
+    if (!mins || mins <= 0) return '0m';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h === 0) return `${m}m`;
+    return m === 0 ? `${h}h` : `${h}h ${m}m`;
+  };
+
   const formatTime = (timeString: string) => {
     if (!timeString) return '';
     const [hours, minutes] = timeString.split(':');
@@ -209,6 +223,28 @@ const WorkerDashboard = () => {
           ))}
         </div>
 
+        {/* Hours worked summary */}
+        <div className="card-elevated p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
+              <Clock className="w-4 h-4 text-primary" />
+            </div>
+            <p className="text-sm font-semibold text-foreground">Hours Worked</p>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: 'Today',      value: formatMinutes(stats.minutesToday) },
+              { label: 'This Week',  value: formatMinutes(stats.minutesThisWeek) },
+              { label: 'This Month', value: formatMinutes(stats.minutesThisMonth) },
+            ].map((item) => (
+              <div key={item.label} className="bg-muted rounded-xl p-3 text-center">
+                <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
+                <p className="text-base font-bold font-heading text-primary">{item.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Active task */}
         {currentTask && (
           <div className="rounded-2xl overflow-hidden border-2 border-warning">
@@ -229,7 +265,10 @@ const WorkerDashboard = () => {
                     {currentTask.location ? [currentTask.location.address, currentTask.location.city].filter(Boolean).join(', ') : t('worker.dashboard.location')}
                   </div>
                 </div>
-                <span className="text-base font-bold text-primary">₹{currentTask.totalAmount}</span>
+                <div className="text-right shrink-0">
+                  <p className="text-xs text-muted-foreground">Collect</p>
+                  <span className="text-base font-bold text-primary">₹{currentTask.totalAmount}</span>
+                </div>
               </div>
               <div className="flex items-center gap-3 p-3 bg-muted rounded-xl mb-4 text-sm">
                 <Clock className="w-4 h-4 text-muted-foreground" />

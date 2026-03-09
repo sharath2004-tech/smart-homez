@@ -18,6 +18,7 @@ import paymentRoutes from './routes/payments.js';
 import preferencesRoutes from './routes/preferences.js';
 import qrPaymentRoutes from './routes/qrPayments.js';
 import reviewRoutes from './routes/reviews.js';
+import salaryRequestsRoutes from './routes/salaryRequests.js';
 import serviceAreaRoutes from './routes/serviceAreas.js';
 import serviceRoutes from './routes/services.js';
 import settingsRoutes from './routes/settings.js';
@@ -184,6 +185,7 @@ app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/tracking', trackingRoutes);
 app.use('/api/preferences', preferencesRoutes);
 app.use('/api/leaves', leavesRoutes);
+app.use('/api/salary-requests', salaryRequestsRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

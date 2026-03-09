@@ -516,13 +516,68 @@ router.get('/worker/dashboard-stats', authenticate, authorize('worker'), async (
       status: 'completed',
       completedAt: { $gte: startOfMonth }
     });
+
+    // Total worked minutes — using actualStartTime/actualEndTime as the source of truth.
+    // Falls back to actualDurationMinutes if already stored, otherwise computes from timestamps.
+    const workedMinutesAgg = await Booking.aggregate([
+      {
+        $match: {
+          worker: workerId,
+          status: 'completed',
+          $or: [
+            { actualDurationMinutes: { $gt: 0 } },
+            { actualStartTime: { $exists: true }, actualEndTime: { $exists: true } }
+          ]
+        }
+      },
+      {
+        $addFields: {
+          computedMinutes: {
+            $cond: [
+              { $and: [{ $gt: ['$actualDurationMinutes', 0] }] },
+              '$actualDurationMinutes',
+              {
+                $divide: [
+                  { $subtract: ['$actualEndTime', '$actualStartTime'] },
+                  60000
+                ]
+              }
+            ]
+          }
+        }
+      },
+      {
+        $facet: {
+          today: [
+            { $match: { completedAt: { $gte: today } } },
+            { $group: { _id: null, total: { $sum: '$computedMinutes' } } }
+          ],
+          week: [
+            { $match: { completedAt: { $gte: startOfWeek } } },
+            { $group: { _id: null, total: { $sum: '$computedMinutes' } } }
+          ],
+          month: [
+            { $match: { completedAt: { $gte: startOfMonth } } },
+            { $group: { _id: null, total: { $sum: '$computedMinutes' } } }
+          ]
+        }
+      }
+    ]);
+
+    const wm = workedMinutesAgg[0] || {};
+    const minutesToday  = Math.round(wm.today?.[0]?.total  || 0);
+    const minutesWeek   = Math.round(wm.week?.[0]?.total   || 0);
+    const minutesMonth  = Math.round(wm.month?.[0]?.total  || 0);
     
     res.json({
       success: true,
       stats: {
         today: todayCount,
         thisWeek: weekCount,
-        thisMonth: monthCount
+        thisMonth: monthCount,
+        minutesToday,
+        minutesThisWeek: minutesWeek,
+        minutesThisMonth: minutesMonth
       }
     });
   } catch (error) {

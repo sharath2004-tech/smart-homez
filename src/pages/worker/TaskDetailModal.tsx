@@ -565,11 +565,11 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
           <div className="card-elevated p-5">
             <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
               <DollarSign className="w-5 h-5 text-primary" />
-              Payment
+              Amount to Collect from Customer
             </h3>
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Base Amount</span>
+                <span className="text-muted-foreground">Service Charge</span>
                 <span className="font-medium text-foreground">₹{task.totalAmount}</span>
               </div>
               {overtimeMinutes > 0 && (
@@ -581,8 +581,8 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                   <div className="border-t border-border pt-2"></div>
                 </>
               )}
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-foreground">Total Amount</span>
+              <div className="flex items-center justify-between p-3 bg-primary-light rounded-xl mt-2">
+                <span className="font-semibold text-foreground">Collect from Customer</span>
                 <span className="text-2xl font-bold text-primary">₹{calculateTotalAmount().toFixed(2)}</span>
               </div>
             </div>
@@ -757,7 +757,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                       
                       <div className="text-xs bg-purple-100 text-purple-800 p-3 rounded-lg space-y-1">
                         <p className="font-semibold">Show this QR to customer for payment:</p>
-                        <p>• Total Amount: ₹{calculateTotalAmount().toFixed(2)}</p>
+                        <p>• Collect: ₹{calculateTotalAmount().toFixed(2)}</p>
                         {overtimeMinutes > 0 && (
                           <p>• Includes ₹{(overtimeMinutes * OVERTIME_RATE).toFixed(2)} overtime charges</p>
                         )}

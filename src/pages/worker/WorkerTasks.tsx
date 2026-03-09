@@ -183,7 +183,8 @@ const WorkerTasks = () => {
             </div>
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <Package className="w-3.5 h-3.5 shrink-0" />
-              <span>₹{task.totalAmount}</span>
+              <span className="text-muted-foreground font-normal">Collect:</span>
+              <span className="text-primary">₹{task.totalAmount}</span>
             </div>
           </div>
 

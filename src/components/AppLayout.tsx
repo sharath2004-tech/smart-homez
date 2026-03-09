@@ -1,4 +1,4 @@
-import { Bell, Calendar, CreditCard, Home, LayoutDashboard, LogOut, MapPin, RefreshCw, Settings, User, Users, Wrench } from "lucide-react";
+import { Bell, Calendar, CreditCard, Home, IndianRupee, LayoutDashboard, LogOut, MapPin, RefreshCw, Settings, User, Users, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 import { LanguageSelector } from "./LanguageSelector";
@@ -34,6 +34,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
   const workerNav = [
     { to: "/worker/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },
     { to: "/worker/tasks", icon: Calendar, label: t('nav.myTasks') },
+    { to: "/worker/salary", icon: IndianRupee, label: "Salary Request" },
     { to: "/worker/leaves", icon: Bell, label: t('nav.myLeaves') },
     { to: "/worker/profile", icon: User, label: t('nav.profile') },
   ];
@@ -43,6 +44,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
     { to: "/admin/bookings", icon: Calendar, label: t('nav.bookings') },
     { to: "/admin/workforce", icon: Users, label: t('nav.workforce') },
     { to: "/admin/worker-schedule", icon: Calendar, label: t('nav.workerSchedule') },
+    { to: "/admin/salary-settlements", icon: IndianRupee, label: "Salary Settlements" },
     { to: "/admin/leaves", icon: Bell, label: t('nav.leaves') },
     { to: "/admin/services", icon: Wrench, label: t('nav.services') },
     { to: "/admin/workers", icon: User, label: t('nav.workers') },
