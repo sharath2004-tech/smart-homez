@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
+import { API_BASE_URL } from "@/lib/api";
 import { AlertCircle, Camera, CheckCircle, Clock, Image as ImageIcon, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -32,12 +33,13 @@ const WorkDocumentation = ({ bookingId, maxPhotos = 10 }: WorkDocumentationProps
 
   useEffect(() => {
     fetchWorkDocumentation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookingId]);
 
   const fetchWorkDocumentation = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/bookings/${bookingId}/work-documentation`, {
+      const response = await fetch(`${API_BASE_URL}/bookings/${bookingId}/work-documentation`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -88,7 +90,7 @@ const WorkDocumentation = ({ bookingId, maxPhotos = 10 }: WorkDocumentationProps
 
         // Upload photo
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:5000/api/bookings/${bookingId}/upload-photo`, {
+        const response = await fetch(`${API_BASE_URL}/bookings/${bookingId}/upload-photo`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
