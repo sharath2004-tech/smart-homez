@@ -122,6 +122,10 @@
     box-shadow: var(--shadow-brand);
   }
 
+  .btn-brand:visited {
+    color: hsl(var(--primary-foreground));
+  }
+
   .card-elevated {
     @apply bg-card rounded-2xl border border-border;
     box-shadow: var(--shadow-card);

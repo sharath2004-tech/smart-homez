@@ -306,7 +306,7 @@ const ServicesPage = () => {
                       className={`w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors ${
                       service.availability?.available 
                         ? 'btn-brand'
-                        : 'bg-muted text-muted-foreground hover:bg-border'
+                        : 'bg-muted text-muted-foreground hover:bg-border visited:text-muted-foreground'
                     }`}
                   >
                     {service.availability?.available ? 'Book Now' : 'View'}
