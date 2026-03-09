@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
-import { useAdminRole } from "@/hooks/useAdminRole";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
+import { useAdminRole } from "@/hooks/useAdminRole";
 import { adminAPI, bookingsAPI } from "@/lib/api";
 import { Calendar, Clock, MapPin, Search, Star, User, UserCheck, UserX, Users } from "lucide-react";
 import { useEffect, useState } from "react";
