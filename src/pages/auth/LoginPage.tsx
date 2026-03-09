@@ -48,8 +48,9 @@ const LoginPage = () => {
     try {
       const response = await authAPI.login(form.email, form.password);
       
-      // Store token
+      // Store token and user
       localStorage.setItem('token', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
       
       // Check if password change is required (first-time login)
       if (response.requirePasswordChange || response.user.isFirstLogin) {

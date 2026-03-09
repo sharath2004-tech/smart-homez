@@ -54,9 +54,13 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
 
   const superAdminNav = [
     { to: "/super-admin/dashboard", icon: LayoutDashboard, label: "Overview" },
-    { to: "/admin/locations", icon: MapPin, label: t('nav.locations') },
-    { to: "/admin/workers", icon: Users, label: t('nav.workers') },
     { to: "/admin/bookings", icon: Calendar, label: t('nav.bookings') },
+    { to: "/admin/workforce", icon: Users, label: t('nav.workforce') },
+    { to: "/admin/worker-schedule", icon: Calendar, label: t('nav.workerSchedule') },
+    { to: "/admin/salary-settlements", icon: IndianRupee, label: "Salary Settlements" },
+    { to: "/admin/leaves", icon: Bell, label: t('nav.leaves') },
+    { to: "/admin/workers", icon: User, label: t('nav.workers') },
+    { to: "/admin/locations", icon: MapPin, label: t('nav.locations') },
     { to: "/admin/services", icon: Wrench, label: t('nav.services') },
     { to: "/admin/settings", icon: Settings, label: t('nav.settings') },
   ];
@@ -75,7 +79,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
             <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center">
               <Home className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="text-base font-bold font-heading text-foreground">Healthy Homez</span>
+            <span className="text-base font-bold font-heading text-foreground">Smart Homez</span>
           </Link>
         </div>
 
@@ -136,7 +140,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
             <Home className="w-4 h-4 text-primary-foreground" />
           </div>
-          <span className="font-bold text-foreground text-sm">Healthy Homez</span>
+          <span className="font-bold text-foreground text-sm">Smart Homez</span>
         </Link>
         <div className="flex items-center gap-2">
           <LanguageSelector />
