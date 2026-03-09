@@ -718,9 +718,15 @@ export const adminAPI = {
     return apiCall('/admin/workers');
   },
 
-  deleteWorker: async (workerId: string) => {
-    return apiCall(`/admin/workers/${workerId}`, {
-      method: 'DELETE'
+  archiveWorker: async (workerId: string) => {
+    return apiCall(`/admin/workers/${workerId}/archive`, {
+      method: 'PATCH'
+    });
+  },
+
+  unarchiveWorker: async (workerId: string) => {
+    return apiCall(`/admin/workers/${workerId}/unarchive`, {
+      method: 'PATCH'
     });
   },
 
@@ -791,7 +797,7 @@ export const preferencesAPI = {
     preferredWorkerP1?: string;
     preferredWorkerP2?: string;
     preferredWorkerP3?: string;
-    languagePreference?: string;
+    languagePreference?: string[];
     religionPreference?: string;
     specialInstructions?: string;
   }) => {

@@ -223,8 +223,8 @@ export const sendPasswordChangeConfirmation = async (email, name) => {
 export const sendPasswordResetEmail = async (email, name, resetUrl) => {
   try {
     if (!isEmailConfigured()) {
-      console.log('ℹ️ Email not configured. Password reset URL for', name, ':', resetUrl);
-      return { success: false, reason: 'Email not configured', resetUrl };
+      console.log('ℹ️ Email not configured. Skipping password reset email for:', name);
+      return { success: false, reason: 'Email not configured' };
     }
 
     const transporter = createTransporter();

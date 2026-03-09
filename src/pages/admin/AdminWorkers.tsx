@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { adminAPI } from "@/lib/api";
-import { CheckCircle, Loader2, MapPin, Plus, Search, Star, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, CheckCircle, Loader2, MapPin, Plus, Search, Star, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface Location {
@@ -38,6 +38,7 @@ interface Worker {
     label?: string;
   }>;
   isActive: boolean;
+  isArchived?: boolean;
 }
 
 const statusConfig: Record<string, { label: string; class: string }> = {
@@ -101,15 +102,26 @@ const AdminWorkers = () => {
     }
   };
 
-  const handleDeleteWorker = async (workerId: string) => {
-    if (!confirm('Are you sure you want to delete this worker?')) return;
-    
+  const handleArchiveWorker = async (workerId: string) => {
+    if (!confirm('Archive this worker? They will be deactivated but their history will be preserved.')) return;
     try {
-      await adminAPI.deleteWorker(workerId);
-      alert('Worker deleted successfully');
+      await adminAPI.archiveWorker(workerId);
+      alert('Worker archived successfully');
       fetchData();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to delete worker';
+      const message = error instanceof Error ? error.message : 'Failed to archive worker';
+      alert(message);
+    }
+  };
+
+  const handleUnarchiveWorker = async (workerId: string) => {
+    if (!confirm('Restore this worker? They will be reactivated.')) return;
+    try {
+      await adminAPI.unarchiveWorker(workerId);
+      alert('Worker restored successfully');
+      fetchData();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to restore worker';
       alert(message);
     }
   };
@@ -344,12 +356,21 @@ const AdminWorkers = () => {
                     </div>
                   ) : null}
 
-                  <button 
-                    onClick={() => handleDeleteWorker(w._id)}
-                    className="w-full py-2 border border-destructive/30 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors flex items-center justify-center gap-1"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" /> Delete Worker
-                  </button>
+                  {w.isArchived ? (
+                    <button
+                      onClick={() => handleUnarchiveWorker(w._id)}
+                      className="w-full py-2 border border-green-300 rounded-xl text-sm font-medium text-green-700 hover:bg-green-50 transition-colors flex items-center justify-center gap-1"
+                    >
+                      <ArchiveRestore className="w-3.5 h-3.5" /> Restore Worker
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleArchiveWorker(w._id)}
+                      className="w-full py-2 border border-amber-300 rounded-xl text-sm font-medium text-amber-700 hover:bg-amber-50 transition-colors flex items-center justify-center gap-1"
+                    >
+                      <Archive className="w-3.5 h-3.5" /> Archive Worker
+                    </button>
+                  )}
                 </div>
               );
             })}

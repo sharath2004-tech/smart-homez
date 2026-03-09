@@ -337,9 +337,6 @@ router.post('/change-password',
   }
 );
 
-// @route   PATCH /api/auth/preferences
-// @desc    Update user preferences
-// @access  Private
 // @route   POST /api/auth/forgot-password
 // @desc    Request a password reset link (sends email with token)
 // @access  Public

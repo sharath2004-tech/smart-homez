@@ -63,6 +63,8 @@
     "locations": "Locations",
     "settings": "Settings",
     "notifications": "Notifications",
+    "mySubscriptions": "My Subscriptions",
+    "workerSchedule": "Worker Schedule",
     "signOut": "Sign out",
     "customer": "customer",
     "worker": "worker",

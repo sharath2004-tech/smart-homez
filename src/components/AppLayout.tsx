@@ -26,7 +26,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
     { to: "/customer/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },
     { to: "/customer/services", icon: Wrench, label: t('nav.services') },
     { to: "/customer/bookings", icon: Calendar, label: t('nav.myBookings') },
-    { to: "/customer/subscriptions", icon: RefreshCw, label: "My Subscriptions" },
+    { to: "/customer/subscriptions", icon: RefreshCw, label: t('nav.mySubscriptions') },
     { to: "/customer/payments", icon: CreditCard, label: t('nav.payments') },
     { to: "/customer/profile", icon: User, label: t('nav.profile') },
   ];
@@ -34,7 +34,6 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
   const workerNav = [
     { to: "/worker/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },
     { to: "/worker/tasks", icon: Calendar, label: t('nav.myTasks') },
-    { to: "/worker/earnings", icon: CreditCard, label: t('nav.earnings') },
     { to: "/worker/leaves", icon: Bell, label: t('nav.myLeaves') },
     { to: "/worker/profile", icon: User, label: t('nav.profile') },
   ];
@@ -43,7 +42,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
     { to: "/admin/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },
     { to: "/admin/bookings", icon: Calendar, label: t('nav.bookings') },
     { to: "/admin/workforce", icon: Users, label: t('nav.workforce') },
-    { to: "/admin/worker-schedule", icon: Calendar, label: "Worker Schedule" },
+    { to: "/admin/worker-schedule", icon: Calendar, label: t('nav.workerSchedule') },
     { to: "/admin/leaves", icon: Bell, label: t('nav.leaves') },
     { to: "/admin/services", icon: Wrench, label: t('nav.services') },
     { to: "/admin/workers", icon: User, label: t('nav.workers') },

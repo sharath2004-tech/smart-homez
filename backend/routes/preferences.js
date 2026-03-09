@@ -44,7 +44,7 @@ router.put('/',
     body('preferredWorkerP1').optional().isMongoId(),
     body('preferredWorkerP2').optional().isMongoId(),
     body('preferredWorkerP3').optional().isMongoId(),
-    body('languagePreference').optional().isString(),
+    body('languagePreference').optional().isArray(),
     body('religionPreference').optional().isString(),
     body('specialInstructions').optional().isString().isLength({ max: 500 })
   ],

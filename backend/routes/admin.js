@@ -619,16 +619,15 @@ router.post('/workers',
   }
 );
 
-// @route   DELETE /api/admin/workers/:workerId
-// @desc    Delete a worker - Admin/Super Admin with location access check
+// @route   PATCH /api/admin/workers/:workerId/archive
+// @desc    Archive a worker (soft deactivation) - preserves history
 // @access  Private/Admin
-router.delete('/workers/:workerId', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+router.patch('/workers/:workerId/archive', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
   try {
     const { workerId } = req.params;
 
-    // Check if admin has permission
     if (req.user.role === 'admin' && !req.user.adminProfile?.permissions?.canDeleteWorkers) {
-      return res.status(403).json({ error: { message: 'No permission to delete workers', status: 403 } });
+      return res.status(403).json({ error: { message: 'No permission to archive workers', status: 403 } });
     }
 
     const worker = await User.findById(workerId);
@@ -636,59 +635,68 @@ router.delete('/workers/:workerId', authenticate, authorize('admin', 'super_admi
       return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
     }
 
-    // For regular admin, verify they have access to at least one of worker's locations
     if (req.user.role === 'admin') {
       const adminLocationIds = req.user.adminProfile?.assignedLocations?.map(loc => loc.locationId.toString()) || [];
       const workerLocationIds = worker.workerProfile?.assignedApartments?.map(apt => apt.locationId?.toString()).filter(Boolean) || [];
-      
       const hasAccess = workerLocationIds.some(locId => adminLocationIds.includes(locId));
-      
       if (!hasAccess) {
-        console.log(`⚠️ Admin ${req.user.name} attempted to delete worker ${worker.name} from different location`);
-        return res.status(403).json({ 
-          error: { 
-            message: 'You can only delete workers assigned to your locations', 
-            status: 403 
-          } 
-        });
+        return res.status(403).json({ error: { message: 'You can only archive workers assigned to your locations', status: 403 } });
       }
     }
 
-    // Check for active bookings
+    // Check for active bookings before archiving
     const activeBookings = await Booking.countDocuments({
       worker: workerId,
       status: { $in: ['pending', 'confirmed', 'in-progress'] }
     });
 
     if (activeBookings > 0) {
-      return res.status(400).json({ 
-        error: { 
-          message: `Cannot delete worker with ${activeBookings} active booking(s). Please reassign or complete them first.`,
-          status: 400 
-        } 
+      return res.status(400).json({
+        error: {
+          message: `Cannot archive worker with ${activeBookings} active booking(s). Please reassign or complete them first.`,
+          status: 400
+        }
       });
     }
 
-    // Permanently delete worker from database
-    await User.findByIdAndDelete(workerId);
+    worker.isActive = false;
+    worker.isArchived = true;
+    await worker.save({ validateBeforeSave: false });
 
-    // Remove from location assignments
-    await Location.updateMany(
-      { 'assignedWorkers.worker': workerId },
-      { $pull: { assignedWorkers: { worker: workerId } } }
-    );
+    console.log(`✅ Worker ${worker.name} (${workerId}) archived by ${req.user.role} ${req.user.name}`);
 
-    // Note: Past bookings will remain in history but with worker reference
-    // This maintains booking history for auditing purposes
-
-    console.log(`✅ Worker ${worker.name} (${workerId}) permanently deleted by ${req.user.role} ${req.user.name}`);
-
-    res.json({
-      success: true,
-      message: 'Worker permanently deleted from database'
-    });
+    res.json({ success: true, message: 'Worker archived successfully' });
   } catch (error) {
-    console.error('Delete worker error:', error);
+    console.error('Archive worker error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   PATCH /api/admin/workers/:workerId/unarchive
+// @desc    Unarchive a worker (restore access)
+// @access  Private/Admin
+router.patch('/workers/:workerId/unarchive', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { workerId } = req.params;
+
+    if (req.user.role === 'admin' && !req.user.adminProfile?.permissions?.canDeleteWorkers) {
+      return res.status(403).json({ error: { message: 'No permission to unarchive workers', status: 403 } });
+    }
+
+    const worker = await User.findById(workerId);
+    if (!worker || worker.role !== 'worker') {
+      return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
+    }
+
+    worker.isActive = true;
+    worker.isArchived = false;
+    await worker.save({ validateBeforeSave: false });
+
+    console.log(`✅ Worker ${worker.name} (${workerId}) unarchived by ${req.user.role} ${req.user.name}`);
+
+    res.json({ success: true, message: 'Worker unarchived successfully' });
+  } catch (error) {
+    console.error('Unarchive worker error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
   }
 });

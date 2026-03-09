@@ -310,8 +310,8 @@ const userSchema = new mongoose.Schema({
       }
     }],
     languagePreference: {
-      type: String,
-      default: 'any'
+      type: [String],
+      default: []
     },
     religionPreference: {
       type: String,
@@ -390,6 +390,10 @@ const userSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  isArchived: {
+    type: Boolean,
+    default: false
   },
   isVerified: {
     type: Boolean,

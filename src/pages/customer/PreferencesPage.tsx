@@ -73,7 +73,7 @@ interface Preferences {
   preferredWorkerP1?: Worker | null;
   preferredWorkerP2?: Worker | null;
   preferredWorkerP3?: Worker | null;
-  languagePreference?: string;
+  languagePreference?: string[];
   religionPreference?: string;
   specialInstructions?: string;
   exceptionWorkers?: ExceptionWorker[];
@@ -564,29 +564,35 @@ const PreferencesPage = () => {
 
             {/* Language Preference */}
             <div className="space-y-3">
-              <Label htmlFor="language">Preferred Language</Label>
-              <Select 
-                value={preferences.languagePreference || ''}
-                onValueChange={(value) => setPreferences(prev => ({ ...prev, languagePreference: value }))}
-              >
-                <SelectTrigger id="language">
-                  <SelectValue placeholder="Select language" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="english">English</SelectItem>
-                  <SelectItem value="hindi">Hindi</SelectItem>
-                  <SelectItem value="marathi">Marathi</SelectItem>
-                  <SelectItem value="tamil">Tamil</SelectItem>
-                  <SelectItem value="telugu">Telugu</SelectItem>
-                  <SelectItem value="kannada">Kannada</SelectItem>
-                  <SelectItem value="bengali">Bengali</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Preferred Language(s)</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {['english', 'hindi', 'marathi', 'tamil', 'telugu', 'kannada', 'bengali'].map((lang) => {
+                  const selected = (preferences.languagePreference || []).includes(lang);
+                  return (
+                    <label key={lang} className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        className="rounded border-input"
+                        checked={selected}
+                        onChange={() => {
+                          setPreferences(prev => ({
+                            ...prev,
+                            languagePreference: selected
+                              ? (prev.languagePreference || []).filter(l => l !== lang)
+                              : [...(prev.languagePreference || []), lang]
+                          }));
+                        }}
+                      />
+                      <span className="text-sm capitalize">{lang}</span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Religion Preference */}
             <div className="space-y-3">
-              <Label htmlFor="religion">Religion Preference (Optional)</Label>
+              <Label htmlFor="religion">Religion Preference</Label>
               <Select 
                 value={preferences.religionPreference || ''}
                 onValueChange={(value) => setPreferences(prev => ({ ...prev, religionPreference: value }))}

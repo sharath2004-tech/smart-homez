@@ -15,6 +15,22 @@ const ResetPasswordPage = () => {
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
 
+  const getPasswordStrength = (pwd: string): { score: number; label: string; color: string } => {
+    if (!pwd) return { score: 0, label: "", color: "" };
+    let score = 0;
+    if (pwd.length >= 8) score++;
+    if (/[A-Z]/.test(pwd)) score++;
+    if (/[0-9]/.test(pwd)) score++;
+    if (/[!@#$%^&*(),.?":{}|<>]/.test(pwd)) score++;
+    if (pwd.length >= 12) score++;
+    if (score <= 1) return { score, label: "Weak", color: "bg-red-500" };
+    if (score <= 2) return { score, label: "Fair", color: "bg-yellow-500" };
+    if (score <= 3) return { score, label: "Good", color: "bg-blue-500" };
+    return { score, label: "Strong", color: "bg-green-500" };
+  };
+
+  const passwordStrength = getPasswordStrength(newPassword);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -83,9 +99,10 @@ const ResetPasswordPage = () => {
             )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">New password</label>
+                <label htmlFor="new-password" className="block text-sm font-medium text-foreground mb-1.5">New password</label>
                 <div className="relative">
                   <input
+                    id="new-password"
                     type={showPassword ? "text" : "password"}
                     className="input-clean pr-10"
                     placeholder="Enter new password"
@@ -95,16 +112,33 @@ const ResetPasswordPage = () => {
                   />
                   <button
                     type="button"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     onClick={() => setShowPassword((v) => !v)}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                {newPassword && (
+                  <div className="mt-2">
+                    <div className="flex gap-1 mb-1">
+                      {[1, 2, 3, 4].map((i) => (
+                        <div
+                          key={i}
+                          className={`h-1 flex-1 rounded-full transition-colors ${
+                            i <= passwordStrength.score ? passwordStrength.color : "bg-muted"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Strength: <span className="font-medium">{passwordStrength.label}</span></p>
+                  </div>
+                )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Confirm new password</label>
+                <label htmlFor="confirm-password" className="block text-sm font-medium text-foreground mb-1.5">Confirm new password</label>
                 <input
+                  id="confirm-password"
                   type={showPassword ? "text" : "password"}
                   className="input-clean"
                   placeholder="Confirm new password"

@@ -166,7 +166,7 @@ const AdminSettings = () => {
         {/* Header */}
         <div className="mb-8">
           <button
-            onClick={() => navigate('/admin')}
+            onClick={() => navigate('/admin/dashboard')}
             className="text-primary hover:text-primary/80 mb-4 flex items-center gap-2"
           >
             ← Back to Dashboard
