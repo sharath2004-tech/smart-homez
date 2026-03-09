@@ -375,7 +375,8 @@ router.post('/forgot-password',
         user.passwordResetToken = undefined;
         user.passwordResetExpires = undefined;
         await user.save({ validateBeforeSave: false });
-        return res.status(500).json({ error: { message: 'Failed to send reset email. Try again later.', status: 500 } });
+        // Return generic message to prevent user enumeration
+        return res.json({ message: 'If that email exists, a reset link has been sent.' });
       }
 
       res.json({ message: 'If that email exists, a reset link has been sent.' });

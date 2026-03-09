@@ -22,7 +22,15 @@ router.post('/locations',
     body('apartmentName').notEmpty().withMessage('Apartment name is required'),
     body('area').notEmpty().withMessage('Area is required'),
     body('city').notEmpty().withMessage('City is required'),
-    body('coordinates').isArray().withMessage('Coordinates must be an array [longitude, latitude]')
+    body('coordinates')
+      .isArray({ min: 2, max: 2 }).withMessage('Coordinates must be an array of exactly 2 values [longitude, latitude]')
+      .custom((coords) => {
+        const [lng, lat] = coords;
+        if (typeof lng !== 'number' || typeof lat !== 'number') throw new Error('Coordinates must be numbers');
+        if (lng < -180 || lng > 180) throw new Error('Longitude must be between -180 and 180');
+        if (lat < -90 || lat > 90) throw new Error('Latitude must be between -90 and 90');
+        return true;
+      })
   ],
   async (req, res) => {
     try {
@@ -886,7 +894,16 @@ router.patch('/workers/:workerId/assign-location',
         );
         if (!workerAlreadyInLocation) {
           location.assignedWorkers.push({ worker: workerId, assignedAt: new Date() });
-          await location.save();
+          try {
+            await location.save();
+          } catch (locationSaveError) {
+            // Rollback worker assignment to keep both documents consistent
+            worker.workerProfile.assignedApartments.pop();
+            await worker.save().catch(rollbackErr =>
+              console.error('Rollback failed — data may be inconsistent:', rollbackErr)
+            );
+            throw locationSaveError;
+          }
         }
       }
 
@@ -960,7 +977,7 @@ router.get('/dashboard-stats', authenticate, authorize('admin', 'super_admin'), 
 
     const todayRevenue = await Booking.aggregate([
       { $match: { completedAt: { $gte: today }, status: 'completed' } },
-      { $group: { _id: null, total: { $sum: '$totalPrice' } } }
+      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
     ]);
 
     // Count online workers
@@ -996,14 +1013,14 @@ router.get('/dashboard-stats', authenticate, authorize('admin', 'super_admin'), 
 // @access  Private/Admin
 router.get('/recent-bookings', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
   try {
-    const { limit = 10 } = req.query;
+    const limitNum = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 100);
 
     let bookings = await Booking.find()
       .populate('customer', 'name')
       .populate('worker', 'name')
       .populate('service', 'name')
       .sort({ createdAt: -1 })
-      .limit(parseInt(limit) * 5); // Fetch more to filter
+      .limit(limitNum * 5); // Fetch more to filter
 
     // Filter bookings by location scope
     if (req.user.role === 'admin') {
@@ -1018,7 +1035,7 @@ router.get('/recent-bookings', authenticate, authorize('admin', 'super_admin'), 
           return workerLocationIds.some(locId => adminLocationIds.includes(locId)) ? booking : null;
         })
       );
-      bookings = bookings.filter(b => b !== null).slice(0, parseInt(limit));
+      bookings = bookings.filter(b => b !== null).slice(0, limitNum);
     } else if (req.user.role === 'super_admin' && req.query.locationId) {
       // Super Admin: filter bookings by specific locationId via worker assignment
       const { locationId } = req.query;
@@ -1029,9 +1046,9 @@ router.get('/recent-bookings', authenticate, authorize('admin', 'super_admin'), 
       const workerIds = new Set(workersInLocation.map((w) => w._id.toString()));
       bookings = bookings
         .filter((b) => b.worker && workerIds.has(b.worker._id?.toString() || b.worker.toString()))
-        .slice(0, parseInt(limit));
+        .slice(0, limitNum);
     } else {
-      bookings = bookings.slice(0, parseInt(limit));
+      bookings = bookings.slice(0, limitNum);
     }
 
     res.json({

@@ -3,7 +3,7 @@ import { toast } from "@/hooks/use-toast";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { leavesAPI, superAdminAPI } from "@/lib/api";
 import { Calendar, CheckCircle, Clock, Plus, User, Users, XCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 // â”€â”€â”€ Interfaces â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -82,12 +82,13 @@ const AdminLeaves = () => {
 
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Returns today's date as YYYY-MM-DD in the user's local timezone
+  const localToday = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
 
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
       const promises: Promise<unknown>[] = [
@@ -97,29 +98,44 @@ const AdminLeaves = () => {
       if (!isSuperAdmin) promises.push(leavesAPI.getAdminMyLeaves());
       if (isSuperAdmin) promises.push(superAdminAPI.getAdminLeaves());
 
+      // Promise.allSettled never rejects — handle each result individually
       const results = await Promise.allSettled(promises);
 
       if (results[0].status === 'fulfilled') {
         const data = results[0].value as { pendingRequests?: PendingLeaveRequest[] };
         setPendingLeaves(data.pendingRequests || []);
+      } else {
+        console.error('Failed to fetch pending leaves:', results[0].reason);
       }
       if (results[1].status === 'fulfilled') {
         setStatistics(results[1].value as LeaveStatistics);
+      } else {
+        console.error('Failed to fetch leave statistics:', results[1].reason);
       }
-      if (!isSuperAdmin && results[2] && results[2].status === 'fulfilled') {
-        const data = results[2].value as { leaves?: AdminLeave[] };
-        setMyLeaves(data.leaves || []);
+      if (!isSuperAdmin && results[2]) {
+        if (results[2].status === 'fulfilled') {
+          const data = results[2].value as { leaves?: AdminLeave[] };
+          setMyLeaves(data.leaves || []);
+        } else {
+          console.error('Failed to fetch own leaves:', results[2].reason);
+        }
       }
-      if (isSuperAdmin && results[2] && results[2].status === 'fulfilled') {
-        const data = results[2].value as { adminLeaves?: AdminLeaveRequest[] };
-        setAdminLeaveRequests(data.adminLeaves || []);
+      if (isSuperAdmin && results[2]) {
+        if (results[2].status === 'fulfilled') {
+          const data = results[2].value as { adminLeaves?: AdminLeaveRequest[] };
+          setAdminLeaveRequests(data.adminLeaves || []);
+        } else {
+          console.error('Failed to fetch admin leave requests:', results[2].reason);
+        }
       }
-    } catch (error) {
-      console.error('Error fetching leaves data:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [isSuperAdmin]);
+
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]); // re-fetch when role resolves or changes
 
   const formatDate = (ds: string) =>
     new Date(ds).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -290,7 +306,7 @@ const AdminLeaves = () => {
                       <label className="block text-sm font-semibold text-foreground mb-1.5">From Date <span className="text-red-500">*</span></label>
                       <input
                         type="date"
-                        min={new Date().toISOString().split('T')[0]}
+                        min={localToday()}
                         value={applyForm.fromDate}
                         onChange={e => setApplyForm(f => ({ ...f, fromDate: e.target.value }))}
                         className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm"
@@ -301,7 +317,7 @@ const AdminLeaves = () => {
                       <label className="block text-sm font-semibold text-foreground mb-1.5">To Date <span className="text-red-500">*</span></label>
                       <input
                         type="date"
-                        min={applyForm.fromDate || new Date().toISOString().split('T')[0]}
+                        min={applyForm.fromDate || localToday()}
                         value={applyForm.toDate}
                         onChange={e => setApplyForm(f => ({ ...f, toDate: e.target.value }))}
                         className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm"

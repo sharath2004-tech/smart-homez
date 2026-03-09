@@ -107,7 +107,7 @@ router.get('/stats', async (req, res) => {
             status: 'completed'
           }
         },
-        { $group: { _id: null, total: { $sum: '$totalPrice' } } }
+        { $group: { _id: null, total: { $sum: '$totalAmount' } } }
       ])
     ]);
 
@@ -713,7 +713,7 @@ router.put('/admin-leaves/:adminId/:leaveId/status', async (req, res) => {
       return res.status(404).json({ error: { message: 'Admin not found', status: 404 } });
     }
 
-    const leave = admin.adminProfile.leaves.id(leaveId);
+    const leave = admin.adminProfile?.leaves?.id(leaveId);
     if (!leave) {
       return res.status(404).json({ error: { message: 'Leave request not found', status: 404 } });
     }

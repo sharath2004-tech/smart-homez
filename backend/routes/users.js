@@ -381,8 +381,9 @@ router.patch('/addresses/:addressId', authenticate, async (req, res) => {
       return res.status(404).json({ error: { message: 'Address not found', status: 404 } });
     }
 
-    // Update fields
-    Object.keys(req.body).forEach(key => {
+    // Update fields — only allow safe, known address fields
+    const allowedFields = ['label', 'street', 'apartment', 'building', 'area', 'city', 'state', 'zipCode', 'location', 'isDefault'];
+    allowedFields.forEach(key => {
       if (req.body[key] !== undefined) {
         address[key] = req.body[key];
       }

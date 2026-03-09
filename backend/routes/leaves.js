@@ -474,6 +474,8 @@ router.post(
         return res.status(400).json({ message: 'A leave request already exists for overlapping dates' });
       }
 
+      if (!admin.adminProfile) admin.adminProfile = {};
+      if (!admin.adminProfile.leaves) admin.adminProfile.leaves = [];
       admin.adminProfile.leaves.push({
         fromDate: from,
         toDate: to,
@@ -490,7 +492,7 @@ router.post(
       });
     } catch (error) {
       console.error('Admin apply leave error:', error);
-      res.status(500).json({ message: 'Server error', error: error.message });
+      res.status(500).json({ message: 'Server error' });
     }
   }
 );
@@ -522,7 +524,7 @@ router.get(
       res.json({ leaves });
     } catch (error) {
       console.error('Admin get my leaves error:', error);
-      res.status(500).json({ message: 'Server error', error: error.message });
+      res.status(500).json({ message: 'Server error' });
     }
   }
 );
@@ -553,7 +555,7 @@ router.delete(
         return res.status(404).json({ message: 'Admin not found' });
       }
 
-      const leave = admin.adminProfile.leaves.id(leaveId);
+      const leave = admin.adminProfile?.leaves?.id(leaveId);
       if (!leave) {
         return res.status(404).json({ message: 'Leave request not found' });
       }
@@ -568,7 +570,7 @@ router.delete(
       res.json({ message: 'Leave request cancelled successfully' });
     } catch (error) {
       console.error('Admin cancel leave error:', error);
-      res.status(500).json({ message: 'Server error', error: error.message });
+      res.status(500).json({ message: 'Server error' });
     }
   }
 );

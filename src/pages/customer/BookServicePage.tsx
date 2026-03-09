@@ -62,7 +62,7 @@ interface Preferences {
   specialInstructions?: string;
 }
 
-type TimeSlot = 'now' | 'morning' | 'afternoon' | 'evening' | 'night';
+type TimePeriod = 'morning' | 'afternoon' | 'evening';
 type BookingMode = 'now' | 'schedule';
 
 const BookServicePage = () => {
@@ -81,7 +81,8 @@ const BookServicePage = () => {
   // Booking form state
   const [bookingType, setBookingType] = useState<'oneTime' | 'daily' | 'weekly' | 'monthly'>('oneTime');
   const [selectedDate, setSelectedDate] = useState('');
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot>('now');
+  const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('morning');
+  const [selectedExactTime, setSelectedExactTime] = useState<string>('');
   const [selectedWorker, setSelectedWorker] = useState<string | null>(null);
   const [preferences, setPreferences] = useState<Preferences>({
     workerGenderPreference: 'any',
@@ -201,28 +202,39 @@ const BookServicePage = () => {
     };
   };
 
-  // Get time from time slot
-  const getTimeFromSlot = (slot: TimeSlot, date?: string): string => {
-    const now = new Date();
-    
-    switch (slot) {
-      case 'now': {
-        // Round up to next 30 min interval + 1 hour for preparation
-        const minutes = Math.ceil((now.getMinutes() + 60) / 30) * 30;
-        const hours = now.getHours() + Math.floor(minutes / 60);
-        return `${String(hours % 24).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+  // Generate 15-min slots for a period
+  const generateSlots = (period: TimePeriod): string[] => {
+    const ranges: Record<TimePeriod, { start: number; end: number }> = {
+      morning:   { start: 6,  end: 12 },
+      afternoon: { start: 12, end: 17 },
+      evening:   { start: 17, end: 22 }
+    };
+    const { start, end } = ranges[period];
+    const slots: string[] = [];
+    for (let h = start; h < end; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
       }
-      case 'morning':
-        return '09:00';
-      case 'afternoon':
-        return '14:00';
-      case 'evening':
-        return '18:00';
-      case 'night':
-        return '20:00';
-      default:
-        return '09:00';
     }
+    return slots;
+  };
+
+  const formatSlotTime = (time: string): string => {
+    const [h, m] = time.split(':').map(Number);
+    const period = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+  };
+
+  // Get booking time string
+  const getBookingTime = (): string => {
+    if (bookingMode === 'now') {
+      const now = new Date();
+      const minutes = Math.ceil((now.getMinutes() + 60) / 30) * 30;
+      const hours = now.getHours() + Math.floor(minutes / 60);
+      return `${String(hours % 24).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+    }
+    return selectedExactTime || '09:00';
   };
 
   const calculatePrice = () => {
@@ -255,12 +267,14 @@ const BookServicePage = () => {
       }
     }
     
-    const selectedTime = bookingMode === 'now' 
-      ? getTimeFromSlot('now')
-      : getTimeFromSlot(selectedTimeSlot, selectedDate);
-    
+    const selectedTime = getBookingTime();
+
     if (bookingMode === 'schedule' && !selectedDate && bookingType === 'oneTime') {
       toast.error('Please select a date');
+      return;
+    }
+    if (bookingMode === 'schedule' && !selectedExactTime) {
+      toast.error('Please select a time slot');
       return;
     }
 
@@ -579,28 +593,57 @@ const BookServicePage = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-3">
                     Select Time Slot
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {['morning', 'afternoon', 'evening', 'night'].map((slot) => (
+
+                  {/* Period tabs */}
+                  <div className="flex gap-2 mb-4">
+                    {(['morning', 'afternoon', 'evening'] as TimePeriod[]).map((period) => (
                       <button
-                        key={slot}
+                        key={period}
                         type="button"
-                        onClick={() => setSelectedTimeSlot(slot as TimeSlot)}
-                        className={`p-3 border rounded-lg text-sm capitalize transition-all ${
-                          selectedTimeSlot === slot
-                            ? 'border-primary bg-primary/5 text-foreground font-medium'
-                            : 'border-border hover:border-primary/50 text-muted-foreground'
+                        onClick={() => { setSelectedPeriod(period); setSelectedExactTime(''); }}
+                        className={`px-5 py-2 rounded-full text-sm font-semibold border transition-all capitalize ${
+                          selectedPeriod === period
+                            ? 'bg-foreground text-background border-foreground shadow-sm'
+                            : 'border-border text-muted-foreground hover:border-foreground/40'
                         }`}
                       >
-                        {slot === 'morning' && '🌅 Morning (9:00 AM)'}
-                        {slot === 'afternoon' && '☀️ Afternoon (2:00 PM)'}
-                        {slot === 'evening' && '🌆 Evening (6:00 PM)'}
-                        {slot === 'night' && '🌙 Night (8:00 PM)'}
+                        {period === 'morning' && '🌅 '}{period === 'afternoon' && '☀️ '}{period === 'evening' && '🌆 '}
+                        {period.charAt(0).toUpperCase() + period.slice(1)}
                       </button>
                     ))}
                   </div>
+
+                  {/* 15-min slot grid */}
+                  <div className="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
+                    {generateSlots(selectedPeriod).map((time) => (
+                      <button
+                        key={time}
+                        type="button"
+                        onClick={() => setSelectedExactTime(time)}
+                        className={`flex flex-col items-center py-3 px-1 rounded-2xl border text-center transition-all ${
+                          selectedExactTime === time
+                            ? 'bg-muted border-muted-foreground/40 shadow-inner'
+                            : 'border-border hover:border-primary/60 hover:bg-primary/5'
+                        }`}
+                      >
+                        <span className="text-sm font-bold text-foreground leading-tight">
+                          {formatSlotTime(time)}
+                        </span>
+                        <span className="text-xs text-primary font-medium mt-0.5">
+                          {workers.length} {workers.length === 1 ? 'worker' : 'workers'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {selectedExactTime && (
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      Selected: <span className="font-semibold text-foreground">{formatSlotTime(selectedExactTime)}</span>
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
