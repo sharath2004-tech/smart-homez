@@ -1,5 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { adminAPI, authAPI, locationsAPI } from "@/lib/api";
+import { cropQRFromImage } from "@/utils/cropQRFromImage";
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Building, MapPin, Plus, QrCode, Search, Shield, Trash2, Upload, UserPlus, X } from "lucide-react";
@@ -181,22 +182,46 @@ const AdminLocations = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check file size (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      alert('File size must be less than 2MB');
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size must be less than 5MB');
       return;
     }
-
-    // Check file type
     if (!file.type.startsWith('image/')) {
       alert('Please upload an image file');
       return;
     }
 
+    setUploadingQR(true);
+
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setQRFormData(prev => ({ ...prev, qrCodeImage: reader.result as string }));
+    reader.onloadend = async () => {
+      try {
+        // Step 1: detect & crop just the QR region
+        const cropped = await cropQRFromImage(reader.result as string);
+
+        // Step 2: resize to 600×600 max
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const max = 600;
+          const scale = Math.min(1, max / Math.max(img.width, img.height));
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d')!;
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          setQRFormData(prev => ({ ...prev, qrCodeImage: canvas.toDataURL('image/png') }));
+          setUploadingQR(false);
+        };
+        img.onerror = () => { alert('Image processing failed.'); setUploadingQR(false); };
+        img.src = cropped;
+      } catch {
+        alert('Failed to process image.');
+        setUploadingQR(false);
+      }
     };
+    reader.onerror = () => { alert('Failed to read file.'); setUploadingQR(false); };
     reader.readAsDataURL(file);
   };
 
@@ -1064,7 +1089,13 @@ const AdminLocations = () => {
                   <label className="block text-sm font-medium text-foreground mb-2">
                     QR Code Image *
                   </label>
-                  {qrFormData.qrCodeImage ? (
+                  {uploadingQR && !qrFormData.qrCodeImage ? (
+                    <div className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-purple-400 rounded-xl bg-purple-50">
+                      <div className="animate-spin w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full mb-3"></div>
+                      <p className="text-sm text-foreground font-medium">Detecting QR code...</p>
+                      <p className="text-xs text-muted-foreground mt-1">Cropping to QR region</p>
+                    </div>
+                  ) : qrFormData.qrCodeImage ? (
                     <div className="relative">
                       <img 
                         src={qrFormData.qrCodeImage} 

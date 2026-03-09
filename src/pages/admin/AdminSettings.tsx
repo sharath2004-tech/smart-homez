@@ -1,4 +1,5 @@
 import { settingsAPI } from "@/lib/api";
+import { cropQRFromImage } from "@/utils/cropQRFromImage";
 import { Building, CreditCard, DollarSign, FileText, Save, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -65,13 +66,10 @@ const AdminSettings = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check file size (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      alert('File size must be less than 2MB');
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size must be less than 5MB');
       return;
     }
-
-    // Check file type
     if (!file.type.startsWith('image/')) {
       alert('Please upload an image file');
       return;
@@ -79,60 +77,40 @@ const AdminSettings = () => {
 
     setUploadingQR(true);
 
-    // Compress and convert image
     const reader = new FileReader();
-    reader.onloadend = () => {
-      const img = new Image();
-      img.onload = () => {
-        // Create canvas to compress image
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        // Set max dimensions (QR codes don't need to be huge)
-        const maxWidth = 800;
-        const maxHeight = 800;
-        let width = img.width;
-        let height = img.height;
+    reader.onloadend = async () => {
+      try {
+        // Step 1: detect & crop just the QR region
+        const cropped = await cropQRFromImage(reader.result as string);
 
-        // Calculate new dimensions
-        if (width > height) {
-          if (width > maxWidth) {
-            height *= maxWidth / width;
-            width = maxWidth;
-          }
-        } else {
-          if (height > maxHeight) {
-            width *= maxHeight / height;
-            height = maxHeight;
-          }
-        }
+        // Step 2: lightly resize to 600×600 max for storage
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const max = 600;
+          const scale = Math.min(1, max / Math.max(img.width, img.height));
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d')!;
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const finalBase64 = canvas.toDataURL('image/png');
 
-        canvas.width = width;
-        canvas.height = height;
-        ctx?.drawImage(img, 0, 0, width, height);
-
-        // Convert to compressed base64 (0.8 quality)
-        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
-        
-        setSettings(prev => ({
-          ...prev,
-          payment: {
-            ...prev.payment,
-            qrCodeImage: compressedBase64
-          }
-        }));
+          setSettings(prev => ({
+            ...prev,
+            payment: { ...prev.payment, qrCodeImage: finalBase64 }
+          }));
+          setUploadingQR(false);
+        };
+        img.onerror = () => { alert('Image processing failed.'); setUploadingQR(false); };
+        img.src = cropped;
+      } catch {
+        alert('Failed to process image.');
         setUploadingQR(false);
-      };
-      img.onerror = () => {
-        alert('Failed to load image. Please try another file.');
-        setUploadingQR(false);
-      };
-      img.src = reader.result as string;
+      }
     };
-    reader.onerror = () => {
-      alert('Failed to read file. Please try again.');
-      setUploadingQR(false);
-    };
+    reader.onerror = () => { alert('Failed to read file.'); setUploadingQR(false); };
     reader.readAsDataURL(file);
   };
 
@@ -235,8 +213,8 @@ const AdminSettings = () => {
                 {uploadingQR ? (
                   <div className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-primary rounded-xl bg-primary/5">
                     <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full mb-3"></div>
-                    <p className="text-sm text-foreground font-medium">Processing image...</p>
-                    <p className="text-xs text-muted-foreground mt-1">Compressing and optimizing</p>
+                    <p className="text-sm text-foreground font-medium">Detecting QR code...</p>
+                    <p className="text-xs text-muted-foreground mt-1">Cropping to QR region</p>
                   </div>
                 ) : settings.payment.qrCodeImage ? (
                   <div className="relative inline-block">
