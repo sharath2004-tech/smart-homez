@@ -737,4 +737,78 @@ router.put('/admin-leaves/:adminId/:leaveId/status', async (req, res) => {
   }
 });
 
+// ─── Service Requests ─────────────────────────────────────────────────────────
+
+// @route   GET /api/super-admin/service-requests
+// @desc    List service creation requests from admins
+router.get('/service-requests', async (req, res) => {
+  try {
+    const ServiceRequest = (await import('../models/ServiceRequest.js')).default;
+    const { status = 'pending' } = req.query;
+    const query = status === 'all' ? {} : { status };
+    const requests = await ServiceRequest.find(query)
+      .populate('requestedBy', 'name email')
+      .populate('reviewedBy', 'name email')
+      .sort({ createdAt: -1 });
+    res.json({ requests, total: requests.length });
+  } catch (error) {
+    console.error('Get service requests error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   POST /api/super-admin/service-requests/:id/approve
+// @desc    Approve an admin service request — creates the Service document
+router.post('/service-requests/:id/approve', async (req, res) => {
+  try {
+    const ServiceRequest = (await import('../models/ServiceRequest.js')).default;
+    const Service = (await import('../models/Service.js')).default;
+
+    const request = await ServiceRequest.findById(req.params.id);
+    if (!request) return res.status(404).json({ error: { message: 'Request not found', status: 404 } });
+    if (request.status !== 'pending') return res.status(400).json({ error: { message: `Request already ${request.status}`, status: 400 } });
+
+    const service = new Service({
+      ...request.serviceData,
+      createdBy: request.requestedBy,
+      isActive: true
+    });
+    await service.save();
+
+    request.status = 'approved';
+    request.reviewedBy = req.user._id;
+    request.reviewedAt = new Date();
+    request.superAdminNote = req.body.note || '';
+    await request.save();
+
+    res.json({ message: 'Service request approved and service is now live', service, request });
+  } catch (error) {
+    console.error('Approve service request error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   POST /api/super-admin/service-requests/:id/reject
+// @desc    Reject an admin service request
+router.post('/service-requests/:id/reject', async (req, res) => {
+  try {
+    const ServiceRequest = (await import('../models/ServiceRequest.js')).default;
+
+    const request = await ServiceRequest.findById(req.params.id);
+    if (!request) return res.status(404).json({ error: { message: 'Request not found', status: 404 } });
+    if (request.status !== 'pending') return res.status(400).json({ error: { message: `Request already ${request.status}`, status: 400 } });
+
+    request.status = 'rejected';
+    request.reviewedBy = req.user._id;
+    request.reviewedAt = new Date();
+    request.superAdminNote = req.body.reason || '';
+    await request.save();
+
+    res.json({ message: 'Service request rejected', request });
+  } catch (error) {
+    console.error('Reject service request error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
 export default router;

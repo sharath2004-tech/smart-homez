@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
-import { authAPI, servicesAPI } from "@/lib/api";
-import { Edit, Info, Plus, Save, Search, Trash2, X } from "lucide-react";
+import { authAPI, servicesAPI, superAdminAPI } from "@/lib/api";
+import { CheckCircle, ChevronRight, Clock, Edit, Info, Plus, Save, Search, Trash2, X, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -45,6 +45,67 @@ interface UserProfile {
   [key: string]: unknown;
 }
 
+interface ServiceRequest {
+  _id: string;
+  serviceTypeName: string;
+  serviceData: { name: string; description: string; price: number; duration: number; category: string };
+  requestedBy: { _id: string; name: string; email: string };
+  status: 'pending' | 'approved' | 'rejected';
+  superAdminNote: string;
+  createdAt: string;
+}
+
+const SERVICE_TYPE_CARDS = [
+  {
+    id: 'instant_hourly',
+    label: 'Insta Maid',
+    emoji: '🧹',
+    tagline: 'On-demand hourly maid service',
+    description: 'Flexible hourly booking. Customer chooses duration (1–8 hrs). Billed per hour.',
+    color: 'from-blue-500/10 to-cyan-500/10 border-blue-200',
+    badge: 'bg-blue-100 text-blue-700',
+    defaults: {
+      name: 'Insta Maid',
+      description: 'On-demand professional maid service available by the hour. Perfect for quick cleaning tasks.',
+      category: 'cleaning',
+      price: 149,
+      duration: 60,
+    }
+  },
+  {
+    id: 'deep_cleaning_full_house',
+    label: 'Deep Cleaning',
+    emoji: '🏠',
+    tagline: 'Professional full-home deep clean',
+    description: 'Thorough cleaning of entire home including kitchen, bathrooms, fans, windows & more.',
+    color: 'from-green-500/10 to-emerald-500/10 border-green-200',
+    badge: 'bg-green-100 text-green-700',
+    defaults: {
+      name: 'Deep Cleaning',
+      description: 'Comprehensive deep cleaning service for your entire home. Includes kitchen, bathrooms, fans, windows and all surfaces.',
+      category: 'cleaning',
+      price: 2999,
+      duration: 240,
+    }
+  },
+  {
+    id: 'monthly_subscription',
+    label: 'Subscription Service',
+    emoji: '🔄',
+    tagline: 'Recurring plans with discounts',
+    description: 'Daily, weekly or monthly maid visits. Fixed worker, flexible frequency.',
+    color: 'from-purple-500/10 to-violet-500/10 border-purple-200',
+    badge: 'bg-purple-100 text-purple-700',
+    defaults: {
+      name: 'Regular Maid Service',
+      description: 'Recurring maid service with flexible subscription plans. Choose daily, weekly or monthly visits with a dedicated worker.',
+      category: 'cleaning',
+      price: 499,
+      duration: 60,
+    }
+  }
+];
+
 const AdminServices = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [services, setServices] = useState<Service[]>([]);
@@ -52,6 +113,12 @@ const AdminServices = () => {
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showTypeSelector, setShowTypeSelector] = useState(false);
+  const [selectedServiceType, setSelectedServiceType] = useState<string | null>(null);
+  const [pendingRequests, setPendingRequests] = useState<ServiceRequest[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [rejectModalId, setRejectModalId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
   const [formData, setFormData] = useState<Service>({
     name: '',
     description: '',
@@ -122,26 +189,91 @@ const AdminServices = () => {
     additionalServiceOptions: []
   });
 
+  const isSuperAdmin = profile?.role === 'super_admin';
+
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (isSuperAdmin) fetchPendingRequests();
+  }, [isSuperAdmin]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
       const [profileData, servicesData] = await Promise.all([
         authAPI.getProfile(),
-        servicesAPI.getAll({}) // Get all services (no filter)
+        servicesAPI.getAll({})
       ]);
       setProfile(profileData.user || profileData);
       setServices(servicesData.services || []);
-      console.log('Loaded services:', servicesData.services?.length || 0);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load services');
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchPendingRequests = async () => {
+    try {
+      setRequestsLoading(true);
+      const res = await superAdminAPI.getServiceRequests('pending');
+      setPendingRequests(res.requests || []);
+    } catch (error) {
+      console.error('Error fetching service requests:', error);
+    } finally {
+      setRequestsLoading(false);
+    }
+  };
+
+  const handleApproveRequest = async (id: string) => {
+    try {
+      await superAdminAPI.approveServiceRequest(id);
+      toast.success('Service approved and is now live for all users!');
+      fetchPendingRequests();
+      fetchData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to approve');
+    }
+  };
+
+  const handleRejectRequest = async () => {
+    if (!rejectModalId) return;
+    try {
+      await superAdminAPI.rejectServiceRequest(rejectModalId, rejectReason);
+      toast.success('Service request rejected.');
+      setRejectModalId(null);
+      setRejectReason('');
+      fetchPendingRequests();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to reject');
+    }
+  };
+
+  const handleTypeSelect = (typeCard: typeof SERVICE_TYPE_CARDS[0]) => {
+    const p = typeCard.defaults;
+    const basePrice = p.price;
+    setSelectedServiceType(typeCard.id);
+    setFormData(prev => ({
+      ...prev,
+      name: p.name,
+      description: p.description,
+      category: p.category,
+      price: basePrice,
+      duration: p.duration,
+      pricingPlans: {
+        oneTime: basePrice,
+        daily: Math.round(basePrice * 0.85),
+        weekly: Math.round(basePrice * 0.75 * 7),
+        monthly: Math.round(basePrice * 0.65 * 30)
+      },
+      // For subscription type, keep existing default plans; otherwise clear
+      subscriptionPlans: typeCard.id === 'monthly_subscription' ? prev.subscriptionPlans : []
+    }));
+    setShowTypeSelector(false);
+    setShowForm(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -164,19 +296,27 @@ const AdminServices = () => {
     }
     
     try {
-      console.log('Submitting service data:', formData);
-      
       if (editingId) {
         await servicesAPI.update(editingId, formData);
+        toast.success('Service updated!');
       } else {
-        await servicesAPI.create(formData);
+        const res = await servicesAPI.create({
+          ...formData,
+          serviceType: selectedServiceType || 'other',
+          serviceTypeName: SERVICE_TYPE_CARDS.find(c => c.id === selectedServiceType)?.label || formData.name
+        });
+        if (res.requestSubmitted) {
+          toast.success('Request sent to Super Admin for approval!', { duration: 5000 });
+        } else {
+          toast.success('Service created and is now live!');
+          fetchData();
+        }
       }
 
-      toast.success(editingId ? 'Service updated!' : 'Service created!');
       setShowForm(false);
       setEditingId(null);
+      setSelectedServiceType(null);
       resetForm();
-      fetchData();
     } catch (error) {
       console.error('Error saving service:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to save service');
@@ -252,28 +392,84 @@ const AdminServices = () => {
   );
 
   return (
-    <AppLayout userType={profile?.role === 'super_admin' ? 'super_admin' : 'admin'} userName={profile?.name || "Admin"}>
+    <AppLayout userType={isSuperAdmin ? 'super_admin' : 'admin'} userName={profile?.name || 'Admin'}>
       <div className="space-y-6 pb-20 md:pb-0">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold font-heading text-foreground">Services Management</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Manage services, pricing plans, and availability
+              {isSuperAdmin ? 'Create services and review admin requests' : 'Request new services — super admin approval required'}
             </p>
           </div>
           <button
             onClick={() => {
               resetForm();
               setEditingId(null);
-              setShowForm(true);
+              setSelectedServiceType(null);
+              setShowTypeSelector(true);
             }}
             className="btn-brand flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            Add Service
+            {isSuperAdmin ? 'Create Service' : 'Request Service'}
           </button>
         </div>
+
+        {/* Super Admin: Pending Requests */}
+        {isSuperAdmin && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-500" />
+                Pending Service Requests
+                {pendingRequests.length > 0 && (
+                  <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-0.5 rounded-full">{pendingRequests.length}</span>
+                )}
+              </h2>
+            </div>
+            {requestsLoading ? (
+              <p className="text-sm text-muted-foreground">Loading requests...</p>
+            ) : pendingRequests.length === 0 ? (
+              <div className="border border-dashed border-border rounded-xl p-4 text-center text-sm text-muted-foreground">No pending requests</div>
+            ) : (
+              <div className="grid gap-3">
+                {pendingRequests.map((req) => (
+                  <div key={req._id} className="card-elevated p-4 border-l-4 border-amber-400">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold text-foreground">{req.serviceData.name}</span>
+                          <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">{req.serviceTypeName}</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground line-clamp-1 mb-2">{req.serviceData.description}</p>
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+                          <span>💰 ₹{req.serviceData.price} · ⏱ {req.serviceData.duration} min</span>
+                          <span>👤 Requested by: <strong className="text-foreground">{req.requestedBy?.name}</strong></span>
+                          <span>📅 {new Date(req.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          onClick={() => handleApproveRequest(req._id)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors"
+                        >
+                          <CheckCircle className="w-3.5 h-3.5" /> Approve
+                        </button>
+                        <button
+                          onClick={() => { setRejectModalId(req._id); setRejectReason(''); }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive/10 text-destructive text-xs font-medium rounded-lg hover:bg-destructive/20 transition-colors"
+                        >
+                          <XCircle className="w-3.5 h-3.5" /> Reject
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Search */}
         <div className="relative">
@@ -378,14 +574,70 @@ const AdminServices = () => {
           </div>
         )}
 
+        {/* Service Type Selector Modal */}
+        {showTypeSelector && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-card rounded-2xl max-w-2xl w-full shadow-2xl">
+              <div className="p-6 border-b border-border flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-foreground">Choose Service Type</h2>
+                  <p className="text-sm text-muted-foreground mt-0.5">Select the type of service you want to {isSuperAdmin ? 'create' : 'request'}</p>
+                </div>
+                <button onClick={() => setShowTypeSelector(false)} className="p-2 hover:bg-muted rounded-lg">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 grid gap-4">
+                {SERVICE_TYPE_CARDS.map((card) => (
+                  <button
+                    key={card.id}
+                    onClick={() => handleTypeSelect(card)}
+                    className={`w-full text-left p-5 rounded-xl border-2 bg-gradient-to-r ${card.color} hover:scale-[1.01] transition-all group`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <span className="text-4xl">{card.emoji}</span>
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-bold text-foreground text-lg">{card.label}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${card.badge}`}>{card.id.replace('_', ' ')}</span>
+                          </div>
+                          <p className="text-sm font-medium text-foreground/80">{card.tagline}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{card.description}</p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+              {!isSuperAdmin && (
+                <div className="px-6 pb-6">
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2 text-sm text-amber-800">
+                    <Info className="w-4 h-4 mt-0.5 shrink-0" />
+                    <span>Your service request will be sent to the <strong>Super Admin</strong> for approval before going live.</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Add/Edit Form Modal */}
         {showForm && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-card rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="sticky top-0 bg-card border-b border-border p-6 flex items-center justify-between">
-                <h2 className="text-xl font-bold text-foreground">
-                  {editingId ? 'Edit Service' : 'Add New Service'}
-                </h2>
+                <div>
+                  <h2 className="text-xl font-bold text-foreground">
+                    {editingId ? 'Edit Service' : SERVICE_TYPE_CARDS.find(c => c.id === selectedServiceType)?.label || 'New Service'}
+                  </h2>
+                  {!editingId && selectedServiceType && (
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {SERVICE_TYPE_CARDS.find(c => c.id === selectedServiceType)?.tagline}
+                    </p>
+                  )}
+                </div>
                 <button
                   onClick={() => {
                     setShowForm(false);
@@ -397,6 +649,13 @@ const AdminServices = () => {
                   <X className="w-5 h-5" />
                 </button>
               </div>
+              {/* Admin approval notice */}
+              {!editingId && !isSuperAdmin && (
+                <div className="mx-6 mt-4 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2 text-sm text-amber-800">
+                  <Info className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span>This service will be sent to <strong>Super Admin</strong> for review before it goes live for customers.</span>
+                </div>
+              )}
 
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
                 <div>
@@ -956,7 +1215,7 @@ const AdminServices = () => {
                     className="flex-1 btn-brand flex items-center justify-center gap-2"
                   >
                     <Save className="w-4 h-4" />
-                    {editingId ? 'Update' : 'Create'} Service
+                    {editingId ? 'Update Service' : isSuperAdmin ? 'Create Service' : 'Submit Request'}
                   </button>
                 </div>
               </form>
@@ -964,6 +1223,33 @@ const AdminServices = () => {
           </div>
         )}
       </div>
+
+      {/* Reject Reason Modal */}
+      {rejectModalId && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-2xl max-w-md w-full p-6 space-y-4">
+            <h3 className="text-lg font-bold text-foreground">Reject Service Request</h3>
+            <p className="text-sm text-muted-foreground">Provide a reason so the admin knows what to fix.</p>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="e.g., Pricing too low for this region. Please revise."
+              className="input-clean resize-none w-full"
+              rows={4}
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setRejectModalId(null); setRejectReason(''); }}
+                className="flex-1 py-2.5 border border-border rounded-xl text-sm font-medium hover:bg-muted"
+              >Cancel</button>
+              <button
+                onClick={handleRejectRequest}
+                className="flex-1 py-2.5 bg-destructive text-white rounded-xl text-sm font-medium hover:bg-destructive/90"
+              >Reject Request</button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 };

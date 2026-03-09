@@ -192,33 +192,35 @@ router.post('/',
         timeSlotRestrictions, cancellationPolicy, specialInstructionsTemplate
       } = req.body;
 
+      const servicePayload = {
+        name, description, category, serviceType, price, pricingPlans, subscriptionPlans,
+        duration, image, tags, requirements, additionalServiceOptions,
+        serviceLocations, availableInAllLocations,
+        sizeParameters, durationOptions, subscriptionOptions, addons,
+        equipmentRequired, pricingTiers, workerPreferences, serviceFields,
+        timeSlotRestrictions, cancellationPolicy, specialInstructionsTemplate
+      };
+
+      // Admins cannot create services directly — their request goes to super admin for approval
+      if (req.user.role === 'admin') {
+        const ServiceRequest = (await import('../models/ServiceRequest.js')).default;
+        const request = new ServiceRequest({
+          serviceData: servicePayload,
+          serviceTypeName: req.body.serviceTypeName || name,
+          requestedBy: req.user._id
+        });
+        await request.save();
+        await request.populate('requestedBy', 'name email');
+        return res.status(201).json({
+          message: 'Service request submitted for super admin approval',
+          request,
+          requestSubmitted: true
+        });
+      }
+
+      // super_admin: create directly
       const service = new Service({
-        name,
-        description,
-        category,
-        serviceType,
-        price,
-        pricingPlans,
-        subscriptionPlans,
-        duration,
-        image,
-        tags,
-        requirements,
-        additionalServiceOptions,
-        serviceLocations,
-        availableInAllLocations,
-        // New parameter fields
-        sizeParameters,
-        durationOptions,
-        subscriptionOptions,
-        addons,
-        equipmentRequired,
-        pricingTiers,
-        workerPreferences,
-        serviceFields,
-        timeSlotRestrictions,
-        cancellationPolicy,
-        specialInstructionsTemplate,
+        ...servicePayload,
         createdBy: req.user._id
       });
 

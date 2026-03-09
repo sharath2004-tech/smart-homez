@@ -1089,6 +1089,30 @@ export const superAdminAPI = {
       method: 'PUT',
       body: JSON.stringify({ status })
     });
+  },
+
+  // ─── Service Requests ─────────────────────────────────────────────────
+
+  // List service requests from admins. status: 'pending' | 'approved' | 'rejected' | 'all'
+  getServiceRequests: async (status?: string) => {
+    const q = status ? `?status=${status}` : '';
+    return apiCall(`/super-admin/service-requests${q}`);
+  },
+
+  // Approve a pending service request (creates the service live)
+  approveServiceRequest: async (id: string, note?: string) => {
+    return apiCall(`/super-admin/service-requests/${id}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ note: note || '' })
+    });
+  },
+
+  // Reject a pending service request with an optional reason
+  rejectServiceRequest: async (id: string, reason: string) => {
+    return apiCall(`/super-admin/service-requests/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason })
+    });
   }
 };
 
