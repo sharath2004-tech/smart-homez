@@ -99,6 +99,20 @@ export const authAPI = {
       method: 'POST',
       body: JSON.stringify({ currentPassword, newPassword })
     });
+  },
+
+  forgotPassword: async (email: string) => {
+    return apiCall('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    });
+  },
+
+  resetPassword: async (token: string, newPassword: string) => {
+    return apiCall('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, newPassword })
+    });
   }
 };
 
@@ -891,6 +905,19 @@ export const reviewsAPI = {
   getWorkerReviews: async (workerId: string) => {
     return apiCall(`/reviews/worker/${workerId}`);
   }
+};
+
+// ====== Generic API wrapper (axios-like convenience object) ======
+// Used by pages that call api.get(), api.patch(), etc. directly.
+export const api = {
+  get: (endpoint: string) => apiCall(endpoint),
+  post: (endpoint: string, data?: any) =>
+    apiCall(endpoint, { method: 'POST', ...(data !== undefined && { body: JSON.stringify(data) }) }),
+  patch: (endpoint: string, data?: any) =>
+    apiCall(endpoint, { method: 'PATCH', ...(data !== undefined && { body: JSON.stringify(data) }) }),
+  put: (endpoint: string, data?: any) =>
+    apiCall(endpoint, { method: 'PUT', ...(data !== undefined && { body: JSON.stringify(data) }) }),
+  delete: (endpoint: string) => apiCall(endpoint, { method: 'DELETE' })
 };
 
 // Export all

@@ -219,8 +219,71 @@ export const sendPasswordChangeConfirmation = async (email, name) => {
   }
 };
 
+// Send password reset email
+export const sendPasswordResetEmail = async (email, name, resetUrl) => {
+  try {
+    if (!isEmailConfigured()) {
+      console.log('ℹ️ Email not configured. Password reset URL for', name, ':', resetUrl);
+      return { success: false, reason: 'Email not configured', resetUrl };
+    }
+
+    const transporter = createTransporter();
+    if (!transporter) {
+      return { success: false, reason: 'Transporter creation failed' };
+    }
+
+    const mailOptions = {
+      from: `"Healthy Homez" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: 'Reset Your Password - Healthy Homez',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+            .button { display: inline-block; background: #667eea; color: white; padding: 14px 32px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
+            .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; }
+            .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header"><h1>🔒 Password Reset Request</h1></div>
+            <div class="content">
+              <p>Hi ${name},</p>
+              <p>We received a request to reset your password. Click the button below to choose a new password:</p>
+              <div style="text-align: center;">
+                <a href="${resetUrl}" class="button">Reset My Password</a>
+              </div>
+              <div class="warning">
+                <strong>⚠️ This link expires in 1 hour.</strong><br>
+                If you did not request a password reset, please ignore this email — your password will remain unchanged.
+              </div>
+              <p>Best regards,<br>The Healthy Homez Team</p>
+            </div>
+            <div class="footer"><p>© ${new Date().getFullYear()} Healthy Homez. All rights reserved.</p></div>
+          </div>
+        </body>
+        </html>
+      `
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Password reset email sent to:', email, 'Message ID:', info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('❌ Error sending password reset email:', error.message);
+    return { success: false, reason: error.message };
+  }
+};
+
 export default {
   generateTemporaryPassword,
   sendTemporaryPasswordEmail,
-  sendPasswordChangeConfirmation
+  sendPasswordChangeConfirmation,
+  sendPasswordResetEmail
 };

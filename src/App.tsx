@@ -14,6 +14,7 @@ import ChangePasswordPage from "./pages/auth/ChangePasswordPage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
+import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 
 // Customer pages
 import BookingsPage from "./pages/customer/BookingsPage";
@@ -40,6 +41,7 @@ import AdminBookings from "./pages/admin/AdminBookings";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminLeaves from "./pages/admin/AdminLeaves";
 import AdminLocations from "./pages/admin/AdminLocations";
+import AdminServiceAreas from "./pages/admin/AdminServiceAreas";
 import AdminServices from "./pages/admin/AdminServices";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminWorkers from "./pages/admin/AdminWorkers";
@@ -63,6 +65,7 @@ const App = () => (
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/change-password" element={<ChangePasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           {/* Customer */}
           <Route path="/customer/dashboard" element={<ProtectedRoute allowedRoles={['customer']}><CustomerDashboard /></ProtectedRoute>} />
@@ -93,6 +96,7 @@ const App = () => (
           <Route path="/admin/services" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminServices /></ProtectedRoute>} />
           <Route path="/admin/workers" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminWorkers /></ProtectedRoute>} />
           <Route path="/admin/locations" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminLocations /></ProtectedRoute>} />
+          <Route path="/admin/service-areas" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminServiceAreas /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminSettings /></ProtectedRoute>} />
 
           {/* Catch-all */}

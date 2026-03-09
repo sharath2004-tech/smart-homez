@@ -1,16 +1,26 @@
+import { ArrowLeft, Check, Home, Loader2, Mail } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Home, Loader2, ArrowLeft, Mail, Check } from "lucide-react";
+import { authAPI } from "../../lib/api";
 
 const ForgotPasswordPage = () => {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => { setIsLoading(false); setSent(true); }, 1500);
+    setError("");
+    try {
+      await authAPI.forgotPassword(email);
+      setSent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send reset email. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -68,6 +78,7 @@ const ForgotPasswordPage = () => {
               <button type="submit" disabled={isLoading} className="btn-brand w-full flex items-center justify-center gap-2">
                 {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</> : "Send reset link"}
               </button>
+              {error && <p className="text-sm text-red-600 text-center mt-2">{error}</p>}
             </form>
           </>
         )}

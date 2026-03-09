@@ -1,9 +1,10 @@
+import crypto from 'crypto';
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
 import { authenticate } from '../middleware/auth.js';
 import User from '../models/User.js';
-import { sendPasswordChangeConfirmation } from '../utils/emailService.js';
+import { sendPasswordChangeConfirmation, sendPasswordResetEmail } from '../utils/emailService.js';
 
 const router = express.Router();
 
@@ -230,6 +231,48 @@ router.get('/me', authenticate, async (req, res) => {
   }
 });
 
+// @route   PATCH /api/auth/me
+// @desc    Update current user profile (name, phone, gender, religion)
+// @access  Private
+router.patch('/me', authenticate,
+  [
+    body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
+    body('phone').optional().trim(),
+    body('gender').optional().isIn(['male', 'female', 'other', 'prefer_not_to_say']).withMessage('Invalid gender value'),
+    body('religion').optional().trim()
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { name, phone, gender, religion } = req.body;
+      const updateData = {};
+      if (name !== undefined) updateData.name = name;
+      if (phone !== undefined) updateData.phone = phone;
+      if (gender !== undefined) updateData.gender = gender;
+      if (religion !== undefined) updateData.religion = religion;
+
+      const user = await User.findByIdAndUpdate(
+        req.user._id,
+        { $set: updateData },
+        { new: true, runValidators: true }
+      ).select('-password');
+
+      if (!user) {
+        return res.status(404).json({ error: { message: 'User not found', status: 404 } });
+      }
+
+      res.json({ message: 'Profile updated successfully', user });
+    } catch (error) {
+      console.error('Update profile error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
 // @route   POST /api/auth/change-password
 // @desc    Change password (for first-time login or regular password change)
 // @access  Private
@@ -297,6 +340,107 @@ router.post('/change-password',
 // @route   PATCH /api/auth/preferences
 // @desc    Update user preferences
 // @access  Private
+// @route   POST /api/auth/forgot-password
+// @desc    Request a password reset link (sends email with token)
+// @access  Public
+router.post('/forgot-password',
+  [body('email').isEmail().withMessage('Valid email is required')],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { email } = req.body;
+      const user = await User.findOne({ email: email.toLowerCase().trim() });
+
+      // Always return success to prevent user enumeration
+      if (!user) {
+        return res.json({ message: 'If that email exists, a reset link has been sent.' });
+      }
+
+      // Generate a secure random token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+      user.passwordResetToken = hashedToken;
+      user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+      await user.save({ validateBeforeSave: false });
+
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+      const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
+
+      try {
+        await sendPasswordResetEmail(user.email, user.name, resetUrl);
+      } catch (emailError) {
+        console.error('Failed to send reset email:', emailError);
+        user.passwordResetToken = undefined;
+        user.passwordResetExpires = undefined;
+        await user.save({ validateBeforeSave: false });
+        return res.status(500).json({ error: { message: 'Failed to send reset email. Try again later.', status: 500 } });
+      }
+
+      res.json({ message: 'If that email exists, a reset link has been sent.' });
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   POST /api/auth/reset-password
+// @desc    Reset password using token from email
+// @access  Public
+router.post('/reset-password',
+  [
+    body('token').notEmpty().withMessage('Token is required'),
+    body('newPassword')
+      .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+      .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter')
+      .matches(/[a-z]/).withMessage('Password must contain at least one lowercase letter')
+      .matches(/[0-9]/).withMessage('Password must contain at least one number')
+      .matches(/[!@#$%^&*(),.?":{}|<>]/).withMessage('Password must contain at least one special character')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { token, newPassword } = req.body;
+      const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+      const user = await User.findOne({
+        passwordResetToken: hashedToken,
+        passwordResetExpires: { $gt: Date.now() }
+      }).select('+password +passwordResetToken +passwordResetExpires');
+
+      if (!user) {
+        return res.status(400).json({ error: { message: 'Invalid or expired reset token.', status: 400 } });
+      }
+
+      user.password = newPassword;
+      user.passwordResetToken = undefined;
+      user.passwordResetExpires = undefined;
+      user.isFirstLogin = false;
+      await user.save();
+
+      try {
+        await sendPasswordChangeConfirmation(user.email, user.name);
+      } catch (emailError) {
+        console.error('Failed to send confirmation email:', emailError);
+      }
+
+      res.json({ message: 'Password reset successfully. You can now log in.', success: true });
+    } catch (error) {
+      console.error('Reset password error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
 router.patch('/preferences', authenticate, async (req, res) => {
   try {
     const { preferences } = req.body;
