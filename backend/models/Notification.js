@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const notificationSchema = new mongoose.Schema({
   recipient: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  type: { type: String, enum: ['booking', 'payment', 'worker-assigned', 'delay', 'cancellation', 'review', 'sos', 'system'], required: true },
+  type: { type: String, enum: ['booking', 'payment', 'worker-assigned', 'delay', 'cancellation', 'review', 'sos', 'system', 'worker-registration', 'booking-confirmed', 'booking-rescheduled', 'worker-reassignment', 'worker-enroute', 'schedule-change', 'refund-processed'], required: true },
   title: { type: String, required: true },
   message: { type: String, required: true },
   data: mongoose.Schema.Types.Mixed,

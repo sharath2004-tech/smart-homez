@@ -8,11 +8,12 @@ import {
     Loader2,
     MapPin,
     Navigation,
+    Phone,
 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-type Step = "form" | "location" | "unavailable" | "done";
+type Step = "form" | "otp" | "location" | "unavailable" | "done";
 
 interface GeoResult {
   address: string;
@@ -42,11 +43,16 @@ const CustomerSignUp = () => {
   const [geoResult, setGeoResult] = useState<GeoResult | null>(null);
   const [notifySubmitted, setNotifySubmitted] = useState(false);
 
+  // OTP state
+  const [otpCode, setOtpCode] = useState("");
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+
   const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
-  // ── Step 1: validate and go to location ────────────────────────────────
-  const handleFormNext = (e: React.FormEvent) => {
+  // ── Step 1: validate and send OTP ─────────────────────────────────────
+  const handleFormNext = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) { setError("Name is required"); return; }
     if (!form.email.trim()) { setError("Email is required"); return; }
@@ -56,7 +62,45 @@ const CustomerSignUp = () => {
     if (form.password.length < 8) { setError("Password must be at least 8 characters"); return; }
     if (form.password !== form.confirmPassword) { setError("Passwords do not match"); return; }
     setError("");
-    setStep("location");
+    setOtpLoading(true);
+    try {
+      await authAPI.sendOTP(form.phone.replace(/\D/g, "").slice(-10));
+      setOtpSent(true);
+      setStep("otp");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send OTP. Please try again.");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  // ── Step 2: verify OTP ─────────────────────────────────────────────────
+  const handleVerifyOTP = async () => {
+    if (!otpCode || otpCode.length < 6) { setError("Enter the 6-digit OTP"); return; }
+    setOtpLoading(true);
+    setError("");
+    try {
+      await authAPI.checkOTP(form.phone, otpCode);
+      setStep("location");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Incorrect OTP. Please check and try again.");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    setOtpLoading(true);
+    setError("");
+    setOtpCode("");
+    try {
+      await authAPI.sendOTP(form.phone.replace(/\D/g, "").slice(-10));
+      setOtpSent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to resend OTP.");
+    } finally {
+      setOtpLoading(false);
+    }
   };
 
   // ── Geocoding helpers ──────────────────────────────────────────────────
@@ -103,6 +147,7 @@ const CustomerSignUp = () => {
         phone: "+91" + form.phone.replace(/\D/g, "").slice(-10),
         role: "customer",
         gender: form.gender || "prefer_not_to_say",
+        isPhoneVerified: true,
       };
 
       if (geo) {
@@ -188,8 +233,8 @@ const CustomerSignUp = () => {
   };
 
   // ── Left panel step indicator ──────────────────────────────────────────
-  const steps = ["Your details", "Your area", "All set!"];
-  const stepIdx = step === "form" ? 0 : step === "location" || step === "unavailable" ? 1 : 2;
+  const steps = ["Your details", "Verify phone", "Your area", "All set!"];
+  const stepIdx = step === "form" ? 0 : step === "otp" ? 1 : step === "location" || step === "unavailable" ? 2 : 3;
 
   if (step === "done") {
     return (
@@ -342,13 +387,65 @@ const CustomerSignUp = () => {
                   </div>
                 </div>
 
-                <button type="submit" className="btn-brand w-full mt-2">Continue</button>
+                <button type="submit" disabled={otpLoading} className="btn-brand w-full mt-2 flex items-center justify-center gap-2">
+                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTP…</> : <><Phone className="w-4 h-4" /> Continue &amp; Verify Phone</>}
+                </button>
               </form>
 
               <p className="text-center text-sm text-muted-foreground mt-6">
                 Already have an account?{" "}
                 <Link to="/login" className="text-primary font-semibold hover:underline">Log in</Link>
               </p>
+            </>
+          )}
+
+          {/* ── STEP: otp ── */}
+          {step === "otp" && (
+            <>
+              <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Verify your number</h2>
+              <p className="text-muted-foreground mb-6">
+                {otpSent
+                  ? `OTP sent to +91${form.phone}. Enter the 6-digit code below.`
+                  : "Sending OTP…"}
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Enter OTP</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    className="input-clean tracking-widest text-center text-lg"
+                    placeholder="· · · · · ·"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                  />
+                </div>
+
+                <button
+                  onClick={handleVerifyOTP}
+                  disabled={otpLoading}
+                  className="btn-brand w-full flex items-center justify-center gap-2"
+                >
+                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</> : "Verify & Continue"}
+                </button>
+
+                <button
+                  onClick={handleResendOTP}
+                  disabled={otpLoading}
+                  className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Resend OTP
+                </button>
+
+                <button
+                  onClick={() => { setStep("form"); setError(""); setOtpCode(""); }}
+                  className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm"
+                >
+                  Back
+                </button>
+              </div>
             </>
           )}
 
@@ -400,7 +497,7 @@ const CustomerSignUp = () => {
                   Skip for now
                 </button>
 
-                <button onClick={() => { setStep("form"); setError(""); }} className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm">
+                <button onClick={() => { setStep("otp"); setError(""); }} className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm">
                   Back
                 </button>
               </div>
@@ -437,7 +534,7 @@ const CustomerSignUp = () => {
                     </div>
                   </div>
                 )}
-                <button onClick={() => { setStep("location"); setError(""); }} className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm">
+                <button onClick={() => { setStep("location"); setError(""); setNotifySubmitted(false); }} className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm">
                   Try a different area
                 </button>
               </div>

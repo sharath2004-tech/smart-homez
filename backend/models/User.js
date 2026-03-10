@@ -76,6 +76,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  isPhoneVerified: {
+    type: Boolean,
+    default: false
+  },
   gender: {
     type: String,
     enum: ['male', 'female', 'other', 'prefer_not_to_say'],

@@ -1,7 +1,5 @@
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { API_BASE_URL, authAPI } from "@/lib/api";
-import { firebaseAuth } from "@/lib/firebase";
-import { ConfirmationResult, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 import {
     Camera,
     CheckCircle,
@@ -14,7 +12,7 @@ import {
     Navigation,
     Upload,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
 type Step = "form" | "otp" | "skills" | "documents" | "location" | "pending";
@@ -63,9 +61,6 @@ const WorkerSignUp = () => {
   const [otpCode, setOtpCode] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
-  const confirmationRef = useRef<ConfirmationResult | null>(null);
-  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
-  const recaptchaContainerRef = useRef<HTMLDivElement>(null);
 
   // Document upload state
   const [profilePic, setProfilePic] = useState<File | null>(null);
@@ -108,29 +103,15 @@ const WorkerSignUp = () => {
   };
 
   // -- OTP helpers ---------------------------------------------------------
-  const initRecaptcha = () => {
-    if (!recaptchaRef.current && recaptchaContainerRef.current) {
-      recaptchaRef.current = new RecaptchaVerifier(firebaseAuth, recaptchaContainerRef.current, {
-        size: "invisible",
-        callback: () => {},
-      });
-    }
-    return recaptchaRef.current!;
-  };
-
   const sendOTP = async () => {
     setOtpLoading(true);
     setError("");
     try {
-      const verifier = initRecaptcha();
-      const digits = form.phone.replace(/\D/g, "").slice(-10);
-      const result = await signInWithPhoneNumber(firebaseAuth, `+91${digits}`, verifier);
-      confirmationRef.current = result;
+      await authAPI.sendOTP(form.phone.replace(/\D/g, "").slice(-10));
       setOtpSent(true);
       setStep("otp");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send OTP. Please try again.");
-      recaptchaRef.current = null;
     } finally {
       setOtpLoading(false);
     }
@@ -138,14 +119,13 @@ const WorkerSignUp = () => {
 
   const handleVerifyOTP = async () => {
     if (!otpCode || otpCode.length < 6) { setError("Enter the 6-digit OTP"); return; }
-    if (!confirmationRef.current) { setError("Please request OTP first"); return; }
     setOtpLoading(true);
     setError("");
     try {
-      await confirmationRef.current.confirm(otpCode);
+      await authAPI.checkOTP(form.phone, otpCode);
       setStep("skills");
-    } catch {
-      setError("Incorrect OTP. Please check and try again.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Incorrect OTP. Please check and try again.");
     } finally {
       setOtpLoading(false);
     }
@@ -296,8 +276,6 @@ const WorkerSignUp = () => {
 
   return (
     <div className="min-h-screen flex">
-      {/* Invisible reCAPTCHA container */}
-      <div ref={recaptchaContainerRef} id="recaptcha-worker" />
 
       {/* Left panel */}
       <div className="hidden lg:flex lg:w-2/5 relative overflow-hidden" style={{ background: "var(--gradient-hero)" }}>
@@ -494,14 +472,14 @@ const WorkerSignUp = () => {
                 </button>
 
                 <button
-                  onClick={() => { setOtpSent(false); setOtpCode(""); setError(""); recaptchaRef.current = null; sendOTP(); }}
+                  onClick={() => { setOtpSent(false); setOtpCode(""); setError(""); sendOTP(); }}
                   disabled={otpLoading}
                   className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Resend OTP
                 </button>
 
-                <button onClick={() => { setStep("form"); setError(""); recaptchaRef.current = null; }} className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm">
+                <button onClick={() => { setStep("form"); setError(""); }} className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm">
                   Back
                 </button>
               </div>

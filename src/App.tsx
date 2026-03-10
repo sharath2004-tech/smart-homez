@@ -2,7 +2,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 // Public pages
@@ -14,7 +14,6 @@ import ChangePasswordPage from "./pages/auth/ChangePasswordPage";
 import CustomerSignUp from "./pages/auth/CustomerSignUp";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import LoginPage from "./pages/auth/LoginPage";
-import RegisterPage from "./pages/auth/RegisterPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import WorkerSignUp from "./pages/auth/WorkerSignUp";
 
@@ -68,7 +67,7 @@ const App = () => (
 
           {/* Auth */}
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/register" element={<Navigate to="/register/customer" replace />} />
           <Route path="/register/customer" element={<CustomerSignUp />} />
           <Route path="/register/worker" element={<WorkerSignUp />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />

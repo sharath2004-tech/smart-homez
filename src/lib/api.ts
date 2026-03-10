@@ -115,11 +115,27 @@ export const authAPI = {
     });
   },
 
-  // Firebase phone OTP verification — exchanges Firebase ID token for platform JWT
-  firebaseVerify: async (idToken: string, role: string, name?: string, gender?: string) => {
-    return apiCall('/auth/firebase-verify', {
+  // Twilio OTP — send a 6-digit SMS OTP to the given phone number
+  sendOTP: async (phone: string) => {
+    return apiCall('/auth/send-otp', {
       method: 'POST',
-      body: JSON.stringify({ idToken, role, name, gender })
+      body: JSON.stringify({ phone })
+    });
+  },
+
+  // Twilio OTP — verify code and return platform JWT (creates user if new)
+  verifyOTP: async (phone: string, code: string, role?: string, name?: string, gender?: string) => {
+    return apiCall('/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ phone, code, role, name, gender })
+    });
+  },
+
+  // Twilio OTP — verify code only, no user creation (for worker registration phone check)
+  checkOTP: async (phone: string, code: string) => {
+    return apiCall('/auth/check-otp', {
+      method: 'POST',
+      body: JSON.stringify({ phone, code })
     });
   },
 

@@ -32,7 +32,7 @@ router.post('/register',
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { name, email, password, role, phone, location, gender, religion, workerProfile } = req.body;
+      const { name, email, password, role, phone, location, gender, religion, workerProfile, isPhoneVerified } = req.body;
 
       // Check if user already exists
       const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
@@ -54,6 +54,7 @@ router.post('/register',
         phone,
         gender: gender || 'prefer_not_to_say',
         religion: religion || undefined,
+        isPhoneVerified: isPhoneVerified === true || isPhoneVerified === 'true',
         isFirstLogin: false // Self-registered users don't need password change
       };
 
@@ -538,6 +539,7 @@ router.post('/register-worker',
         gender: gender || 'prefer_not_to_say',
         profileImage: `/uploads/profile-pics/${profilePicFile.filename}`,
         isFirstLogin: false,
+        isPhoneVerified: phoneVerified === 'true' || phoneVerified === true,
         workerProfile: {
           experience: parseInt(experience) || 0,
           specialization: parsedSkills,
@@ -588,7 +590,7 @@ router.post('/register-worker',
             recipient: admin._id,
             title: 'New Worker Application',
             message: `${name} has applied to join as a worker. Review their profile and documents.`,
-            type: 'system',
+            type: 'worker-registration',
             data: { workerId: user._id, workerName: name }
           }));
           await Notification.insertMany(notifications);

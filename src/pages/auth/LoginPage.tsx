@@ -1,8 +1,6 @@
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { authAPI, publicAPI } from "@/lib/api";
-import { firebaseAuth } from "@/lib/firebase";
-import { ConfirmationResult, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
-import { Eye, EyeOff, Home, Loader2, Phone, Shield } from "lucide-react";
+import { Eye, EyeOff, Home, Loader2, Phone, RefreshCw, Shield } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -22,9 +20,8 @@ const LoginPage = () => {
   const [otpCode, setOtpCode] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
-  const confirmationRef = useRef<ConfirmationResult | null>(null);
-  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
-  const recaptchaContainerRef = useRef<HTMLDivElement>(null);
+  const [resendCountdown, setResendCountdown] = useState(0);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     publicAPI.getStats().then((r) => { if (r.success) setStats(r.stats); }).catch(() => {});
@@ -37,7 +34,12 @@ const LoginPage = () => {
     setOtpPhone("");
     setOtpCode("");
     setOtpSent(false);
+    setResendCountdown(0);
+    if (countdownRef.current) clearInterval(countdownRef.current);
   }, [tab]);
+
+  // Clean up interval on unmount
+  useEffect(() => () => { if (countdownRef.current) clearInterval(countdownRef.current); }, []);
 
   const formatNumber = (n: number) => (n >= 1000 ? (n / 1000).toFixed(1) + "K+" : n + "+");
 
@@ -67,14 +69,19 @@ const LoginPage = () => {
     }
   };
 
-  const initRecaptcha = () => {
-    if (!recaptchaRef.current && recaptchaContainerRef.current) {
-      recaptchaRef.current = new RecaptchaVerifier(firebaseAuth, recaptchaContainerRef.current, {
-        size: "invisible",
-        callback: () => {},
+  const startResendCountdown = () => {
+    setResendCountdown(30);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    countdownRef.current = setInterval(() => {
+      setResendCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(countdownRef.current!);
+          countdownRef.current = null;
+          return 0;
+        }
+        return prev - 1;
       });
-    }
-    return recaptchaRef.current!;
+    }, 1000);
   };
 
   const handleSendOTP = async () => {
@@ -83,13 +90,27 @@ const LoginPage = () => {
     setOtpLoading(true);
     setError("");
     try {
-      const verifier = initRecaptcha();
-      const result = await signInWithPhoneNumber(firebaseAuth, `+91${digits}`, verifier);
-      confirmationRef.current = result;
+      await authAPI.sendOTP(digits);
       setOtpSent(true);
+      startResendCountdown();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send OTP. Please try again.");
-      recaptchaRef.current = null;
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    if (resendCountdown > 0) return;
+    setOtpCode("");
+    setError("");
+    setOtpLoading(true);
+    try {
+      const digits = otpPhone.replace(/\D/g, "").slice(-10);
+      await authAPI.sendOTP(digits);
+      startResendCountdown();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to resend OTP.");
     } finally {
       setOtpLoading(false);
     }
@@ -97,13 +118,10 @@ const LoginPage = () => {
 
   const handleVerifyOTP = async () => {
     if (!otpCode || otpCode.length < 6) { setError("Enter the 6-digit OTP"); return; }
-    if (!confirmationRef.current) { setError("Please request OTP first"); return; }
     setOtpLoading(true);
     setError("");
     try {
-      const userCredential = await confirmationRef.current.confirm(otpCode);
-      const idToken = await userCredential.user.getIdToken();
-      const response = await authAPI.firebaseVerify(idToken, tab);
+      const response = await authAPI.verifyOTP(otpPhone, otpCode, tab);
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
       const role = response.user.role;
@@ -112,19 +130,15 @@ const LoginPage = () => {
       else if (role === "worker") window.location.href = "/worker/dashboard";
       else window.location.href = "/customer/dashboard";
     } catch (err) {
-      if (err instanceof Error && err.message.includes("invalid-verification-code")) {
-        setError("Incorrect OTP. Please try again.");
-      } else {
-        setError(err instanceof Error ? err.message : "Verification failed. Please try again.");
-      }
+      setError(err instanceof Error ? err.message : "Verification failed. Please try again.");
       setOtpLoading(false);
     }
   };
 
   const tabs = [
-    { key: "customer", label: "Customer", emoji: "??" },
-    { key: "worker", label: "Worker", emoji: "??" },
-    { key: "admin", label: "Admin", emoji: "??" },
+    { key: "customer", label: "Customer", icon: "ðŸ‘¤" },
+    { key: "worker", label: "Worker", icon: "ðŸ”§" },
+    { key: "admin", label: "Admin", icon: "ðŸ›¡ï¸" },
   ] as const;
 
   const signupLink = tab === "customer" ? "/register/customer" : tab === "worker" ? "/register/worker" : null;
@@ -172,9 +186,6 @@ const LoginPage = () => {
           <LanguageSelector />
         </div>
 
-        {/* Invisible reCAPTCHA container */}
-        <div ref={recaptchaContainerRef} id="recaptcha-container" />
-
         <div className="w-full max-w-md animate-fade-in">
           <div className="lg:hidden flex items-center gap-2 mb-8">
             <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center">
@@ -198,7 +209,7 @@ const LoginPage = () => {
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <span>{t_.emoji}</span>
+                <span>{t_.icon}</span>
                 <span>{t_.label}</span>
               </button>
             ))}
@@ -313,47 +324,71 @@ const LoginPage = () => {
                         placeholder="98765 43210"
                         value={otpPhone}
                         onChange={(e) => setOtpPhone(e.target.value.replace(/\D/g, ""))}
+                        onKeyDown={(e) => e.key === "Enter" && handleSendOTP()}
+                        autoFocus
                       />
                     </div>
+                    <p className="text-xs text-muted-foreground mt-1">A 6-digit OTP will be sent via SMS</p>
                   </div>
                   <button
                     onClick={handleSendOTP}
-                    disabled={otpLoading}
+                    disabled={otpLoading || otpPhone.replace(/\D/g, "").length < 10}
                     className="btn-brand w-full flex items-center justify-center gap-2"
                   >
-                    {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTP…</> : "Send OTP"}
+                    {otpLoading
+                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTP&hellip;</>
+                      : <><Phone className="w-4 h-4" /> Send OTP</>}
                   </button>
                 </>
               ) : (
                 <>
-                  <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800">
-                    OTP sent to +91{otpPhone}. Check your SMS.
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 flex items-start gap-2">
+                    <Phone className="w-4 h-4 mt-0.5 shrink-0 text-green-600" />
+                    <span>OTP sent to <strong>+91&nbsp;{otpPhone}</strong>. Check your SMS.</span>
                   </div>
+
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">Enter OTP</label>
                     <input
                       type="text"
                       inputMode="numeric"
                       maxLength={6}
-                      className="input-clean tracking-widest text-center text-lg"
-                      placeholder="• • • • • •"
+                      className="input-clean tracking-[0.5em] text-center text-lg font-mono"
+                      placeholder="Â· Â· Â· Â· Â· Â·"
                       value={otpCode}
                       onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                      onKeyDown={(e) => e.key === "Enter" && handleVerifyOTP()}
+                      autoFocus
                     />
                   </div>
+
                   <button
                     onClick={handleVerifyOTP}
-                    disabled={otpLoading}
+                    disabled={otpLoading || otpCode.length < 6}
                     className="btn-brand w-full flex items-center justify-center gap-2"
                   >
-                    {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</> : "Verify & Login"}
+                    {otpLoading
+                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying&hellip;</>
+                      : "Verify &amp; Login"}
                   </button>
-                  <button
-                    onClick={() => { setOtpSent(false); setOtpCode(""); setError(""); recaptchaRef.current = null; }}
-                    className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Change number / Resend OTP
-                  </button>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <button
+                      onClick={() => { setOtpSent(false); setOtpCode(""); setError(""); setResendCountdown(0); }}
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Change number
+                    </button>
+                    <button
+                      onClick={handleResendOTP}
+                      disabled={otpLoading || resendCountdown > 0}
+                      className="flex items-center gap-1.5 text-primary hover:text-primary/80 disabled:text-muted-foreground disabled:cursor-not-allowed transition-colors font-medium"
+                    >
+                      {resendCountdown > 0
+                        ? <span>Resend in {resendCountdown}s</span>
+                        : <><RefreshCw className="w-3.5 h-3.5" /> Resend OTP</>}
+                    </button>
+                  </div>
                 </>
               )}
             </div>
