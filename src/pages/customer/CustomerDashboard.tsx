@@ -180,14 +180,16 @@ const CustomerDashboard = () => {
             >
               Good morning 👋
             </motion.p>
-            <motion.h1 
-              className="text-2xl font-bold font-heading text-foreground"
-              initial={{ x: -20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: 0.3, type: "spring" }}
-            >
-              {profile?.name || "Loading..."}
-            </motion.h1>
+            <Link to="/customer/profile">
+              <motion.h1 
+                className="text-2xl font-bold font-heading text-foreground hover:text-primary transition-colors cursor-pointer"
+                initial={{ x: -20, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                transition={{ delay: 0.3, type: "spring" }}
+              >
+                {profile?.name || "Loading..."}
+              </motion.h1>
+            </Link>
           </div>
           <motion.button 
             className="relative p-2.5 bg-card rounded-xl border border-border"

@@ -75,8 +75,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   const [overtimeMinutes, setOvertimeMinutes] = useState(0);
   const [isScanning, setIsScanning] = useState(false);
   const [hasTimeOffset, setHasTimeOffset] = useState(false);
-  const [showPhotoCapture, setShowPhotoCapture] = useState(false);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
   const [adminPaymentQR, setAdminPaymentQR] = useState<string>("");
   const [showPaymentProofCapture, setShowPaymentProofCapture] = useState(false);
   const [uploadingPaymentProof, setUploadingPaymentProof] = useState(false);
@@ -173,13 +172,13 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
     }
   }, [task?.status, task?.actualStartTime, task?.bookingDate, task?.endTime]);
 
-  // Generate payment QR when task is completed and has completion photo
+  // Generate payment QR when task is completed
   useEffect(() => {
-    if (task?.status === 'completed' && task.completionPhoto && !paymentQRImage) {
+    if (task?.status === 'completed' && task?.actualEndTime && !paymentQRImage) {
       generatePaymentQR();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [task?.status, task?.completionPhoto]);
+  }, [task?.status, task?.actualEndTime]);
 
   const generateQRCode = async (code: string) => {
     try {
@@ -221,52 +220,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
     }
   };
 
-  const handlePhotoCapture = async (file: File) => {
-    try {
-      // Close photo capture view immediately
-      setShowPhotoCapture(false);
-      setUploadingPhoto(true);
-      
-      console.log('📸 Starting photo upload:', {
-        taskId,
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type,
-        taskStatus: task?.status
-      });
-      
-      // Validate file
-      if (!file || file.size === 0) {
-        throw new Error('Invalid file selected');
-      }
-      
-      if (file.size > 5 * 1024 * 1024) {
-        throw new Error('File size must be less than 5MB');
-      }
-      
-      // Use the API utility method
-      const result = await bookingsAPI.uploadCompletionPhoto(taskId, file);
-      
-      console.log('✅ Photo upload successful:', result);
-      
-      // Update task with completion photo
-      setTask({ ...task!, completionPhoto: result.completionPhoto });
-      
-      alert('✅ Completion photo uploaded successfully! Payment QR code is now available.');
-      
-      // Generate payment QR code
-      await generatePaymentQR();
-      
-      // Refresh task data
-      await fetchTaskDetail(true);
-    } catch (error) {
-      console.error('❌ Error uploading completion photo:', error);
-      const errorMessage = (error as Error).message || 'Failed to upload completion photo';
-      alert(`Upload failed: ${errorMessage}`);
-    } finally {
-      setUploadingPhoto(false);
-    }
-  };
+
 
   const handlePaymentProofCapture = async (file: File) => {
     try {
@@ -694,75 +648,14 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
             </div>
           )}
 
-          {/* Step 2: Completion Photo Upload - Show for completed tasks after QR scan */}
+          {/* Payment QR and proof - shown once task is completed */}
           {task.status === 'completed' && task.actualEndTime && (
             <div className="space-y-4">
-              {/* Completion Photo Upload Section */}
-              <div className="card-elevated p-5 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200">
-                <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
-                  <Camera className="w-5 h-5 text-blue-600" />
-                  Step 2: Upload Completion Photo 📸
-                </h3>
-                
-                {task.completionPhoto ? (
-                  <div className="space-y-3">
-                    <div className="relative rounded-lg overflow-hidden border-2 border-green-500">
-                      <img 
-                        src={bookingsAPI.getCompletionPhotoUrl(task.completionPhoto.url)}
-                        alt="Completion photo" 
-                        className="w-full h-auto max-h-64 object-contain bg-black mx-auto"
-                      />
-                    </div>
-                    <div className="flex items-center justify-center gap-2 text-green-700 font-medium">
-                      <CheckCircle className="w-5 h-5" />
-                      Photo uploaded successfully!
-                    </div>
-                    <button
-                      onClick={() => setShowPhotoCapture(true)}
-                      className="w-full py-2 px-4 border-2 border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors"
-                    >
-                      Re-upload Photo
-                    </button>
-                  </div>
-                ) : showPhotoCapture ? (
-                  <PhotoCapture
-                    onPhotoCapture={handlePhotoCapture}
-                    onCancel={() => setShowPhotoCapture(false)}
-                    showPreview={false}
-                    autoUpload={true}
-                  />
-                ) : uploadingPhoto ? (
-                  <div className="text-center py-8">
-                    <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-                    <p className="text-blue-700 font-medium">Uploading photo...</p>
-                    <p className="text-xs text-muted-foreground mt-2">Please wait</p>
-                  </div>
-                ) : (
-                  <div>
-                    <button
-                      onClick={() => setShowPhotoCapture(true)}
-                      disabled={uploadingPhoto}
-                      className="btn-brand py-3 px-6 w-full"
-                    >
-                      <Camera className="w-5 h-5 inline-block mr-2" />
-                      Take Completion Photo
-                    </button>
-                    <div className="mt-3 text-xs bg-blue-100 text-blue-800 p-3 rounded-lg space-y-1">
-                      <p className="font-semibold">Why upload a photo?</p>
-                      <p>• Proves work was completed</p>
-                      <p>• Protects you from disputes</p>
-                      <p>• Builds customer trust</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Step 3: Payment QR Code - Show after photo upload */}
-              {task.completionPhoto && (
-                <div className="card-elevated p-5 bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200">
+              {/* Step 2: Payment QR Code */}
+              <div className="card-elevated p-5 bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200">
                   <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
                     <DollarSign className="w-5 h-5 text-purple-600" />
-                    Step 3: Payment QR Code 💳
+                    Step 2: Payment QR Code 💳
                   </h3>
                   
                   {paymentQRImage ? (
@@ -795,14 +688,13 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                     </div>
                   )}
                 </div>
-              )}
 
-              {/* Step 4: Payment Proof Upload - Show after payment QR is displayed */}
-              {task.completionPhoto && paymentQRImage && (
+              {/* Step 3: Payment Proof Upload - Show after payment QR is displayed */}
+              {paymentQRImage && (
                 <div className="card-elevated p-5 bg-gradient-to-br from-amber-50 to-yellow-50 border-2 border-amber-200">
                   <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
                     <Camera className="w-5 h-5 text-amber-600" />
-                    Step 4: Upload Payment Proof 📸✅
+                    Step 3: Upload Payment Proof 📸✅
                   </h3>
                   
                   {task.paymentProof ? (

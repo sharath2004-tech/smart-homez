@@ -20,6 +20,7 @@ import WorkerSignUp from "./pages/auth/WorkerSignUp";
 // Customer pages
 import BookingsPage from "./pages/customer/BookingsPage";
 import CustomerDashboard from "./pages/customer/CustomerDashboard";
+import HelpPage from "./pages/customer/HelpPage";
 import MySubscriptionsPage from "./pages/customer/MySubscriptionsPage";
 import NotificationSettingsPage from "./pages/customer/NotificationSettingsPage";
 import PaymentsPage from "./pages/customer/PaymentsPage";
@@ -41,6 +42,7 @@ import WorkerTasks from "./pages/worker/WorkerTasks";
 // Admin pages
 import AdminBookings from "./pages/admin/AdminBookings";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminHelpMessages from "./pages/admin/AdminHelpMessages";
 import AdminLeaves from "./pages/admin/AdminLeaves";
 import AdminLocations from "./pages/admin/AdminLocations";
 import AdminSalarySettlements from "./pages/admin/AdminSalarySettlements";
@@ -85,6 +87,7 @@ const App = () => (
           <Route path="/customer/preferences" element={<ProtectedRoute allowedRoles={['customer']}><PreferencesPage /></ProtectedRoute>} />
           <Route path="/customer/notifications" element={<ProtectedRoute allowedRoles={['customer']}><NotificationSettingsPage /></ProtectedRoute>} />
           <Route path="/customer/profile" element={<ProtectedRoute allowedRoles={['customer']}><ProfilePage /></ProtectedRoute>} />
+          <Route path="/customer/help" element={<ProtectedRoute allowedRoles={['customer']}><HelpPage userType="customer" /></ProtectedRoute>} />
           <Route path="/customer/service-areas" element={<ProtectedRoute allowedRoles={['customer']}><ServiceAreaDemo /></ProtectedRoute>} />
 
           {/* Worker */}
@@ -94,6 +97,7 @@ const App = () => (
           <Route path="/worker/leaves" element={<ProtectedRoute allowedRoles={['worker']}><WorkerLeaves /></ProtectedRoute>} />
           <Route path="/worker/salary" element={<ProtectedRoute allowedRoles={['worker']}><WorkerSalaryRequest /></ProtectedRoute>} />
           <Route path="/worker/profile" element={<ProtectedRoute allowedRoles={['worker']}><WorkerProfile /></ProtectedRoute>} />
+          <Route path="/worker/help" element={<ProtectedRoute allowedRoles={['worker']}><HelpPage userType="worker" /></ProtectedRoute>} />
 
           {/* Admin */}
           <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminDashboard /></ProtectedRoute>} />
@@ -108,6 +112,7 @@ const App = () => (
           <Route path="/admin/service-areas" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminServiceAreas /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminSettings /></ProtectedRoute>} />
           <Route path="/admin/salary-settlements" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminSalarySettlements /></ProtectedRoute>} />
+          <Route path="/admin/help-messages" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminHelpMessages /></ProtectedRoute>} />
 
           {/* Super Admin */}
           <Route path="/super-admin/dashboard" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminDashboard /></ProtectedRoute>} />

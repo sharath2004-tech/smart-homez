@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { authAPI, workersAPI } from "@/lib/api";
-import { Calendar, Clock, Download, IndianRupee, TrendingUp } from "lucide-react";
+import { Calendar, Clock, Download, IndianRupee } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -233,7 +233,7 @@ const WorkerEarnings = () => {
     <AppLayout userType="worker" userName={profile?.name || "Worker"}>
       <div className="max-w-3xl mx-auto space-y-6 animate-fade-in pb-20 md:pb-0">
         <div>
-          <h1 className="text-2xl font-bold font-heading text-foreground mb-1">{t('worker.earnings.title')}</h1>
+          <h1 className="text-2xl font-bold font-heading text-foreground mb-1">Salary Management</h1>
           <p className="text-muted-foreground text-sm">{t('worker.earnings.subtitle')}</p>
         </div>
 
@@ -291,23 +291,6 @@ const WorkerEarnings = () => {
               <p className="text-primary-foreground font-bold">{displayStats[period].jobs}</p>
             </div>
           </div>
-        </div>
-
-        {/* Working hours requirement */}
-        <div className="card-elevated p-5">
-          <h3 className="font-bold font-heading text-foreground mb-3 flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-primary" /> Daily Activity
-          </h3>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted-foreground">Today's progress</span>
-            <span className="text-sm font-semibold text-foreground">{displayStats.today.hours} / 7h target</span>
-          </div>
-          <div className="h-3 bg-muted rounded-full overflow-hidden">
-            <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${Math.min((stats.today * HOURLY_RATE) / 420 * 100, 100)}%` }} />
-           </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            {stats.today >= 5 ? 'Great job! You met your daily goal!' : `Keep going! Complete ${Math.ceil((420 - stats.today * HOURLY_RATE) / HOURLY_RATE)} more jobs to reach target`}
-          </p>
         </div>
 
         {/* Transaction history */}
@@ -385,6 +368,23 @@ const WorkerEarnings = () => {
               })}
             </div>
           )}
+        </div>
+
+        {/* Salary Settlement CTA */}
+        <div className="card-elevated p-5 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h3 className="font-bold text-foreground text-sm mb-1">Ready to request your salary?</h3>
+              <p className="text-xs text-muted-foreground">Submit a salary request for admin approval and settlement.</p>
+            </div>
+            <a
+              href="/worker/salary"
+              className="btn-brand py-2.5 px-4 text-sm whitespace-nowrap flex items-center gap-1.5 shrink-0"
+            >
+              <IndianRupee className="w-4 h-4" />
+              Request Salary
+            </a>
+          </div>
         </div>
       </div>
     </AppLayout>

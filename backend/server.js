@@ -10,6 +10,7 @@ import adminRoutes from './routes/admin.js';
 import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import earningsRoutes from './routes/earnings.js';
+import helpRoutes from './routes/help.js';
 import leavesRoutes from './routes/leaves.js';
 import locationRoutes from './routes/locations.js';
 import notificationPreferencesRoutes from './routes/notificationPreferences.js';
@@ -188,6 +189,7 @@ app.use('/api/tracking', trackingRoutes);
 app.use('/api/preferences', preferencesRoutes);
 app.use('/api/leaves', leavesRoutes);
 app.use('/api/salary-requests', salaryRequestsRoutes);
+app.use('/api/help', helpRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

@@ -1177,6 +1177,47 @@ export const superAdminAPI = {
   }
 };
 
+// ====== Help / Support APIs ======
+
+export const helpAPI = {
+  // Submit a help message (authenticated user)
+  submitMessage: async (subject: string, message: string) => {
+    return apiCall('/help', {
+      method: 'POST',
+      body: JSON.stringify({ subject, message })
+    });
+  },
+
+  // Get own past messages
+  getMyMessages: async () => {
+    return apiCall('/help/my');
+  },
+
+  // Admin: list all messages (with optional status filter)
+  adminGetAll: async (status?: string) => {
+    const query = status ? `?status=${status}` : '';
+    return apiCall(`/help/admin${query}`);
+  },
+
+  // Admin: mark as read
+  markRead: async (id: string) => {
+    return apiCall(`/help/${id}/read`, { method: 'PATCH' });
+  },
+
+  // Admin: reply and resolve
+  reply: async (id: string, reply: string) => {
+    return apiCall(`/help/${id}/reply`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reply })
+    });
+  },
+
+  // Admin: delete
+  deleteMessage: async (id: string) => {
+    return apiCall(`/help/${id}`, { method: 'DELETE' });
+  }
+};
+
 // ====== Generic API wrapper (axios-like convenience object) ======
 // Used by pages that call api.get(), api.patch(), etc. directly.
 export const api = {

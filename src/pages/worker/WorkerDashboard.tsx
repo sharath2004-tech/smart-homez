@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import WorkerAvailabilityToggle from "@/components/WorkerAvailabilityToggle";
 import { API_BASE_URL, authAPI, bookingsAPI, workersAPI } from "@/lib/api";
-import { Bell, CheckCircle, ChevronRight, Clock, MapPin, QrCode, Star, TrendingUp } from "lucide-react";
+import { Bell, CheckCircle, ChevronRight, Clock, MapPin, QrCode, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -218,23 +218,6 @@ const WorkerDashboard = () => {
           
           {/* Availability Toggle - Prominent position */}
           <WorkerAvailabilityToggle />
-        </div>
-
-        {/* Earnings summary */}
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { label: t('worker.dashboard.today'), value: `₹${stats.today}`, icon: TrendingUp, color: "text-primary", bg: "bg-primary-light" },
-            { label: t('worker.dashboard.thisWeek'), value: `₹${stats.thisWeek}`, icon: CheckCircle, color: "text-success", bg: "bg-success-light" },
-            { label: t('worker.dashboard.thisMonth'), value: `₹${stats.thisMonth}`, icon: Star, color: "text-warning", bg: "bg-warning-light" },
-          ].map((card) => (
-            <div key={card.label} className="card-elevated p-4">
-              <div className={`w-8 h-8 ${card.bg} rounded-lg flex items-center justify-center mb-2`}>
-                <card.icon className={`w-4 h-4 ${card.color}`} />
-              </div>
-              <p className="text-xs text-muted-foreground">{card.label}</p>
-              <p className="text-lg font-bold font-heading text-foreground mt-0.5">{card.value}</p>
-            </div>
-          ))}
         </div>
 
         {/* Hours worked summary */}

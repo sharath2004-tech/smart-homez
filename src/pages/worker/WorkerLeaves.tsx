@@ -117,6 +117,16 @@ const WorkerLeaves = () => {
     }
   };
 
+  const handleCancelLeave = async (leaveId: string) => {
+    try {
+      await leavesAPI.cancelLeave(leaveId);
+      setLeaves((prev) => prev.filter((l) => l._id !== leaveId));
+      toast({ title: 'Leave request cancelled' });
+    } catch (error) {
+      toast({ title: 'Failed to cancel leave', variant: 'destructive' });
+    }
+  };
+
   const isDateDisabled = (date: Date) => {
     // Disable past dates
     const today = new Date();
@@ -241,6 +251,18 @@ const WorkerLeaves = () => {
                         <p className="text-xs text-muted-foreground">
                           Requested on {new Date(leave.requestedAt).toLocaleDateString()}
                         </p>
+
+                        {leave.status === 'pending' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 border-red-200 hover:bg-red-50 mt-1"
+                            onClick={() => handleCancelLeave(leave._id)}
+                          >
+                            <XCircle className="w-3 h-3 mr-1" />
+                            Cancel Request
+                          </Button>
+                        )}
                       </div>
                     ))
                 )}

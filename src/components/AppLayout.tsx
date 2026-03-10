@@ -1,7 +1,7 @@
-import { Bell, Calendar, ClipboardCheck, CreditCard, Home, IndianRupee, LayoutDashboard, LogOut, MapPin, Menu, RefreshCw, Settings, User, Users, Wrench, X } from "lucide-react";
+import { ArrowLeft, Bell, Calendar, ClipboardCheck, CreditCard, HelpCircle, Home, IndianRupee, LayoutDashboard, LogOut, MapPin, Menu, MessageSquare, RefreshCw, Settings, User, Users, Wrench, X } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { LanguageSelector } from "./LanguageSelector";
 
 interface AppLayoutProps {
@@ -12,6 +12,7 @@ interface AppLayoutProps {
 
 const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLayoutProps) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -31,14 +32,17 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
     { to: "/customer/subscriptions", icon: RefreshCw, label: t('nav.mySubscriptions') },
     { to: "/customer/payments", icon: CreditCard, label: t('nav.payments') },
     { to: "/customer/profile", icon: User, label: t('nav.profile') },
+    { to: "/customer/help", icon: HelpCircle, label: "Help" },
   ];
 
   const workerNav = [
     { to: "/worker/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },
     { to: "/worker/tasks", icon: Calendar, label: t('nav.myTasks') },
+    { to: "/worker/earnings", icon: IndianRupee, label: "Salary Management" },
     { to: "/worker/salary", icon: IndianRupee, label: "Salary Request" },
     { to: "/worker/leaves", icon: Bell, label: t('nav.myLeaves') },
     { to: "/worker/profile", icon: User, label: t('nav.profile') },
+    { to: "/worker/help", icon: HelpCircle, label: "Help" },
   ];
 
   const adminNav = [
@@ -52,6 +56,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
     { to: "/admin/workers", icon: User, label: t('nav.workers') },
     { to: "/admin/worker-requests", icon: ClipboardCheck, label: "Worker Requests" },
     { to: "/admin/locations", icon: MapPin, label: t('nav.locations') },
+    { to: "/admin/help-messages", icon: MessageSquare, label: "Help Messages" },
     { to: "/admin/settings", icon: Settings, label: t('nav.settings') },
   ];
 
@@ -66,6 +71,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
     { to: "/admin/worker-requests", icon: ClipboardCheck, label: "Worker Requests" },
     { to: "/admin/locations", icon: MapPin, label: t('nav.locations') },
     { to: "/admin/services", icon: Wrench, label: t('nav.services') },
+    { to: "/admin/help-messages", icon: MessageSquare, label: "Help Messages" },
     { to: "/admin/settings", icon: Settings, label: t('nav.settings') },
   ];
 
@@ -139,15 +145,34 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
       </aside>
 
       {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b border-border px-4 py-3 flex items-center justify-between">
-        <Link to={dashboardPath} className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <Home className="w-4 h-4 text-primary-foreground" />
-          </div>
-          <span className="font-bold text-foreground text-sm">Smart Homez</span>
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b border-border px-3 py-3 flex items-center gap-2">
+        {location.pathname !== dashboardPath ? (
+          <button
+            onClick={() => navigate(-1)}
+            className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-muted transition-colors shrink-0"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="w-5 h-5 text-foreground" />
+          </button>
+        ) : (
+          <Link to={dashboardPath} className="flex items-center gap-2 shrink-0">
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+              <Home className="w-4 h-4 text-primary-foreground" />
+            </div>
+          </Link>
+        )}
+        <Link to={dashboardPath} className="flex-1 font-bold text-foreground text-sm truncate">
+          Smart Homez
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <LanguageSelector />
+          <button
+            onClick={handleLogout}
+            className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-destructive/10 text-destructive transition-colors"
+            aria-label="Sign out"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
           <button
             onClick={() => setMobileOpen(true)}
             className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-muted transition-colors"

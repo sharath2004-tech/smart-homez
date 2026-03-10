@@ -1872,13 +1872,6 @@ router.post('/:id/upload-payment-proof',
         });
       }
 
-      // Check if completion photo exists
-      if (!booking.completionPhoto || !booking.completionPhoto.url) {
-        return res.status(400).json({ 
-          error: { message: 'Please upload completion photo first', status: 400 } 
-        });
-      }
-
       // Validate file was uploaded
       if (!req.file) {
         return res.status(400).json({ 
