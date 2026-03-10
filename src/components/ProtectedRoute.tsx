@@ -14,31 +14,45 @@ interface ProtectedRouteProps {
   allowedRoles: string[];
 }
 
+// Read cached user from localStorage to show content immediately
+function getCachedUser(): User | null {
+  try {
+    const raw = localStorage.getItem('user');
+    return raw ? (JSON.parse(raw) as User) : null;
+  } catch {
+    return null;
+  }
+}
+
 const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cached = getCachedUser();
+  const token = localStorage.getItem('token');
+
+  // Start with cached user (instant render) — only show spinner when there's no cache at all
+  const [user, setUser] = useState<User | null>(cached);
+  const [loading, setLoading] = useState(!cached && !!token);
 
   useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-
-      const response = await authAPI.getProfile();
-      setUser(response.user || response);
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      localStorage.removeItem('token');
-    } finally {
+    if (!token) {
       setLoading(false);
+      return;
     }
-  };
+    // Re-validate token in the background; update cache
+    authAPI.getProfile()
+      .then((response) => {
+        const fresh: User = response.user || response;
+        setUser(fresh);
+        localStorage.setItem('user', JSON.stringify(fresh));
+      })
+      .catch(() => {
+        // Token is invalid — clear and redirect
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setUser(null);
+      })
+      .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading) {
     return (
@@ -51,19 +65,17 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
     );
   }
 
-  if (!user) {
+  if (!token || !user) {
     return <Navigate to="/login" replace />;
   }
 
   if (!allowedRoles.includes(user.role)) {
-    // Redirect to appropriate dashboard based on role
     const dashboardMap: Record<string, string> = {
       customer: '/customer/dashboard',
       worker: '/worker/dashboard',
       admin: '/admin/dashboard',
       super_admin: '/super-admin/dashboard'
     };
-    
     return <Navigate to={dashboardMap[user.role] || '/'} replace />;
   }
 

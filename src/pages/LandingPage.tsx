@@ -14,6 +14,8 @@ const LandingPage = () => {
     fulfillmentRate: 95
   });
   const [loading, setLoading] = useState(true);
+  // Track whether we got real data from the API
+  const [statsLoaded, setStatsLoaded] = useState(false);
 
   const services = [
     { icon: "🧹", nameKey: "landing.services.instaMaid", descKey: "landing.services.instaMaidDesc", tagKey: "landing.services.popular", color: "bg-accent" },
@@ -36,6 +38,7 @@ const LandingPage = () => {
         const response = await publicAPI.getStats();
         if (response.success) {
           setStats(response.stats);
+          setStatsLoaded(true);
         }
       } catch (error) {
         console.error('Failed to fetch stats:', error);
@@ -130,8 +133,8 @@ const LandingPage = () => {
         <div className="relative max-w-6xl mx-auto px-6 mt-16">
           <div className="grid grid-cols-3 gap-4 md:gap-8">
             {[
-              { value: loading ? "..." : formatNumber(stats.totalCustomers), labelKey: "landing.stats.happyCustomers" },
-              { value: loading ? "..." : formatNumber(stats.totalWorkers), labelKey: "landing.stats.activeWorkers" },
+              { value: loading ? "..." : statsLoaded ? formatNumber(stats.totalCustomers) : "500+", labelKey: "landing.stats.happyCustomers" },
+              { value: loading ? "..." : statsLoaded ? formatNumber(stats.totalWorkers) : "50+", labelKey: "landing.stats.activeWorkers" },
               { value: loading ? "..." : `${stats.fulfillmentRate}%+`, labelKey: "landing.stats.fulfillmentRate" },
             ].map((stat) => (
               <div key={stat.labelKey} className="text-center p-4 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.08)", backdropFilter: "blur(8px)" }}>
@@ -232,7 +235,7 @@ const LandingPage = () => {
         <div className="max-w-6xl mx-auto px-6 text-center">
           <h2 className="text-4xl font-bold font-heading text-primary-foreground mb-4">{t('landing.cta.title')}</h2>
           <p className="text-primary-foreground/70 mb-8 text-lg">
-            {loading ? t('landing.cta.subtitleFallback') : t('landing.cta.subtitle').replace('{{count}}', formatNumber(stats.totalCustomers))}
+            {loading || !statsLoaded ? t('landing.cta.subtitleFallback') : t('landing.cta.subtitle').replace('{{count}}', formatNumber(stats.totalCustomers))}
           </p>
           <Link to="/register" className="inline-flex items-center gap-2 bg-primary-foreground text-primary font-bold py-4 px-10 rounded-xl hover:opacity-90 transition-all hover:-translate-y-0.5">
             {t('landing.cta.button')} <ArrowRight className="w-4 h-4" />

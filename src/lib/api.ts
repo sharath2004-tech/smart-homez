@@ -31,10 +31,13 @@ const getHeaders = () => {
 };
 
 // Generic API call function
-async function apiCall(endpoint: string, options:RequestInit = {}) {
+async function apiCall(endpoint: string, options: RequestInit = {}, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timerId = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
+      signal: controller.signal,
       headers: {
         ...getHeaders(),
         ...options.headers
@@ -54,8 +57,13 @@ async function apiCall(endpoint: string, options:RequestInit = {}) {
 
     return data;
   } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timed out. The server may be starting up — please try again.');
+    }
     console.error(`API Error [${endpoint}]:`, error);
     throw error;
+  } finally {
+    clearTimeout(timerId);
   }
 }
 
@@ -159,14 +167,12 @@ export const authAPI = {
 
 export const publicAPI = {
   getStats: async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/public/stats`);
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Get public stats error:', error);
-      throw error;
-    }
+    return apiCall('/public/stats', {}, 10000);
+  },
+
+  // Returns all active service cities and their locations — used in signup city picker
+  getServiceLocations: async () => {
+    return apiCall('/locations/public', {}, 10000);
   }
 };
 

@@ -12,6 +12,48 @@ import {
 
 const router = express.Router();
 
+// @route   GET /api/locations/public
+// @desc    Get all active service locations — for signup city/area picker (no auth)
+// @access  Public
+router.get('/public', async (req, res) => {
+  try {
+    const locations = await Location.find({ isActive: true })
+      .select('apartmentName area city state zipCode location isServiceAvailable assignedWorkers')
+      .sort({ city: 1, area: 1 });
+
+    // Group by city
+    const cityMap = {};
+    for (const loc of locations) {
+      const city = loc.city;
+      if (!cityMap[city]) cityMap[city] = [];
+      cityMap[city].push({
+        _id: loc._id,
+        apartmentName: loc.apartmentName,
+        area: loc.area,
+        city: loc.city,
+        state: loc.state,
+        zipCode: loc.zipCode,
+        coordinates: loc.location?.coordinates
+          ? { lng: loc.location.coordinates[0], lat: loc.location.coordinates[1] }
+          : null,
+        isServiceAvailable: loc.isServiceAvailable,
+        workersCount: loc.assignedWorkers?.length || 0,
+      });
+    }
+
+    const cities = Object.entries(cityMap).map(([city, locations]) => ({
+      city,
+      locations,
+      hasService: locations.some(l => l.isServiceAvailable),
+    }));
+
+    res.json({ success: true, cities, total: locations.length });
+  } catch (error) {
+    console.error('Public locations error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // Get all locations (admin only)
 router.get('/', authenticate, authorize('admin'), async (req, res) => {
   try {

@@ -1,3 +1,4 @@
+import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { settingsAPI } from "@/lib/api";
 import { cropQRFromImage } from "@/utils/cropQRFromImage";
@@ -25,7 +26,7 @@ interface Settings {
 
 const AdminSettings = () => {
   const navigate = useNavigate();
-  const { isSuperAdmin } = useAdminRole();
+  const { role, name, isSuperAdmin } = useAdminRole();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingQR, setUploadingQR] = useState(false);
@@ -134,23 +135,20 @@ const AdminSettings = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-teal-50 flex items-center justify-center">
-        <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full"></div>
-      </div>
+      <AppLayout userType={role} userName={name}>
+        <div className="flex items-center justify-center py-16">
+          <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full"></div>
+        </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-teal-50">
-      <div className="max-w-6xl mx-auto p-4 md:p-8">
+    <AppLayout userType={role} userName={name}>
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <button
-            onClick={() => navigate('/admin/dashboard')}
-            className="text-primary hover:text-primary/80 mb-4 flex items-center gap-2"
-          >
-            ← Back to Dashboard
-          </button>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Application Settings</h1>
           <h1 className="text-3xl font-bold text-foreground mb-2">Application Settings</h1>
           <p className="text-muted-foreground">Configure payment, company, and booking settings</p>
         </div>
@@ -436,7 +434,7 @@ const AdminSettings = () => {
           </div>
         </div>
       </div>
-    </div>
+      </AppLayout>
   );
 };
 

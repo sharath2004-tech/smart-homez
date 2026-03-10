@@ -32,7 +32,7 @@ router.post('/validate', async (req, res) => {
     // Import Location model
     const { default: Location } = await import('../models/Location.js');
     
-    // Find locations within 500m radius
+    // Find locations within 5km radius (city-level coverage)
     const nearbyLocations = await Location.find({
       location: {
         $near: {
@@ -40,11 +40,10 @@ router.post('/validate', async (req, res) => {
             type: 'Point',
             coordinates: [longitude, latitude]
           },
-          $maxDistance: 500 // 500 meters
+          $maxDistance: 5000 // 5 km — covers typical city service area
         }
       },
-      isServiceAvailable: true,
-      isActive: true
+      isActive: true // include all active locations regardless of isServiceAvailable
     }).limit(1);
     
     if (nearbyLocations.length > 0) {
@@ -61,11 +60,8 @@ router.post('/validate', async (req, res) => {
         message: `Service available at ${location.apartmentName}`,
       });
     } else {
-      // Find nearest location
-      const allLocations = await Location.find({
-        isServiceAvailable: true,
-        isActive: true
-      }).limit(10);
+      // Find nearest location (active only)
+      const allLocations = await Location.find({ isActive: true }).limit(10);
       
       let nearest = null;
       let minDistance = Infinity;

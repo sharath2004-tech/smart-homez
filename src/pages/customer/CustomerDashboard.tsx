@@ -50,36 +50,32 @@ const CustomerDashboard = () => {
   ];
 
   useEffect(() => {
-    fetchDashboardData();
-  }, [latitude, longitude]);
-
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-      
-      // Fetch user profile
-      const profileData = await authAPI.getProfile();
-      setProfile(profileData.user || profileData);
-
-      // Fetch upcoming bookings
-      const bookingsData = await bookingsAPI.getUpcoming();
-      setUpcomingBookings((bookingsData.bookings || []).slice(0, 2));
-
-      // Check nearby workers if location available
-      if (latitude && longitude) {
-        const workersData = await locationsAPI.getNearbyWorkers({
-          latitude,
-          longitude,
-          maxDistance: 500
-        });
-        setNearbyWorkersCount(workersData.count || 0);
+    // Fetch profile and bookings once on mount — no re-fetch on location change
+    const fetchCoreData = async () => {
+      try {
+        setLoading(true);
+        const [profileData, bookingsData] = await Promise.all([
+          authAPI.getProfile(),
+          bookingsAPI.getUpcoming(),
+        ]);
+        setProfile(profileData.user || profileData);
+        setUpcomingBookings((bookingsData.bookings || []).slice(0, 2));
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+    fetchCoreData();
+  }, []);
+
+  // Fetch nearby workers separately whenever coordinates become available
+  useEffect(() => {
+    if (!latitude || !longitude) return;
+    locationsAPI.getNearbyWorkers({ latitude, longitude, maxDistance: 500 })
+      .then((workersData) => setNearbyWorkersCount(workersData.count || 0))
+      .catch(() => {/* non-critical — silently ignore */});
+  }, [latitude, longitude]);
 
   const defaultAddress = profile?.addresses?.find(addr => addr.isDefault);
   const displayAddress = defaultAddress 

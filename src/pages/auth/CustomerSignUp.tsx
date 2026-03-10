@@ -1,7 +1,8 @@
 ﻿import { LanguageSelector } from "@/components/LanguageSelector";
-import { API_BASE_URL, authAPI } from "@/lib/api";
+import { authAPI, publicAPI } from "@/lib/api";
 import {
     CheckCircle,
+    ChevronDown,
     Eye,
     EyeOff,
     Home,
@@ -10,10 +11,10 @@ import {
     Navigation,
     Phone,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-type Step = "form" | "otp" | "location" | "unavailable" | "done";
+type Step = "form" | "otp" | "location" | "done";
 
 interface GeoResult {
   address: string;
@@ -22,6 +23,24 @@ interface GeoResult {
   zipCode: string;
   lat: number;
   lng: number;
+}
+
+interface ServiceLocation {
+  _id: string;
+  apartmentName: string;
+  area: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  coordinates: { lat: number; lng: number } | null;
+  isServiceAvailable: boolean;
+  workersCount: number;
+}
+
+interface ServiceCity {
+  city: string;
+  locations: ServiceLocation[];
+  hasService: boolean;
 }
 
 const CustomerSignUp = () => {
@@ -39,14 +58,30 @@ const CustomerSignUp = () => {
   const [loading, setLoading] = useState(false);
   const [locLoading, setLocLoading] = useState(false);
   const [error, setError] = useState("");
-  const [manualAddress, setManualAddress] = useState("");
   const [geoResult, setGeoResult] = useState<GeoResult | null>(null);
-  const [notifySubmitted, setNotifySubmitted] = useState(false);
 
   // OTP state
   const [otpCode, setOtpCode] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+
+  // City / location picker state
+  const [serviceCities, setServiceCities] = useState<ServiceCity[]>([]);
+  const [citiesLoading, setCitiesLoading] = useState(false);
+  const [selectedCity, setSelectedCity] = useState("");
+  const [selectedLocationId, setSelectedLocationId] = useState("");
+
+  // Load available service cities when the location step is shown
+  useEffect(() => {
+    if (step !== "location") return;
+    setCitiesLoading(true);
+    publicAPI.getServiceLocations()
+      .then((data) => {
+        if (data.cities) setServiceCities(data.cities);
+      })
+      .catch(() => {/* non-critical */})
+      .finally(() => setCitiesLoading(false));
+  }, [step]);
 
   const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -103,39 +138,6 @@ const CustomerSignUp = () => {
     }
   };
 
-  // ── Geocoding helpers ──────────────────────────────────────────────────
-  const reverseGeocode = async (lat: number, lng: number): Promise<GeoResult> => {
-    try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
-      const data = await res.json();
-      const addr = data.address || {};
-      return {
-        lat, lng,
-        address: data.display_name || "",
-        area: addr.suburb || addr.neighbourhood || addr.residential || addr.village || "",
-        city: addr.city || addr.town || addr.district || "",
-        zipCode: addr.postcode || "",
-      };
-    } catch {
-      return { lat, lng, address: "", area: "", city: "", zipCode: "" };
-    }
-  };
-
-  const checkAvailability = async (lat: number, lng: number) => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/service-areas/validate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ latitude: lat, longitude: lng }),
-      });
-      if (!res.ok) return false;
-      const data = await res.json();
-      return data.isAvailable === true;
-    } catch {
-      return false;
-    }
-  };
-
   // ── Register account ───────────────────────────────────────────────────
   const registerAccount = async (geo: GeoResult | null) => {
     setLoading(true);
@@ -179,62 +181,73 @@ const CustomerSignUp = () => {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude: lat, longitude: lng } = pos.coords;
-        const geo = await reverseGeocode(lat, lng);
-        setGeoResult(geo);
-        const avail = await checkAvailability(lat, lng);
         setLocLoading(false);
-        if (avail) {
-          await registerAccount(geo);
+
+        // Try to match GPS coordinates to the nearest service location
+        let bestLoc: ServiceLocation | null = null;
+        let bestDist = Infinity;
+        for (const cityGroup of serviceCities) {
+          for (const loc of cityGroup.locations) {
+            if (!loc.coordinates) continue;
+            const dLat = loc.coordinates.lat - lat;
+            const dLng = loc.coordinates.lng - lng;
+            const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+            if (dist < bestDist) {
+              bestDist = dist;
+              bestLoc = loc;
+            }
+          }
+        }
+
+        if (bestLoc) {
+          setSelectedCity(bestLoc.city);
+          setSelectedLocationId(bestLoc._id);
+          setGeoResult({
+            address: `${bestLoc.apartmentName}, ${bestLoc.area}, ${bestLoc.city}`,
+            area: bestLoc.area,
+            city: bestLoc.city,
+            zipCode: bestLoc.zipCode,
+            lat: bestLoc.coordinates?.lat ?? lat,
+            lng: bestLoc.coordinates?.lng ?? lng,
+          });
         } else {
-          setStep("unavailable");
+          setError("Couldn't match your location. Please select your city manually.");
         }
       },
       () => {
         setLocLoading(false);
-        setError("Location access denied. Please allow it or enter your address manually.");
+        setError("Location access denied. Please select your city from the list.");
       }
     );
   };
 
-  const handleManualLocation = async () => {
-    if (!manualAddress.trim()) { setError("Please enter your area / address"); return; }
-    setLocLoading(true);
-    setError("");
-    try {
-      const enc = encodeURIComponent(manualAddress + ", India");
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${enc}`);
-      const results = await res.json();
-      if (!results.length) { setError("Address not found. Try a more specific area."); setLocLoading(false); return; }
-      const lat = parseFloat(results[0].lat);
-      const lng = parseFloat(results[0].lon);
-      const geo = await reverseGeocode(lat, lng);
-      setGeoResult(geo);
-      const avail = await checkAvailability(lat, lng);
-      setLocLoading(false);
-      if (avail) {
-        await registerAccount(geo);
-      } else {
-        setStep("unavailable");
-      }
-    } catch {
-      setLocLoading(false);
-      setError("Location lookup failed. Please try again.");
-    }
-  };
-
   const handleSkipLocation = () => registerAccount(null);
 
-  const handleNotifyMe = async () => {
-    if (geoResult) {
-      localStorage.setItem("pendingLocation", JSON.stringify({ ...geoResult, notifyMe: true }));
-    }
-    await registerAccount(geoResult);
-    setNotifySubmitted(true);
+  // ── Register with selected city/location from the picker ─────────────────
+  const handleConfirmLocation = async () => {
+    if (!selectedCity) { setError("Please select your city"); return; }
+    if (!selectedLocationId) { setError("Please select your area / apartment"); return; }
+    setError("");
+
+    const city = serviceCities.find(c => c.city === selectedCity);
+    const loc = city?.locations.find(l => l._id === selectedLocationId);
+    if (!loc) { setError("Invalid selection. Please try again."); return; }
+
+    const geo: GeoResult = {
+      address: `${loc.apartmentName}, ${loc.area}, ${loc.city}`,
+      area: loc.area,
+      city: loc.city,
+      zipCode: loc.zipCode,
+      lat: loc.coordinates?.lat ?? 0,
+      lng: loc.coordinates?.lng ?? 0,
+    };
+    setGeoResult(geo);
+    await registerAccount(geo);
   };
 
   // ── Left panel step indicator ──────────────────────────────────────────
   const steps = ["Your details", "Verify phone", "Your area", "All set!"];
-  const stepIdx = step === "form" ? 0 : step === "otp" ? 1 : step === "location" || step === "unavailable" ? 2 : 3;
+  const stepIdx = step === "form" ? 0 : step === "otp" ? 1 : step === "location" ? 2 : 3;
 
   if (step === "done") {
     return (
@@ -452,90 +465,103 @@ const CustomerSignUp = () => {
           {/* ── STEP: location ── */}
           {step === "location" && (
             <>
-              <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Where are you?</h2>
-              <p className="text-muted-foreground mb-6">
-                Share your location so we can check if services are available in your area.
+              <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Select your area</h2>
+              <p className="text-muted-foreground mb-5">
+                Choose the city and location where you need home services.
               </p>
-              <div className="space-y-4">
+
+              {citiesLoading ? (
+                <div className="flex items-center justify-center py-10">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  <span className="ml-2 text-muted-foreground text-sm">Loading service areas…</span>
+                </div>
+              ) : serviceCities.length === 0 ? (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 mb-4">
+                  No service areas are set up yet. You can still create your account and we'll notify you when service launches in your area.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* City selector */}
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">City</label>
+                    <div className="relative">
+                      <select
+                        className="input-clean appearance-none pr-10"
+                        value={selectedCity}
+                        onChange={(e) => { setSelectedCity(e.target.value); setSelectedLocationId(""); setError(""); }}
+                      >
+                        <option value="">— Select your city —</option>
+                        {serviceCities.map((c) => (
+                          <option key={c.city} value={c.city}>
+                            {c.city}{c.hasService ? "" : " (coming soon)"}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* Location / apartment selector */}
+                  {selectedCity && (() => {
+                    const city = serviceCities.find(c => c.city === selectedCity);
+                    const locs = city?.locations ?? [];
+                    return (
+                      <div>
+                        <label className="block text-sm font-medium text-foreground mb-1.5">Area / Apartment</label>
+                        <div className="relative">
+                          <select
+                            className="input-clean appearance-none pr-10"
+                            value={selectedLocationId}
+                            onChange={(e) => { setSelectedLocationId(e.target.value); setError(""); }}
+                          >
+                            <option value="">— Select your area —</option>
+                            {locs.map((loc) => (
+                              <option key={loc._id} value={loc._id}>
+                                {loc.apartmentName}{loc.area ? `, ${loc.area}` : ""}
+                                {loc.isServiceAvailable ? " ✓" : " (coming soon)"}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* GPS auto-detect */}
+              <div className="mt-4">
                 <button
+                  type="button"
                   onClick={handleGPS}
-                  disabled={locLoading}
-                  className="w-full flex items-center justify-center gap-3 py-4 px-4 bg-primary/10 border-2 border-primary rounded-xl text-primary font-semibold hover:bg-primary/20 transition-colors"
+                  disabled={locLoading || citiesLoading}
+                  className="w-full flex items-center justify-center gap-2 py-3 border border-border rounded-xl text-sm font-medium text-foreground hover:bg-muted transition-colors"
                 >
-                  {locLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Navigation className="w-5 h-5" />}
-                  Use my current location
+                  {locLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Navigation className="w-4 h-4 text-primary" />}
+                  Auto-detect my location
                 </button>
+              </div>
 
-                <div className="relative flex items-center gap-3">
-                  <div className="flex-1 h-px bg-border" />
-                  <span className="text-xs text-muted-foreground">or enter area</span>
-                  <div className="flex-1 h-px bg-border" />
-                </div>
-
-                <div className="flex gap-2">
-                  <input
-                    className="input-clean flex-1"
-                    placeholder="e.g. Koramangala, Bengaluru"
-                    value={manualAddress}
-                    onChange={(e) => setManualAddress(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleManualLocation()}
-                  />
-                  <button
-                    onClick={handleManualLocation}
-                    disabled={locLoading}
-                    className="px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors"
-                  >
-                    {locLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
-                  </button>
-                </div>
+              <div className="space-y-3 mt-6">
+                <button
+                  onClick={handleConfirmLocation}
+                  disabled={loading || !selectedCity || !selectedLocationId}
+                  className="btn-brand w-full flex items-center justify-center gap-2"
+                >
+                  {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating account…</> : <><MapPin className="w-4 h-4" /> Confirm &amp; Create Account</>}
+                </button>
 
                 <button
                   onClick={handleSkipLocation}
                   disabled={loading}
                   className="w-full py-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Skip for now
+                  Skip — I'll set location later
                 </button>
 
                 <button onClick={() => { setStep("otp"); setError(""); }} className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm">
                   Back
-                </button>
-              </div>
-            </>
-          )}
-
-          {/* ── STEP: unavailable ── */}
-          {step === "unavailable" && (
-            <>
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <MapPin className="w-8 h-8 text-amber-500" />
-                </div>
-                <h2 className="text-2xl font-bold font-heading text-foreground mb-2">Not available yet</h2>
-                <p className="text-muted-foreground">
-                  We don't serve{geoResult?.city ? ` ${geoResult.city}` : " your area"} yet, but we're expanding fast!
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                {!notifySubmitted ? (
-                  <button
-                    onClick={handleNotifyMe}
-                    disabled={loading}
-                    className="btn-brand w-full flex items-center justify-center gap-2"
-                  >
-                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Notify me when available"}
-                  </button>
-                ) : (
-                  <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 text-center">
-                    ✅ Got it! We'll notify you at <strong>{form.email}</strong> when we launch in your area.
-                    <div className="mt-3">
-                      <Link to="/login" className="text-primary font-semibold hover:underline">Go to login</Link>
-                    </div>
-                  </div>
-                )}
-                <button onClick={() => { setStep("location"); setError(""); setNotifySubmitted(false); }} className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm">
-                  Try a different area
                 </button>
               </div>
             </>

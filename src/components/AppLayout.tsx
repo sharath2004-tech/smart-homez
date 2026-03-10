@@ -1,4 +1,5 @@
-import { Bell, Calendar, ClipboardCheck, CreditCard, Home, IndianRupee, LayoutDashboard, LogOut, MapPin, RefreshCw, Settings, User, Users, Wrench } from "lucide-react";
+import { Bell, Calendar, ClipboardCheck, CreditCard, Home, IndianRupee, LayoutDashboard, LogOut, MapPin, Menu, RefreshCw, Settings, User, Users, Wrench, X } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 import { LanguageSelector } from "./LanguageSelector";
@@ -12,6 +13,7 @@ interface AppLayoutProps {
 const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLayoutProps) => {
   const location = useLocation();
   const { t } = useTranslation();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleLogout = () => {
     // Clear authentication data
@@ -73,10 +75,10 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
 
   return (
     <div className="min-h-screen flex bg-background">
-      {/* Sidebar */}
+      {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-64 flex-col bg-sidebar border-r border-sidebar-border fixed inset-y-0 left-0 z-40">
         {/* Logo */}
-        <div className="p-5 border-b border-sidebar-border">
+        <div className="p-5 border-b border-sidebar-border shrink-0">
           <Link to={dashboardPath} className="flex items-center gap-2.5">
             <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center">
               <Home className="w-4 h-4 text-primary-foreground" />
@@ -86,7 +88,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
         </div>
 
         {/* User info */}
-        <div className="p-4 border-b border-sidebar-border">
+        <div className="p-4 border-b border-sidebar-border shrink-0">
           <div className="flex items-center gap-3 p-3 bg-sidebar-accent rounded-xl">
             <div className="w-9 h-9 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold shrink-0">
               {initials}
@@ -99,7 +101,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
         </div>
 
         {/* Nav items */}
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
             const isActive = location.pathname === item.to;
             return (
@@ -120,7 +122,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
         </nav>
 
         {/* Bottom actions */}
-        <div className="p-4 border-t border-sidebar-border space-y-1">
+        <div className="p-4 border-t border-sidebar-border space-y-1 shrink-0">
           <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent transition-all">
             <Bell className="w-4 h-4" />
             {t('nav.notifications')}
@@ -146,11 +148,89 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
         </Link>
         <div className="flex items-center gap-2">
           <LanguageSelector />
-          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-bold">
-            {initials}
-          </div>
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-muted transition-colors"
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5 text-foreground" />
+          </button>
         </div>
       </div>
+
+      {/* Mobile sidebar drawer */}
+      {mobileOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="md:hidden fixed inset-0 z-50 bg-black/40"
+            onClick={() => setMobileOpen(false)}
+          />
+          {/* Drawer */}
+          <div className="md:hidden fixed inset-y-0 left-0 z-50 w-72 flex flex-col bg-sidebar shadow-xl">
+            {/* Drawer header */}
+            <div className="p-4 border-b border-sidebar-border shrink-0 flex items-center justify-between">
+              <Link to={dashboardPath} onClick={() => setMobileOpen(false)} className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                  <Home className="w-4 h-4 text-primary-foreground" />
+                </div>
+                <span className="font-bold text-foreground">Smart Homez</span>
+              </Link>
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-sidebar-accent transition-colors"
+                aria-label="Close menu"
+              >
+                <X className="w-5 h-5 text-sidebar-foreground" />
+              </button>
+            </div>
+            {/* User info */}
+            <div className="p-4 border-b border-sidebar-border shrink-0">
+              <div className="flex items-center gap-3 p-3 bg-sidebar-accent rounded-xl">
+                <div className="w-9 h-9 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold shrink-0">
+                  {initials}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate">{userName}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{userType === 'super_admin' ? 'Super Admin' : t(`nav.${userType}`)}</p>
+                </div>
+              </div>
+            </div>
+            {/* Nav items - scrollable */}
+            <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+              {navItems.map((item) => {
+                const isActive = location.pathname === item.to;
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    onClick={() => setMobileOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      isActive
+                        ? "bg-primary text-primary-foreground shadow-brand"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground"
+                    }`}
+                  >
+                    <item.icon className="w-4 h-4 shrink-0" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+            {/* Drawer bottom */}
+            <div className="p-4 border-t border-sidebar-border space-y-1 shrink-0">
+              <LanguageSelector variant="full" />
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10 transition-all"
+              >
+                <LogOut className="w-4 h-4" />
+                {t('nav.signOut')}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Main content */}
       <main className="flex-1 md:ml-64 pt-16 md:pt-0">
@@ -158,25 +238,6 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
           {children}
         </div>
       </main>
-
-      {/* Mobile bottom nav */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card border-t border-border px-2 py-2 flex">
-        {navItems.slice(0, 5).map((item) => {
-          const isActive = location.pathname === item.to;
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={`flex-1 flex flex-col items-center gap-1 py-2 px-1 rounded-lg transition-all ${
-                isActive ? "text-primary" : "text-muted-foreground"
-              }`}
-            >
-              <item.icon className="w-5 h-5" />
-              <span className="text-xs font-medium">{item.label}</span>
-            </Link>
-          );
-        })}
-      </div>
     </div>
   );
 };

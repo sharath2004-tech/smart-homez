@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useAdminRole } from "@/hooks/useAdminRole";
 import { adminAPI } from "@/lib/api";
 import { CheckCircle, Clock, ExternalLink, Loader2, User, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -26,6 +27,7 @@ interface PendingWorker {
 }
 
 const AdminWorkerRequests = () => {
+  const { role, name } = useAdminRole();
   const [workers, setWorkers] = useState<PendingWorker[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -85,7 +87,7 @@ const AdminWorkerRequests = () => {
     new Date(date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
   return (
-    <AppLayout>
+    <AppLayout userType={role} userName={name}>
       <div className="p-6 max-w-5xl mx-auto">
         <div className="mb-6">
           <h1 className="text-2xl font-bold font-heading text-foreground">Worker Approval Requests</h1>
