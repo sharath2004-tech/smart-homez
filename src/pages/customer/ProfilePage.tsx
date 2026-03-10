@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { authAPI, locationsAPI, usersAPI } from "@/lib/api";
-import { Bell, Check, ChevronRight, Edit2, Eye, EyeOff, Loader2, MapPin, Plus, Star, Trash2, User, Users } from "lucide-react";
+import { Bell, Check, ChevronRight, Edit2, Eye, EyeOff, Loader2, MapPin, Plus, Star, Trash2, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -265,7 +265,7 @@ const ProfilePage = () => {
       <div className="max-w-2xl mx-auto space-y-6 animate-fade-in pb-20 md:pb-0">
         {/* Profile header */}
         <div className="card-elevated p-6 text-center relative">
-          <button className="absolute top-4 right-4 p-2 bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors">
+          <button onClick={() => setShowAccountModal(true)} className="absolute top-4 right-4 p-2 bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors" title="Edit profile">
             <Edit2 className="w-4 h-4" />
           </button>
           <div className="w-20 h-20 bg-primary-light rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-primary/20">
@@ -281,19 +281,9 @@ const ProfilePage = () => {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className="card-elevated p-4 text-center">
-            <p className="text-2xl font-bold font-heading text-foreground">{stats.totalBookings}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Total Bookings</p>
-          </div>
-          <div className="card-elevated p-4 text-center">
-            <p className="text-2xl font-bold font-heading text-foreground">{stats.preferredWorkers.length}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Preferred Workers</p>
-          </div>
-          <div className="card-elevated p-4 text-center">
-            <p className="text-2xl font-bold font-heading text-foreground">{stats.monthsActive}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Months Active</p>
-          </div>
+        <div className="card-elevated p-4 text-center">
+          <p className="text-2xl font-bold font-heading text-foreground">{stats.totalBookings}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Total Bookings</p>
         </div>
 
         {/* Saved addresses */}
@@ -427,33 +417,7 @@ const ProfilePage = () => {
           )}
         </div>
 
-        {/* Preferred Workers */}
-        {stats.preferredWorkers.length > 0 && (
-          <div className="card-elevated p-5">
-            <h3 className="font-bold font-heading text-foreground mb-4 flex items-center gap-2">
-              <Users className="w-4 h-4 text-primary" /> Preferred Workers
-            </h3>
-            <div className="space-y-3">
-              {stats.preferredWorkers.map((w, idx) => (
-                <div key={idx} className="flex items-center gap-3 p-3 bg-muted rounded-xl">
-                  <div className="w-9 h-9 bg-primary-light rounded-full flex items-center justify-center text-primary text-xs font-bold shrink-0">
-                    {w.name.split(' ').map(n => n[0]).join('')}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground">{w.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {w.specialization.join(', ')} • {w.jobsCount} sessions with you
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1 text-xs">
-                    <Star className="w-3 h-3 fill-warning text-warning" />
-                    <span className="font-medium text-foreground">{w.rating.toFixed(1)}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+
 
         {/* Settings */}
         <div className="card-elevated overflow-hidden">

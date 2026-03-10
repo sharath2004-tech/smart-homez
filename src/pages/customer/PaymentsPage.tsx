@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { authAPI, bookingsAPI } from "@/lib/api";
-import { CheckCircle, CreditCard, Download, TrendingUp, Wallet } from "lucide-react";
+import { AlertCircle, CheckCircle, Download, Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -117,9 +117,8 @@ const PaymentsPage = () => {
         </div>
 
         {/* Summary cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           {[
-            { icon: TrendingUp, label: "This Month", value: `₹${stats.thisMonth.toLocaleString()}`, color: "text-primary", bg: "bg-primary-light" },
             { icon: CheckCircle, label: "Total Services", value: stats.totalServices, color: "text-success", bg: "bg-success-light" },
             { icon: Wallet, label: "Saved (Sub.)", value: `₹${stats.savedAmount}`, color: "text-warning", bg: "bg-warning-light" },
           ].map((card) => (
@@ -133,30 +132,20 @@ const PaymentsPage = () => {
           ))}
         </div>
 
-        {/* Payment methods */}
+        {/* Payment methods - UPI only */}
         <div className="card-elevated p-5">
           <h2 className="text-base font-bold font-heading text-foreground mb-4">Payment Methods</h2>
-          <div className="space-y-3">
-            {[
-              { icon: "💳", name: "Credit/Debit Card", detail: "Pay with card", isDefault: false },
-              { icon: "📱", name: "UPI", detail: "PhonePe, Google Pay, Paytm", isDefault: true },
-              { icon: "💵", name: "Cash", detail: "Pay after service", isDefault: false },
-            ].map((method) => (
-              <div key={method.name} className="flex items-center gap-3 p-3 bg-muted rounded-xl">
-                <span className="text-2xl">{method.icon}</span>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">{method.name}</p>
-                  <p className="text-xs text-muted-foreground">{method.detail}</p>
-                </div>
-                {method.isDefault && <span className="badge-success text-xs">Available</span>}
-              </div>
-            ))}
-            <button
-              onClick={() => alert('Payment method management coming soon!')}
-              className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-border rounded-xl text-sm font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-            >
-              <CreditCard className="w-4 h-4" /> Add payment method
-            </button>
+          <div className="flex items-start gap-3 p-4 bg-destructive/10 border border-destructive/30 rounded-xl mb-3">
+            <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+            <p className="text-sm text-destructive font-medium">We only accept UPI / QR code payments. Cards and cash are not accepted.</p>
+          </div>
+          <div className="flex items-center gap-3 p-3 bg-muted rounded-xl">
+            <span className="text-2xl">📱</span>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-foreground">UPI / QR Code</p>
+              <p className="text-xs text-muted-foreground">PhonePe, Google Pay, Paytm, any UPI app</p>
+            </div>
+            <span className="badge-success text-xs">Available</span>
           </div>
         </div>
 
@@ -179,26 +168,30 @@ const PaymentsPage = () => {
             </div>
           ) : (
             <div className="space-y-2">
-              {transactions.map((t: any) => (
-                <div key={t._id} className="card-elevated p-4 flex items-center gap-3">
+              {transactions.map((tx: any) => (
+                <div key={tx._id} className="card-elevated p-4 flex items-center gap-3">
                   <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center text-xl shrink-0">
-                    {getServiceEmoji(t.service?.name || 'Service')}
+                    {getServiceEmoji(tx.service?.name || 'Service')}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{t.service?.name || 'Service'}</p>
+                    <p className="text-sm font-medium text-foreground truncate">{tx.service?.name || 'Service'}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-xs text-muted-foreground">
-                        {formatDate(t.completedAt || t.bookingDate)}
+                        {formatDate(tx.completedAt || tx.bookingDate)}
                       </span>
                       <span className="text-xs text-muted-foreground">·</span>
                       <span className="text-xs text-muted-foreground">
-                        {getPaymentMethod(t.paymentMethod)}
+                        {getPaymentMethod(tx.paymentMethod)}
                       </span>
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-foreground">₹{t.totalAmount}</p>
-                    <span className="badge-success text-xs">Paid</span>
+                    <p className="text-sm font-bold text-foreground">₹{tx.totalAmount}</p>
+                    {tx.paymentStatus === 'paid' ? (
+                      <span className="badge-success text-xs">Paid</span>
+                    ) : (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-warning/15 text-warning font-medium">Pending</span>
+                    )}
                   </div>
                 </div>
               ))}

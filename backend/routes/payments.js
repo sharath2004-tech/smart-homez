@@ -105,8 +105,8 @@ router.post('/',
   [
     body('booking').notEmpty().withMessage('Booking ID is required'),
     body('amount').isNumeric().withMessage('Amount must be a number'),
-    body('paymentMethod').isIn(['card', 'cash', 'bank_transfer', 'wallet'])
-      .withMessage('Invalid payment method')
+    body('paymentMethod').isIn(['qr-upi'])
+      .withMessage('Only UPI/QR code payments are accepted')
   ],
   async (req, res) => {
     try {
@@ -137,13 +137,13 @@ router.post('/',
         amount,
         paymentMethod,
         transactionId,
-        status: 'completed' // In real app, this would be 'pending' until payment gateway confirms
+        status: 'pending' // Remains pending until admin approves via /qr-payments/:id/admin-verify
       });
 
       await payment.save();
 
-      // Update booking payment status
-      bookingDoc.paymentStatus = 'paid';
+      // Mark booking as worker-confirmed — full 'paid' status set only after admin approval
+      bookingDoc.paymentStatus = 'worker-confirmed';
       await bookingDoc.save();
 
       const populatedPayment = await Payment.findById(payment._id)
