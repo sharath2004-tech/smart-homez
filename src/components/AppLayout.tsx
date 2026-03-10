@@ -39,7 +39,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
     { to: "/worker/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },
     { to: "/worker/tasks", icon: Calendar, label: t('nav.myTasks') },
     { to: "/worker/earnings", icon: IndianRupee, label: "Salary Management" },
-    { to: "/worker/salary", icon: IndianRupee, label: "Salary Request" },
+    { to: "/worker/salary", icon: IndianRupee, label: "Salary History" },
     { to: "/worker/leaves", icon: Bell, label: t('nav.myLeaves') },
     { to: "/worker/profile", icon: User, label: t('nav.profile') },
     { to: "/worker/help", icon: HelpCircle, label: "Help" },

@@ -374,15 +374,15 @@ const WorkerEarnings = () => {
         <div className="card-elevated p-5 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h3 className="font-bold text-foreground text-sm mb-1">Ready to request your salary?</h3>
-              <p className="text-xs text-muted-foreground">Submit a salary request for admin approval and settlement.</p>
+              <h3 className="font-bold text-foreground text-sm mb-1">View your salary payments</h3>
+              <p className="text-xs text-muted-foreground">See your monthly salary payments sent by admin.</p>
             </div>
             <a
               href="/worker/salary"
               className="btn-brand py-2.5 px-4 text-sm whitespace-nowrap flex items-center gap-1.5 shrink-0"
             >
               <IndianRupee className="w-4 h-4" />
-              Request Salary
+              Salary History
             </a>
           </div>
         </div>

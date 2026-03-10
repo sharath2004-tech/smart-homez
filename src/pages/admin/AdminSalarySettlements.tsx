@@ -1,15 +1,15 @@
 import AppLayout from '@/components/AppLayout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminRole } from '@/hooks/useAdminRole';
 import { api } from '@/lib/api';
 import {
+    AlertCircle,
     CheckCircle,
     ChevronDown,
     ChevronUp,
@@ -17,12 +17,40 @@ import {
     IndianRupee,
     Loader2,
     RefreshCw,
+    Search,
+    Send,
     User,
     XCircle
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+interface Worker {
+  _id: string;
+  name: string;
+  email: string;
+  workerProfile?: { hourlyRate?: number };
+}
+
+interface TaskPreview {
+  _id: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  serviceName: string;
+  minutesWorked: number;
+}
+
+interface SalaryPreview {
+  periodFrom: string;
+  periodTo: string;
+  totalMinutesWorked: number;
+  totalTasksCompleted: number;
+  hourlyRate: number;
+  requestedAmount: number;
+  tasks: TaskPreview[];
+}
 
 interface BookingDetail {
   _id: string;
@@ -80,7 +108,7 @@ const STATUS_META = {
   paid:     { label: 'Paid',     badge: 'bg-green-100 text-green-800',  icon: CheckCircle }
 } as const;
 
-const TABS = ['all', 'pending', 'approved', 'rejected', 'paid'] as const;
+const TABS = ['all', 'paid'] as const;
 type Tab = typeof TABS[number];
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -89,16 +117,21 @@ const AdminSalarySettlements = () => {
   const { name, role } = useAdminRole();
   const { toast } = useToast();
 
-  const [tab, setTab] = useState<Tab>('pending');
+  const [tab, setTab] = useState<Tab>('all');
   const [requests, setRequests] = useState<SalaryRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  // Action state per request
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState('');
-  const [rejectingId, setRejectingId] = useState<string | null>(null);
-  const [notesInput, setNotesInput] = useState('');
+  // Send Salary panel state
+  const [sendOpen, setSendOpen] = useState(false);
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [workerSearch, setWorkerSearch] = useState('');
+  const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
+  const [sendFrom, setSendFrom] = useState('');
+  const [sendTo, setSendTo] = useState('');
+  const [sendPreview, setSendPreview] = useState<SalaryPreview | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [sending, setSending] = useState(false);
 
   const fetchRequests = useCallback(async () => {
     setLoading(true);
@@ -116,60 +149,79 @@ const AdminSalarySettlements = () => {
 
   useEffect(() => {
     fetchRequests();
+    fetchWorkers();
   }, [fetchRequests]);
 
-  const handleApprove = async (id: string) => {
-    setActionLoading(id);
+  const fetchWorkers = async () => {
     try {
-      await api.patch(`/salary-requests/${id}/approve`, notesInput ? { notes: notesInput } : undefined);
-      toast({ title: 'Approved', description: 'Salary request approved successfully' });
-      setNotesInput('');
-      await fetchRequests();
+      const data = await api.get('/admin/workers');
+      setWorkers(data.workers || data || []);
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Could not approve', variant: 'destructive' });
-    } finally {
-      setActionLoading(null);
+      console.error('Fetch workers error:', err);
     }
   };
 
-  const handleReject = async (id: string) => {
-    if (!rejectReason.trim()) {
-      toast({ title: 'Reason required', description: 'Please provide a reason for rejection', variant: 'destructive' });
+  const handleWorkerPreview = async () => {
+    if (!selectedWorker) {
+      toast({ title: 'Select a worker', variant: 'destructive' });
       return;
     }
-    setActionLoading(id);
+    if (!sendFrom || !sendTo) {
+      toast({ title: 'Select a date range', variant: 'destructive' });
+      return;
+    }
+    if (sendFrom > sendTo) {
+      toast({ title: 'Invalid range', description: '"From" must be before "To"', variant: 'destructive' });
+      return;
+    }
+    setPreviewing(true);
+    setSendPreview(null);
     try {
-      await api.patch(`/salary-requests/${id}/reject`, { reason: rejectReason });
-      toast({ title: 'Rejected', description: 'Salary request rejected' });
-      setRejectReason('');
-      setRejectingId(null);
-      await fetchRequests();
+      const data = await api.get(
+        `/salary-requests/admin/worker-preview?workerId=${selectedWorker._id}&from=${sendFrom}&to=${sendTo}`
+      );
+      setSendPreview(data.preview);
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Could not reject', variant: 'destructive' });
+      toast({
+        title: 'Preview failed',
+        description: err instanceof Error ? err.message : 'Could not fetch preview',
+        variant: 'destructive'
+      });
     } finally {
-      setActionLoading(null);
+      setPreviewing(false);
     }
   };
 
-  const handleMarkPaid = async (id: string) => {
-    setActionLoading(id);
+  const handleSendSalary = async () => {
+    if (!selectedWorker || !sendPreview) return;
+    setSending(true);
     try {
-      await api.patch(`/salary-requests/${id}/mark-paid`, notesInput ? { notes: notesInput } : undefined);
-      toast({ title: 'Marked as Paid', description: 'Salary settlement complete' });
-      setNotesInput('');
+      const res = await api.post('/salary-requests/admin/send', {
+        workerId: selectedWorker._id,
+        periodFrom: sendFrom,
+        periodTo: sendTo
+      });
+      toast({ title: 'Salary Sent!', description: res.message || `Salary sent to ${selectedWorker.name}` });
+      setSendOpen(false);
+      setSelectedWorker(null);
+      setWorkerSearch('');
+      setSendFrom('');
+      setSendTo('');
+      setSendPreview(null);
       await fetchRequests();
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Could not mark as paid', variant: 'destructive' });
+      toast({
+        title: 'Failed',
+        description: err instanceof Error ? err.message : 'Could not send salary',
+        variant: 'destructive'
+      });
     } finally {
-      setActionLoading(null);
+      setSending(false);
     }
   };
 
   const toggleExpand = (id: string) => {
     setExpandedId(prev => prev === id ? null : id);
-    setRejectingId(null);
-    setRejectReason('');
-    setNotesInput('');
   };
 
   return (
@@ -177,8 +229,8 @@ const AdminSalarySettlements = () => {
       <div className="p-4 md:p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Salary Settlements</h1>
-            <p className="text-sm text-muted-foreground mt-1">Review and settle worker salary requests</p>
+            <h1 className="text-2xl font-bold text-foreground">Salary Management</h1>
+            <p className="text-sm text-muted-foreground mt-1">Send monthly salary to workers based on their completed work</p>
           </div>
           <Button variant="outline" size="sm" onClick={fetchRequests} disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -186,8 +238,188 @@ const AdminSalarySettlements = () => {
           </Button>
         </div>
 
+        {/* ── Send Salary Panel ── */}
+        <Card>
+          <div
+            className="p-4 cursor-pointer flex items-center justify-between hover:bg-muted/30 transition-colors"
+            onClick={() => { setSendOpen(o => !o); setSendPreview(null); }}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
+                <Send className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <p className="font-semibold text-foreground">Send Salary</p>
+                <p className="text-xs text-muted-foreground">Pay a worker for their completed tasks</p>
+              </div>
+            </div>
+            {sendOpen
+              ? <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+          </div>
+
+          {sendOpen && (
+            <div className="border-t border-border">
+              <CardContent className="p-4 space-y-4">
+                {/* Worker search */}
+                <div className="space-y-1.5">
+                  <Label>Select Worker</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search worker by name or email..."
+                      value={workerSearch}
+                      onChange={e => { setWorkerSearch(e.target.value); setSelectedWorker(null); setSendPreview(null); }}
+                      className="pl-9"
+                    />
+                  </div>
+                  {workerSearch && !selectedWorker && (
+                    <div className="bg-background border border-border rounded-md shadow-md max-h-40 overflow-y-auto">
+                      {workers
+                        .filter(w =>
+                          w.name.toLowerCase().includes(workerSearch.toLowerCase()) ||
+                          w.email.toLowerCase().includes(workerSearch.toLowerCase())
+                        )
+                        .map(w => (
+                          <button
+                            key={w._id}
+                            className="w-full text-left px-3 py-2.5 hover:bg-muted/50 transition-colors text-sm"
+                            onClick={() => { setSelectedWorker(w); setWorkerSearch(w.name); setSendPreview(null); }}
+                          >
+                            <p className="font-medium">{w.name}</p>
+                            <p className="text-xs text-muted-foreground">{w.email}</p>
+                          </button>
+                        ))}
+                      {workers.filter(w =>
+                        w.name.toLowerCase().includes(workerSearch.toLowerCase()) ||
+                        w.email.toLowerCase().includes(workerSearch.toLowerCase())
+                      ).length === 0 && (
+                        <p className="px-3 py-3 text-sm text-muted-foreground">No workers found</p>
+                      )}
+                    </div>
+                  )}
+                  {selectedWorker && (
+                    <div className="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-md px-3 py-2">
+                      <User className="w-4 h-4 text-primary" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{selectedWorker.name}</p>
+                        <p className="text-xs text-muted-foreground">{selectedWorker.email}</p>
+                      </div>
+                      <button
+                        className="text-xs text-muted-foreground hover:text-destructive"
+                        onClick={() => { setSelectedWorker(null); setWorkerSearch(''); setSendPreview(null); }}
+                      >
+                        Change
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Date range */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="sendFrom">From Date</Label>
+                    <Input
+                      id="sendFrom"
+                      type="date"
+                      value={sendFrom}
+                      onChange={e => { setSendFrom(e.target.value); setSendPreview(null); }}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="sendTo">To Date</Label>
+                    <Input
+                      id="sendTo"
+                      type="date"
+                      value={sendTo}
+                      onChange={e => { setSendTo(e.target.value); setSendPreview(null); }}
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleWorkerPreview}
+                  disabled={!selectedWorker || !sendFrom || !sendTo || previewing}
+                >
+                  {previewing
+                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Calculating...</>
+                    : <><Search className="w-4 h-4 mr-2" />Calculate Salary</>}
+                </Button>
+
+                {/* Preview result */}
+                {sendPreview && (
+                  <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+                    <div className="grid grid-cols-3 gap-3 text-center">
+                      <div className="bg-background rounded-md p-3">
+                        <p className="text-xs text-muted-foreground">Tasks Done</p>
+                        <p className="text-xl font-bold">{sendPreview.totalTasksCompleted}</p>
+                      </div>
+                      <div className="bg-background rounded-md p-3">
+                        <p className="text-xs text-muted-foreground">Time Worked</p>
+                        <p className="text-xl font-bold">{formatMinutes(sendPreview.totalMinutesWorked)}</p>
+                      </div>
+                      <div className="bg-background rounded-md p-3">
+                        <p className="text-xs text-muted-foreground">Rate / hr</p>
+                        <p className="text-xl font-bold">₹{sendPreview.hourlyRate}</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-primary rounded-lg p-4 text-center">
+                      <p className="text-sm text-primary-foreground/80">Salary Amount</p>
+                      <p className="text-3xl font-bold text-primary-foreground mt-1">₹{sendPreview.requestedAmount.toFixed(2)}</p>
+                    </div>
+
+                    {sendPreview.tasks.length > 0 && (
+                      <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tasks Included</p>
+                        {sendPreview.tasks.map(task => (
+                          <div key={task._id} className="flex items-center justify-between bg-background rounded px-3 py-2 text-sm">
+                            <div>
+                              <p className="font-medium">{task.serviceName}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(task.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                {' · '}{task.startTime} – {task.endTime}
+                              </p>
+                            </div>
+                            <span className="text-xs text-muted-foreground">{formatMinutes(task.minutesWorked)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {sendPreview.totalTasksCompleted === 0 && (
+                      <div className="flex items-center gap-2 text-amber-700 text-sm bg-amber-50 rounded p-3">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        No completed tasks found in this date range.
+                      </div>
+                    )}
+
+                    <Separator />
+
+                    <Button
+                      className="w-full bg-green-600 hover:bg-green-700"
+                      onClick={handleSendSalary}
+                      disabled={sending || sendPreview.totalTasksCompleted === 0}
+                    >
+                      {sending
+                        ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending...</>
+                        : <><IndianRupee className="w-4 h-4 mr-2" />Send ₹{sendPreview.requestedAmount.toFixed(2)} to {selectedWorker?.name}</>}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </div>
+          )}
+        </Card>
+
+        {/* ── Salary History ── */}
+        <div>
+          <h2 className="text-lg font-semibold text-foreground mb-3">Salary History</h2>
+
         {/* Tabs */}
-        <div className="flex gap-1 bg-muted rounded-lg p-1 w-full overflow-x-auto">
+        <div className="flex gap-1 bg-muted rounded-lg p-1 w-full overflow-x-auto mb-4">
           {TABS.map(t => (
             <button
               key={t}
@@ -218,8 +450,6 @@ const AdminSalarySettlements = () => {
               const meta = STATUS_META[req.status];
               const Icon = meta.icon;
               const isExpanded = expandedId === req._id;
-              const isActioning = actionLoading === req._id;
-              const isRejecting = rejectingId === req._id;
 
               return (
                 <Card key={req._id} className="overflow-hidden">
@@ -330,90 +560,6 @@ const AdminSalarySettlements = () => {
                         {req.adminNotes && (
                           <p className="text-xs text-muted-foreground italic">Admin note: {req.adminNotes}</p>
                         )}
-
-                        {/* Actions */}
-                        {req.status === 'pending' && (
-                          <div className="space-y-3 pt-1">
-                            <div className="space-y-1.5">
-                              <Label htmlFor={`notes-${req._id}`} className="text-xs">Notes (optional)</Label>
-                              <Input
-                                id={`notes-${req._id}`}
-                                placeholder="Add a note for the worker..."
-                                value={notesInput}
-                                onChange={e => setNotesInput(e.target.value)}
-                              />
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                className="flex-1"
-                                onClick={() => handleApprove(req._id)}
-                                disabled={isActioning}
-                              >
-                                {isActioning && !isRejecting
-                                  ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                  : <CheckCircle className="w-4 h-4 mr-2" />}
-                                Approve
-                              </Button>
-                              <Button
-                                variant="outline"
-                                className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
-                                onClick={() => setRejectingId(isRejecting ? null : req._id)}
-                                disabled={isActioning}
-                              >
-                                <XCircle className="w-4 h-4 mr-2" />
-                                Reject
-                              </Button>
-                            </div>
-                            {isRejecting && (
-                              <div className="space-y-2 bg-red-50 rounded-lg p-3">
-                                <Label className="text-xs text-red-700">Reason for rejection *</Label>
-                                <Textarea
-                                  placeholder="Enter rejection reason..."
-                                  value={rejectReason}
-                                  onChange={e => setRejectReason(e.target.value)}
-                                  rows={2}
-                                  className="text-sm"
-                                />
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  className="w-full"
-                                  onClick={() => handleReject(req._id)}
-                                  disabled={isActioning || !rejectReason.trim()}
-                                >
-                                  {isActioning
-                                    ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    : null}
-                                  Confirm Rejection
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {req.status === 'approved' && (
-                          <div className="space-y-3 pt-1">
-                            <div className="space-y-1.5">
-                              <Label htmlFor={`notes-paid-${req._id}`} className="text-xs">Payment note (optional)</Label>
-                              <Input
-                                id={`notes-paid-${req._id}`}
-                                placeholder="e.g. Paid via UPI / Cash..."
-                                value={notesInput}
-                                onChange={e => setNotesInput(e.target.value)}
-                              />
-                            </div>
-                            <Button
-                              className="w-full bg-green-600 hover:bg-green-700"
-                              onClick={() => handleMarkPaid(req._id)}
-                              disabled={isActioning}
-                            >
-                              {isActioning
-                                ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                : <IndianRupee className="w-4 h-4 mr-2" />}
-                              Mark as Paid — ₹{req.requestedAmount.toFixed(2)}
-                            </Button>
-                          </div>
-                        )}
                       </CardContent>
                     </div>
                   )}
@@ -422,6 +568,7 @@ const AdminSalarySettlements = () => {
             })}
           </div>
         )}
+        </div>
       </div>
     </AppLayout>
   );

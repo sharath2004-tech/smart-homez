@@ -210,6 +210,163 @@ router.post('/',
 // ADMIN routes
 // ────────────────────────────────────────────────────────────────────────────
 
+// @route   GET /api/salary-requests/admin/worker-preview
+// @desc    Admin: preview completed bookings for a worker in a date range
+// @access  Private/Admin
+router.get('/admin/worker-preview', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { workerId, from, to } = req.query;
+    if (!workerId || !from || !to) {
+      return res.status(400).json({ error: { message: 'workerId, from, and to are required', status: 400 } });
+    }
+
+    const worker = await User.findById(workerId).select('name email workerProfile').lean();
+    if (!worker || worker.role === 'admin') {
+      const found = await User.findById(workerId).select('name email role workerProfile').lean();
+      if (!found) return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
+    }
+
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    toDate.setHours(23, 59, 59, 999);
+
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+      return res.status(400).json({ error: { message: 'Invalid date format', status: 400 } });
+    }
+
+    const bookings = await Booking.find({
+      worker: workerId,
+      status: 'completed',
+      bookingDate: { $gte: fromDate, $lte: toDate }
+    })
+      .populate('service', 'name')
+      .select('bookingDate startTime endTime actualDurationMinutes actualStartTime actualEndTime service')
+      .lean();
+
+    let totalMinutes = 0;
+    const tasks = bookings.map(b => {
+      let mins = 0;
+      if (b.actualDurationMinutes > 0) {
+        mins = b.actualDurationMinutes;
+      } else if (b.actualStartTime && b.actualEndTime) {
+        mins = Math.floor((new Date(b.actualEndTime) - new Date(b.actualStartTime)) / 60000);
+      }
+      totalMinutes += mins;
+      return {
+        _id: b._id,
+        date: b.bookingDate,
+        startTime: b.startTime,
+        endTime: b.endTime,
+        serviceName: b.service?.name || 'Service',
+        minutesWorked: mins
+      };
+    });
+
+    const workerProfile = await User.findById(workerId).select('workerProfile').lean();
+    const hourlyRate = (workerProfile?.workerProfile?.hourlyRate) || DEFAULT_HOURLY_RATE;
+    const amount = Math.round((totalMinutes / 60) * hourlyRate * 100) / 100;
+
+    res.json({
+      success: true,
+      preview: {
+        periodFrom: fromDate,
+        periodTo: toDate,
+        totalMinutesWorked: totalMinutes,
+        totalTasksCompleted: bookings.length,
+        hourlyRate,
+        requestedAmount: amount,
+        tasks
+      }
+    });
+  } catch (error) {
+    console.error('Admin worker preview error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   POST /api/salary-requests/admin/send
+// @desc    Admin: directly send salary to a worker (creates a paid record)
+// @access  Private/Admin
+router.post('/admin/send',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  [
+    body('workerId').notEmpty().withMessage('Worker ID required'),
+    body('periodFrom').isISO8601().withMessage('Valid periodFrom required'),
+    body('periodTo').isISO8601().withMessage('Valid periodTo required')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: { message: errors.array()[0].msg, status: 400 } });
+      }
+
+      const { workerId, periodFrom, periodTo, notes } = req.body;
+
+      const worker = await User.findById(workerId).select('name email workerProfile role').lean();
+      if (!worker || worker.role !== 'worker') {
+        return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
+      }
+
+      const fromDate = new Date(periodFrom);
+      const toDate = new Date(periodTo);
+      toDate.setHours(23, 59, 59, 999);
+
+      if (fromDate > toDate) {
+        return res.status(400).json({ error: { message: 'periodFrom must be before periodTo', status: 400 } });
+      }
+
+      const bookings = await Booking.find({
+        worker: workerId,
+        status: 'completed',
+        bookingDate: { $gte: fromDate, $lte: toDate }
+      }).select('_id actualDurationMinutes actualStartTime actualEndTime').lean();
+
+      let totalMinutes = 0;
+      for (const b of bookings) {
+        if (b.actualDurationMinutes > 0) {
+          totalMinutes += b.actualDurationMinutes;
+        } else if (b.actualStartTime && b.actualEndTime) {
+          totalMinutes += Math.floor((new Date(b.actualEndTime) - new Date(b.actualStartTime)) / 60000);
+        }
+      }
+
+      const hourlyRate = worker.workerProfile?.hourlyRate || DEFAULT_HOURLY_RATE;
+      const requestedAmount = Math.round((totalMinutes / 60) * hourlyRate * 100) / 100;
+
+      const record = new WorkerSalaryRequest({
+        worker: workerId,
+        admin: req.user._id,
+        periodFrom: fromDate,
+        periodTo: toDate,
+        totalMinutesWorked: totalMinutes,
+        totalTasksCompleted: bookings.length,
+        hourlyRate,
+        requestedAmount,
+        bookings: bookings.map(b => b._id),
+        status: 'paid',
+        approvedBy: req.user._id,
+        approvedAt: new Date(),
+        paidAt: new Date(),
+        adminNotes: notes ? String(notes).slice(0, 500) : null
+      });
+
+      await record.save();
+      await record.populate('worker', 'name email');
+
+      res.status(201).json({
+        success: true,
+        message: `Salary of ₹${requestedAmount.toFixed(2)} sent to ${worker.name}`,
+        request: record
+      });
+    } catch (error) {
+      console.error('Admin send salary error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
 // @route   GET /api/salary-requests/admin
 // @desc    Admin: list all worker salary requests for this admin's locations
 // @access  Private/Admin
