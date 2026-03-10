@@ -2,9 +2,9 @@ import AppLayout from "@/components/AppLayout";
 import LocationSelector, { LocationData } from "@/components/LocationSelector";
 import { authAPI, servicesAPI } from "@/lib/api";
 import { motion } from "framer-motion";
-import { Clock, Filter, MapPin, Search, Users } from "lucide-react";
+import { Clock, MapPin, Search, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 interface Service {
   _id: string;
@@ -20,9 +20,19 @@ interface Service {
   };
 }
 
+const SERVICE_CATEGORIES = [
+  { key: 'insta',        label: 'Insta / Adhoc',    icon: '⚡', desc: 'Instant on-demand booking',     color: 'bg-amber-50 border-amber-300' },
+  { key: 'subscription', label: 'Subscription',      icon: '📅', desc: 'Recurring plans & save 20%',   color: 'bg-blue-50 border-blue-300' },
+  { key: 'deep',         label: 'Deep Cleaning',     icon: '✨', desc: 'Full home deep clean service', color: 'bg-green-50 border-green-300' },
+] as const;
+
 const ServicesPage = () => {
+  const [searchParams] = useSearchParams();
   const [services, setServices] = useState<Service[]>([]);
   const [search, setSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState<string | null>(
+    searchParams.get('category')
+  );
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
   const [showLocationSelector, setShowLocationSelector] = useState(true);
@@ -110,6 +120,18 @@ const ServicesPage = () => {
     }
   }, [selectedLocation, showLocationSelector, fetchServices]);
 
+  const matchesCategory = (service: Service) => {
+    if (!activeCategory) return true;
+    const n = service.name.toLowerCase();
+    const c = service.category.toLowerCase();
+    if (activeCategory === 'insta') return n.includes('insta') || n.includes('adhoc') || n.includes('hourly');
+    if (activeCategory === 'subscription') return n.includes('subscription') || n.includes('monthly') || n.includes('weekly') || c.includes('subscription');
+    if (activeCategory === 'deep') return n.includes('deep') || n.includes('full home');
+    return true;
+  };
+
+  const displayedServices = services.filter(matchesCategory);
+
   const getCategoryEmoji = (category: string, name: string) => {
     if (name.toLowerCase().includes('insta')) return '⚡';
     if (name.toLowerCase().includes('monthly') || name.toLowerCase().includes('subscription')) return '📅';
@@ -190,6 +212,25 @@ const ServicesPage = () => {
               )}
             </motion.div>
 
+            {/* 3 Category Cards */}
+            <div className="grid grid-cols-3 gap-3">
+              {SERVICE_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.key}
+                  onClick={() => setActiveCategory(activeCategory === cat.key ? null : cat.key)}
+                  className={`p-3 rounded-2xl border-2 text-center transition-all ${
+                    activeCategory === cat.key
+                      ? 'border-primary bg-primary/10 shadow-md'
+                      : `${cat.color} hover:border-primary/40`
+                  }`}
+                >
+                  <div className="text-2xl mb-1">{cat.icon}</div>
+                  <p className="text-xs font-semibold text-foreground leading-tight">{cat.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block leading-tight">{cat.desc}</p>
+                </button>
+              ))}
+            </div>
+
             {/* Search */}
             <motion.div 
               className="flex gap-3"
@@ -197,26 +238,17 @@ const ServicesPage = () => {
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.4 }}
             >
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              className="input-clean pl-10"
-              placeholder="Search services..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <motion.button 
-            className="p-3 bg-card border border-border rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            whileHover={{ scale: 1.05, rotate: 15 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <Filter className="w-4 h-4" />
-          </motion.button>
-        </motion.div>
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  className="input-clean pl-10"
+                  placeholder="Search services..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+            </motion.div>
 
-        {/* Loading State */}
-        {console.log('Rendering - Loading:', loading, 'Services count:', services.length)}
         {loading ? (
           <motion.div 
             className="text-center py-12"
@@ -230,7 +262,7 @@ const ServicesPage = () => {
             />
             <p className="text-sm text-muted-foreground">Loading services...</p>
           </motion.div>
-        ) : services.length === 0 ? (
+        ) : displayedServices.length === 0 ? (
           <motion.div 
             className="text-center py-12"
             initial={{ scale: 0.9, opacity: 0 }}
@@ -248,10 +280,8 @@ const ServicesPage = () => {
             <p className="text-sm text-muted-foreground mt-1">Try adjusting your search or check back later</p>
           </motion.div>
         ) : (
-          <div 
-            className="grid gap-4 sm:grid-cols-2"
-          >
-            {services.map((service, index) => (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {displayedServices.map((service, index) => (
               <div 
                 key={service._id} 
                 className="card-elevated-hover p-5 group"

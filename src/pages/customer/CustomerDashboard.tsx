@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { authAPI, bookingsAPI, locationsAPI } from "@/lib/api";
 import { motion } from "framer-motion";
-import { ArrowRight, Bell, ChevronRight, Clock, Heart, MapPin, Settings, Sparkles, Star } from "lucide-react";
+import { AlertCircle, ArrowRight, Bell, ChevronRight, Clock, MapPin, Settings, Sparkles, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -37,29 +37,33 @@ interface UserProfile {
 const CustomerDashboard = () => {
   const { t } = useTranslation();
   const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
+  const [ongoingBooking, setOngoingBooking] = useState<Booking | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [nearbyWorkersCount, setNearbyWorkersCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [serviceableStatus, setServiceableStatus] = useState<'available' | 'unavailable' | 'unknown'>('unknown');
   const { latitude, longitude, error: locationError } = useGeolocation();
 
+  // Only 3 service category cards
   const quickServices = [
-    { icon: "🧹", name: t('services.instaMaid'), subtitle: t('services.instaMaidSubtitle'), badge: t('services.instaMaidBadge') },
-    { icon: "✨", name: t('services.deepClean'), subtitle: t('services.deepCleanSubtitle'), badge: t('services.deepCleanBadge') },
-    { icon: "🍳", name: t('services.kitchen'), subtitle: t('services.kitchenSubtitle'), badge: "" },
-    { icon: "🚿", name: t('services.bathroom'), subtitle: t('services.bathroomSubtitle'), badge: "" },
+    { icon: "⚡", name: "Insta / Adhoc", subtitle: "Instant booking", badge: "On demand", category: "insta" },
+    { icon: "📅", name: "Subscription", subtitle: "Recurring plans", badge: "Save 20%", category: "subscription" },
+    { icon: "✨", name: "Deep Cleaning", subtitle: "Full home clean", badge: "Best value", category: "deep" },
   ];
 
   useEffect(() => {
-    // Fetch profile and bookings once on mount — no re-fetch on location change
     const fetchCoreData = async () => {
       try {
         setLoading(true);
-        const [profileData, bookingsData] = await Promise.all([
+        const [profileData, bookingsData, ongoingData] = await Promise.all([
           authAPI.getProfile(),
           bookingsAPI.getUpcoming(),
+          bookingsAPI.getOngoing(),
         ]);
         setProfile(profileData.user || profileData);
         setUpcomingBookings((bookingsData.bookings || []).slice(0, 2));
+        const ongoing = ongoingData.bookings || [];
+        setOngoingBooking(ongoing.length > 0 ? ongoing[0] : null);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -69,12 +73,18 @@ const CustomerDashboard = () => {
     fetchCoreData();
   }, []);
 
-  // Fetch nearby workers separately whenever coordinates become available
   useEffect(() => {
     if (!latitude || !longitude) return;
     locationsAPI.getNearbyWorkers({ latitude, longitude, maxDistance: 500 })
       .then((workersData) => setNearbyWorkersCount(workersData.count || 0))
-      .catch(() => {/* non-critical — silently ignore */});
+      .catch(() => {});
+    // Check serviceability
+    locationsAPI.getNearby({ latitude, longitude, maxDistance: 20000 })
+      .then((res) => {
+        const locs = res.locations || res.data || [];
+        setServiceableStatus(locs.length > 0 ? 'available' : 'unavailable');
+      })
+      .catch(() => setServiceableStatus('unknown'));
   }, [latitude, longitude]);
 
   const defaultAddress = profile?.addresses?.find(addr => addr.isDefault);
@@ -204,6 +214,52 @@ const CustomerDashboard = () => {
           </Link>
         </motion.div>
 
+        {/* Ongoing Booking — top priority */}
+        {ongoingBooking && (
+          <motion.div
+            variants={itemVariants}
+            className="rounded-2xl p-4 border-2 border-primary bg-primary/5"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <motion.span
+                className="w-2.5 h-2.5 bg-green-500 rounded-full inline-block"
+                animate={{ opacity: [1, 0.3, 1] }}
+                transition={{ repeat: Infinity, duration: 1.5 }}
+              />
+              <span className="text-xs font-bold text-green-600 uppercase tracking-wide">Service In Progress</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-xl shrink-0">
+                🧹
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-foreground text-sm">{ongoingBooking.service.name}</p>
+                <p className="text-xs text-muted-foreground">{ongoingBooking.worker?.name || 'Worker assigned'}</p>
+              </div>
+              <Link to="/customer/bookings" className="btn-brand text-xs py-2 px-3 shrink-0">
+                Track
+              </Link>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Not serviceable warning */}
+        {serviceableStatus === 'unavailable' && (
+          <motion.div
+            variants={itemVariants}
+            className="rounded-2xl p-4 border border-amber-300 bg-amber-50 flex items-start gap-3"
+          >
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-foreground">Your area isn't serviceable yet</p>
+              <p className="text-xs text-muted-foreground mt-0.5">You can still book for a different serviceable location.</p>
+            </div>
+            <Link to="/customer/services" className="text-xs text-primary font-semibold shrink-0 hover:underline whitespace-nowrap">
+              Book elsewhere
+            </Link>
+          </motion.div>
+        )}
+
         {/* Hero Banner */}
         {nearbyWorkersCount > 0 && (
           <motion.div 
@@ -253,7 +309,7 @@ const CustomerDashboard = () => {
             </Link>
           </div>
           <motion.div 
-            className="grid grid-cols-2 sm:grid-cols-4 gap-3"
+            className="grid grid-cols-3 gap-3"
             variants={containerVariants}
           >
             {quickServices.map((s, index) => (
@@ -264,7 +320,10 @@ const CustomerDashboard = () => {
                 whileTap="tap"
                 custom={index}
               >
-                <Link to="/customer/services" className="card-elevated-hover p-4 text-center group block h-[140px] flex flex-col justify-center">
+                <Link
+                  to={`/customer/services?category=${s.category}`}
+                  className="card-elevated-hover p-4 text-center group block flex flex-col items-center justify-center min-h-[130px]"
+                >
                   <motion.div 
                     className="text-3xl mb-2"
                     whileHover={{ scale: 1.2, rotate: 10 }}
@@ -272,9 +331,9 @@ const CustomerDashboard = () => {
                   >
                     {s.icon}
                   </motion.div>
-                  <p className="text-sm font-semibold text-foreground">{s.name}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{s.subtitle}</p>
-                  {s.badge && <span className="badge-primary mt-2 text-xs inline-block">{s.badge}</span>}
+                  <p className="text-xs font-semibold text-foreground leading-tight">{s.name}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-tight hidden sm:block">{s.subtitle}</p>
+                  {s.badge && <span className="badge-primary mt-1.5 text-xs inline-block">{s.badge}</span>}
                 </Link>
               </motion.div>
             ))}
@@ -375,35 +434,15 @@ const CustomerDashboard = () => {
           )}
         </motion.div>
 
-        {/* Worker Preferences */}
-        <motion.div variants={itemVariants} className="grid sm:grid-cols-2 gap-3">
+        {/* Account Settings quick link */}
+        <motion.div variants={itemVariants}>
           <motion.div whileHover="hover" whileTap="tap" variants={cardHoverVariants}>
-            <Link 
-              to="/customer/preferences" 
+            <Link
+              to="/customer/profile"
               className="card-elevated-hover p-4 flex items-center gap-4 group block"
             >
-              <motion.div 
-                className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors"
-                whileHover={{ rotate: [0, -10, 10, 0] }}
-                transition={{ duration: 0.5 }}
-              >
-                <Heart className="w-6 h-6 text-primary" />
-              </motion.div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-foreground">Worker Preferences</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Set your preferred workers</p>
-              </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
-            </Link>
-          </motion.div>
-
-          <motion.div whileHover="hover" whileTap="tap" variants={cardHoverVariants}>
-            <Link 
-              to="/customer/profile" 
-              className="card-elevated-hover p-4 flex items-center gap-4 group block"
-            >
-              <motion.div 
-                className="w-12 h-12 bg-secondary rounded-xl flex items-center justify-center shrink-0 group-hover:bg-secondary/80 transition-colors"
+              <motion.div
+                className="w-12 h-12 bg-secondary rounded-xl flex items-center justify-center shrink-0"
                 whileHover={{ rotate: 180 }}
                 transition={{ duration: 0.3 }}
               >
@@ -411,7 +450,7 @@ const CustomerDashboard = () => {
               </motion.div>
               <div className="flex-1">
                 <p className="text-sm font-semibold text-foreground">Account Settings</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Manage your profile & addresses</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Manage your profile &amp; addresses</p>
               </div>
               <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground group-hover:translate-x-1 transition-all" />
             </Link>
