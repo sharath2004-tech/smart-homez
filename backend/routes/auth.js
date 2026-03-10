@@ -240,6 +240,7 @@ router.get('/me', authenticate, async (req, res) => {
 router.patch('/me', authenticate,
   [
     body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
+    body('email').optional().isEmail().withMessage('Valid email is required'),
     body('phone').optional().trim(),
     body('gender').optional().isIn(['male', 'female', 'other', 'prefer_not_to_say']).withMessage('Invalid gender value'),
     body('religion').optional().trim()
@@ -251,12 +252,22 @@ router.patch('/me', authenticate,
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { name, phone, gender, religion } = req.body;
+      const { name, email, phone, gender, religion } = req.body;
       const updateData = {};
       if (name !== undefined) updateData.name = name;
       if (phone !== undefined) updateData.phone = phone;
       if (gender !== undefined) updateData.gender = gender;
       if (religion !== undefined) updateData.religion = religion;
+
+      // Email change: check for duplicates before updating
+      if (email !== undefined) {
+        const normalizedEmail = email.toLowerCase().trim();
+        const existing = await User.findOne({ email: normalizedEmail, _id: { $ne: req.user._id } });
+        if (existing) {
+          return res.status(400).json({ error: { message: 'Email is already in use', status: 400 } });
+        }
+        updateData.email = normalizedEmail;
+      }
 
       const user = await User.findByIdAndUpdate(
         req.user._id,

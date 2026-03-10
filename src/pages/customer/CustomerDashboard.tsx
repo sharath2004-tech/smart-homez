@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { authAPI, bookingsAPI, locationsAPI } from "@/lib/api";
 import { motion } from "framer-motion";
-import { AlertCircle, ArrowRight, Bell, ChevronRight, Clock, MapPin, Settings, Sparkles, Star } from "lucide-react";
+import { AlertCircle, ArrowRight, Bell, ChevronRight, Clock, MapPin, Settings, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -260,45 +260,7 @@ const CustomerDashboard = () => {
           </motion.div>
         )}
 
-        {/* Hero Banner */}
-        {nearbyWorkersCount > 0 && (
-          <motion.div 
-            variants={itemVariants}
-            className="rounded-2xl p-6 relative overflow-hidden" 
-            style={{ background: "var(--gradient-brand)" }}
-            whileHover={{ scale: 1.02 }}
-            transition={{ type: "spring", stiffness: 300 }}
-          >
-            <motion.div 
-              className="absolute right-0 top-0 bottom-0 w-32 flex items-center justify-center text-5xl opacity-20 pr-4"
-              animate={{ rotate: [0, 5, -5, 0] }}
-              transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
-            >
-              🏠
-            </motion.div>
-            <div className="relative">
-              <motion.div 
-                className="badge-primary mb-3 inline-flex text-xs" 
-                style={{ backgroundColor: "rgba(255,255,255,0.2)", color: "white" }}
-                animate={{ scale: [1, 1.05, 1] }}
-                transition={{ repeat: Infinity, duration: 2 }}
-              >
-                <Sparkles className="w-3 h-3" />
-                <span>Insta service available</span>
-              </motion.div>
-              <h2 className="text-xl font-bold font-heading text-primary-foreground mb-1">Get a maid in 15 minutes!</h2>
-              <p className="text-primary-foreground/70 text-sm mb-4">{nearbyWorkersCount} workers available near you right now</p>
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Link
-                  to="/customer/services"
-                  className="inline-flex items-center gap-2 bg-primary-foreground text-primary font-semibold py-2.5 px-5 rounded-xl text-sm hover:opacity-90 transition-all"
-                >
-                  Book Now <ArrowRight className="w-4 h-4" />
-                </Link>
-              </motion.div>
-            </div>
-          </motion.div>
-        )}
+
 
         {/* Quick Services */}
         <motion.div variants={itemVariants}>
@@ -457,30 +419,7 @@ const CustomerDashboard = () => {
           </motion.div>
         </motion.div>
 
-        {/* Subscription banner */}
-        <motion.div 
-          variants={itemVariants}
-          whileHover={{ scale: 1.02, y: -5 }}
-          transition={{ type: "spring", stiffness: 300 }}
-          className="card-elevated p-5 flex items-center gap-4 bg-secondary"
-        >
-          <motion.div 
-            className="text-4xl"
-            animate={{ rotate: [0, 5, -5, 0] }}
-            transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
-          >
-            📅
-          </motion.div>
-          <div className="flex-1">
-            <p className="font-bold text-foreground font-heading text-sm">Save 20% with Monthly Plan</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Regular cleaning at discounted rates</p>
-          </div>
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-            <Link to="/customer/services" className="btn-brand text-xs py-2 px-4 shrink-0">
-              Explore
-            </Link>
-          </motion.div>
-        </motion.div>
+
       </motion.div>
     </AppLayout>
   );
