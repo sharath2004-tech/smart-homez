@@ -44,11 +44,22 @@ router.post('/send-otp', async (req, res) => {
 
     res.json({ success: true, message: 'OTP sent successfully' });
   } catch (error) {
-    console.error('Send OTP error:', error);
-    const msg = error.message.includes('valid 10-digit')
-      ? error.message
-      : 'Failed to send OTP. Please try again.';
-    res.status(400).json({ message: msg });
+    console.error('Send OTP error:', error.message, error.code, error.status);
+
+    if (error.message.includes('valid 10-digit')) {
+      return res.status(400).json({ message: error.message });
+    }
+    if (error.message.includes('credentials not configured') || error.message.includes('Verify SID')) {
+      return res.status(500).json({ message: 'SMS service is not configured. Contact support.' });
+    }
+    // Twilio-specific error codes
+    if (error.code === 60200) return res.status(400).json({ message: 'Invalid phone number format.' });
+    if (error.code === 60203) return res.status(429).json({ message: 'Max OTP attempts reached. Please wait 10 minutes and try again.' });
+    if (error.code === 60212) return res.status(429).json({ message: 'Too many requests. Please wait a moment and try again.' });
+    if (error.code === 20003) return res.status(500).json({ message: 'SMS service authentication failed. Contact support.' });
+    if (error.code === 20404) return res.status(500).json({ message: 'SMS service not found. Contact support.' });
+
+    res.status(400).json({ message: error.message || 'Failed to send OTP. Please try again.' });
   }
 });
 
@@ -114,11 +125,13 @@ router.post('/verify-otp', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Verify OTP error:', error);
+    console.error('Verify OTP error:', error.message, error.code, error.status);
     if (error.status === 404 || error.code === 20404) {
       return res.status(401).json({ message: 'OTP has expired or already been used. Please request a new one.' });
     }
-    res.status(500).json({ message: 'Verification failed. Please try again.' });
+    if (error.code === 60200) return res.status(400).json({ message: 'Invalid phone number.' });
+    if (error.code === 60202) return res.status(429).json({ message: 'Max verification attempts reached. Please request a new OTP.' });
+    res.status(500).json({ message: error.message || 'Verification failed. Please try again.' });
   }
 });
 
@@ -146,11 +159,12 @@ router.post('/check-otp', async (req, res) => {
 
     res.json({ success: true, verified: true });
   } catch (error) {
-    console.error('Check OTP error:', error);
+    console.error('Check OTP error:', error.message, error.code, error.status);
     if (error.status === 404 || error.code === 20404) {
       return res.status(401).json({ message: 'OTP has expired or already been used. Please request a new one.' });
     }
-    res.status(500).json({ message: 'Verification failed. Please try again.' });
+    if (error.code === 60202) return res.status(429).json({ message: 'Max verification attempts reached. Please request a new OTP.' });
+    res.status(500).json({ message: error.message || 'Verification failed. Please try again.' });
   }
 });
 
