@@ -3,6 +3,7 @@ import { body, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
 import Booking from '../models/Booking.js';
 import Location from '../models/Location.js';
+import Notification from '../models/Notification.js';
 import ServiceArea from '../models/ServiceArea.js';
 import User from '../models/User.js';
 import WorkerEarnings from '../models/WorkerEarnings.js';
@@ -2129,5 +2130,85 @@ router.get('/worker-schedule-export',
     }
   }
 );
+
+// ============== WORKER APPROVAL ROUTES ==============
+
+// @route   GET /api/admin/worker-requests
+// @desc    List workers pending admin approval
+// @access  Private/Admin
+router.get('/worker-requests', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const pendingWorkers = await User.find({
+      role: 'worker',
+      'workerProfile.accountStatus': 'pending_review'
+    })
+      .select('name email phone gender profileImage workerProfile.specialization workerProfile.experience workerProfile.accountStatus workerProfile.documents createdAt')
+      .sort({ createdAt: -1 });
+
+    res.json({ success: true, workers: pendingWorkers });
+  } catch (error) {
+    console.error('Get worker requests error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   POST /api/admin/worker-requests/:id/approve
+// @desc    Approve a pending worker
+// @access  Private/Admin
+router.post('/worker-requests/:id/approve', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const worker = await User.findOneAndUpdate(
+      { _id: req.params.id, role: 'worker' },
+      { 'workerProfile.accountStatus': 'active', isVerified: true },
+      { new: true }
+    );
+
+    if (!worker) return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
+
+    await Notification.create({
+      recipient: worker._id,
+      title: 'Application Approved!',
+      message: 'Your worker account has been approved. You can now log in and start accepting bookings.',
+      type: 'system',
+      data: { type: 'account_approved' }
+    });
+
+    console.log(`✅ Worker approved: ${worker.name} (${worker._id}) by admin ${req.user._id}`);
+    res.json({ success: true, message: 'Worker approved successfully', worker: { id: worker._id, name: worker.name } });
+  } catch (error) {
+    console.error('Approve worker error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   POST /api/admin/worker-requests/:id/reject
+// @desc    Reject a pending worker
+// @access  Private/Admin
+router.post('/worker-requests/:id/reject', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const worker = await User.findOneAndUpdate(
+      { _id: req.params.id, role: 'worker' },
+      { 'workerProfile.accountStatus': 'rejected', isVerified: false },
+      { new: true }
+    );
+
+    if (!worker) return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
+
+    await Notification.create({
+      recipient: worker._id,
+      title: 'Application Status Update',
+      message: reason || 'Your worker application was not approved at this time. Please contact support for more information.',
+      type: 'system',
+      data: { type: 'account_rejected' }
+    });
+
+    console.log(`❌ Worker rejected: ${worker.name} (${worker._id}) by admin ${req.user._id}`);
+    res.json({ success: true, message: 'Worker rejected' });
+  } catch (error) {
+    console.error('Reject worker error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
 
 export default router;

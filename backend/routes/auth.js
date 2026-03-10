@@ -3,6 +3,8 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
 import { authenticate } from '../middleware/auth.js';
+import { uploadWorkerFiles } from '../middleware/upload.js';
+import Notification from '../models/Notification.js';
 import User from '../models/User.js';
 import { sendPasswordChangeConfirmation, sendPasswordResetEmail } from '../utils/emailService.js';
 
@@ -464,5 +466,162 @@ router.patch('/preferences', authenticate, async (req, res) => {
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
   }
 });
+
+// @route   POST /api/auth/register-worker
+// @desc    Register a new worker with profile pic + Aadhaar documents
+// @access  Public (multipart/form-data)
+router.post('/register-worker',
+  uploadWorkerFiles.fields([
+    { name: 'profilePicture', maxCount: 1 },
+    { name: 'aadhaarFront', maxCount: 1 },
+    { name: 'aadhaarBack', maxCount: 1 }
+  ]),
+  async (req, res) => {
+    try {
+      const { name, email, password, phone, gender, experience, skills, location, phoneVerified } = req.body;
+
+      // Validate required text fields
+      if (!name || !email || !password || !phone) {
+        return res.status(400).json({ error: { message: 'Name, email, password and phone are required', status: 400 } });
+      }
+
+      // Validate password strength
+      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+      if (!passwordRegex.test(password)) {
+        return res.status(400).json({ error: { message: 'Password must be at least 8 characters with uppercase, lowercase, number and special character', status: 400 } });
+      }
+
+      // Validate required files
+      if (!req.files?.profilePicture?.[0]) {
+        return res.status(400).json({ error: { message: 'Profile picture is required', status: 400 } });
+      }
+      if (!req.files?.aadhaarFront?.[0]) {
+        return res.status(400).json({ error: { message: 'Aadhaar front image is required', status: 400 } });
+      }
+
+      // Check if user already exists
+      const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
+      if (existingUser) {
+        return res.status(400).json({ error: { message: 'User already exists with this email', status: 400 } });
+      }
+
+      // Parse skills from JSON string if needed
+      let parsedSkills = [];
+      if (skills) {
+        try {
+          parsedSkills = typeof skills === 'string' ? JSON.parse(skills) : skills;
+        } catch {
+          parsedSkills = Array.isArray(skills) ? skills : [skills];
+        }
+      }
+
+      // Parse location from JSON string if needed
+      let parsedLocation = null;
+      if (location) {
+        try {
+          parsedLocation = typeof location === 'string' ? JSON.parse(location) : location;
+        } catch { /* ignore */ }
+      }
+
+      const profilePicFile = req.files.profilePicture[0];
+      const aadhaarFrontFile = req.files.aadhaarFront[0];
+      const aadhaarBackFile = req.files.aadhaarBack?.[0] || null;
+
+      const normalizedPhone = phone.startsWith('+') ? phone : `+91${phone.replace(/\D/g, '').slice(-10)}`;
+
+      const userData = {
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
+        password,
+        role: 'worker',
+        phone: normalizedPhone,
+        gender: gender || 'prefer_not_to_say',
+        profileImage: `/uploads/profile-pics/${profilePicFile.filename}`,
+        isFirstLogin: false,
+        workerProfile: {
+          experience: parseInt(experience) || 0,
+          specialization: parsedSkills,
+          accountStatus: 'pending_review',
+          documents: {
+            aadhaarFront: `/uploads/worker-docs/${aadhaarFrontFile.filename}`,
+            aadhaarBack: aadhaarBackFile ? `/uploads/worker-docs/${aadhaarBackFile.filename}` : null,
+            uploadedAt: new Date()
+          }
+        }
+      };
+
+      if (parsedLocation?.coordinates?.length === 2) {
+        userData.addresses = [{
+          label: 'Home',
+          street: parsedLocation.address || '',
+          area: parsedLocation.area || '',
+          city: parsedLocation.city || '',
+          zipCode: parsedLocation.zipCode || '',
+          location: { type: 'Point', coordinates: parsedLocation.coordinates },
+          isDefault: true
+        }];
+        userData.currentLocation = {
+          type: 'Point',
+          coordinates: parsedLocation.coordinates,
+          lastUpdated: new Date()
+        };
+        userData.workerProfile.assignedApartments = [{
+          apartmentName: parsedLocation.area || '',
+          area: parsedLocation.area || '',
+          city: parsedLocation.city || '',
+          location: { type: 'Point', coordinates: parsedLocation.coordinates },
+          maxWalkingDistance: 500
+        }];
+        userData.workerProfile.serviceRadius = 500;
+      }
+
+      const user = new User(userData);
+      await user.save();
+
+      console.log(`✅ Worker registered (pending review): ${email} (ID: ${user._id})`);
+
+      // Notify all admins about new worker registration request
+      try {
+        const admins = await User.find({ role: { $in: ['admin', 'super_admin'] }, isActive: true }).select('_id');
+        if (admins.length > 0) {
+          const notifications = admins.map(admin => ({
+            recipient: admin._id,
+            title: 'New Worker Application',
+            message: `${name} has applied to join as a worker. Review their profile and documents.`,
+            type: 'system',
+            data: { workerId: user._id, workerName: name }
+          }));
+          await Notification.insertMany(notifications);
+        }
+      } catch (notifErr) {
+        console.error('Admin notification failed (non-fatal):', notifErr.message);
+      }
+
+      const token = jwt.sign(
+        { userId: user._id, role: user.role },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      res.status(201).json({
+        message: 'Worker registration successful. Pending admin review.',
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          accountStatus: 'pending_review'
+        }
+      });
+    } catch (error) {
+      console.error('Worker registration error:', error);
+      if (error.code === 11000) {
+        return res.status(400).json({ error: { message: 'A user with this email already exists', status: 400 } });
+      }
+      res.status(500).json({ error: { message: 'Server error during registration', status: 500 } });
+    }
+  }
+);
 
 export default router;

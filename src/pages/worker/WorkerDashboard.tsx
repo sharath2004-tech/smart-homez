@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import WorkerAvailabilityToggle from "@/components/WorkerAvailabilityToggle";
-import { authAPI, bookingsAPI, workersAPI } from "@/lib/api";
+import { API_BASE_URL, authAPI, bookingsAPI, workersAPI } from "@/lib/api";
 import { Bell, CheckCircle, ChevronRight, Clock, MapPin, QrCode, Star, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -43,6 +43,7 @@ interface Profile {
   name: string;
   email: string;
   role: string;
+  profileImage?: string;
   workerProfile?: {
     availability?: boolean;
     rating?: number;
@@ -196,9 +197,22 @@ const WorkerDashboard = () => {
         {/* Header */}
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-muted-foreground text-sm">Welcome back 👋</p>
-              <h1 className="text-2xl font-bold font-heading text-foreground">{profile?.name}</h1>
+            <div className="flex items-center gap-3">
+              {profile?.profileImage ? (
+                <img
+                  src={`${API_BASE_URL.replace('/api', '')}${profile.profileImage}`}
+                  alt={profile.name}
+                  className="w-12 h-12 rounded-full object-cover border-2 border-border shrink-0"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg shrink-0">
+                  {profile?.name?.charAt(0).toUpperCase() || "W"}
+                </div>
+              )}
+              <div>
+                <p className="text-muted-foreground text-sm">Welcome back 👋</p>
+                <h1 className="text-2xl font-bold font-heading text-foreground">{profile?.name}</h1>
+              </div>
             </div>
           </div>
           

@@ -48,6 +48,7 @@ import AdminSalarySettlements from "./pages/admin/AdminSalarySettlements";
 import AdminServiceAreas from "./pages/admin/AdminServiceAreas";
 import AdminServices from "./pages/admin/AdminServices";
 import AdminSettings from "./pages/admin/AdminSettings";
+import AdminWorkerRequests from "./pages/admin/AdminWorkerRequests";
 import AdminWorkers from "./pages/admin/AdminWorkers";
 import AdminWorkerSchedule from "./pages/admin/AdminWorkerSchedule";
 import AdminWorkforce from "./pages/admin/AdminWorkforce";
@@ -100,6 +101,7 @@ const App = () => (
           <Route path="/admin/bookings" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminBookings /></ProtectedRoute>} />
           <Route path="/admin/workforce" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminWorkforce /></ProtectedRoute>} />
           <Route path="/admin/worker-schedule" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminWorkerSchedule /></ProtectedRoute>} />
+          <Route path="/admin/worker-requests" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminWorkerRequests /></ProtectedRoute>} />
           <Route path="/admin/leaves" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminLeaves /></ProtectedRoute>} />
           <Route path="/admin/services" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminServices /></ProtectedRoute>} />
           <Route path="/admin/workers" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminWorkers /></ProtectedRoute>} />

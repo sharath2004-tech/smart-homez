@@ -121,6 +121,21 @@ export const authAPI = {
       method: 'POST',
       body: JSON.stringify({ idToken, role, name, gender })
     });
+  },
+
+  // Worker registration with file uploads (multipart/form-data)
+  registerWorker: async (formData: FormData) => {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/auth/register-worker`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error?.message || data.message || 'Worker registration failed');
+    }
+    return data;
   }
 };
 
@@ -745,6 +760,22 @@ export const adminAPI = {
   unarchiveWorker: async (workerId: string) => {
     return apiCall(`/admin/workers/${workerId}/unarchive`, {
       method: 'PATCH'
+    });
+  },
+
+  // Worker approval requests
+  getPendingWorkers: async () => {
+    return apiCall('/admin/worker-requests');
+  },
+
+  approveWorker: async (workerId: string) => {
+    return apiCall(`/admin/worker-requests/${workerId}/approve`, { method: 'POST' });
+  },
+
+  rejectWorker: async (workerId: string, reason?: string) => {
+    return apiCall(`/admin/worker-requests/${workerId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason })
     });
   },
 

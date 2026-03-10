@@ -1,18 +1,23 @@
-﻿import { LanguageSelector } from "@/components/LanguageSelector";
+import { LanguageSelector } from "@/components/LanguageSelector";
 import { API_BASE_URL, authAPI } from "@/lib/api";
+import { firebaseAuth } from "@/lib/firebase";
+import { ConfirmationResult, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 import {
+    Camera,
     CheckCircle,
+    Clock,
     Eye,
     EyeOff,
     Home,
     Loader2,
     MapPin,
     Navigation,
+    Upload,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-type Step = "form" | "skills" | "location" | "done";
+type Step = "form" | "otp" | "skills" | "documents" | "location" | "pending";
 
 const SKILLS = [
   "General Cleaning",
@@ -54,13 +59,41 @@ const WorkerSignUp = () => {
   const [manualAddress, setManualAddress] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
 
+  // OTP state
+  const [otpCode, setOtpCode] = useState("");
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const confirmationRef = useRef<ConfirmationResult | null>(null);
+  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
+  const recaptchaContainerRef = useRef<HTMLDivElement>(null);
+
+  // Document upload state
+  const [profilePic, setProfilePic] = useState<File | null>(null);
+  const [aadhaarFront, setAadhaarFront] = useState<File | null>(null);
+  const [aadhaarBack, setAadhaarBack] = useState<File | null>(null);
+  const [profilePicPreview, setProfilePicPreview] = useState<string | null>(null);
+  const [aadhaarFrontPreview, setAadhaarFrontPreview] = useState<string | null>(null);
+  const [aadhaarBackPreview, setAadhaarBackPreview] = useState<string | null>(null);
+
   const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
   const toggleSkill = (skill: string) =>
     setSelectedSkills((prev) => prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill]);
 
-  // ── Step 1: basic details ───────────────────────────────────────────────
+  const handleFileChange = (
+    file: File | null,
+    setter: (f: File | null) => void,
+    previewSetter: (s: string | null) => void
+  ) => {
+    if (!file) { setter(null); previewSetter(null); return; }
+    setter(file);
+    const reader = new FileReader();
+    reader.onloadend = () => previewSetter(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  // -- Step 1: basic details -----------------------------------------------
   const handleFormNext = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) { setError("Name is required"); return; }
@@ -71,18 +104,70 @@ const WorkerSignUp = () => {
     if (form.password.length < 8) { setError("Password must be at least 8 characters"); return; }
     if (form.password !== form.confirmPassword) { setError("Passwords do not match"); return; }
     setError("");
-    setStep("skills");
+    sendOTP();
   };
 
-  // ── Step 2: skills ─────────────────────────────────────────────────────
+  // -- OTP helpers ---------------------------------------------------------
+  const initRecaptcha = () => {
+    if (!recaptchaRef.current && recaptchaContainerRef.current) {
+      recaptchaRef.current = new RecaptchaVerifier(firebaseAuth, recaptchaContainerRef.current, {
+        size: "invisible",
+        callback: () => {},
+      });
+    }
+    return recaptchaRef.current!;
+  };
+
+  const sendOTP = async () => {
+    setOtpLoading(true);
+    setError("");
+    try {
+      const verifier = initRecaptcha();
+      const digits = form.phone.replace(/\D/g, "").slice(-10);
+      const result = await signInWithPhoneNumber(firebaseAuth, `+91${digits}`, verifier);
+      confirmationRef.current = result;
+      setOtpSent(true);
+      setStep("otp");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send OTP. Please try again.");
+      recaptchaRef.current = null;
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    if (!otpCode || otpCode.length < 6) { setError("Enter the 6-digit OTP"); return; }
+    if (!confirmationRef.current) { setError("Please request OTP first"); return; }
+    setOtpLoading(true);
+    setError("");
+    try {
+      await confirmationRef.current.confirm(otpCode);
+      setStep("skills");
+    } catch {
+      setError("Incorrect OTP. Please check and try again.");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  // -- Step 2: skills -----------------------------------------------------
   const handleSkillsNext = () => {
     if (selectedSkills.length === 0) { setError("Please select at least one skill"); return; }
     if (!termsAccepted) { setError("Please accept the Terms of Service to continue"); return; }
     setError("");
+    setStep("documents");
+  };
+
+  // -- Step 3: documents --------------------------------------------------
+  const handleDocumentsNext = () => {
+    if (!profilePic) { setError("Profile picture is required"); return; }
+    if (!aadhaarFront) { setError("Aadhaar front image is required"); return; }
+    setError("");
     setStep("location");
   };
 
-  // ── Geocoding helpers ──────────────────────────────────────────────────
+  // -- Geocoding helpers --------------------------------------------------
   const reverseGeocode = async (lat: number, lng: number): Promise<GeoResult> => {
     try {
       const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
@@ -100,38 +185,39 @@ const WorkerSignUp = () => {
     }
   };
 
-  // ── Register ───────────────────────────────────────────────────────────
+  // -- Register -----------------------------------------------------------
   const registerAccount = async (geo: GeoResult | null) => {
     setLoading(true);
+    setError("");
     try {
-      const payload: Record<string, unknown> = {
-        name: form.name.trim(),
-        email: form.email.trim().toLowerCase(),
-        password: form.password,
-        phone: "+91" + form.phone.replace(/\D/g, "").slice(-10),
-        role: "worker",
-        gender: form.gender || "prefer_not_to_say",
-        workerProfile: {
-          experience: parseInt(form.experience) || 0,
-          skills: selectedSkills,
-        },
-      };
+      const formData = new FormData();
+      formData.append("name", form.name.trim());
+      formData.append("email", form.email.trim().toLowerCase());
+      formData.append("password", form.password);
+      formData.append("phone", "+91" + form.phone.replace(/\D/g, "").slice(-10));
+      formData.append("gender", form.gender || "prefer_not_to_say");
+      formData.append("experience", form.experience || "0");
+      formData.append("skills", JSON.stringify(selectedSkills));
+      formData.append("phoneVerified", "true");
 
       if (geo) {
-        payload.location = {
+        formData.append("location", JSON.stringify({
           address: geo.address,
           area: geo.area,
           city: geo.city,
           zipCode: geo.zipCode,
           coordinates: [geo.lng, geo.lat],
-        };
+        }));
       }
 
-      const response = await authAPI.register(payload);
+      if (profilePic) formData.append("profilePicture", profilePic);
+      if (aadhaarFront) formData.append("aadhaarFront", aadhaarFront);
+      if (aadhaarBack) formData.append("aadhaarBack", aadhaarBack);
+
+      const response = await authAPI.registerWorker(formData);
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
-      setStep("done");
-      setTimeout(() => { window.location.href = "/worker/dashboard"; }, 2000);
+      setStep("pending");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed. Please try again.");
     } finally {
@@ -179,43 +265,40 @@ const WorkerSignUp = () => {
 
   const handleSkipLocation = () => registerAccount(null);
 
-  // ── Validate service area availability (used only to inform, not block) ─
-  const checkAvailability = async (lat: number, lng: number) => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/service-areas/validate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ latitude: lat, longitude: lng }),
-      });
-      if (!res.ok) return false;
-      const data = await res.json();
-      return data.isAvailable === true;
-    } catch {
-      return false;
-    }
-  };
-  void checkAvailability; // suppress unused warning
+  // -- Steps for left panel -----------------------------------------------
+  const stepLabels = ["Your details", "Verify phone", "Skills", "Documents", "Service area"];
+  const stepIdx = step === "form" ? 0 : step === "otp" ? 1 : step === "skills" ? 2 : step === "documents" ? 3 : 4;
 
-  // ── Steps for left panel ───────────────────────────────────────────────
-  const stepLabels = ["Your details", "Skills", "Service area"];
-  const stepIdx = step === "form" ? 0 : step === "skills" ? 1 : 2;
-
-  if (step === "done") {
+  // -- Pending approval screen -------------------------------------------
+  if (step === "pending") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-6">
         <div className="text-center max-w-md animate-scale-in">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-10 h-10 text-green-600" />
+          <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Clock className="w-10 h-10 text-amber-600" />
           </div>
-          <h2 className="text-3xl font-bold font-heading text-foreground mb-3">Welcome aboard! 🎉</h2>
-          <p className="text-muted-foreground">Your worker account is ready. Redirecting to dashboard…</p>
+          <h2 className="text-3xl font-bold font-heading text-foreground mb-3">Application Submitted! ??</h2>
+          <p className="text-muted-foreground mb-4">
+            Your worker application is under review. Our admin team will verify your documents and approve your account.
+          </p>
+          <p className="text-sm text-muted-foreground bg-muted rounded-xl p-4">
+            You will receive a notification once your account is approved. This usually takes 1�2 business days.
+          </p>
+          <Link to="/login" className="mt-6 inline-block btn-brand px-8">
+            Back to Login
+          </Link>
         </div>
       </div>
     );
   }
 
+  void API_BASE_URL; // suppress unused import warning
+
   return (
     <div className="min-h-screen flex">
+      {/* Invisible reCAPTCHA container */}
+      <div ref={recaptchaContainerRef} id="recaptcha-worker" />
+
       {/* Left panel */}
       <div className="hidden lg:flex lg:w-2/5 relative overflow-hidden" style={{ background: "var(--gradient-hero)" }}>
         <div className="relative z-10 flex flex-col justify-between p-12 text-primary-foreground h-full">
@@ -240,7 +323,7 @@ const WorkerSignUp = () => {
                     : i === stepIdx ? "bg-primary-foreground/80 text-primary"
                     : "bg-primary-foreground/20 text-primary-foreground/50"
                   }`}>
-                    {i < stepIdx ? "✓" : i + 1}
+                    {i < stepIdx ? "?" : i + 1}
                   </div>
                   <span className={`text-sm ${i <= stepIdx ? "text-primary-foreground" : "text-primary-foreground/50"}`}>
                     {label}
@@ -270,7 +353,7 @@ const WorkerSignUp = () => {
             </div>
           )}
 
-          {/* ── STEP: form ── */}
+          {/* -- STEP: form -- */}
           {step === "form" && (
             <>
               <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Join as a Worker</h2>
@@ -288,7 +371,7 @@ const WorkerSignUp = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Mobile Number</label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Mobile Number <span className="text-destructive">*</span></label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">+91</span>
                     <input
@@ -302,6 +385,7 @@ const WorkerSignUp = () => {
                       required
                     />
                   </div>
+                  <p className="text-xs text-muted-foreground mt-1">An OTP will be sent to verify this number</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -365,7 +449,9 @@ const WorkerSignUp = () => {
                   </div>
                 </div>
 
-                <button type="submit" className="btn-brand w-full mt-2">Continue</button>
+                <button type="submit" disabled={otpLoading} className="btn-brand w-full mt-2 flex items-center justify-center gap-2">
+                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTP�</> : "Continue & Verify Phone"}
+                </button>
               </form>
 
               <p className="text-center text-sm text-muted-foreground mt-6">
@@ -375,7 +461,54 @@ const WorkerSignUp = () => {
             </>
           )}
 
-          {/* ── STEP: skills ── */}
+          {/* -- STEP: otp -- */}
+          {step === "otp" && (
+            <>
+              <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Verify your number</h2>
+              <p className="text-muted-foreground mb-6">
+                {otpSent
+                  ? `OTP sent to +91${form.phone}. Enter the 6-digit code below.`
+                  : "Sending OTP�"}
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Enter OTP</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    className="input-clean tracking-widest text-center text-lg"
+                    placeholder="� � � � � �"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                  />
+                </div>
+
+                <button
+                  onClick={handleVerifyOTP}
+                  disabled={otpLoading}
+                  className="btn-brand w-full flex items-center justify-center gap-2"
+                >
+                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying�</> : "Verify & Continue"}
+                </button>
+
+                <button
+                  onClick={() => { setOtpSent(false); setOtpCode(""); setError(""); recaptchaRef.current = null; sendOTP(); }}
+                  disabled={otpLoading}
+                  className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Resend OTP
+                </button>
+
+                <button onClick={() => { setStep("form"); setError(""); recaptchaRef.current = null; }} className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm">
+                  Back
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* -- STEP: skills -- */}
           {step === "skills" && (
             <>
               <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Your skills</h2>
@@ -417,7 +550,7 @@ const WorkerSignUp = () => {
               </label>
 
               <div className="flex gap-3">
-                <button onClick={() => { setStep("form"); setError(""); }} className="flex-1 py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors">
+                <button onClick={() => { setStep("otp"); setError(""); }} className="flex-1 py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors">
                   Back
                 </button>
                 <button onClick={handleSkillsNext} className="btn-brand flex-1">Continue</button>
@@ -425,7 +558,105 @@ const WorkerSignUp = () => {
             </>
           )}
 
-          {/* ── STEP: location ── */}
+          {/* -- STEP: documents -- */}
+          {step === "documents" && (
+            <>
+              <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Upload documents</h2>
+              <p className="text-muted-foreground mb-2">Required for account verification</p>
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 mb-6">
+                Your documents are securely stored and only reviewed by our admin team.
+              </div>
+
+              <div className="space-y-5">
+                {/* Profile picture */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Profile Photo <span className="text-destructive">*</span>
+                  </label>
+                  <label className={`flex flex-col items-center justify-center w-full h-36 border-2 border-dashed rounded-xl cursor-pointer transition-all hover:bg-accent ${profilePicPreview ? "border-primary bg-primary/5" : "border-border"}`}>
+                    {profilePicPreview ? (
+                      <img src={profilePicPreview} alt="Profile preview" className="h-full w-full object-cover rounded-xl" />
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                        <Camera className="w-8 h-8" />
+                        <span className="text-sm">Upload your photo</span>
+                        <span className="text-xs">JPG, PNG up to 5MB</span>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(e) => handleFileChange(e.target.files?.[0] || null, setProfilePic, setProfilePicPreview)}
+                    />
+                  </label>
+                </div>
+
+                {/* Aadhaar front */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Aadhaar Card � Front <span className="text-destructive">*</span>
+                  </label>
+                  <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer transition-all hover:bg-accent ${aadhaarFrontPreview ? "border-primary bg-primary/5" : "border-border"}`}>
+                    {aadhaarFrontPreview ? (
+                      <div className="flex items-center gap-2 text-primary">
+                        <CheckCircle className="w-5 h-5" />
+                        <span className="text-sm font-medium">Aadhaar front uploaded</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                        <Upload className="w-7 h-7" />
+                        <span className="text-sm">Upload Aadhaar front</span>
+                        <span className="text-xs">JPG, PNG up to 5MB</span>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(e) => handleFileChange(e.target.files?.[0] || null, setAadhaarFront, setAadhaarFrontPreview)}
+                    />
+                  </label>
+                </div>
+
+                {/* Aadhaar back */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Aadhaar Card � Back <span className="text-muted-foreground font-normal">(optional but recommended)</span>
+                  </label>
+                  <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer transition-all hover:bg-accent ${aadhaarBackPreview ? "border-primary bg-primary/5" : "border-border"}`}>
+                    {aadhaarBackPreview ? (
+                      <div className="flex items-center gap-2 text-primary">
+                        <CheckCircle className="w-5 h-5" />
+                        <span className="text-sm font-medium">Aadhaar back uploaded</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                        <Upload className="w-7 h-7" />
+                        <span className="text-sm">Upload Aadhaar back</span>
+                        <span className="text-xs">JPG, PNG up to 5MB</span>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(e) => handleFileChange(e.target.files?.[0] || null, setAadhaarBack, setAadhaarBackPreview)}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button onClick={() => { setStep("skills"); setError(""); }} className="flex-1 py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors">
+                  Back
+                </button>
+                <button onClick={handleDocumentsNext} className="btn-brand flex-1">Continue</button>
+              </div>
+            </>
+          )}
+
+          {/* -- STEP: location -- */}
           {step === "location" && (
             <>
               <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Your service area</h2>
@@ -466,7 +697,7 @@ const WorkerSignUp = () => {
                 </div>
 
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800">
-                  💡 You can update your service area anytime from your profile settings.
+                  ?? You can update your service area anytime from your profile settings.
                 </div>
 
                 <button
@@ -478,7 +709,7 @@ const WorkerSignUp = () => {
                   Skip for now
                 </button>
 
-                <button onClick={() => { setStep("skills"); setError(""); }} className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm">
+                <button onClick={() => { setStep("documents"); setError(""); }} className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm">
                   Back
                 </button>
               </div>
@@ -491,4 +722,3 @@ const WorkerSignUp = () => {
 };
 
 export default WorkerSignUp;
-

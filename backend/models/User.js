@@ -270,6 +270,19 @@ const userSchema = new mongoose.Schema({
       ifscCode: String,
       bankName: String,
       upiId: String
+    },
+    // Worker account approval status
+    accountStatus: {
+      type: String,
+      enum: ['pending_review', 'active', 'rejected'],
+      default: 'active'
+    },
+    // KYC documents
+    documents: {
+      aadhaarFront: { type: String, default: null },
+      aadhaarBack: { type: String, default: null },
+      aadhaarNumber: { type: String, default: null },
+      uploadedAt: { type: Date, default: null }
     }
   },
   // Customer preferences

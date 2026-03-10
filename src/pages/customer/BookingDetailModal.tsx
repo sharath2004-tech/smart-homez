@@ -1,5 +1,5 @@
 import EmbeddedQRScanner from "@/components/EmbeddedQRScanner";
-import { bookingsAPI } from "@/lib/api";
+import { API_BASE_URL, bookingsAPI } from "@/lib/api";
 import { ArrowLeft, Calendar, Camera, CheckCircle, DollarSign, Phone, QrCode, Timer, User } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReviewModal from "./ReviewModal";
@@ -9,6 +9,7 @@ interface Worker {
   name: string;
   email?: string;
   phone?: string;
+  profileImage?: string;
   rating?: number;
   gender?: string;
   religion?: string;
@@ -354,9 +355,17 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                 </h3>
                 <div className="bg-muted p-4 rounded-xl space-y-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold">
-                      {booking.worker.name.split(' ').map(n => n[0]).join('')}
-                    </div>
+                    {booking.worker.profileImage ? (
+                      <img
+                        src={`${API_BASE_URL.replace('/api', '')}${booking.worker.profileImage}`}
+                        alt={booking.worker.name}
+                        className="w-12 h-12 rounded-full object-cover border-2 border-border shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold shrink-0">
+                        {booking.worker.name.split(' ').map(n => n[0]).join('')}
+                      </div>
+                    )}
                     <div className="flex-1">
                       <p className="font-semibold text-foreground">{booking.worker.name}</p>
                       {booking.worker.email && (
