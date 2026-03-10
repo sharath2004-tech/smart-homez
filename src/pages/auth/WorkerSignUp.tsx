@@ -282,7 +282,7 @@ const WorkerSignUp = () => {
             Your worker application is under review. Our admin team will verify your documents and approve your account.
           </p>
           <p className="text-sm text-muted-foreground bg-muted rounded-xl p-4">
-            You will receive a notification once your account is approved. This usually takes 1–2 business days.
+            You will receive a notification once your account is approved. This usually takes 1ï¿½2 business days.
           </p>
           <Link to="/login" className="mt-6 inline-block btn-brand px-8">
             Back to Login
@@ -450,7 +450,7 @@ const WorkerSignUp = () => {
                 </div>
 
                 <button type="submit" disabled={otpLoading} className="btn-brand w-full mt-2 flex items-center justify-center gap-2">
-                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTP…</> : "Continue & Verify Phone"}
+                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTPï¿½</> : "Continue & Verify Phone"}
                 </button>
               </form>
 
@@ -468,7 +468,7 @@ const WorkerSignUp = () => {
               <p className="text-muted-foreground mb-6">
                 {otpSent
                   ? `OTP sent to +91${form.phone}. Enter the 6-digit code below.`
-                  : "Sending OTP…"}
+                  : "Sending OTPï¿½"}
               </p>
 
               <div className="space-y-4">
@@ -479,7 +479,7 @@ const WorkerSignUp = () => {
                     inputMode="numeric"
                     maxLength={6}
                     className="input-clean tracking-widest text-center text-lg"
-                    placeholder="• • • • • •"
+                    placeholder="ï¿½ ï¿½ ï¿½ ï¿½ ï¿½ ï¿½"
                     value={otpCode}
                     onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
                   />
@@ -490,7 +490,7 @@ const WorkerSignUp = () => {
                   disabled={otpLoading}
                   className="btn-brand w-full flex items-center justify-center gap-2"
                 >
-                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</> : "Verify & Continue"}
+                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifyingï¿½</> : "Verify & Continue"}
                 </button>
 
                 <button
@@ -595,7 +595,7 @@ const WorkerSignUp = () => {
                 {/* Aadhaar front */}
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
-                    Aadhaar Card — Front <span className="text-destructive">*</span>
+                    Aadhaar Card ï¿½ Front <span className="text-destructive">*</span>
                   </label>
                   <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer transition-all hover:bg-accent ${aadhaarFrontPreview ? "border-primary bg-primary/5" : "border-border"}`}>
                     {aadhaarFrontPreview ? (
@@ -622,7 +622,7 @@ const WorkerSignUp = () => {
                 {/* Aadhaar back */}
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
-                    Aadhaar Card — Back <span className="text-muted-foreground font-normal">(optional but recommended)</span>
+                    Aadhaar Card ï¿½ Back <span className="text-muted-foreground font-normal">(optional but recommended)</span>
                   </label>
                   <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer transition-all hover:bg-accent ${aadhaarBackPreview ? "border-primary bg-primary/5" : "border-border"}`}>
                     {aadhaarBackPreview ? (
