@@ -69,7 +69,7 @@ const BookServicePage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [service, setService] = useState<Service | null>(null);
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<{ name: string; currentLocation?: { area: string; city: string } } | null>(null);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
   const [workers, setWorkers] = useState<Worker[]>([]);
@@ -775,7 +775,7 @@ const BookServicePage = () => {
                 <button
                   key={plan.id}
                   type="button"
-                  onClick={() => setBookingType(plan.name as any)}
+                  onClick={() => setBookingType(plan.name as 'oneTime' | 'daily' | 'weekly' | 'monthly')}
                   className={`p-4 border-2 rounded-xl transition-all relative ${
                     bookingType === plan.name
                       ? 'border-primary bg-primary/5 ring-2 ring-primary/30'

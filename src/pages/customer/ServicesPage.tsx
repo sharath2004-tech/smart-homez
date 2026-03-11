@@ -34,7 +34,7 @@ const ServicesPage = () => {
     searchParams.get('category')
   );
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<{ name: string; addresses?: { isDefault: boolean; [key: string]: unknown }[] } | null>(null);
   const [showLocationSelector, setShowLocationSelector] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
 
@@ -83,9 +83,9 @@ const ServicesPage = () => {
   const fetchServices = useCallback(async () => {
     try {
       setLoading(true);
-      const defaultAddress = profile?.addresses?.find((addr: any) => addr.isDefault);
+      const defaultAddress = profile?.addresses?.find((addr: { isDefault: boolean }) => addr.isDefault);
       
-      const params: any = {
+      const params: Record<string, unknown> = {
         isActive: true,
         limit: 20
       };

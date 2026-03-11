@@ -297,7 +297,7 @@ const AdminServices = () => {
     
     try {
       if (editingId) {
-        await servicesAPI.update(editingId, formData);
+        await servicesAPI.update(editingId, formData as unknown as Record<string, unknown>);
         toast.success('Service updated!');
       } else {
         const res = await servicesAPI.create({

@@ -24,11 +24,29 @@ interface Stats {
   savedAmount: number;
 }
 
+interface CompletedBooking {
+  _id: string;
+  service?: { name: string };
+  totalAmount?: number;
+  completedAt?: string;
+  createdAt: string;
+  bookingDate?: string;
+  paymentMethod?: string;
+  paymentStatus?: string;
+}
+
+interface UserProfile {
+  _id: string;
+  name: string;
+  email: string;
+  addresses?: { isDefault: boolean; [key: string]: unknown }[];
+}
+
 const PaymentsPage = () => {
   const { t } = useTranslation();
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<CompletedBooking[]>([]);
   const [stats, setStats] = useState<Stats>({ thisMonth: 0, totalServices: 0, savedAmount: 0 });
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -53,12 +71,12 @@ const PaymentsPage = () => {
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
 
-      const thisMonthBookings = completedBookings.filter((b: any) => {
+      const thisMonthBookings = completedBookings.filter((b: CompletedBooking) => {
         const bookingDate = new Date(b.completedAt || b.createdAt);
         return bookingDate.getMonth() === currentMonth && bookingDate.getFullYear() === currentYear;
       });
 
-      const thisMonthTotal = thisMonthBookings.reduce((sum: number, b: any) => sum + (b.totalAmount || 0), 0);
+      const thisMonthTotal = thisMonthBookings.reduce((sum: number, b: CompletedBooking) => sum + (b.totalAmount || 0), 0);
       const totalServices = completedBookings.length;
 
       setStats({
@@ -168,7 +186,7 @@ const PaymentsPage = () => {
             </div>
           ) : (
             <div className="space-y-2">
-              {transactions.map((tx: any) => (
+              {transactions.map((tx: CompletedBooking) => (
                 <div key={tx._id} className="card-elevated p-4 flex items-center gap-3">
                   <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center text-xl shrink-0">
                     {getServiceEmoji(tx.service?.name || 'Service')}

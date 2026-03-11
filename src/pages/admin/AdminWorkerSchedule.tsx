@@ -3,7 +3,7 @@ import { API_BASE_URL, authAPI } from "@/lib/api";
 import { Calendar, Clock, FileSpreadsheet, Filter, LayoutGrid, MapPin, RefreshCw, Table2, TrendingDown, TrendingUp, User, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 interface Booking {
   _id: string;
@@ -123,8 +123,8 @@ const AdminWorkerSchedule = () => {
       setExporting(true);
       
       if (format === 'xlsx') {
-        // Export to Excel using xlsx library
-        exportToExcel();
+        // Export to Excel using exceljs library
+        await exportToExcel();
       } else {
         // Export CSV from backend
         const token = localStorage.getItem('token');
@@ -161,7 +161,7 @@ const AdminWorkerSchedule = () => {
     }
   };
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     try {
       // Prepare data for Excel export
       const today = new Date();
@@ -204,48 +204,34 @@ const AdminWorkerSchedule = () => {
         });
       });
 
-      // Create workbook and add main data sheet
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(excelData);
-      
-      // Set column widths
-      const colWidths = [
-        { wch: 20 }, // Worker Name
-        { wch: 15 }, // Worker Phone
-        { wch: 15 }, // Specialization
-        { wch: 12 }, // Date
-        { wch: 12 }, // Day
-        { wch: 10 }, // Start Time
-        { wch: 10 }, // End Time
-        { wch: 12 }, // Status
-        { wch: 10 }, // Period
-        { wch: 15 }, // Booking Type
-        { wch: 12 }, // Frequency
-        { wch: 25 }, // Service
-        { wch: 15 }, // Category
-        { wch: 20 }, // Customer Name
-        { wch: 15 }, // Customer Phone
-        { wch: 25 }, // Location
-        { wch: 15 }, // Area
-        { wch: 12 }  // City
-      ];
-      ws['!cols'] = colWidths;
-      
-      XLSX.utils.book_append_sheet(wb, ws, 'Worker Schedule');
+      const colWidths = [20, 15, 15, 12, 12, 10, 10, 12, 10, 15, 12, 25, 15, 20, 15, 25, 15, 12];
+      const wb = new ExcelJS.Workbook();
 
-      // Add daily summary sheet
+      // Main sheet
+      const ws = wb.addWorksheet('Worker Schedule');
+      if (excelData.length > 0) {
+        ws.columns = Object.keys(excelData[0]).map((key, i) => ({
+          header: key,
+          key,
+          width: colWidths[i] || 15
+        }));
+        excelData.forEach(row => ws.addRow(row));
+      }
+
+      // Daily summary sheet
       const dailySummary = calculateDailySummary();
-      const wsSummary = XLSX.utils.json_to_sheet(dailySummary);
-      wsSummary['!cols'] = [
-        { wch: 15 }, // Date
-        { wch: 12 }, // Day
-        { wch: 15 }, // Workers Count
-        { wch: 15 }, // Bookings Count
-        { wch: 15 }  // Subscriptions
-      ];
-      XLSX.utils.book_append_sheet(wb, wsSummary, 'Daily Summary');
+      const wsSummary = wb.addWorksheet('Daily Summary');
+      const sumColWidths = [15, 12, 15, 15, 15];
+      if (dailySummary.length > 0) {
+        wsSummary.columns = Object.keys(dailySummary[0]).map((key, i) => ({
+          header: key,
+          key,
+          width: sumColWidths[i] || 15
+        }));
+        dailySummary.forEach(row => wsSummary.addRow(row));
+      }
 
-      // Add statistics sheet
+      // Statistics sheet
       const statsData = [
         { Metric: 'Total Workers', Value: summary?.totalWorkers || 0 },
         { Metric: 'Total Bookings', Value: summary?.totalBookings || 0 },
@@ -255,14 +241,23 @@ const AdminWorkerSchedule = () => {
         { Metric: 'Subscription Bookings', Value: summary?.subscriptionBookings || 0 },
         { Metric: 'One-Time Bookings', Value: summary?.oneTimeBookings || 0 }
       ];
-      const wsStats = XLSX.utils.json_to_sheet(statsData);
-      wsStats['!cols'] = [{ wch: 25 }, { wch: 15 }];
-      XLSX.utils.book_append_sheet(wb, wsStats, 'Statistics');
-      
-      // Generate and download Excel file
+      const wsStats = wb.addWorksheet('Statistics');
+      wsStats.columns = [
+        { header: 'Metric', key: 'Metric', width: 25 },
+        { header: 'Value', key: 'Value', width: 15 }
+      ];
+      statsData.forEach(row => wsStats.addRow(row));
+
+      // Trigger browser download
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const fileName = `worker-schedule-${new Date().toISOString().split('T')[0]}.xlsx`;
-      XLSX.writeFile(wb, fileName);
-      
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(link.href);
+
     } catch (error) {
       console.error('Excel export error:', error);
       throw error;

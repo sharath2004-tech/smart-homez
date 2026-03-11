@@ -49,7 +49,7 @@ async function apiCall(endpoint: string, options: RequestInit = {}, timeoutMs = 
     if (!response.ok) {
       // Handle validation errors array
       if (data.errors && Array.isArray(data.errors)) {
-        const errorMessages = data.errors.map((err: any) => err.msg).join(', ');
+        const errorMessages = data.errors.map((err: { msg: string }) => err.msg).join(', ');
         throw new Error(errorMessages || 'Validation failed');
       }
       throw new Error(data.message || data.error?.message || 'API request failed');
@@ -77,7 +77,7 @@ export const authAPI = {
     });
   },
 
-  register: async (userData: any) => {
+  register: async (userData: Record<string, unknown>) => {
     return apiCall('/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData)
@@ -88,14 +88,14 @@ export const authAPI = {
     return apiCall('/auth/me');
   },
 
-  updateProfile: async (userData: any) => {
+  updateProfile: async (userData: Record<string, unknown>) => {
     return apiCall('/auth/me', {
       method: 'PATCH',
       body: JSON.stringify(userData)
     });
   },
 
-  updatePreferences: async (preferences: any) => {
+  updatePreferences: async (preferences: Record<string, unknown>) => {
     return apiCall('/auth/preferences', {
       method: 'PATCH',
       body: JSON.stringify({ preferences })
@@ -206,14 +206,14 @@ export const servicesAPI = {
     return apiCall(`/services/${id}`);
   },
 
-  create: async (serviceData: any) => {
+  create: async (serviceData: Record<string, unknown>) => {
     return apiCall('/services', {
       method: 'POST',
       body: JSON.stringify(serviceData)
     });
   },
 
-  update: async (id: string, serviceData: any) => {
+  update: async (id: string, serviceData: Record<string, unknown>) => {
     return apiCall(`/services/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(serviceData)
@@ -247,14 +247,14 @@ export const bookingsAPI = {
     return apiCall(`/bookings/${id}`);
   },
 
-  create: async (bookingData: any) => {
+  create: async (bookingData: Record<string, unknown>) => {
     return apiCall('/bookings', {
       method: 'POST',
       body: JSON.stringify(bookingData)
     });
   },
 
-  update: async (id: string, bookingData: any) => {
+  update: async (id: string, bookingData: Record<string, unknown>) => {
     return apiCall(`/bookings/${id}`, {
       method: 'PUT',
       body: JSON.stringify(bookingData)
@@ -377,14 +377,14 @@ export const locationsAPI = {
     return apiCall('/locations');
   },
 
-  createLocation: async (locationData: any) => {
+  createLocation: async (locationData: Record<string, unknown>) => {
     return apiCall('/locations', {
       method: 'POST',
       body: JSON.stringify(locationData)
     });
   },
 
-  updateLocation: async (id: string, locationData: any) => {
+  updateLocation: async (id: string, locationData: Record<string, unknown>) => {
     return apiCall(`/locations/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(locationData)
@@ -432,7 +432,7 @@ export const locationsAPI = {
     });
   },
 
-  geocode: async (address: any) => {
+  geocode: async (address: string | Record<string, unknown>) => {
     return apiCall('/locations/geocode', {
       method: 'POST',
       body: JSON.stringify({ address })
@@ -513,28 +513,28 @@ export const usersAPI = {
     return apiCall(`/users/${id}`);
   },
 
-  update: async (id: string, userData: any) => {
+  update: async (id: string, userData: Record<string, unknown>) => {
     return apiCall(`/users/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(userData)
     });
   },
 
-  updatePreferences: async (preferences: any) => {
+  updatePreferences: async (preferences: Record<string, unknown>) => {
     return apiCall('/users/preferences', {
       method: 'PATCH',
       body: JSON.stringify(preferences)
     });
   },
 
-  addAddress: async (address: any) => {
+  addAddress: async (address: Record<string, unknown>) => {
     return apiCall('/users/addresses', {
       method: 'POST',
       body: JSON.stringify(address)
     });
   },
 
-  updateAddress: async (addressId: string, address: any) => {
+  updateAddress: async (addressId: string, address: Record<string, unknown>) => {
     return apiCall(`/users/addresses/${addressId}`, {
       method: 'PATCH',
       body: JSON.stringify(address)
@@ -899,7 +899,7 @@ export const preferencesAPI = {
     const queryParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
+        if (value !== undefined && value !== null) {
           queryParams.append(key, String(value));
         }
       });
@@ -1222,11 +1222,11 @@ export const helpAPI = {
 // Used by pages that call api.get(), api.patch(), etc. directly.
 export const api = {
   get: (endpoint: string) => apiCall(endpoint),
-  post: (endpoint: string, data?: any) =>
+  post: (endpoint: string, data?: Record<string, unknown>) =>
     apiCall(endpoint, { method: 'POST', ...(data !== undefined && { body: JSON.stringify(data) }) }),
-  patch: (endpoint: string, data?: any) =>
+  patch: (endpoint: string, data?: Record<string, unknown>) =>
     apiCall(endpoint, { method: 'PATCH', ...(data !== undefined && { body: JSON.stringify(data) }) }),
-  put: (endpoint: string, data?: any) =>
+  put: (endpoint: string, data?: Record<string, unknown>) =>
     apiCall(endpoint, { method: 'PUT', ...(data !== undefined && { body: JSON.stringify(data) }) }),
   delete: (endpoint: string) => apiCall(endpoint, { method: 'DELETE' })
 };

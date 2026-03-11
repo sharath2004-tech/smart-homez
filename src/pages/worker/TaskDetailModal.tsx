@@ -170,7 +170,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       setOvertimeMinutes(0);
       setHasTimeOffset(false);
     }
-  }, [task?.status, task?.actualStartTime, task?.bookingDate, task?.endTime]);
+  }, [task?.status, task?.actualStartTime, task?.bookingDate, task?.endTime, task?._id]);
 
   // Generate payment QR when task is completed
   useEffect(() => {
