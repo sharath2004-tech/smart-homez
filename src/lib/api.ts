@@ -188,6 +188,7 @@ export const servicesAPI = {
     page?: number;
     limit?: number;
     isActive?: boolean;
+    serviceType?: string;
   }) => {
     const queryParams = new URLSearchParams();
     if (params) {

@@ -313,6 +313,20 @@ const bookingSchema = new mongoose.Schema({
     zipCode: String,
     coordinates: [Number] // [longitude, latitude]
   },
+  // Service-specific details captured at booking time
+  serviceDetails: {
+    // Insta/Adhoc specific
+    hours: { type: Number, default: null },
+    taskList: [{ type: String }],
+    bringSupplies: { type: Boolean, default: false },
+    roomsCount: { type: Number, default: null },
+    // Deep cleaning specific
+    package: { type: String, default: null }, // '1BHK','2BHK','3BHK','4BHK','villa'
+    areas: [{ type: String }],  // e.g. 'kitchen','bathroom','sofa','carpet','window','fan','balcony'
+    addOns: [{ type: String }],
+    // Subscription specific (mirrors recurringSchedule for UI)
+    sessionDurationHours: { type: Number, default: null }
+  },
   notes: {
     type: String,
     default: ''

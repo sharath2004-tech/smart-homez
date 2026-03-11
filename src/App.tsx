@@ -28,6 +28,9 @@ import PreferencesPage from "./pages/customer/PreferencesPage";
 import ProfilePage from "./pages/customer/ProfilePage";
 import ServiceAreaDemo from "./pages/customer/ServiceAreaDemo";
 import ServiceRouter from "./pages/customer/ServiceRouter";
+import DeepCleaningServicePage from "./pages/customer/services/DeepCleaningServicePage";
+import InstaServicePage from "./pages/customer/services/InstaServicePage";
+import SubscriptionServicePage from "./pages/customer/services/SubscriptionServicePage";
 import ServicesPage from "./pages/customer/ServicesPage";
 import SubscriptionBookingPage from "./pages/customer/SubscriptionBookingPage";
 
@@ -79,6 +82,9 @@ const App = () => (
           {/* Customer */}
           <Route path="/customer/dashboard" element={<ProtectedRoute allowedRoles={['customer']}><CustomerDashboard /></ProtectedRoute>} />
           <Route path="/customer/services" element={<ProtectedRoute allowedRoles={['customer']}><ServicesPage /></ProtectedRoute>} />
+          <Route path="/customer/services/insta" element={<ProtectedRoute allowedRoles={['customer']}><InstaServicePage /></ProtectedRoute>} />
+          <Route path="/customer/services/subscription" element={<ProtectedRoute allowedRoles={['customer']}><SubscriptionServicePage /></ProtectedRoute>} />
+          <Route path="/customer/services/deep-cleaning" element={<ProtectedRoute allowedRoles={['customer']}><DeepCleaningServicePage /></ProtectedRoute>} />
           <Route path="/customer/book/:id" element={<ProtectedRoute allowedRoles={['customer']}><ServiceRouter /></ProtectedRoute>} />
           <Route path="/customer/subscribe/:id" element={<ProtectedRoute allowedRoles={['customer']}><SubscriptionBookingPage /></ProtectedRoute>} />
           <Route path="/customer/bookings" element={<ProtectedRoute allowedRoles={['customer']}><BookingsPage /></ProtectedRoute>} />

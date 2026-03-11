@@ -13,6 +13,7 @@ router.get('/', async (req, res) => {
   try {
     const { 
       category, 
+      serviceType,
       search, 
       isActive, 
       page = 1, 
@@ -24,6 +25,11 @@ router.get('/', async (req, res) => {
     
     const query = {};
     if (category) query.category = category;
+    if (serviceType) {
+      // Support comma-separated serviceType values
+      const types = serviceType.split(',').map(t => t.trim());
+      query.serviceType = types.length > 1 ? { $in: types } : types[0];
+    }
     // Only filter by isActive if explicitly provided
     if (isActive !== undefined && isActive !== null && isActive !== '') {
       query.isActive = isActive === 'true' || isActive === true;

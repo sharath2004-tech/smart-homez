@@ -385,7 +385,8 @@ router.post('/',
         bookingType,
         preferences,
         isSubscription,
-        subscriptionDetails
+        subscriptionDetails,
+        serviceDetails
       } = req.body;
 
       // Validate subscription bookings require a worker
@@ -603,7 +604,8 @@ router.post('/',
         assignmentMethod: worker ? 'manual' : 'auto',
         bookingType: bookingType || 'oneTime',
         isRecurring: bookingType && bookingType !== 'oneTime',
-        preferences: preferences || {}
+        preferences: preferences || {},
+        ...(serviceDetails && { serviceDetails })
       };
 
       // Add subscription details if it's a subscription booking

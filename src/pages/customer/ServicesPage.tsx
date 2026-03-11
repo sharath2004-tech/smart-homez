@@ -4,7 +4,7 @@ import { authAPI, servicesAPI } from "@/lib/api";
 import { motion } from "framer-motion";
 import { Clock, MapPin, Search, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 interface Service {
   _id: string;
@@ -21,13 +21,14 @@ interface Service {
 }
 
 const SERVICE_CATEGORIES = [
-  { key: 'insta',        label: 'Insta / Adhoc',    icon: '⚡', desc: 'Instant on-demand booking',     color: 'bg-amber-50 border-amber-300' },
-  { key: 'subscription', label: 'Subscription',      icon: '📅', desc: 'Recurring plans & save 20%',   color: 'bg-blue-50 border-blue-300' },
-  { key: 'deep',         label: 'Deep Cleaning',     icon: '✨', desc: 'Full home deep clean service', color: 'bg-green-50 border-green-300' },
+  { key: 'insta',        label: 'Insta / Adhoc',    icon: '⚡', desc: 'Instant on-demand booking',     color: 'bg-amber-50 border-amber-300',  badge: 'On demand',  badgeColor: 'bg-teal-100 text-teal-700', path: '/customer/services/insta' },
+  { key: 'subscription', label: 'Subscription',      icon: '📅', desc: 'Recurring plans & save 20%',   color: 'bg-blue-50 border-blue-300',    badge: 'Save 20%',   badgeColor: 'bg-teal-100 text-teal-700', path: '/customer/services/subscription' },
+  { key: 'deep',         label: 'Deep Cleaning',     icon: '✨', desc: 'Full home deep clean service', color: 'bg-green-50 border-green-300',  badge: 'Best value', badgeColor: 'bg-teal-100 text-teal-700', path: '/customer/services/deep-cleaning' },
 ] as const;
 
 const ServicesPage = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [services, setServices] = useState<Service[]>([]);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(
@@ -217,16 +218,13 @@ const ServicesPage = () => {
               {SERVICE_CATEGORIES.map((cat) => (
                 <button
                   key={cat.key}
-                  onClick={() => setActiveCategory(activeCategory === cat.key ? null : cat.key)}
-                  className={`p-3 rounded-2xl border-2 text-center transition-all ${
-                    activeCategory === cat.key
-                      ? 'border-primary bg-primary/10 shadow-md'
-                      : `${cat.color} hover:border-primary/40`
-                  }`}
+                  onClick={() => navigate(cat.path)}
+                  className={`p-3 rounded-2xl border-2 text-center transition-all ${cat.color} hover:border-primary/60 hover:shadow-md active:scale-95`}
                 >
                   <div className="text-2xl mb-1">{cat.icon}</div>
                   <p className="text-xs font-semibold text-foreground leading-tight">{cat.label}</p>
                   <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block leading-tight">{cat.desc}</p>
+                  <span className={`inline-block mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full ${cat.badgeColor}`}>{cat.badge}</span>
                 </button>
               ))}
             </div>
