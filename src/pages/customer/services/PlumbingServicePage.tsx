@@ -129,6 +129,11 @@ const PlumbingServicePage = () => {
     try {
       setBooking(true);
       
+      if (!service) {
+        toast.error('Service not found. Please go back and try again.');
+        return;
+      }
+
       const userLocation = localStorage.getItem('userLocation');
       const location = userLocation ? JSON.parse(userLocation) : null;
 

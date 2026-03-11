@@ -36,6 +36,10 @@ const settingsSchema = new mongoose.Schema({
     address: {
       type: String,
       default: ''
+    },
+    defaultState: {
+      type: String,
+      default: 'Maharashtra'
     }
   },
 
@@ -50,6 +54,11 @@ const settingsSchema = new mongoose.Schema({
       type: Number,
       default: 24, // Hours before booking
       min: 0
+    },
+    serviceRadius: {
+      type: Number,
+      default: 500, // Default walking distance in meters
+      min: 50
     }
   },
 

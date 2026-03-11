@@ -837,17 +837,46 @@ export const settingsAPI = {
     payment?: {
       upiId?: string;
       upiName?: string;
-      qrCodeImage?: string;
+      qrCodeImage?: string | null;
     };
     company?: {
       name?: string;
       phone?: string;
       email?: string;
       address?: string;
+      defaultState?: string;
     };
     booking?: {
       overtimeRate?: number;
       cancellationHours?: number;
+      serviceRadius?: number;
+    };
+    earnings?: {
+      platformCommissionRate?: number;
+      bookingConvenienceFee?: number;
+      minPayoutAmount?: number;
+      payoutSchedule?: string;
+      instantPayoutFee?: number;
+      payoutDay?: number;
+      autoPayoutEnabled?: boolean;
+    };
+    subscriptions?: {
+      workerPlans?: {
+        basic?: { price?: number; commissionRate?: number };
+        pro?: { price?: number; commissionRate?: number };
+        premium?: { price?: number; commissionRate?: number };
+      };
+      customerPlans?: {
+        basic?: { price?: number; discountRate?: number };
+        premium?: { price?: number; discountRate?: number };
+      };
+    };
+    cancellationPolicy?: {
+      fullRefundHours?: number;
+      partialRefundPercentage?: number;
+      partialRefundHours?: number;
+      cancellationCharge?: number;
+      noRefundHours?: number;
     };
   }) => {
     return apiCall('/settings', {

@@ -134,6 +134,10 @@ const InstaServicePage = () => {
     setSelectedTasks((p) => (p.includes(id) ? p.filter((t) => t !== id) : [...p, id]));
 
   const handleBook = async () => {
+    if (!serviceId) {
+      toast.error('No maid service is currently available in your area. Please contact support.');
+      return;
+    }
     const defaultAddr =
       profile?.addresses?.find((a) => a.isDefault) || profile?.addresses?.[0];
     const coords = defaultAddr?.location?.coordinates;

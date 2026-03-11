@@ -157,6 +157,11 @@ const ACServicingPage = () => {
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!service) {
+      toast.error('Service not found. Please go back and try again.');
+      return;
+    }
+
     if (!selectedDate) {
       toast.error('Please select a date');
       return;

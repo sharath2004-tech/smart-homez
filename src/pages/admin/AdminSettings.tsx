@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { settingsAPI } from "@/lib/api";
 import { cropQRFromImage } from "@/utils/cropQRFromImage";
-import { Building, CreditCard, DollarSign, FileText, Lock, Save, Upload } from "lucide-react";
+import { Building, CreditCard, DollarSign, FileText, Lock, Save, Shield, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -17,10 +17,39 @@ interface Settings {
     phone: string;
     email: string;
     address: string;
+    defaultState: string;
   };
   booking: {
     overtimeRate: number;
     cancellationHours: number;
+    serviceRadius: number;
+  };
+  earnings: {
+    platformCommissionRate: number;
+    bookingConvenienceFee: number;
+    minPayoutAmount: number;
+    payoutSchedule: string;
+    instantPayoutFee: number;
+    payoutDay: number;
+    autoPayoutEnabled: boolean;
+  };
+  subscriptions: {
+    workerPlans: {
+      basic: { price: number; commissionRate: number };
+      pro: { price: number; commissionRate: number };
+      premium: { price: number; commissionRate: number };
+    };
+    customerPlans: {
+      basic: { price: number; discountRate: number };
+      premium: { price: number; discountRate: number };
+    };
+  };
+  cancellationPolicy: {
+    fullRefundHours: number;
+    partialRefundPercentage: number;
+    partialRefundHours: number;
+    cancellationCharge: number;
+    noRefundHours: number;
   };
 }
 
@@ -40,11 +69,40 @@ const AdminSettings = () => {
       name: 'Healthy Homez',
       phone: '',
       email: '',
-      address: ''
+      address: '',
+      defaultState: 'Maharashtra'
     },
     booking: {
       overtimeRate: 2.5,
-      cancellationHours: 24
+      cancellationHours: 24,
+      serviceRadius: 500
+    },
+    earnings: {
+      platformCommissionRate: 0,
+      bookingConvenienceFee: 0,
+      minPayoutAmount: 500,
+      payoutSchedule: 'weekly',
+      instantPayoutFee: 0,
+      payoutDay: 1,
+      autoPayoutEnabled: false
+    },
+    subscriptions: {
+      workerPlans: {
+        basic: { price: 0, commissionRate: 0 },
+        pro: { price: 0, commissionRate: 0 },
+        premium: { price: 0, commissionRate: 0 }
+      },
+      customerPlans: {
+        basic: { price: 0, discountRate: 0 },
+        premium: { price: 0, discountRate: 0 }
+      }
+    },
+    cancellationPolicy: {
+      fullRefundHours: 1,
+      partialRefundPercentage: 0,
+      partialRefundHours: 0.5,
+      cancellationCharge: 100,
+      noRefundHours: 0
     }
   });
 
@@ -149,8 +207,7 @@ const AdminSettings = () => {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">Application Settings</h1>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Application Settings</h1>
-          <p className="text-muted-foreground">Configure payment, company, and booking settings</p>
+          <p className="text-muted-foreground">Configure payment, company, booking{isSuperAdmin ? ', earnings, subscriptions, and cancellation policy' : ', and booking settings'}</p>
         </div>
 
         <div className="grid gap-6">
@@ -346,6 +403,25 @@ const AdminSettings = () => {
                   className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
+
+              {isSuperAdmin && (
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Default State
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.company.defaultState}
+                    onChange={(e) => setSettings(prev => ({
+                      ...prev,
+                      company: { ...prev.company, defaultState: e.target.value }
+                    }))}
+                    placeholder="e.g. Maharashtra"
+                    className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Default state used when creating new locations</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -403,8 +479,254 @@ const AdminSettings = () => {
                   Minimum hours before booking to cancel
                 </p>
               </div>
+
+              {isSuperAdmin && (
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Service Radius (meters)
+                  </label>
+                  <input
+                    type="number"
+                    min="50"
+                    step="50"
+                    value={settings.booking.serviceRadius}
+                    onChange={(e) => setSettings(prev => ({
+                      ...prev,
+                      booking: { ...prev.booking, serviceRadius: parseInt(e.target.value) || 500 }
+                    }))}
+                    className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Default walking distance radius for worker assignment</p>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Super Admin Only: Earnings & Payout */}
+          {isSuperAdmin && (
+            <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-amber-200">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                  <DollarSign className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-bold text-foreground">Earnings & Payout</h2>
+                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Super Admin Only</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Platform commission, fees and payout schedule</p>
+                </div>
+              </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Platform Commission Rate (0–1)</label>
+                  <input type="number" step="0.01" min="0" max="1"
+                    value={settings.earnings.platformCommissionRate}
+                    onChange={(e) => setSettings(prev => ({ ...prev, earnings: { ...prev.earnings, platformCommissionRate: parseFloat(e.target.value) || 0 } }))}
+                    className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">e.g. 0.15 = 15% commission (0 = free)</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Booking Convenience Fee (₹)</label>
+                  <input type="number" min="0"
+                    value={settings.earnings.bookingConvenienceFee}
+                    onChange={(e) => setSettings(prev => ({ ...prev, earnings: { ...prev.earnings, bookingConvenienceFee: parseFloat(e.target.value) || 0 } }))}
+                    className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Flat fee per booking (0 = free)</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Minimum Payout Amount (₹)</label>
+                  <input type="number" min="0"
+                    value={settings.earnings.minPayoutAmount}
+                    onChange={(e) => setSettings(prev => ({ ...prev, earnings: { ...prev.earnings, minPayoutAmount: parseFloat(e.target.value) || 0 } }))}
+                    className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Payout Schedule</label>
+                  <select
+                    value={settings.earnings.payoutSchedule}
+                    onChange={(e) => setSettings(prev => ({ ...prev, earnings: { ...prev.earnings, payoutSchedule: e.target.value } }))}
+                    className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+                  >
+                    <option value="instant">Instant</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="biweekly">Bi-Weekly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Instant Payout Fee (0–0.1)</label>
+                  <input type="number" step="0.01" min="0" max="0.1"
+                    value={settings.earnings.instantPayoutFee}
+                    onChange={(e) => setSettings(prev => ({ ...prev, earnings: { ...prev.earnings, instantPayoutFee: parseFloat(e.target.value) || 0 } }))}
+                    className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">e.g. 0.02 = 2% fee (0 = free)</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Payout Day (1=Mon, 7=Sun)</label>
+                  <input type="number" min="1" max="7"
+                    value={settings.earnings.payoutDay}
+                    onChange={(e) => setSettings(prev => ({ ...prev, earnings: { ...prev.earnings, payoutDay: parseInt(e.target.value) || 1 } }))}
+                    className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div className="md:col-span-2 flex items-center gap-3">
+                  <input type="checkbox"
+                    checked={settings.earnings.autoPayoutEnabled}
+                    onChange={(e) => setSettings(prev => ({ ...prev, earnings: { ...prev.earnings, autoPayoutEnabled: e.target.checked } }))}
+                    className="w-5 h-5 rounded accent-primary"
+                    id="autoPayout"
+                  />
+                  <label htmlFor="autoPayout" className="text-sm font-medium text-foreground cursor-pointer">
+                    Enable Auto-Payouts
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Super Admin Only: Subscription Pricing */}
+          {isSuperAdmin && (
+            <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-amber-200">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                  <Shield className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-bold text-foreground">Subscription Pricing</h2>
+                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Super Admin Only</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Set prices for worker and customer subscription plans</p>
+                </div>
+              </div>
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-semibold text-foreground mb-3">Worker Plans</h3>
+                  <div className="grid md:grid-cols-3 gap-4">
+                    {(['basic', 'pro', 'premium'] as const).map(plan => (
+                      <div key={plan} className="border border-border rounded-xl p-4">
+                        <p className="font-medium text-foreground capitalize mb-3">{plan}</p>
+                        <div className="space-y-2">
+                          <div>
+                            <label className="text-xs text-muted-foreground">Price (₹/month)</label>
+                            <input type="number" min="0"
+                              value={settings.subscriptions.workerPlans[plan].price}
+                              onChange={(e) => setSettings(prev => ({ ...prev, subscriptions: { ...prev.subscriptions, workerPlans: { ...prev.subscriptions.workerPlans, [plan]: { ...prev.subscriptions.workerPlans[plan], price: parseFloat(e.target.value) || 0 } } } }))}
+                              className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary mt-1"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Commission Rate (0–1)</label>
+                            <input type="number" min="0" max="1" step="0.01"
+                              value={settings.subscriptions.workerPlans[plan].commissionRate}
+                              onChange={(e) => setSettings(prev => ({ ...prev, subscriptions: { ...prev.subscriptions, workerPlans: { ...prev.subscriptions.workerPlans, [plan]: { ...prev.subscriptions.workerPlans[plan], commissionRate: parseFloat(e.target.value) || 0 } } } }))}
+                              className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary mt-1"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground mb-3">Customer Plans</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {(['basic', 'premium'] as const).map(plan => (
+                      <div key={plan} className="border border-border rounded-xl p-4">
+                        <p className="font-medium text-foreground capitalize mb-3">{plan}</p>
+                        <div className="space-y-2">
+                          <div>
+                            <label className="text-xs text-muted-foreground">Price (₹/month)</label>
+                            <input type="number" min="0"
+                              value={settings.subscriptions.customerPlans[plan].price}
+                              onChange={(e) => setSettings(prev => ({ ...prev, subscriptions: { ...prev.subscriptions, customerPlans: { ...prev.subscriptions.customerPlans, [plan]: { ...prev.subscriptions.customerPlans[plan], price: parseFloat(e.target.value) || 0 } } } }))}
+                              className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary mt-1"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Discount Rate (0–1)</label>
+                            <input type="number" min="0" max="1" step="0.01"
+                              value={settings.subscriptions.customerPlans[plan].discountRate}
+                              onChange={(e) => setSettings(prev => ({ ...prev, subscriptions: { ...prev.subscriptions, customerPlans: { ...prev.subscriptions.customerPlans, [plan]: { ...prev.subscriptions.customerPlans[plan], discountRate: parseFloat(e.target.value) || 0 } } } }))}
+                              className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary mt-1"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Super Admin Only: Cancellation Policy */}
+          {isSuperAdmin && (
+            <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-amber-200">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-bold text-foreground">Cancellation Policy</h2>
+                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Super Admin Only</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Refund windows and cancellation charges</p>
+                </div>
+              </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Full Refund Window (hours before booking)</label>
+                  <input type="number" min="0" step="0.5"
+                    value={settings.cancellationPolicy.fullRefundHours}
+                    onChange={(e) => setSettings(prev => ({ ...prev, cancellationPolicy: { ...prev.cancellationPolicy, fullRefundHours: parseFloat(e.target.value) || 0 } }))}
+                    className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Customer gets 100% refund if cancelled before this window</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Cancellation Charge (₹)</label>
+                  <input type="number" min="0"
+                    value={settings.cancellationPolicy.cancellationCharge}
+                    onChange={(e) => setSettings(prev => ({ ...prev, cancellationPolicy: { ...prev.cancellationPolicy, cancellationCharge: parseFloat(e.target.value) || 0 } }))}
+                    className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Flat fee charged if cancelled within full refund window</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Partial Refund Window (hours)</label>
+                  <input type="number" min="0" step="0.5"
+                    value={settings.cancellationPolicy.partialRefundHours}
+                    onChange={(e) => setSettings(prev => ({ ...prev, cancellationPolicy: { ...prev.cancellationPolicy, partialRefundHours: parseFloat(e.target.value) || 0 } }))}
+                    className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Partial Refund Percentage (%)</label>
+                  <input type="number" min="0" max="100"
+                    value={settings.cancellationPolicy.partialRefundPercentage}
+                    onChange={(e) => setSettings(prev => ({ ...prev, cancellationPolicy: { ...prev.cancellationPolicy, partialRefundPercentage: parseFloat(e.target.value) || 0 } }))}
+                    className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">No Refund Window (hours)</label>
+                  <input type="number" min="0" step="0.5"
+                    value={settings.cancellationPolicy.noRefundHours}
+                    onChange={(e) => setSettings(prev => ({ ...prev, cancellationPolicy: { ...prev.cancellationPolicy, noRefundHours: parseFloat(e.target.value) || 0 } }))}
+                    className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">No refund if cancelled within this many hours of booking</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Save Button */}
           <div className="flex justify-end gap-3">

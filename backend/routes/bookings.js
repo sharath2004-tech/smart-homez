@@ -1446,7 +1446,7 @@ async function checkWorkerAvailability(workerId, scheduledDate, duration) {
 // @route   POST /api/bookings/:id/assign-worker
 // @desc    Auto-assign best worker to booking
 // @access  Private/Admin
-router.post('/:id/assign-worker', authenticate, authorize('admin'), async (req, res) => {
+router.post('/:id/assign-worker', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
     
@@ -1480,7 +1480,7 @@ router.post('/:id/assign-worker', authenticate, authorize('admin'), async (req, 
 // @access  Private/Admin
 router.post('/:id/reassign-worker', 
   authenticate, 
-  authorize('admin'),
+  authorize('admin', 'super_admin'),
   [body('reason').notEmpty().withMessage('Reason for reassignment is required')],
   async (req, res) => {
     try {

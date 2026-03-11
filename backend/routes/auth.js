@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import { authenticate } from '../middleware/auth.js';
 import { uploadWorkerFiles } from '../middleware/upload.js';
 import Notification from '../models/Notification.js';
+import Settings from '../models/Settings.js';
 import User from '../models/User.js';
 import { sendPasswordChangeConfirmation, sendPasswordResetEmail } from '../utils/emailService.js';
 
@@ -44,6 +45,9 @@ router.post('/register',
       }
 
       console.log(`✅ No existing user found for email: ${email}, proceeding with registration`);
+
+      // Load configurable settings
+      const settings = await Settings.getSettings();
 
       // Prepare user data
       const userData = {
@@ -93,9 +97,9 @@ router.post('/register',
                 type: 'Point',
                 coordinates: location.coordinates
               },
-              maxWalkingDistance: 500 // Default 500 meters
+              maxWalkingDistance: settings.booking.serviceRadius // configurable
             }],
-            serviceRadius: 500 // Default 500 meters
+            serviceRadius: settings.booking.serviceRadius // configurable
           };
         } else if (role === 'worker' && workerProfile) {
           // If no location but workerProfile provided
@@ -121,7 +125,7 @@ router.post('/register',
       const token = jwt.sign(
         { userId: user._id, role: user.role },
         process.env.JWT_SECRET,
-        { expiresIn: '7d' }
+        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
       );
 
       res.status(201).json({
@@ -200,7 +204,7 @@ router.post('/login',
       const token = jwt.sign(
         { userId: user._id, role: user.role },
         process.env.JWT_SECRET,
-        { expiresIn: '7d' }
+        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
       );
 
       res.json({
@@ -517,6 +521,8 @@ router.post('/register-worker',
         return res.status(400).json({ error: { message: 'User already exists with this email', status: 400 } });
       }
 
+      const settings = await Settings.getSettings();
+
       // Parse skills from JSON string if needed
       let parsedSkills = [];
       if (skills) {
@@ -583,9 +589,9 @@ router.post('/register-worker',
           area: parsedLocation.area || '',
           city: parsedLocation.city || '',
           location: { type: 'Point', coordinates: parsedLocation.coordinates },
-          maxWalkingDistance: 500
+          maxWalkingDistance: settings.booking.serviceRadius
         }];
-        userData.workerProfile.serviceRadius = 500;
+        userData.workerProfile.serviceRadius = settings.booking.serviceRadius;
       }
 
       const user = new User(userData);
@@ -613,7 +619,7 @@ router.post('/register-worker',
       const token = jwt.sign(
         { userId: user._id, role: user.role },
         process.env.JWT_SECRET,
-        { expiresIn: '7d' }
+        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
       );
 
       res.status(201).json({

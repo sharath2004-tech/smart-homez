@@ -5,6 +5,7 @@ import Booking from '../models/Booking.js';
 import Location from '../models/Location.js';
 import Notification from '../models/Notification.js';
 import ServiceArea from '../models/ServiceArea.js';
+import Settings from '../models/Settings.js';
 import User from '../models/User.js';
 import WorkerEarnings from '../models/WorkerEarnings.js';
 import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/emailService.js';
@@ -41,19 +42,20 @@ router.post('/locations',
       }
 
       const { apartmentName, building, area, city, state, zipCode, coordinates, maxServiceRadius } = req.body;
+      const settings = await Settings.getSettings();
 
       const location = new Location({
         apartmentName,
         building,
         area,
         city,
-        state: state || 'Maharashtra',
+        state: state || settings.company.defaultState,
         zipCode,
         location: {
           type: 'Point',
           coordinates: coordinates // [longitude, latitude]
         },
-        maxServiceRadius: maxServiceRadius || 500,
+        maxServiceRadius: maxServiceRadius || settings.booking.serviceRadius,
         isServiceAvailable: true, // Service available at all created locations
         createdBy: req.user._id
       });
@@ -81,7 +83,7 @@ router.post('/create-admin',
   [
     body('name').notEmpty().withMessage('Name is required'),
     body('email').isEmail().withMessage('Valid email is required'),
-    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
     body('phone').notEmpty().withMessage('Phone is required'),
     body('assignedLocationIds').optional().isArray().withMessage('Assigned locations must be an array')
   ],
@@ -561,6 +563,7 @@ router.post('/workers',
 
       // Get apartment assignments
       const locations = await Location.find({ _id: { $in: assignedApartmentIds } });
+      const settings = await Settings.getSettings();
       
       if (locations.length === 0) {
         return res.status(404).json({ error: { message: 'No valid locations found', status: 404 } });
@@ -604,7 +607,7 @@ router.post('/workers',
           hourlyRate: hourlyRate || 0,
           assignedApartments,
           availability: true,
-          serviceRadius: 500 // 500 meters walking distance
+          serviceRadius: settings.booking.serviceRadius // configurable walking distance in meters
         }
       });
 
@@ -965,7 +968,11 @@ router.get('/dashboard-stats', authenticate, authorize('admin', 'super_admin'), 
 
     const workersInLocations = workers;
 
-    // Get bookings for these locations (based on address matching)
+    // Date boundaries
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    // Today's stats
     const todayBookings = await Booking.countDocuments({
       createdAt: { $gte: today },
       status: { $in: ['pending', 'confirmed', 'in-progress'] }
@@ -981,26 +988,55 @@ router.get('/dashboard-stats', authenticate, authorize('admin', 'super_admin'), 
       { $group: { _id: null, total: { $sum: '$totalAmount' } } }
     ]);
 
+    // Yesterday's stats for change calculation
+    const yesterdayBookings = await Booking.countDocuments({
+      createdAt: { $gte: yesterday, $lt: today },
+      status: { $in: ['pending', 'confirmed', 'in-progress'] }
+    });
+
+    const completedYesterday = await Booking.countDocuments({
+      completedAt: { $gte: yesterday, $lt: today },
+      status: 'completed'
+    });
+
+    const yesterdayRevenue = await Booking.aggregate([
+      { $match: { completedAt: { $gte: yesterday, $lt: today }, status: 'completed' } },
+      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+    ]);
+
+    // Helper to format percentage change
+    const calcChange = (current, previous) => {
+      if (previous === 0) return current > 0 ? '+100%' : '0%';
+      const pct = ((current - previous) / previous * 100).toFixed(1);
+      return Number(pct) >= 0 ? `+${pct}%` : `${pct}%`;
+    };
+
     // Count online workers
     const onlineWorkers = workersInLocations.filter(w => w.workerProfile.availability).length;
 
-    // Calculate fulfillment rate
+    // Calculate fulfillment rate (today)
     const totalBookingsToday = todayBookings + completedToday;
     const fulfillmentRate = totalBookingsToday > 0 
       ? ((completedToday / totalBookingsToday) * 100).toFixed(1)
+      : 100;
+
+    // Calculate fulfillment rate (yesterday) for change
+    const totalBookingsYesterday = yesterdayBookings + completedYesterday;
+    const fulfillmentRateYesterday = totalBookingsYesterday > 0
+      ? (completedYesterday / totalBookingsYesterday) * 100
       : 100;
 
     res.json({
       success: true,
       stats: {
         todayBookings,
-        bookingsChange: '+0%', // TODO: Calculate vs yesterday
+        bookingsChange: calcChange(todayBookings, yesterdayBookings),
         activeWorkers: workersInLocations.length,
         workersOnlineInfo: `${onlineWorkers} online`,
         todayRevenue: todayRevenue[0]?.total || 0,
-        revenueChange: '+0%', // TODO: Calculate vs yesterday
+        revenueChange: calcChange(todayRevenue[0]?.total || 0, yesterdayRevenue[0]?.total || 0),
         fulfillmentRate: parseFloat(fulfillmentRate),
-        fulfillmentChange: '+0%' // TODO: Calculate vs yesterday
+        fulfillmentChange: calcChange(parseFloat(fulfillmentRate), fulfillmentRateYesterday)
       }
     });
   } catch (error) {

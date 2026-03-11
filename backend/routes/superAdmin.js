@@ -9,6 +9,7 @@ import { body, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
 import Booking from '../models/Booking.js';
 import Location from '../models/Location.js';
+import Settings from '../models/Settings.js';
 import User from '../models/User.js';
 import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/emailService.js';
 
@@ -195,6 +196,7 @@ router.post(
       }
 
       const temporaryPassword = generateTemporaryPassword();
+      const settings = await Settings.getSettings();
       const assignedApartments = locations.map((loc) => ({
         locationId: loc._id,
         apartmentName: loc.apartmentName,
@@ -223,7 +225,7 @@ router.post(
           hourlyRate: hourlyRate || 0,
           assignedApartments,
           availability: true,
-          serviceRadius: 500
+          serviceRadius: settings.booking.serviceRadius
         }
       });
 
@@ -379,16 +381,17 @@ router.post(
       }
 
       const { apartmentName, building, area, city, state, zipCode, coordinates, maxServiceRadius } = req.body;
+      const settings = await Settings.getSettings();
 
       const location = new Location({
         apartmentName,
         building,
         area,
         city,
-        state: state || 'Maharashtra',
+        state: state || settings.company.defaultState,
         zipCode,
         location: { type: 'Point', coordinates },
-        maxServiceRadius: maxServiceRadius || 500,
+        maxServiceRadius: maxServiceRadius || settings.booking.serviceRadius,
         isServiceAvailable: true,
         createdBy: req.user._id
       });

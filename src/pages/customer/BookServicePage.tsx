@@ -295,6 +295,11 @@ const BookServicePage = () => {
 
     try {
       setBooking(true);
+
+      if (!service) {
+        toast.error('Service not found. Please go back and try again.');
+        return;
+      }
       
       // Get user location from localStorage
       const userLocation = localStorage.getItem('userLocation');
