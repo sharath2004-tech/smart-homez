@@ -697,7 +697,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                     Step 3: Upload Payment Proof 📸✅
                   </h3>
                   
-                  {task.paymentProof ? (
+                  {task.paymentProof && !showPaymentProofCapture ? (
                     <div className="space-y-3">
                       <div className="relative rounded-lg overflow-hidden border-2 border-green-500">
                         <img 
@@ -729,7 +729,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                         <p className="text-xs text-green-700 mt-1">All documentation has been submitted</p>
                       </div>
                       <button
-                        onClick={() => setShowPaymentProofCapture(true)}
+                        onClick={() => { setPaymentTransactionId(''); setPaymentTransactionTime(new Date().toISOString()); setShowPaymentProofCapture(true); }}
                         className="w-full py-2 px-4 border-2 border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50 transition-colors"
                       >
                         Re-upload Payment Proof
