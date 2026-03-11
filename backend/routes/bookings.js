@@ -997,8 +997,17 @@ router.delete('/:id', authenticate, async (req, res) => {
     };
 
     // Calculate time difference
+    // booking.scheduledDate does not exist on the schema; derive from bookingDate + startTime
     const now = new Date();
-    const scheduledTime = new Date(booking.scheduledDate);
+    let scheduledTime;
+    if (booking.scheduledDate) {
+      scheduledTime = new Date(booking.scheduledDate);
+    } else {
+      const bookingDateObj = new Date(booking.bookingDate);
+      const [startH, startM] = (booking.startTime || '00:00').split(':').map(Number);
+      scheduledTime = new Date(bookingDateObj);
+      scheduledTime.setHours(startH, startM, 0, 0);
+    }
     const hoursUntilBooking = (scheduledTime - now) / (1000 * 60 * 60);
 
     // Calculate refund based on policy
