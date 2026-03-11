@@ -90,6 +90,10 @@ const InstaServicePage = () => {
   const [notes, setNotes] = useState("");
   const [noServiceWarning, setNoServiceWarning] = useState(false);
 
+  // Slot availability: map of startTime → number of workers busy during that slot
+  const [busyWorkersBySlot, setBusyWorkersBySlot] = useState<Record<string, number>>({});
+  const [totalWorkers, setTotalWorkers] = useState(0);
+
   const totalAmount = hours * pricePerHour + (bringSupplies ? 50 : 0);
 
   const availableSlots = (() => {
@@ -129,6 +133,42 @@ const InstaServicePage = () => {
     };
     init();
   }, []);
+
+  // Fetch booked-slots whenever the date changes
+  useEffect(() => {
+    const fetchSlots = async () => {
+      try {
+        const data = await bookingsAPI.getBookedSlots(bookingDate);
+        const ranges: { workerId: string | null; startTime: string; endTime: string }[] =
+          data.bookedRanges || [];
+        setTotalWorkers(data.totalWorkers || 0);
+
+        // For each TIME_SLOT, count how many workers are busy during [slotStart, slotStart+hours]
+        const busy: Record<string, number> = {};
+        for (const slot of TIME_SLOTS) {
+          const [sh, sm] = slot.split(":").map(Number);
+          const slotStartMins = sh * 60 + sm;
+          const slotEndMins = slotStartMins + hours * 60;
+          const workersBusy = new Set<string>();
+          for (const r of ranges) {
+            if (!r.workerId) continue;
+            const [rsh, rsm] = r.startTime.split(":").map(Number);
+            const [reh, rem] = r.endTime.split(":").map(Number);
+            const rStart = rsh * 60 + rsm;
+            const rEnd = reh * 60 + rem;
+            if (rStart < slotEndMins && rEnd > slotStartMins) {
+              workersBusy.add(r.workerId);
+            }
+          }
+          busy[slot] = workersBusy.size;
+        }
+        setBusyWorkersBySlot(busy);
+      } catch {
+        // non-critical — continue without availability info
+      }
+    };
+    fetchSlots();
+  }, [bookingDate, hours]);
 
   const toggleTask = (id: string) =>
     setSelectedTasks((p) => (p.includes(id) ? p.filter((t) => t !== id) : [...p, id]));
@@ -413,21 +453,60 @@ const InstaServicePage = () => {
                   No slots left today. Switch to "Schedule" to pick a future date.
                 </div>
               ) : (
-                <div className="grid grid-cols-4 gap-2">
-                  {availableSlots.map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setStartTime(t)}
-                      className={`py-2.5 rounded-xl border-2 text-xs font-semibold transition-all ${
-                        startTime === t
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border hover:border-primary/40 text-foreground"
-                      }`}
-                    >
-                      {fmt12(t)}
-                    </button>
-                  ))}
-                </div>
+                <>
+                  <div className="grid grid-cols-4 gap-2">
+                    {availableSlots.map((t) => {
+                      const busy = busyWorkersBySlot[t] ?? 0;
+                      const free = totalWorkers > 0 ? totalWorkers - busy : null;
+                      const fullyBooked = free !== null && free <= 0;
+                      const limited = free !== null && free === 1;
+                      return (
+                        <button
+                          key={t}
+                          onClick={() => !fullyBooked && setStartTime(t)}
+                          disabled={fullyBooked}
+                          title={
+                            free === null
+                              ? undefined
+                              : fullyBooked
+                              ? "All workers booked"
+                              : `${free} worker${free !== 1 ? "s" : ""} available`
+                          }
+                          className={`py-2.5 rounded-xl border-2 text-xs font-semibold transition-all relative ${
+                            fullyBooked
+                              ? "border-destructive/30 bg-destructive/5 text-destructive/50 cursor-not-allowed line-through"
+                              : startTime === t
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border hover:border-primary/40 text-foreground"
+                          }`}
+                        >
+                          {fmt12(t)}
+                          {free !== null && !fullyBooked && (
+                            <span
+                              className={`absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full text-[8px] flex items-center justify-center text-white font-bold ${
+                                limited ? "bg-amber-500" : "bg-green-500"
+                              }`}
+                            >
+                              {free}
+                            </span>
+                          )}
+                          {fullyBooked && (
+                            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-destructive text-[8px] flex items-center justify-center text-white font-bold">
+                              ✕
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {totalWorkers > 0 && (
+                    <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" /> Available</span>
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> Limited (1 worker)</span>
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-destructive inline-block" /> Fully booked</span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

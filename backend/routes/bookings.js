@@ -710,8 +710,35 @@ router.post('/',
             
             await booking.save();
 
+            // ── Race-condition guard ─────────────────────────────────────────
+            // Two simultaneous bookings can both pick the same worker before
+            // either is saved. Re-check for conflicts NOW that this booking is
+            // in the DB, and unassign if another booking already owns this slot.
+            const startOfDay = new Date(bookingData.bookingDate);
+            startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(bookingData.bookingDate);
+            endOfDay.setHours(23, 59, 59, 999);
+            const raceConflict = await Booking.findOne({
+              worker: booking.worker,
+              _id: { $ne: booking._id },
+              bookingDate: { $gte: startOfDay, $lte: endOfDay },
+              status: { $in: ['confirmed', 'in-progress', 'pending'] },
+              startTime: { $lt: bookingData.endTime },
+              endTime: { $gt: bookingData.startTime }
+            }).lean();
+            if (raceConflict) {
+              console.warn(`⚠️ Race-condition double-booking detected for worker ${booking.worker}. Unassigning.`);
+              booking.worker = undefined;
+              booking.backupWorkers = [];
+              booking.status = 'pending';
+              booking.assignedAt = undefined;
+              booking.confirmedAt = undefined;
+              await booking.save();
+            }
+            // ────────────────────────────────────────────────────────────────
+
             console.log(`✅ Primary worker assigned via ${assignmentResult.assignmentMethod}`);
-            console.log(`✅ ${assignmentResult.backupWorkers.length} backup workers assigned`);
+            console.log(`✅ ${assignmentResult.backupWorkers?.length ?? 0} backup workers assigned`);
             console.log(`⏱️ Assignment completed in ${assignmentResult.assignmentDetails.assignmentTime}ms`);
           } else {
             console.log(`⚠️ Advanced assignment failed: ${assignmentResult.error}`);

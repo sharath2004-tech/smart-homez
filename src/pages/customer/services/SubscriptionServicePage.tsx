@@ -318,7 +318,7 @@ const SubscriptionServicePage = () => {
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-foreground">₹{svc.price}</p>
-                          <p className="text-xs text-muted-foreground">/hr</p>
+                          <p className="text-xs text-muted-foreground">/session</p>
                         </div>
                       </div>
                     </button>

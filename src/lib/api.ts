@@ -288,6 +288,10 @@ export const bookingsAPI = {
     return apiCall('/bookings?status=completed,cancelled');
   },
 
+  getBookedSlots: async (date: string) => {
+    return apiCall(`/bookings/booked-slots?date=${date}`);
+  },
+
   generateStartQR: async (id: string, jobDescriptionAcknowledged: boolean = true) => {
     return apiCall(`/bookings/${id}/generate-start-qr`, {
       method: 'POST',

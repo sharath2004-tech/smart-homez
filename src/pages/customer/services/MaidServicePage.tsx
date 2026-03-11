@@ -306,7 +306,12 @@ const MaidServicePage = () => {
                 >
                   <div className="font-semibold">{type.label}</div>
                   <div className="text-sm text-muted-foreground">{type.desc}</div>
-                  <div className="text-sm text-primary font-bold mt-1">₹{type.price}/hr</div>
+                  <div className="text-sm text-primary font-bold mt-1">
+                    ₹{type.price}
+                    <span className="font-normal text-muted-foreground text-xs">
+                      {type.value === 'oneTime' || type.value === 'daily' ? '/hr' : type.value === 'weekly' ? '/week' : '/month'}
+                    </span>
+                  </div>
                 </button>
               ))}
             </div>
