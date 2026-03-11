@@ -451,12 +451,12 @@ router.post('/',
         ? (subscriptionDetails?.startDate || bookingDate)
         : bookingDate;
       if (effectiveBookingDate) {
+        const bookingDateStr = typeof effectiveBookingDate === 'string'
+          ? effectiveBookingDate.slice(0, 10)
+          : new Date(effectiveBookingDate).toISOString().slice(0, 10);
         try {
           const bhConfig = await BusinessHours.getConfig();
-          const bookingDateStr = typeof effectiveBookingDate === 'string'
-            ? effectiveBookingDate.slice(0, 10)
-            : new Date(effectiveBookingDate).toISOString().slice(0, 10);
-          const holiday = bhConfig.holidays?.find(h => h.date === bookingDateStr);
+          const holiday = (bhConfig.holidays || []).find(h => h.date === bookingDateStr);
           if (holiday) {
             return res.status(400).json({
               error: {
@@ -469,8 +469,8 @@ router.post('/',
             });
           }
         } catch (bhErr) {
-          console.error('Holiday check error (non-fatal):', bhErr.message);
-          // Non-fatal — continue if BH config cannot be read
+          // Only skip holiday check if MongoDB call itself fails (e.g., connection issue)
+          console.error('Holiday check DB error — skipping guard:', bhErr.message);
         }
       }
       // ───────────────────────────────────────────────────────────────────

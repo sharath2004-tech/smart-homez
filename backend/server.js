@@ -49,7 +49,14 @@ const PORT = process.env.PORT || 5000;
 // CORS Configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : ['http://localhost:5173', 'http://localhost:8080', 'http://localhost:8081', 'http://localhost:8082'];
+  : [
+      'http://localhost:5173',
+      'http://localhost:8080',
+      'http://localhost:8081',
+      'http://localhost:8082',
+      'https://smart-homez.vercel.app',
+      'https://*.vercel.app'
+    ];
 
 console.log('🔒 CORS Allowed Origins:', allowedOrigins);
 

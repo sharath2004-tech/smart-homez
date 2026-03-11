@@ -409,8 +409,13 @@ const BookServicePage = () => {
       navigate('/customer/bookings');
     } catch (error: unknown) {
       console.error('Booking error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to create booking';
-      toast.error(errorMessage);
+      const rawMsg = error instanceof Error ? error.message : 'Failed to create booking';
+      // Surface holiday rejection with extra context
+      if (rawMsg.toLowerCase().includes('holiday') || rawMsg.toLowerCase().includes('not available on')) {
+        toast.error(rawMsg, { duration: 6000 });
+      } else {
+        toast.error(rawMsg);
+      }
     } finally {
       setBooking(false);
     }
