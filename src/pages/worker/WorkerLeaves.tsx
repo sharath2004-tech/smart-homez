@@ -48,8 +48,8 @@ const WorkerLeaves = () => {
     } catch (error) {
       console.error('Error fetching leaves:', error);
       toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to fetch leaves',
+        title: t('common.error'),
+        description: error instanceof Error ? error.message : t('worker.leaves.failedToFetch'),
         variant: 'destructive'
       });
     }
@@ -72,8 +72,8 @@ const WorkerLeaves = () => {
   const handleApplyLeave = async () => {
     if (!selectedDate) {
       toast({
-        title: 'Error',
-        description: 'Please select a date',
+        title: t('common.error'),
+        description: t('worker.leaves.pleaseSelectDate'),
         variant: 'destructive'
       });
       return;
@@ -84,8 +84,8 @@ const WorkerLeaves = () => {
       await leavesAPI.applyLeave(selectedDate.toISOString(), reason.trim());
 
       toast({
-        title: 'Success',
-        description: 'Leave request submitted successfully'
+        title: t('common.success'),
+        description: t('worker.leaves.leaveSubmitted')
       });
 
       setSelectedDate(undefined);
@@ -95,8 +95,8 @@ const WorkerLeaves = () => {
     } catch (error) {
       console.error('Error applying leave:', error);
       toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to apply leave',
+        title: t('common.error'),
+        description: error instanceof Error ? error.message : t('worker.leaves.failedToApply'),
         variant: 'destructive'
       });
     } finally {
@@ -121,9 +121,9 @@ const WorkerLeaves = () => {
     try {
       await leavesAPI.cancelLeave(leaveId);
       setLeaves((prev) => prev.filter((l) => l._id !== leaveId));
-      toast({ title: 'Leave request cancelled' });
+      toast({ title: t('worker.leaves.leaveCancelled') });
     } catch (error) {
-      toast({ title: 'Failed to cancel leave', variant: 'destructive' });
+      toast({ title: t('worker.leaves.failedToCancel'), variant: 'destructive' });
     }
   };
 
@@ -151,9 +151,14 @@ const WorkerLeaves = () => {
           <Info className="h-4 w-4" />
           <AlertDescription>
             <div className="flex items-center justify-between">
-              <span>
-                You have <strong>{remainingLeaves}</strong> out of <strong>{profile.monthlyLeaveQuota}</strong> leaves remaining this month
-              </span>
+              <span
+                  dangerouslySetInnerHTML={{
+                    __html: t('worker.leaves.leavesRemaining', {
+                      remaining: remainingLeaves,
+                      total: profile.monthlyLeaveQuota
+                    })
+                  }}
+                />
             </div>
           </AlertDescription>
         </Alert>
@@ -177,9 +182,9 @@ const WorkerLeaves = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Reason (Optional)</label>
+                <label className="text-sm font-medium">{t('worker.leaves.reasonOptional')}</label>
                 <Textarea
-                  placeholder="Enter reason for leave..."
+                  placeholder={t('worker.leaves.enterReason')}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   maxLength={200}
@@ -196,12 +201,12 @@ const WorkerLeaves = () => {
                 className="w-full"
               >
                 <CalendarIcon className="w-4 h-4 mr-2" />
-                {isSubmitting ? 'Submitting...' : 'Submit Leave Request'}
+                {isSubmitting ? t('worker.leaves.submitting') : t('worker.leaves.submitLeaveRequest')}
               </Button>
 
               {remainingLeaves <= 0 && (
                 <p className="text-sm text-destructive text-center">
-                  You have reached your monthly leave quota
+                  {t('worker.leaves.quotaReached')}
                 </p>
               )}
             </CardContent>
@@ -217,7 +222,7 @@ const WorkerLeaves = () => {
               <div className="space-y-3 max-h-[500px] overflow-y-auto">
                 {leaves.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-8">
-                    No leave requests yet
+                    {t('worker.leaves.noLeaveRequests')}
                   </p>
                 ) : (
                   leaves
@@ -244,12 +249,12 @@ const WorkerLeaves = () => {
 
                         {leave.reason && (
                           <p className="text-sm text-muted-foreground">
-                            <strong>Reason:</strong> {leave.reason}
+                            <strong>{t('worker.leaves.reasonLabel')}</strong> {leave.reason}
                           </p>
                         )}
 
                         <p className="text-xs text-muted-foreground">
-                          Requested on {new Date(leave.requestedAt).toLocaleDateString()}
+                          {t('worker.leaves.requestedOn')} {new Date(leave.requestedAt).toLocaleDateString()}
                         </p>
 
                         {leave.status === 'pending' && (
@@ -260,7 +265,7 @@ const WorkerLeaves = () => {
                             onClick={() => handleCancelLeave(leave._id)}
                           >
                             <XCircle className="w-3 h-3 mr-1" />
-                            Cancel Request
+                            {t('worker.leaves.cancelRequest')}
                           </Button>
                         )}
                       </div>

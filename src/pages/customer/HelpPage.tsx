@@ -2,48 +2,21 @@ import AppLayout from "@/components/AppLayout";
 import { helpAPI } from "@/lib/api";
 import { CheckCircle, ChevronDown, ChevronUp, HelpCircle, Phone, Send } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface FaqItem {
   question: string;
   answer: string;
 }
 
-const faqs: FaqItem[] = [
-  {
-    question: "How do I book a service?",
-    answer:
-      "Go to the Services tab, choose the service you need, pick a date and time slot, confirm your address, and complete the booking. You'll receive a confirmation once a worker is assigned.",
-  },
-  {
-    question: "Can I reschedule or cancel my booking?",
-    answer:
-      "Yes. Open your booking from the My Bookings tab and use the reschedule or cancel option before the worker starts. Cancellations made at least 2 hours before the appointment are free of charge.",
-  },
-  {
-    question: "How do I pay for a service?",
-    answer:
-      "We accept UPI payments only. After the worker marks the job as complete, you'll receive a payment QR code. Scan it with any UPI app to complete the payment.",
-  },
-  {
-    question: "What if the worker doesn't show up?",
-    answer:
-      "If your worker is more than 15 minutes late without notice, please contact our support number immediately. We'll arrange a replacement or issue a full refund.",
-  },
-  {
-    question: "How are workers verified?",
-    answer:
-      "All workers go through ID verification, background checks, and a training assessment before they are allowed to take bookings on the platform.",
-  },
-  {
-    question: "How do I raise a complaint about a completed service?",
-    answer:
-      "Call our support number within 24 hours of service completion. Provide your booking ID and describe the issue. Our team will review and respond within one business day.",
-  },
-  {
-    question: "Is my personal information safe?",
-    answer:
-      "Yes. We only share your name and general address area with the assigned worker. Your phone number is never disclosed. All data is stored securely and never sold to third parties.",
-  },
+const useFaqs = (t: (key: string) => string): FaqItem[] => [
+  { question: t('customer.help.faq1q'), answer: t('customer.help.faq1a') },
+  { question: t('customer.help.faq2q'), answer: t('customer.help.faq2a') },
+  { question: t('customer.help.faq3q'), answer: t('customer.help.faq3a') },
+  { question: t('customer.help.faq4q'), answer: t('customer.help.faq4a') },
+  { question: t('customer.help.faq5q'), answer: t('customer.help.faq5a') },
+  { question: t('customer.help.faq6q'), answer: t('customer.help.faq6a') },
+  { question: t('customer.help.faq7q'), answer: t('customer.help.faq7a') },
 ];
 
 interface HelpPageProps {
@@ -51,6 +24,8 @@ interface HelpPageProps {
 }
 
 const HelpPage = ({ userType = "customer" }: HelpPageProps) => {
+  const { t } = useTranslation();
+  const faqs = useFaqs(t);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
@@ -86,10 +61,10 @@ const HelpPage = ({ userType = "customer" }: HelpPageProps) => {
         <div>
           <h1 className="text-2xl font-bold font-heading text-foreground mb-1 flex items-center gap-2">
             <HelpCircle className="w-6 h-6 text-primary" />
-            Help &amp; Support
+            {t('customer.help.title')}
           </h1>
           <p className="text-muted-foreground text-sm">
-            Find answers to common questions or reach us directly.
+            {t('customer.help.subtitle')}
           </p>
         </div>
 
@@ -99,21 +74,21 @@ const HelpPage = ({ userType = "customer" }: HelpPageProps) => {
             <Phone className="w-6 h-6 text-primary-foreground" />
           </div>
           <div>
-            <p className="text-xs text-muted-foreground mb-0.5">Customer Support</p>
+            <p className="text-xs text-muted-foreground mb-0.5">{t('customer.help.customerSupport')}</p>
             <a
               href="tel:+919999999999"
               className="text-xl font-bold text-foreground hover:text-primary transition-colors"
             >
               +91 99999 99999
             </a>
-            <p className="text-xs text-muted-foreground mt-0.5">Mon–Sat, 8 AM – 8 PM</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{t('customer.help.supportHours')}</p>
           </div>
         </div>
 
         {/* FAQ section */}
         <div>
           <h2 className="text-base font-bold font-heading text-foreground mb-3">
-            Frequently Asked Questions
+            {t('customer.help.faq')}
           </h2>
           <div className="space-y-2">
             {faqs.map((item, index) => (
@@ -148,46 +123,46 @@ const HelpPage = ({ userType = "customer" }: HelpPageProps) => {
         {/* Contact form */}
         <div>
           <h2 className="text-base font-bold font-heading text-foreground mb-3">
-            Send Us a Message
+            {t('customer.help.sendMessage')}
           </h2>
 
           {submitted ? (
             <div className="card-elevated p-6 flex flex-col items-center gap-3 text-center">
               <CheckCircle className="w-10 h-10 text-green-500" />
-              <p className="font-semibold text-foreground">Message sent!</p>
+              <p className="font-semibold text-foreground">{t('customer.help.messageSent')}</p>
               <p className="text-sm text-muted-foreground">
-                We'll get back to you as soon as possible.
+                {t('customer.help.messageSentDesc')}
               </p>
               <button
                 onClick={() => setSubmitted(false)}
                 className="text-sm text-primary underline mt-1"
               >
-                Send another message
+                {t('customer.help.sendAnother')}
               </button>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="card-elevated p-5 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Subject <span className="text-muted-foreground font-normal">(optional)</span>
+                  {t('customer.help.subject')} <span className="text-muted-foreground font-normal">{t('customer.help.subjectOptional')}</span>
                 </label>
                 <input
                   type="text"
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
-                  placeholder="e.g. Issue with my booking"
+                  placeholder={t('customer.help.subjectPlaceholder')}
                   maxLength={200}
                   className="w-full px-3 py-2.5 border border-border rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Message <span className="text-red-500">*</span>
+                  {t('customer.help.message')} <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Describe your issue or question…"
+                  placeholder={t('customer.help.messagePlaceholder')}
                   rows={5}
                   maxLength={2000}
                   required
@@ -206,7 +181,7 @@ const HelpPage = ({ userType = "customer" }: HelpPageProps) => {
                 className="btn-brand w-full py-3 flex items-center justify-center gap-2 disabled:opacity-60"
               >
                 <Send className="w-4 h-4" />
-                {submitting ? "Sending…" : "Send Message"}
+                {submitting ? t('customer.help.sending') : t('customer.help.sendBtn')}
               </button>
             </form>
           )}

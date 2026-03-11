@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Bell, Check, MessageCircle, MessageSquare, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface NotificationPreferences {
   inApp?: {
@@ -26,6 +27,7 @@ interface NotificationPreferences {
 }
 
 const NotificationSettingsPage = () => {
+  const { t } = useTranslation();
   const [preferences, setPreferences] = useState<NotificationPreferences>({});
   const [contactInfo, setContactInfo] = useState({ phone: '', email: '' });
   const [loading, setLoading] = useState(true);
@@ -52,7 +54,7 @@ const NotificationSettingsPage = () => {
       }
     } catch (error) {
       console.error('Error fetching preferences:', error);
-      showMessage('error', 'Failed to load notification preferences');
+      showMessage('error', t('customer.notificationSettings.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -72,14 +74,14 @@ const NotificationSettingsPage = () => {
       });
 
       if (response.ok) {
-        showMessage('success', 'Notification preferences saved successfully');
+        showMessage('success', t('customer.notificationSettings.savedSuccess'));
         await fetchPreferences();
       } else {
         throw new Error('Failed to save preferences');
       }
     } catch (error) {
       console.error('Error saving preferences:', error);
-      showMessage('error', 'Failed to save notification preferences');
+      showMessage('error', t('customer.notificationSettings.failedToSave'));
     } finally {
       setSaving(false);
     }
@@ -112,7 +114,7 @@ const NotificationSettingsPage = () => {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading notification settings...</p>
+          <p className="text-muted-foreground">{t('customer.notificationSettings.loading')}</p>
         </div>
       </div>
     );
@@ -128,7 +130,7 @@ const NotificationSettingsPage = () => {
             Notification Settings
           </h1>
           <p className="text-muted-foreground mt-2">
-            Manage how you receive notifications about your bookings
+            {t('customer.notificationSettings.subtitle')}
           </p>
         </div>
 
@@ -147,19 +149,19 @@ const NotificationSettingsPage = () => {
         {/* Contact Information */}
         <Card>
           <CardHeader>
-            <CardTitle>Contact Information</CardTitle>
+            <CardTitle>{t('customer.notificationSettings.contactInfo')}</CardTitle>
             <CardDescription>
-              Ensure your contact details are up to date to receive notifications
+              {t('customer.notificationSettings.contactInfoDesc')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
-              <Label className="text-sm text-muted-foreground">Phone</Label>
-              <p className="font-medium">{contactInfo.phone || 'Not provided'}</p>
+              <Label className="text-sm text-muted-foreground">{t('customer.notificationSettings.phone')}</Label>
+              <p className="font-medium">{contactInfo.phone || t('customer.notificationSettings.notProvided')}</p>
             </div>
             <div>
-              <Label className="text-sm text-muted-foreground">Email</Label>
-              <p className="font-medium">{contactInfo.email || 'Not provided'}</p>
+              <Label className="text-sm text-muted-foreground">{t('customer.notificationSettings.email')}</Label>
+              <p className="font-medium">{contactInfo.email || t('customer.notificationSettings.notProvided')}</p>
             </div>
           </CardContent>
         </Card>
@@ -167,9 +169,9 @@ const NotificationSettingsPage = () => {
         {/* Notification Channels */}
         <Card>
           <CardHeader>
-            <CardTitle>Notification Channels</CardTitle>
+            <CardTitle>{t('customer.notificationSettings.channels')}</CardTitle>
             <CardDescription>
-              Choose how you want to receive notifications. WhatsApp is most cost-effective and instant.
+              {t('customer.notificationSettings.channelsDesc')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -178,9 +180,9 @@ const NotificationSettingsPage = () => {
               <div className="flex items-center gap-3">
                 <Bell className="w-5 h-5 text-primary" />
                 <div>
-                  <Label htmlFor="in-app" className="font-medium">In-App Notifications</Label>
+                  <Label htmlFor="in-app" className="font-medium">{t('customer.notificationSettings.inApp')}</Label>
                   <p className="text-sm text-muted-foreground">
-                    Receive notifications within the app
+                    {t('customer.notificationSettings.inAppDesc')}
                   </p>
                 </div>
               </div>
@@ -196,9 +198,9 @@ const NotificationSettingsPage = () => {
               <div className="flex items-center gap-3">
                 <MessageCircle className="w-5 h-5 text-green-500" />
                 <div>
-                  <Label htmlFor="whatsapp" className="font-medium">WhatsApp Notifications</Label>
+                  <Label htmlFor="whatsapp" className="font-medium">{t('customer.notificationSettings.whatsapp')}</Label>
                   <p className="text-sm text-muted-foreground">
-                    Get instant updates via WhatsApp (Recommended)
+                    {t('customer.notificationSettings.whatsappDesc')}
                   </p>
                   {preferences.whatsapp?.enabled && preferences.whatsapp?.consentDate && (
                     <p className="text-xs text-muted-foreground mt-1">
@@ -220,9 +222,9 @@ const NotificationSettingsPage = () => {
               <div className="flex items-center gap-3">
                 <MessageSquare className="w-5 h-5 text-blue-500" />
                 <div>
-                  <Label htmlFor="sms" className="font-medium">SMS Notifications</Label>
+                  <Label htmlFor="sms" className="font-medium">{t('customer.notificationSettings.sms')}</Label>
                   <p className="text-sm text-muted-foreground">
-                    Receive updates via text message
+                    {t('customer.notificationSettings.smsDesc')}
                   </p>
                   {preferences.sms?.enabled && preferences.sms?.consentDate && (
                     <p className="text-xs text-muted-foreground mt-1">
@@ -242,7 +244,7 @@ const NotificationSettingsPage = () => {
             {!contactInfo.phone && (
               <Alert>
                 <AlertDescription>
-                  Add your phone number in your profile to enable WhatsApp and SMS notifications.
+                  {t('customer.notificationSettings.addPhoneHint')}
                 </AlertDescription>
               </Alert>
             )}
@@ -252,16 +254,16 @@ const NotificationSettingsPage = () => {
         {/* Notification Types */}
         <Card>
           <CardHeader>
-            <CardTitle>What to Notify</CardTitle>
+            <CardTitle>{t('customer.notificationSettings.whatToNotify')}</CardTitle>
             <CardDescription>
-              Choose which events you want to be notified about
+              {t('customer.notificationSettings.whatToNotifyDesc')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="worker-assignment" className="font-medium">Worker Assignment</Label>
-                <p className="text-sm text-muted-foreground">When a worker is assigned to your booking</p>
+                <Label htmlFor="worker-assignment" className="font-medium">{t('customer.notificationSettings.workerAssignment')}</Label>
+                <p className="text-sm text-muted-foreground">{t('customer.notificationSettings.workerAssignmentDesc')}</p>
               </div>
               <Switch
                 id="worker-assignment"
@@ -272,8 +274,8 @@ const NotificationSettingsPage = () => {
 
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="schedule-change" className="font-medium">Schedule Changes</Label>
-                <p className="text-sm text-muted-foreground">When your booking time is changed</p>
+                <Label htmlFor="schedule-change" className="font-medium">{t('customer.notificationSettings.scheduleChanges')}</Label>
+                <p className="text-sm text-muted-foreground">{t('customer.notificationSettings.scheduleChangesDesc')}</p>
               </div>
               <Switch
                 id="schedule-change"
@@ -284,8 +286,8 @@ const NotificationSettingsPage = () => {
 
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="worker-reassignment" className="font-medium">Worker Reassignment</Label>
-                <p className="text-sm text-muted-foreground">When a different worker is assigned</p>
+                <Label htmlFor="worker-reassignment" className="font-medium">{t('customer.notificationSettings.workerReassignment')}</Label>
+                <p className="text-sm text-muted-foreground">{t('customer.notificationSettings.workerReassignmentDesc')}</p>
               </div>
               <Switch
                 id="worker-reassignment"
@@ -296,8 +298,8 @@ const NotificationSettingsPage = () => {
 
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="delay" className="font-medium">Delay Notifications</Label>
-                <p className="text-sm text-muted-foreground">When your service is delayed</p>
+                <Label htmlFor="delay" className="font-medium">{t('customer.notificationSettings.delayNotifications')}</Label>
+                <p className="text-sm text-muted-foreground">{t('customer.notificationSettings.delayNotificationsDesc')}</p>
               </div>
               <Switch
                 id="delay"
@@ -308,8 +310,8 @@ const NotificationSettingsPage = () => {
 
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="cancellation" className="font-medium">Cancellations & Refunds</Label>
-                <p className="text-sm text-muted-foreground">When bookings are cancelled or refunded</p>
+                <Label htmlFor="cancellation" className="font-medium">{t('customer.notificationSettings.cancellations')}</Label>
+                <p className="text-sm text-muted-foreground">{t('customer.notificationSettings.cancellationsDesc')}</p>
               </div>
               <Switch
                 id="cancellation"
@@ -327,13 +329,13 @@ const NotificationSettingsPage = () => {
             onClick={fetchPreferences}
             disabled={saving}
           >
-            Reset
+            {t('customer.notificationSettings.reset')}
           </Button>
           <Button
             onClick={savePreferences}
             disabled={saving}
           >
-            {saving ? 'Saving...' : 'Save Preferences'}
+            {saving ? t('customer.notificationSettings.saving') : t('customer.notificationSettings.savePreferences')}
           </Button>
         </div>
 
@@ -343,13 +345,13 @@ const NotificationSettingsPage = () => {
             <div className="flex gap-3">
               <Bell className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
               <div className="space-y-2 text-sm">
-                <p className="font-medium">About Notifications</p>
+                <p className="font-medium">{t('customer.notificationSettings.aboutNotifications')}</p>
                 <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                  <li>In-app notifications are always free and instant</li>
-                  <li>WhatsApp notifications are cost-effective and highly reliable</li>
-                  <li>SMS notifications are sent as backup when WhatsApp fails</li>
-                  <li>You can change these settings anytime</li>
-                  <li>Critical notifications (delays, cancellations) use all enabled channels</li>
+                  <li>{t('customer.notificationSettings.aboutInApp')}</li>
+                  <li>{t('customer.notificationSettings.aboutWhatsapp')}</li>
+                  <li>{t('customer.notificationSettings.aboutSms')}</li>
+                  <li>{t('customer.notificationSettings.aboutChangeAnytime')}</li>
+                  <li>{t('customer.notificationSettings.aboutCritical')}</li>
                 </ul>
               </div>
             </div>

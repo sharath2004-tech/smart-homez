@@ -183,14 +183,14 @@ const WorkerTasks = () => {
             </div>
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <Package className="w-3.5 h-3.5 shrink-0" />
-              <span className="text-muted-foreground font-normal">Collect:</span>
+              <span className="text-muted-foreground font-normal">{t('worker.tasks.collectLabel')}</span>
               <span className="text-primary">₹{task.totalAmount}</span>
             </div>
           </div>
 
           <div className="pt-2 border-t border-border">
             <p className="text-xs text-primary font-medium">
-              👆 Tap to view full details and navigation
+              👆 {t('worker.tasks.tapToViewDetails')}
             </p>
           </div>
         </div>

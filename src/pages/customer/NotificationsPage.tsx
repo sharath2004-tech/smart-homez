@@ -3,8 +3,10 @@ import { api } from '../../lib/api';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { Bell } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export default function NotificationCenter() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const { data: notifications } = useQuery({
@@ -31,10 +33,10 @@ export default function NotificationCenter() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Bell /> Notifications {unreadCount > 0 && <span className="text-sm bg-red-500 text-white px-2 py-1 rounded-full">{unreadCount}</span>}
+          <Bell /> {t('customer.notifications.title')} {unreadCount > 0 && <span className="text-sm bg-red-500 text-white px-2 py-1 rounded-full">{unreadCount}</span>}
         </h1>
         {unreadCount > 0 && (
-          <Button size="sm" onClick={() => markAllReadMutation.mutate()}>Mark All Read</Button>
+          <Button size="sm" onClick={() => markAllReadMutation.mutate()}>{t('customer.notifications.markAllRead')}</Button>
         )}
       </div>
       <div className="space-y-2">
@@ -47,7 +49,7 @@ export default function NotificationCenter() {
                 <p className="text-xs text-gray-400 mt-1">{new Date(notif.createdAt).toLocaleString()}</p>
               </div>
               {!notif.isRead && (
-                <Button size="sm" variant="ghost" onClick={() => markReadMutation.mutate(notif._id)}>Mark Read</Button>
+                <Button size="sm" variant="ghost" onClick={() => markReadMutation.mutate(notif._id)}>{t('customer.notifications.markRead')}</Button>
               )}
             </div>
           </Card>

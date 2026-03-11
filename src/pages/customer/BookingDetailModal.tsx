@@ -2,6 +2,7 @@ import EmbeddedQRScanner from "@/components/EmbeddedQRScanner";
 import { API_BASE_URL, bookingsAPI } from "@/lib/api";
 import { ArrowLeft, Calendar, Camera, CheckCircle, DollarSign, Phone, QrCode, Timer, User } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import ReviewModal from "./ReviewModal";
 
 interface Worker {
@@ -75,6 +76,7 @@ interface BookingDetailModalProps {
 }
 
 const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModalProps) => {
+  const { t } = useTranslation();
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
   const [showScanner, setShowScanner] = useState(false);
@@ -97,11 +99,11 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
       setBooking(response.booking);
     } catch (error) {
       console.error('Error fetching booking detail:', error);
-      if (!silent) alert('Failed to load booking details');
+      if (!silent) alert(t('customer.bookings.failedToLoadDetails'));
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [bookingId]);
+  }, [bookingId, t]);
 
   useEffect(() => {
     fetchBookingDetail(false); // Initial load with loading spinner
@@ -171,24 +173,24 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
   const handleScanStartQR = useCallback(async (qrCode: string) => {
     try {
       const response = await bookingsAPI.scanStartQR(bookingId, qrCode, true);
-      alert('Service started successfully! Timer has begun.');
+      alert(t('customer.bookings.serviceStartedSuccess'));
       setShowScanner(false);
       fetchBookingDetail();
       onRefresh();
     } catch (error) {
       console.error('Error scanning QR:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to scan QR code';
+      const errorMessage = error instanceof Error ? error.message : t('customer.bookings.failedToScanQR');
       alert(errorMessage);
       setShowScanner(false);
     }
-  }, [bookingId, fetchBookingDetail, onRefresh]);
+  }, [bookingId, fetchBookingDetail, onRefresh, t]);
 
   const handleScanEndQR = useCallback(async (qrCode: string) => {
     try {
       const response = await bookingsAPI.scanEndQR(bookingId, qrCode);
       const result = response.booking;
       
-      let message = 'Service completed successfully!';
+      let message = t('customer.bookings.serviceCompletedSuccess');
       if (result.overtimeMinutes > 0) {
         message += `\n\nOvertime: ${result.overtimeMinutes} minutes\nOvertime Charge: ₹${result.overtimeCharges.toFixed(2)}\nTotal Amount: ₹${result.totalAmount.toFixed(2)}`;
       }
@@ -199,14 +201,14 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
       onRefresh();
     } catch (error) {
       console.error('Error scanning end QR:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to end service';
+      const errorMessage = error instanceof Error ? error.message : t('customer.bookings.failedToEndService');
       alert(errorMessage);
       setShowEndScanner(false);
     }
-  }, [bookingId, fetchBookingDetail, onRefresh]);
+  }, [bookingId, fetchBookingDetail, onRefresh, t]);
 
   const handleDirectEndService = useCallback(async () => {
-    if (!confirm('Are you sure you want to end the service now?\n\nNote: If worker has generated an end QR code, it\'s better to scan it for verification.')) {
+    if (!confirm(t('customer.bookings.confirmEndService'))) {
       return;
     }
 
@@ -240,7 +242,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
     } finally {
       setEndingService(false);
     }
-  }, [bookingId, booking?.serviceEndQRCode, fetchBookingDetail, onRefresh]);
+  }, [bookingId, booking?.serviceEndQRCode, fetchBookingDetail, onRefresh, t]);
 
   const formatTime = (timeString: string) => {
     if (!timeString) return '';
@@ -280,7 +282,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl p-8 max-w-md w-full">
           <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full mx-auto"></div>
-          <p className="text-center mt-4 text-muted-foreground">Loading booking details...</p>
+          <p className="text-center mt-4 text-muted-foreground">{t('customer.bookings.loadingDetails')}</p>
         </div>
       </div>
     );
@@ -301,7 +303,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="flex-1">
-              <h2 className="text-xl font-bold">Booking Details</h2>
+              <h2 className="text-xl font-bold">{t('customer.bookings.bookingDetails')}</h2>
               <p className="text-sm opacity-90">ID: {booking._id.slice(-8)}</p>
             </div>
           </div>
@@ -315,7 +317,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
 
             {/* Status Badge */}
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Status</span>
+              <span className="text-sm text-muted-foreground">{t('customer.bookings.status')}</span>
               <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
                 booking.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
                 booking.status === 'in-progress' ? 'bg-purple-100 text-purple-800' :
@@ -330,15 +332,15 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
             <div className="space-y-3">
               <h3 className="font-semibold text-foreground flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-primary" />
-                Schedule
+                {t('customer.bookings.schedule')}
               </h3>
               <div className="bg-muted p-4 rounded-xl space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Date</span>
+                  <span className="text-muted-foreground">{t('customer.bookings.date')}</span>
                   <span className="font-medium text-foreground">{formatDate(booking.bookingDate)}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Time Slot</span>
+                  <span className="text-muted-foreground">{t('customer.bookings.timeSlot')}</span>
                   <span className="font-medium text-foreground">
                     {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
                   </span>
@@ -351,7 +353,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
               <div className="space-y-3">
                 <h3 className="font-semibold text-foreground flex items-center gap-2">
                   <User className="w-5 h-5 text-primary" />
-                  Worker Details
+                  {t('customer.bookings.workerDetails')}
                 </h3>
                 <div className="bg-muted p-4 rounded-xl space-y-3">
                   <div className="flex items-center gap-3">
@@ -391,18 +393,18 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
               <div className="space-y-3">
                 <h3 className="font-semibold text-foreground flex items-center gap-2">
                   <QrCode className="w-5 h-5 text-primary" />
-                  Service Start QR Code
+                  {t('customer.bookings.serviceStartQRCode')}
                 </h3>
                 <div className="bg-teal-50 border-2 border-teal-200 p-4 rounded-xl text-center space-y-3">
                   <p className="text-sm text-muted-foreground mb-3">
-                    When worker arrives, scan their QR code to start the service and timer
+                    {t('customer.bookings.scanQRToStart')}
                   </p>
                   <button
                     onClick={() => setShowScanner(true)}
                     className="btn-brand w-full py-3 flex items-center justify-center gap-2"
                   >
                     <QrCode className="w-5 h-5" />
-                    Scan Worker's QR Code
+                    {t('customer.bookings.scanWorkerQR')}
                   </button>
                 </div>
               </div>
@@ -413,10 +415,10 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
               <div className="space-y-3">
                 <h3 className="font-semibold text-foreground flex items-center gap-2">
                   <Timer className="w-5 h-5 text-primary" />
-                  Service In Progress
+                  {t('customer.bookings.serviceInProgress')}
                 </h3>
                 <div className="bg-purple-50 border-2 border-purple-200 p-6 rounded-xl text-center space-y-2">
-                  <p className="text-sm text-muted-foreground">Elapsed Time</p>
+                  <p className="text-sm text-muted-foreground">{t('customer.bookings.elapsedTime')}</p>
                   <p className="text-4xl font-bold text-purple-600 font-mono">
                     {formatElapsedTime(elapsedTime)}
                   </p>
@@ -436,11 +438,11 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                 <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 p-4 rounded-xl space-y-3">
                   <h4 className="font-semibold text-green-800 text-center flex items-center justify-center gap-2">
                     <QrCode className="w-5 h-5" />
-                    End Service
+                    {t('customer.bookings.endService')}
                   </h4>
 
                   <p className="text-xs text-green-700 text-center">
-                    Scan the worker's QR code to confirm service completion.
+                    {t('customer.bookings.scanQRToEnd')}
                   </p>
 
                   {/* Scan Worker's End QR */}
@@ -449,7 +451,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                     className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
                   >
                     <QrCode className="w-5 h-5" />
-                    Scan Worker's End QR Code
+                    {t('customer.bookings.scanWorkerEndQR')}
                   </button>
                 </div>
               </div>
@@ -460,7 +462,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
               <div className="space-y-3">
                 <h3 className="font-semibold text-foreground flex items-center gap-2">
                   <Camera className="w-5 h-5 text-primary" />
-                  Completion Photo
+                  {t('customer.bookings.completionPhoto')}
                   {booking.completionPhoto.verified && (
                     <CheckCircle className="w-4 h-4 text-green-600" />
                   )}
@@ -480,7 +482,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <CheckCircle className="w-3 h-3 text-green-600" />
-                      Verified completion photo
+                      {t('customer.bookings.verifiedCompletionPhoto')}
                     </span>
                     {booking.completionPhoto.timestamp && (
                       <span>
@@ -501,11 +503,11 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
             <div className="space-y-3">
               <h3 className="font-semibold text-foreground flex items-center gap-2">
                 <DollarSign className="w-5 h-5 text-primary" />
-                Payment
+                {t('customer.bookings.payment')}
               </h3>
               <div className="bg-muted p-4 rounded-xl space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Base Amount</span>
+                  <span className="text-muted-foreground">{t('customer.bookings.baseAmount')}</span>
                   <span className="font-medium text-foreground">₹{booking.totalAmount}</span>
                 </div>
                 {overtimeMinutes > 0 && (
@@ -518,7 +520,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                   </>
                 )}
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-foreground">Total Amount</span>
+                  <span className="font-semibold text-foreground">{t('customer.bookings.totalAmount')}</span>
                   <span className="text-2xl font-bold text-primary">₹{calculateTotalAmount().toFixed(2)}</span>
                 </div>
               </div>
@@ -529,13 +531,13 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
               <div className="space-y-3">
                 <div className="bg-purple-50 border-2 border-purple-200 p-4 rounded-xl text-center">
                   <p className="text-sm text-purple-800 mb-3">
-                    How was your experience with {booking.worker.name}?
+                    {t('customer.bookings.howWasExperience', { workerName: booking.worker.name })}
                   </p>
                   <button
                     onClick={() => setShowReviewModal(true)}
                     className="btn-brand w-full py-3"
                   >
-                    ⭐ Write a Review
+                    ⭐ {t('customer.bookings.writeReview')}
                   </button>
                 </div>
               </div>
@@ -544,7 +546,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
             {/* Show Rating if already reviewed */}
             {booking.rating && (
               <div className="space-y-3">
-                <h3 className="font-semibold text-foreground">Your Review</h3>
+                <h3 className="font-semibold text-foreground">{t('customer.bookings.yourReview')}</h3>
                 <div className="bg-muted p-4 rounded-xl">
                   <div className="flex items-center gap-2 mb-2">
                     {[1, 2, 3, 4, 5].map((star) => (
@@ -565,7 +567,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
               onClick={onClose}
               className="w-full btn-secondary py-3"
             >
-              Close
+              {t('customer.bookings.close')}
             </button>
           </div>
         </div>

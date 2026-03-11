@@ -109,14 +109,14 @@ const BookingsPage = () => {
   };
 
   const handleCancelBooking = async (bookingId: string) => {
-    if (!confirm('Are you sure you want to cancel this booking?')) return;
+    if (!confirm(t('customer.bookings.cancelConfirm'))) return;
 
     try {
       await bookingsAPI.cancel(bookingId);
       await fetchBookings();
     } catch (error) {
       console.error('Error cancelling booking:', error);
-      alert(error instanceof Error ? error.message : 'Failed to cancel booking. Please try again.');
+      alert(error instanceof Error ? error.message : t('customer.bookings.failedCancel'));
     }
   };
 
@@ -147,7 +147,7 @@ const BookingsPage = () => {
 
   const handleTrackWorker = (booking: Booking) => {
     if (!booking.worker) {
-      alert('Worker not yet assigned to this booking.');
+      alert(t('customer.bookings.workerNotAssigned'));
       return;
     }
     
@@ -157,7 +157,7 @@ const BookingsPage = () => {
 
   const handleContactWorker = (worker: Worker) => {
     if (!worker.phone) {
-      alert('Worker phone number not available.');
+      alert(t('customer.bookings.workerPhoneUnavailable'));
       return;
     }
     window.open(`tel:${worker.phone}`);
@@ -193,20 +193,20 @@ const BookingsPage = () => {
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <h1 className="text-2xl font-bold font-heading text-foreground mb-1">My Bookings</h1>
-              <p className="text-sm text-muted-foreground">Track and manage your service bookings</p>
+              <p className="text-sm text-muted-foreground">{t('customer.bookings.trackAndManage')}</p>
             </div>
             <button
               onClick={handleManualRefresh}
               disabled={refreshing}
               className="p-2 hover:bg-muted rounded-lg transition-colors"
-              title="Refresh bookings"
+              title={t('customer.bookings.refreshBookings')}
             >
               <RefreshCw className={`w-5 h-5 text-primary ${refreshing ? 'animate-spin' : ''}`} />
             </button>
           </div>
           {lastRefresh && (
             <p className="text-xs text-muted-foreground mt-2">
-              Last updated: {lastRefresh.toLocaleTimeString()} • Auto-refreshes every 15s
+              {t('customer.bookings.lastUpdated')} {lastRefresh.toLocaleTimeString()} • {t('customer.bookings.autoRefresh')}
             </p>
           )}
         </div>
@@ -217,13 +217,13 @@ const BookingsPage = () => {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold capitalize transition-all ${
+              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${
                 activeTab === tab
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {tab}
+              {t(`customer.bookings.${tab}`)}
             </button>
           ))}
         </div>
@@ -233,8 +233,8 @@ const BookingsPage = () => {
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
             <QrCode className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
             <div>
-              <p className="text-sm font-medium text-blue-900">Tap any booking to view details and scan QR code</p>
-              <p className="text-xs text-blue-700 mt-1">When your worker arrives, tap the booking and scan their QR code to start the service timer.</p>
+              <p className="text-sm font-medium text-blue-900">{t('customer.bookings.tapToScanQR')}</p>
+              <p className="text-xs text-blue-700 mt-1">{t('customer.bookings.tapToScanQRDesc')}</p>
             </div>
           </div>
         )}
@@ -244,16 +244,16 @@ const BookingsPage = () => {
           {loading ? (
             <div className="card-elevated p-12 text-center">
               <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full mx-auto"></div>
-              <p className="text-sm text-muted-foreground mt-4">Loading bookings...</p>
+              <p className="text-sm text-muted-foreground mt-4">{t('customer.bookings.loadingBookings')}</p>
             </div>
           ) : bookings.length === 0 ? (
             <div className="card-elevated p-12 text-center">
               <Calendar className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-              <h3 className="text-lg font-bold text-foreground mb-2">No {activeTab} bookings</h3>
+              <h3 className="text-lg font-bold text-foreground mb-2">{t('customer.bookings.noBookingsTab', { tab: activeTab })}</h3>
               <p className="text-sm text-muted-foreground">
-                {activeTab === "upcoming" && "Book a service to get started!"}
-                {activeTab === "ongoing" && "No services currently in progress."}
-                {activeTab === "past" && "Your completed bookings will appear here."}
+                {activeTab === "upcoming" && t('customer.bookings.bookToGetStarted')}
+                {activeTab === "ongoing" && t('customer.bookings.noOngoing')}
+                {activeTab === "past" && t('customer.bookings.pastWillAppear')}
               </p>
             </div>
           ) : (
@@ -272,7 +272,7 @@ const BookingsPage = () => {
                   {/* Ready to Start Indicator */}
                   {booking.status === 'confirmed' && booking.serviceStartQRCode && !booking.actualStartTime && (
                     <div className="absolute top-3 right-3 px-3 py-1 bg-teal-500 text-white text-xs font-semibold rounded-full animate-pulse">
-                      👆 Tap to scan QR
+                      👆 {t('customer.bookings.tapToScan')}
                     </div>
                   )}
                   
@@ -283,7 +283,7 @@ const BookingsPage = () => {
                         {booking.service.name}
                       </h3>
                       <p className="text-xs text-muted-foreground">
-                        Booking ID: {booking._id.slice(-8)}
+                        {t('customer.bookings.bookingId')} {booking._id.slice(-8)}
                       </p>
                     </div>
                     <Badge className={`${statusInfo.bg} ${statusInfo.text} border-0`}>

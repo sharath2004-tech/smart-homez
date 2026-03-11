@@ -233,7 +233,7 @@ const WorkerEarnings = () => {
     <AppLayout userType="worker" userName={profile?.name || "Worker"}>
       <div className="max-w-3xl mx-auto space-y-6 animate-fade-in pb-20 md:pb-0">
         <div>
-          <h1 className="text-2xl font-bold font-heading text-foreground mb-1">Salary Management</h1>
+          <h1 className="text-2xl font-bold font-heading text-foreground mb-1">{t('worker.earnings.salaryManagement')}</h1>
           <p className="text-muted-foreground text-sm">{t('worker.earnings.subtitle')}</p>
         </div>
 
@@ -247,7 +247,7 @@ const WorkerEarnings = () => {
                 period === p ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {p === "today" ? t('worker.dashboard.today') : p === "week" ? t('worker.dashboard.thisWeek') : t('worker.dashboard.thisMonth')}
+              {p === "today" ? t('worker.tasks.today') : p === "week" ? t('worker.tasks.thisWeek') : t('worker.tasks.thisMonth')}
             </button>
           ))}
         </div>
@@ -260,13 +260,13 @@ const WorkerEarnings = () => {
                 <IndianRupee className="w-6 h-6 text-primary-foreground" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Your Hourly Rate</p>
-                <p className="text-2xl font-bold text-foreground">₹{HOURLY_RATE}<span className="text-base text-muted-foreground">/hour</span></p>
+                <p className="text-sm text-muted-foreground">{t('worker.earnings.yourHourlyRate')}</p>
+                <p className="text-2xl font-bold text-foreground">₹{HOURLY_RATE}<span className="text-base text-muted-foreground">{t('worker.earnings.perHour')}</span></p>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-xs text-muted-foreground">Earnings calculated</p>
-              <p className="text-sm font-semibold text-primary">Start to End time</p>
+              <p className="text-xs text-muted-foreground">{t('worker.earnings.earningsCalculated')}</p>
+              <p className="text-sm font-semibold text-primary">{t('worker.earnings.startToEndTime')}</p>
             </div>
           </div>
         </div>
@@ -276,17 +276,17 @@ const WorkerEarnings = () => {
           <div className="absolute right-4 top-4 opacity-20 text-6xl">💰</div>
           <p className="text-primary-foreground/70 text-sm mb-1">{t('worker.earnings.totalEarnings')}</p>
           <p className="text-4xl font-bold font-heading text-primary-foreground mb-1">{displayStats[period].earned}</p>
-          <p className="text-primary-foreground/80 text-sm mb-4">{displayStats[period].avgRate} average</p>
+          <p className="text-primary-foreground/80 text-sm mb-4">{displayStats[period].avgRate} {t('worker.earnings.average')}</p>
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-primary-foreground/10 rounded-xl p-3 backdrop-blur-sm">
               <div className="flex items-center gap-2 text-primary-foreground/60 text-xs mb-1">
-                <Clock className="w-3.5 h-3.5" /> Hours Worked
+                <Clock className="w-3.5 h-3.5" /> {t('worker.earnings.hoursWorked')}
               </div>
               <p className="text-primary-foreground font-bold">{displayStats[period].hours}</p>
             </div>
             <div className="bg-primary-foreground/10 rounded-xl p-3 backdrop-blur-sm">
               <div className="flex items-center gap-2 text-primary-foreground/60 text-xs mb-1">
-                <Calendar className="w-3.5 h-3.5" /> Jobs Done
+                <Calendar className="w-3.5 h-3.5" /> {t('worker.earnings.jobsDone')}
               </div>
               <p className="text-primary-foreground font-bold">{displayStats[period].jobs}</p>
             </div>
@@ -296,9 +296,9 @@ const WorkerEarnings = () => {
         {/* Transaction history */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-bold font-heading text-foreground">Recent Transactions</h2>
+            <h2 className="text-base font-bold font-heading text-foreground">{t('worker.earnings.recentTransactions')}</h2>
             <button className="flex items-center gap-1.5 text-sm text-primary font-medium">
-              <Download className="w-3.5 h-3.5" /> Export
+              <Download className="w-3.5 h-3.5" /> {t('worker.earnings.export')}
             </button>
           </div>
           
@@ -337,7 +337,7 @@ const WorkerEarnings = () => {
                       <div className="text-right">
                         <p className="font-bold text-foreground">₹{Math.round(breakdown.totalGross)}</p>
                         <span className="text-xs px-2 py-0.5 bg-success-light text-success rounded-full font-medium">
-                          Settled
+                          {t('worker.earnings.settled')}
                         </span>
                       </div>
                     </div>
@@ -347,18 +347,18 @@ const WorkerEarnings = () => {
                       <div className="pt-3 border-t border-border space-y-1.5">
                         <div className="flex justify-between text-xs">
                           <span className="text-muted-foreground">
-                            Base ({breakdown.hours.toFixed(2)}h × ₹{breakdown.hourlyRate}/hr)
+                            {t('worker.earnings.base')} ({breakdown.hours.toFixed(2)}h × ₹{breakdown.hourlyRate}/hr)
                           </span>
                           <span className="font-medium text-foreground">₹{Math.round(breakdown.baseEarnings)}</span>
                         </div>
                         {breakdown.overtimeEarnings > 0 && (
                           <div className="flex justify-between text-xs">
-                            <span className="text-muted-foreground">Overtime charges</span>
+                            <span className="text-muted-foreground">{t('worker.earnings.overtimeCharges')}</span>
                             <span className="font-medium text-warning">+₹{Math.round(breakdown.overtimeEarnings)}</span>
                           </div>
                         )}
                         <div className="flex justify-between text-xs pt-1 border-t border-border/50">
-                          <span className="font-medium text-foreground">Total Gross</span>
+                          <span className="font-medium text-foreground">{t('worker.earnings.totalGross')}</span>
                           <span className="font-bold text-foreground">₹{Math.round(breakdown.totalGross)}</span>
                         </div>
                       </div>
@@ -374,15 +374,15 @@ const WorkerEarnings = () => {
         <div className="card-elevated p-5 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h3 className="font-bold text-foreground text-sm mb-1">View your salary payments</h3>
-              <p className="text-xs text-muted-foreground">See your monthly salary payments sent by admin.</p>
+              <h3 className="font-bold text-foreground text-sm mb-1">{t('worker.earnings.viewSalaryPayments')}</h3>
+              <p className="text-xs text-muted-foreground">{t('worker.earnings.seeMonthlySalary')}</p>
             </div>
             <a
               href="/worker/salary"
               className="btn-brand py-2.5 px-4 text-sm whitespace-nowrap flex items-center gap-1.5 shrink-0"
             >
               <IndianRupee className="w-4 h-4" />
-              Salary History
+              {t('worker.earnings.salaryHistory')}
             </a>
           </div>
         </div>

@@ -4,6 +4,7 @@ import { authAPI, servicesAPI } from "@/lib/api";
 import { motion } from "framer-motion";
 import { Clock, MapPin, Search, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 interface Service {
@@ -27,6 +28,7 @@ const SERVICE_CATEGORIES = [
 ] as const;
 
 const ServicesPage = () => {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [services, setServices] = useState<Service[]>([]);
@@ -66,7 +68,7 @@ const ServicesPage = () => {
 
   const handleLocationConfirmed = (location: LocationData) => {
     if (!location.isAvailable) {
-      alert("Sorry, we don't service this area yet. We'll notify you when we expand!");
+      alert(t('customer.services.areaNotServiceable'));
       return;
     }
     
@@ -188,8 +190,8 @@ const ServicesPage = () => {
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.2 }}
             >
-              <h1 className="text-2xl font-bold font-heading text-foreground mb-1">Our Services</h1>
-              <p className="text-muted-foreground text-sm">Choose from a wide range of home services</p>
+              <h1 className="text-2xl font-bold font-heading text-foreground mb-1">{t('customer.services.title')}</h1>
+              <p className="text-muted-foreground text-sm">{t('customer.services.subtitle')}</p>
               {selectedLocation && (
                 <motion.div 
                   className="mt-2 flex items-center justify-between"
@@ -201,13 +203,13 @@ const ServicesPage = () => {
                     <MapPin className="w-3 h-3" />
                     {selectedLocation.area && selectedLocation.city 
                       ? `${selectedLocation.area}, ${selectedLocation.city}` 
-                      : 'Location set'}
+                      : t('customer.services.locationSet')}
                   </p>
                   <button 
                     onClick={handleChangeLocation}
                     className="text-xs text-primary hover:underline"
                   >
-                    Change Location
+                    {t('customer.services.changeLocation')}
                   </button>
                 </motion.div>
               )}
@@ -240,7 +242,7 @@ const ServicesPage = () => {
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
                   className="input-clean pl-10"
-                  placeholder="Search services..."
+                  placeholder={t('customer.services.searchPlaceholder')}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -258,7 +260,7 @@ const ServicesPage = () => {
               animate={{ rotate: 360 }}
               transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
             />
-            <p className="text-sm text-muted-foreground">Loading services...</p>
+            <p className="text-sm text-muted-foreground">{t('customer.services.loading')}</p>
           </motion.div>
         ) : displayedServices.length === 0 ? (
           <motion.div 
@@ -274,8 +276,8 @@ const ServicesPage = () => {
             >
               🔍
             </motion.div>
-            <p className="font-medium text-foreground">No services found</p>
-            <p className="text-sm text-muted-foreground mt-1">Try adjusting your search or check back later</p>
+            <p className="font-medium text-foreground">{t('customer.services.noServices')}</p>
+            <p className="text-sm text-muted-foreground mt-1">{t('customer.services.noServicesDesc')}</p>
           </motion.div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
@@ -297,7 +299,7 @@ const ServicesPage = () => {
                       <h3 className="font-bold font-heading text-foreground text-sm">{service.name}</h3>
                       {service.availability && (
                         <span className={`shrink-0 text-xs ${service.availability.available ? 'badge-success' : 'badge-warning'}`}>
-                          {service.availability.available ? 'Available' : 'Limited'}
+                          {service.availability.available ? t('customer.services.available') : t('customer.services.limited')}
                         </span>
                       )}
                     </div>
@@ -311,7 +313,7 @@ const ServicesPage = () => {
                     <Users className="w-3.5 h-3.5 text-muted-foreground" />
                     <span className="text-xs text-foreground">
                       {service.availability.workersCount > 0 
-                        ? `${service.availability.workersCount} workers nearby`
+                        ? t('customer.services.workersNearby', { count: service.availability.workersCount })
                         : service.availability.reason}
                     </span>
                   </div>
@@ -337,7 +339,7 @@ const ServicesPage = () => {
                         : 'bg-muted text-muted-foreground hover:bg-border visited:text-muted-foreground'
                     }`}
                   >
-                    {service.availability?.available ? 'Book Now' : 'View'}
+                    {service.availability?.available ? t('customer.services.bookNow') : t('customer.services.view')}
                     </Link>
                   </motion.div>
                 </div>

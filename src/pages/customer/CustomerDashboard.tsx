@@ -46,9 +46,9 @@ const CustomerDashboard = () => {
 
   // Only 3 service category cards
   const quickServices = [
-    { icon: "⚡", name: "Insta / Adhoc", subtitle: "Instant booking", badge: "On demand", path: "/customer/services/insta" },
-    { icon: "📅", name: "Subscription", subtitle: "Recurring plans", badge: "Save 20%", path: "/customer/services/subscription" },
-    { icon: "✨", name: "Deep Cleaning", subtitle: "Full home clean", badge: "Best value", path: "/customer/services/deep-cleaning" },
+    { icon: "⚡", name: t('customer.dashboard.instaAdhoc'), subtitle: t('customer.dashboard.instantBooking'), badge: t('customer.dashboard.onDemand'), path: "/customer/services/insta" },
+    { icon: "📅", name: t('customer.dashboard.subscription'), subtitle: t('customer.dashboard.recurringPlans'), badge: t('customer.dashboard.save20'), path: "/customer/services/subscription" },
+    { icon: "✨", name: t('customer.dashboard.deepCleaning'), subtitle: t('customer.dashboard.fullHomeClean'), badge: t('customer.dashboard.bestValue'), path: "/customer/services/deep-cleaning" },
   ];
 
   useEffect(() => {
@@ -178,7 +178,7 @@ const CustomerDashboard = () => {
               animate={{ opacity: 1 }}
               transition={{ delay: 0.2 }}
             >
-              Good morning 👋
+              {t('customer.dashboard.goodMorning')}
             </motion.p>
             <Link to="/customer/profile">
               <motion.h1 
@@ -228,7 +228,7 @@ const CustomerDashboard = () => {
                 animate={{ opacity: [1, 0.3, 1] }}
                 transition={{ repeat: Infinity, duration: 1.5 }}
               />
-              <span className="text-xs font-bold text-green-600 uppercase tracking-wide">Service In Progress</span>
+              <span className="text-xs font-bold text-green-600 uppercase tracking-wide">{t('customer.dashboard.serviceInProgress')}</span>
             </div>
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-xl shrink-0">
@@ -236,10 +236,10 @@ const CustomerDashboard = () => {
               </div>
               <div className="flex-1">
                 <p className="font-semibold text-foreground text-sm">{ongoingBooking.service.name}</p>
-                <p className="text-xs text-muted-foreground">{ongoingBooking.worker?.name || 'Worker assigned'}</p>
+                <p className="text-xs text-muted-foreground">{ongoingBooking.worker?.name || t('customer.dashboard.workerAssigned')}</p>
               </div>
               <Link to="/customer/bookings" className="btn-brand text-xs py-2 px-3 shrink-0">
-                Track
+                {t('customer.dashboard.track')}
               </Link>
             </div>
           </motion.div>
@@ -253,11 +253,11 @@ const CustomerDashboard = () => {
           >
             <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="text-sm font-semibold text-foreground">Your area isn't serviceable yet</p>
-              <p className="text-xs text-muted-foreground mt-0.5">You can still book for a different serviceable location.</p>
+              <p className="text-sm font-semibold text-foreground">{t('customer.dashboard.areaNotServiceable')}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{t('customer.dashboard.bookElsewhere')}</p>
             </div>
             <Link to="/customer/services" className="text-xs text-primary font-semibold shrink-0 hover:underline whitespace-nowrap">
-              Book elsewhere
+              {t('customer.dashboard.bookElsewhereLink')}
             </Link>
           </motion.div>
         )}
@@ -371,7 +371,7 @@ const CustomerDashboard = () => {
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-foreground text-sm">{b.service.name}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {b.worker?.name || "Worker will be assigned"}
+                      {b.worker?.name || t('customer.dashboard.workerWillBeAssigned')}
                     </p>
                     <div className="flex items-center gap-3 mt-1.5">
                       <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -390,7 +390,7 @@ const CustomerDashboard = () => {
                     animate={{ scale: 1 }}
                     transition={{ delay: 0.2 + index * 0.1 }}
                   >
-                    {b.status === "confirmed" ? "Confirmed" : "Pending"}
+                    {b.status === "confirmed" ? t('customer.dashboard.confirmed') : t('customer.dashboard.pending')}
                   </motion.span>
                 </motion.div>
               ))}
@@ -413,8 +413,8 @@ const CustomerDashboard = () => {
                 <Settings className="w-6 h-6 text-foreground" />
               </motion.div>
               <div className="flex-1">
-                <p className="text-sm font-semibold text-foreground">Account Settings</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Manage your profile &amp; addresses</p>
+                <p className="text-sm font-semibold text-foreground">{t('customer.dashboard.accountSettings')}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t('customer.dashboard.manageProfile')}</p>
               </div>
               <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground group-hover:translate-x-1 transition-all" />
             </Link>

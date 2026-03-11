@@ -2,6 +2,7 @@ import { bookingsAPI, locationsAPI, qrPaymentsAPI } from "@/lib/api";
 import { ArrowLeft, Camera, CheckCircle, DollarSign, MapPin, QrCode, Upload } from "lucide-react";
 import QRCodeLib from "qrcode";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface QRPayment {
   _id: string;
@@ -33,6 +34,7 @@ interface PaymentModalProps {
 }
 
 const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalProps) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [qrPayment, setQrPayment] = useState<QRPayment | null>(null);
   const [locationPaymentQR, setLocationPaymentQR] = useState<LocationPaymentQR | null>(null);
@@ -98,7 +100,7 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
       }
     } catch (error) {
       console.error('Error fetching payment:', error);
-      alert('Failed to load payment details');
+      alert(t('worker.paymentModal.failedLoadPayment'));
       onClose();
     } finally {
       setLoading(false);
@@ -133,13 +135,13 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
 
     // Check file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB');
+      alert(t('worker.paymentModal.fileTooLarge'));
       return;
     }
 
     // Check file type
     if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file');
+      alert(t('worker.paymentModal.invalidFileType'));
       return;
     }
 
@@ -152,12 +154,12 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
 
   const handleConfirmPayment = async () => {
     if (!transactionId.trim()) {
-      alert('Please enter the transaction ID');
+      alert(t('worker.paymentModal.enterTxnId'));
       return;
     }
 
     if (!screenshot) {
-      alert('Please upload a payment screenshot');
+      alert(t('worker.paymentModal.uploadScreenshot'));
       return;
     }
 
@@ -173,11 +175,11 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
         await qrPaymentsAPI.workerConfirm(qrPayment!._id, transactionId, screenshot);
       }
       
-      alert('✅ Payment confirmed successfully! Admin will verify it soon.');
+      alert(t('worker.paymentModal.paymentConfirmed'));
       onPaymentConfirmed();
     } catch (error) {
       console.error('Error confirming payment:', error);
-      alert('Failed to confirm payment. Please try again.');
+      alert(t('worker.paymentModal.failedConfirmPayment'));
     } finally {
       setUploading(false);
     }
@@ -188,7 +190,7 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl p-8 max-w-md w-full">
           <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full mx-auto"></div>
-          <p className="text-center mt-4 text-muted-foreground">Loading payment details...</p>
+          <p className="text-center mt-4 text-muted-foreground">{t('worker.paymentModal.loadingPayment')}</p>
         </div>
       </div>
     );
@@ -207,8 +209,8 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="flex-1">
-              <h2 className="text-xl font-bold">Payment Collection</h2>
-              <p className="text-sm opacity-90">Show QR & collect payment</p>
+              <h2 className="text-xl font-bold">{t('worker.paymentModal.title')}</h2>
+              <p className="text-sm opacity-90">{t('worker.paymentModal.subtitle')}</p>
             </div>
           </div>
 
@@ -219,7 +221,7 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
                 <div className="bg-green-50 border-2 border-green-200 p-6 rounded-xl text-center">
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <DollarSign className="w-6 h-6 text-green-600" />
-                    <p className="text-sm text-green-700 font-medium">Amount to Collect</p>
+                    <p className="text-sm text-green-700 font-medium">{t('worker.paymentModal.amountToCollect')}</p>
                   </div>
                   <p className="text-4xl font-bold text-green-600">₹{qrPayment.amount}</p>
                 </div>
@@ -228,14 +230,14 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
                   <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
                     <QrCode className="w-5 h-5" />
-                    How to collect payment:
+                    {t('worker.paymentModal.howToCollect')}
                   </h3>
                   <ol className="text-sm text-blue-800 space-y-1 ml-6 list-decimal">
-                    <li>Show this QR code to the customer</li>
-                    <li>Customer scans and pays via UPI</li>
-                    <li>Ask customer for transaction ID</li>
-                    <li>Take screenshot of payment confirmation</li>
-                    <li>Upload payment proof</li>
+                    <li>{t('worker.paymentModal.step1')}</li>
+                    <li>{t('worker.paymentModal.step2')}</li>
+                    <li>{t('worker.paymentModal.step3')}</li>
+                    <li>{t('worker.paymentModal.step4')}</li>
+                    <li>{t('worker.paymentModal.step5')}</li>
                   </ol>
                 </div>
 
@@ -245,7 +247,7 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
                     <div className="flex items-center gap-2 mb-2">
                       <MapPin className="w-5 h-5 text-purple-600" />
                       <h3 className="font-semibold text-purple-900">
-                        Admin's Payment QR for this Location
+                        {t('worker.paymentModal.adminQRLocation')}
                       </h3>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-purple-700">
@@ -255,7 +257,7 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
                     </div>
                     {locationPaymentQR?.upiName && (
                       <p className="text-xs text-purple-600 mt-1">
-                        Payee: {locationPaymentQR.upiName}
+                        {t('worker.paymentModal.payee')}: {locationPaymentQR.upiName}
                       </p>
                     )}
                   </div>
@@ -268,14 +270,14 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
                       <div className="mb-4">
                         <p className="text-sm font-semibold text-purple-700 mb-1 flex items-center justify-center gap-2">
                           <QrCode className="w-4 h-4" />
-                          Admin's Custom QR Code
+                          {t('worker.paymentModal.adminCustomQR')}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          This QR is specifically assigned to this location by the admin
+                          {t('worker.paymentModal.qrAssignedToLocation')}
                         </p>
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground mb-4">Customer scans this QR code to pay</p>
+                      <p className="text-sm text-muted-foreground mb-4">{t('worker.paymentModal.customerScansQR')}</p>
                     )}
                     <img 
                       src={qrCodeImage} 
@@ -285,19 +287,19 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
                     <div className="mt-4 p-3 bg-muted rounded-lg">
                       {locationPaymentQR?.upiName && usingLocationQR ? (
                         <>
-                          <p className="text-xs text-muted-foreground">Payee Name</p>
+                          <p className="text-xs text-muted-foreground">{t('worker.paymentModal.payeeName')}</p>
                           <p className="text-sm font-semibold">{locationPaymentQR.upiName}</p>
                         </>
                       ) : null}
                       {qrPayment?.upiId && qrPayment.upiId !== 'N/A' ? (
                         <div className={locationPaymentQR?.upiName && usingLocationQR ? 'mt-2 pt-2 border-t border-border' : ''}>
-                          <p className="text-xs text-muted-foreground">UPI ID</p>
+                          <p className="text-xs text-muted-foreground">{t('worker.paymentModal.upiId')}</p>
                           <p className="text-sm font-mono font-semibold">{qrPayment.upiId}</p>
                         </div>
                       ) : null}
                       {locationPaymentQR?.phoneNumber && usingLocationQR && (
                         <div className="mt-2 pt-2 border-t border-border">
-                          <p className="text-xs text-muted-foreground">Contact</p>
+                          <p className="text-xs text-muted-foreground">{t('worker.paymentModal.contact')}</p>
                           <p className="text-sm font-semibold">{locationPaymentQR.phoneNumber}</p>
                         </div>
                       )}
@@ -311,7 +313,7 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
                   className="w-full btn-brand py-3 flex items-center justify-center gap-2"
                 >
                   <Camera className="w-5 h-5" />
-                  Customer Paid - Upload Proof
+                  {t('worker.paymentModal.customerPaidUpload')}
                 </button>
               </>
             ) : (
@@ -319,18 +321,18 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
                 {/* Upload Screenshot */}
                 <div className="space-y-3">
                   <label className="block">
-                    <span className="text-sm font-medium text-foreground">Transaction ID *</span>
+                    <span className="text-sm font-medium text-foreground">{t('worker.paymentModal.transactionId')}</span>
                     <input
                       type="text"
                       value={transactionId}
                       onChange={(e) => setTransactionId(e.target.value)}
-                      placeholder="Enter UPI transaction ID"
+                      placeholder={t('worker.paymentModal.enterTransactionId')}
                       className="mt-1 w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </label>
 
                   <label className="block">
-                    <span className="text-sm font-medium text-foreground">Payment Screenshot *</span>
+                    <span className="text-sm font-medium text-foreground">{t('worker.paymentModal.paymentScreenshot')}</span>
                     <div className="mt-2">
                       {screenshot ? (
                         <div className="relative">
@@ -343,14 +345,14 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
                             onClick={() => setScreenshot('')}
                             className="absolute top-2 right-2 bg-red-500 text-white px-3 py-1 rounded-lg text-sm"
                           >
-                            Remove
+                            {t('worker.paymentModal.remove')}
                           </button>
                         </div>
                       ) : (
                         <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-border rounded-xl cursor-pointer hover:bg-muted transition-colors">
                           <Upload className="w-12 h-12 text-muted-foreground mb-2" />
-                          <p className="text-sm text-muted-foreground">Click to upload screenshot</p>
-                          <p className="text-xs text-muted-foreground mt-1">Max 5MB, JPG/PNG</p>
+                          <p className="text-sm text-muted-foreground">{t('worker.paymentModal.clickToUpload')}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{t('worker.paymentModal.maxSize')}</p>
                           <input
                             type="file"
                             accept="image/*"
@@ -380,12 +382,12 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
                     {uploading ? (
                       <>
                         <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                        Uploading...
+                        {t('worker.paymentModal.uploading')}
                       </>
                     ) : (
                       <>
                         <CheckCircle className="w-5 h-5" />
-                        Confirm Payment
+                        {t('worker.paymentModal.confirmPayment')}
                       </>
                     )}
                   </button>
@@ -393,8 +395,8 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
 
                 {/* Info Note */}
                 <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
-                  <p className="font-medium mb-1">⚠️ Important</p>
-                  <p>Admin will verify the payment before releasing your earnings. Make sure to upload a clear screenshot.</p>
+                  <p className="font-medium mb-1">⚠️ {t('worker.paymentModal.important')}</p>
+                  <p>{t('worker.paymentModal.adminWillVerify')}</p>
                 </div>
               </>
             )}

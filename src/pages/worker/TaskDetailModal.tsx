@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 interface Task {
   _id: string;
   service: {
@@ -67,6 +68,7 @@ interface TaskDetailModalProps {
 }
 
 const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) => {
+  const { t } = useTranslation();
   const [task, setTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
   const [qrCodeImage, setQrCodeImage] = useState<string>("");
@@ -101,7 +103,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       }
     } catch (error) {
       console.error('Error fetching task detail:', error);
-      if (!silent) alert('Failed to load task details');
+      if (!silent) alert(t('worker.taskDetail.failedLoadTask'));
     } finally {
       if (!silent) setLoading(false);
     }
@@ -201,10 +203,10 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       const response = await bookingsAPI.generateStartQR(taskId, true);
       setTask({ ...task!, serviceStartQRCode: response.qrCode });
       generateQRCode(response.qrCode);
-      alert('QR Code generated! Show this to customer to start service.');
+      alert(t('worker.taskDetail.qrGenerated'));
     } catch (error) {
       console.error('Error generating QR:', error);
-      alert('Failed to generate QR code');
+      alert(t('worker.taskDetail.failedGenerateQR'));
     }
   };
 
@@ -213,10 +215,10 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       const response = await bookingsAPI.generateEndQR(taskId);
       setTask({ ...task!, serviceEndQRCode: response.qrCode });
       generateQRCode(response.qrCode);
-      alert('End QR Code generated! Show this to customer to end service and calculate final charges.');
+      alert(t('worker.taskDetail.endQRGenerated'));
     } catch (error) {
       console.error('Error generating end QR:', error);
-      alert('Failed to generate end QR code');
+      alert(t('worker.taskDetail.failedEndQR'));
     }
   };
 
@@ -237,14 +239,14 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       setPaymentTransactionId('');
       setPaymentTransactionTime('');
       
-      alert('✅ Payment proof uploaded successfully! Task is now fully documented.');
+      alert(t('worker.taskDetail.proofUploadSuccess'));
       
       // Refresh task data
       await fetchTaskDetail(true);
       onRefresh(); // Refresh parent list
     } catch (error) {
       console.error('Error uploading payment proof:', error);
-      alert((error as Error).message || 'Failed to upload payment proof');
+      alert((error as Error).message || t('worker.taskDetail.failedUploadProof'));
     } finally {
       setUploadingPaymentProof(false);
     }
@@ -252,7 +254,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
 
   const handleOpenPaymentProofCapture = () => {
     if (!paymentTransactionId.trim()) {
-      alert('Please enter the Transaction ID before uploading payment proof.');
+      alert(t('worker.taskDetail.pleaseEnterTxnId'));
       return;
     }
     setPaymentTransactionTime(new Date().toISOString());
@@ -385,11 +387,11 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
           </button>
           <div className="flex-1">
             <h2 className="font-bold text-foreground text-lg">{task.service.name}</h2>
-            <p className="text-sm text-muted-foreground">Task Details</p>
+            <p className="text-sm text-muted-foreground">{t('worker.taskDetail.title')}</p>
           </div>
           <span className={`text-xs font-semibold px-3 py-1.5 rounded-full ${getStatusColor(task.status)}`}>
-            {task.status === 'in-progress' ? 'In Progress' : 
-             task.status === 'completed' ? 'Completed' : 'Scheduled'}
+            {task.status === 'in-progress' ? t('worker.taskDetail.inProgress') : 
+             task.status === 'completed' ? t('worker.taskDetail.completed') : t('worker.taskDetail.scheduled')}
           </span>
         </div>
 
@@ -399,20 +401,20 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
             <>
               <div className="card-elevated p-6 text-center bg-primary-light">
                 <Timer className="w-8 h-8 text-primary mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground mb-2">Work in Progress</p>
+                <p className="text-sm text-muted-foreground mb-2">{t('worker.taskDetail.workInProgress')}</p>
                 <p className="text-3xl font-bold text-primary font-mono">
                   {formatElapsedTime(elapsedTime)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Target: {formatTime(task.startTime)} - {formatTime(task.endTime)}
+                  {t('worker.taskDetail.target')}: {formatTime(task.startTime)} - {formatTime(task.endTime)}
                 </p>
                 {overtimeMinutes > 0 && (
                   <div className="mt-4 p-3 bg-orange-100 border border-orange-300 rounded-lg">
                     <p className="text-sm font-semibold text-orange-800">
-                      ⚠️ Overtime: {overtimeMinutes} minutes
+                      ⚠️ {t('worker.taskDetail.overtimeMinutes', { minutes: overtimeMinutes })}
                     </p>
                     <p className="text-xs text-orange-700 mt-1">
-                      Additional ₹{(overtimeMinutes * OVERTIME_RATE).toFixed(2)} will be charged
+                      {t('worker.taskDetail.additionalCharge', { amount: (overtimeMinutes * OVERTIME_RATE).toFixed(2) })}
                     </p>
                   </div>
                 )}
@@ -429,16 +431,16 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
           <div className="card-elevated p-5">
             <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
               <User className="w-5 h-5 text-primary" />
-              Customer Details
+              {t('worker.taskDetail.customerDetails')}
             </h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Name</span>
+                <span className="text-sm text-muted-foreground">{t('worker.taskDetail.name')}</span>
                 <span className="text-sm font-medium text-foreground">{task.customer.name}</span>
               </div>
               {task.customer.phone && (
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Phone</span>
+                  <span className="text-sm text-muted-foreground">{t('worker.taskDetail.phone')}</span>
                   <a 
                     href={`tel:${task.customer.phone}`}
                     className="text-sm font-medium text-primary flex items-center gap-1.5 hover:underline"
@@ -450,7 +452,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
               )}
               {task.customer.email && (
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Email</span>
+                  <span className="text-sm text-muted-foreground">{t('worker.taskDetail.email')}</span>
                   <span className="text-sm font-medium text-foreground">{task.customer.email}</span>
                 </div>
               )}
@@ -463,14 +465,14 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-foreground flex items-center gap-2">
                   <MapPin className="w-5 h-5 text-primary" />
-                  Service Location
+                  {t('worker.taskDetail.serviceLocation')}
                 </h3>
                 <button
                   onClick={openMapsNavigation}
                   className="flex items-center gap-1.5 text-sm text-primary font-medium hover:underline"
                 >
                   <Navigation className="w-4 h-4" />
-                  Navigate
+                  {t('worker.taskDetail.navigate')}
                 </button>
               </div>
               <div className="space-y-2 text-sm">
@@ -478,7 +480,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                   <div className="flex items-start gap-2">
                     <Home className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-muted-foreground text-xs">House/Flat Number</p>
+                      <p className="text-muted-foreground text-xs">{t('worker.taskDetail.houseFlatNumber')}</p>
                       <p className="text-foreground font-medium">{task.location.apartment}</p>
                     </div>
                   </div>
@@ -487,7 +489,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                   <div className="flex items-start gap-2">
                     <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-muted-foreground text-xs">Building/Society</p>
+                      <p className="text-muted-foreground text-xs">{t('worker.taskDetail.buildingSociety')}</p>
                       <p className="text-foreground font-medium">{task.location.building}</p>
                     </div>
                   </div>
@@ -511,22 +513,22 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
           <div className="card-elevated p-5">
             <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
               <Calendar className="w-5 h-5 text-primary" />
-              Schedule
+              {t('worker.taskDetail.schedule')}
             </h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Date</span>
+                <span className="text-sm text-muted-foreground">{t('worker.taskDetail.date')}</span>
                 <span className="text-sm font-medium text-foreground">{formatDate(task.bookingDate)}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Time Slot</span>
+                <span className="text-sm text-muted-foreground">{t('worker.taskDetail.timeSlot')}</span>
                 <span className="text-sm font-medium text-foreground">
                   {formatTime(task.startTime)} - {formatTime(task.endTime)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Duration</span>
-                <span className="text-sm font-medium text-foreground">{task.service.duration} mins</span>
+                <span className="text-sm text-muted-foreground">{t('worker.taskDetail.duration')}</span>
+                <span className="text-sm font-medium text-foreground">{task.service.duration} {t('worker.taskDetail.mins')}</span>
               </div>
             </div>
           </div>
@@ -535,24 +537,24 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
           <div className="card-elevated p-5">
             <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
               <DollarSign className="w-5 h-5 text-primary" />
-              Amount to Collect from Customer
+              {t('worker.taskDetail.amountToCollect')}
             </h3>
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Service Charge</span>
+                <span className="text-muted-foreground">{t('worker.taskDetail.serviceCharge')}</span>
                 <span className="font-medium text-foreground">₹{task.totalAmount}</span>
               </div>
               {overtimeMinutes > 0 && (
                 <>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-orange-600">Overtime ({overtimeMinutes} min × ₹{OVERTIME_RATE})</span>
+                    <span className="text-orange-600">{t('worker.taskDetail.overtime')} ({overtimeMinutes} min × ₹{OVERTIME_RATE})</span>
                     <span className="font-medium text-orange-600">₹{(overtimeMinutes * OVERTIME_RATE).toFixed(2)}</span>
                   </div>
                   <div className="border-t border-border pt-2"></div>
                 </>
               )}
               <div className="flex items-center justify-between p-3 bg-primary-light rounded-xl mt-2">
-                <span className="font-semibold text-foreground">Collect from Customer</span>
+                <span className="font-semibold text-foreground">{t('worker.taskDetail.collectFromCustomer')}</span>
                 <span className="text-2xl font-bold text-primary">₹{calculateTotalAmount().toFixed(2)}</span>
               </div>
             </div>
@@ -563,7 +565,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
             <div className="card-elevated p-5 text-center">
               <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
                 <QrCode className="w-5 h-5 text-primary" />
-                Service Start QR Code
+                {t('worker.taskDetail.serviceStartQR')}
               </h3>
               
               {qrCodeImage ? (
@@ -572,10 +574,10 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                     <img src={qrCodeImage} alt="Service Start QR" className="w-64 h-64" />
                   </div>
                   <p className="text-sm text-muted-foreground mb-2">
-                    Show this QR code to customer when you arrive
+                    {t('worker.taskDetail.showQRToCustomer')}
                   </p>
                   <p className="text-xs text-warning bg-warning-light p-3 rounded-lg">
-                    ⏱️ Customer will scan this to start the service timer
+                    ⏱️ {t('worker.taskDetail.customerWillScanStart')}
                   </p>
                 </div>
               ) : (
@@ -585,10 +587,10 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                     className="btn-brand py-3 px-6"
                   >
                     <QrCode className="w-5 h-5 inline-block mr-2" />
-                    Generate Start QR Code
+                    {t('worker.taskDetail.generateStartQR')}
                   </button>
                   <p className="text-sm text-muted-foreground mt-3">
-                    Generate QR code when you reach customer location
+                    {t('worker.taskDetail.generateWhenReach')}
                   </p>
                 </div>
               )}
@@ -602,7 +604,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
               <div className="card-elevated p-5 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200">
                 <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
                   <QrCode className="w-5 h-5 text-green-600" />
-                  Step 1: Service End QR Code
+                  {t('worker.taskDetail.step1ServiceEnd')}
                 </h3>
                 
                 {task.serviceEndQRCode ? (
@@ -611,18 +613,18 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                       <img src={qrCodeImage} alt="Service End QR" className="w-64 h-64" />
                     </div>
                     <p className="text-sm font-medium text-green-700 mb-2">
-                      ✅ Show this QR code to customer to end service
+                      ✅ {t('worker.taskDetail.showEndQR')}
                     </p>
                     <div className="text-xs bg-green-100 text-green-800 p-3 rounded-lg space-y-1">
-                      <p className="font-semibold">Customer will scan this QR to:</p>
-                      <p>• Stop the service timer</p>
-                      <p>• Calculate final charges including overtime</p>
-                      <p>• Complete the booking</p>
+                      <p className="font-semibold">{t('worker.taskDetail.customerWillScanEnd')}</p>
+                      <p>• {t('worker.taskDetail.stopTimer')}</p>
+                      <p>• {t('worker.taskDetail.calculateCharges')}</p>
+                      <p>• {t('worker.taskDetail.completeBooking')}</p>
                     </div>
                     {overtimeMinutes > 0 && (
                       <div className="mt-3 bg-orange-100 border border-orange-300 rounded-lg p-3">
                         <p className="text-sm font-semibold text-orange-800">
-                          ⚠️ Overtime: {overtimeMinutes} minutes
+                          ⚠️ {t('worker.taskDetail.overtimeMinutes', { minutes: overtimeMinutes })}
                         </p>
                         <p className="text-xs text-orange-700">
                           Extra ₹{(overtimeMinutes * OVERTIME_RATE).toFixed(2)} will be added to final bill
@@ -637,10 +639,10 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                       className="font-semibold py-3 px-6 rounded-lg transition-colors shadow-md w-full bg-green-600 hover:bg-green-700 text-white"
                     >
                       <QrCode className="w-5 h-5 inline-block mr-2" />
-                      Generate End QR Code
+                      {t('worker.taskDetail.generateEndQR')}
                     </button>
                     <p className="text-xs text-muted-foreground mt-2 text-center">
-                      Customer will scan to end service and calculate charges
+                      {t('worker.taskDetail.customerScanEndCalc')}
                     </p>
                   </div>
                 )}
@@ -655,7 +657,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
               <div className="card-elevated p-5 bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200">
                   <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
                     <DollarSign className="w-5 h-5 text-purple-600" />
-                    Step 2: Payment QR Code 💳
+                    {t('worker.taskDetail.step2PaymentQR')} 💳
                   </h3>
                   
                   {paymentQRImage ? (
@@ -665,14 +667,14 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                       </div>
                       
                       <div className="text-xs bg-purple-100 text-purple-800 p-3 rounded-lg space-y-1">
-                        <p className="font-semibold">Show this QR to customer for payment:</p>
-                        <p>• Collect: ₹{calculateTotalAmount().toFixed(2)}</p>
+                        <p className="font-semibold">{t('worker.taskDetail.showQRForPayment')}</p>
+                        <p>• {t('worker.taskDetail.collect')}: ₹{calculateTotalAmount().toFixed(2)}</p>
                         {overtimeMinutes > 0 && (
-                          <p>• Includes ₹{(overtimeMinutes * OVERTIME_RATE).toFixed(2)} overtime charges</p>
+                          <p>• {t('worker.taskDetail.includesOvertime', { amount: (overtimeMinutes * OVERTIME_RATE).toFixed(2) })}</p>
                         )}
-                        <p>• Customer can scan to complete payment</p>
+                        <p>• {t('worker.taskDetail.customerCanScan')}</p>
                         {adminPaymentQR && (
-                          <p className="text-green-700 font-medium mt-2">✓ Using admin's payment QR code</p>
+                          <p className="text-green-700 font-medium mt-2">✓ {t('worker.taskDetail.usingAdminQR')}</p>
                         )}
                       </div>
                     </div>
@@ -683,7 +685,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                         className="btn-brand py-3 px-6"
                       >
                         <DollarSign className="w-5 h-5 inline-block mr-2" />
-                        Show Payment QR
+                        {t('worker.taskDetail.showPaymentQR')}
                       </button>
                     </div>
                   )}
@@ -694,7 +696,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                 <div className="card-elevated p-5 bg-gradient-to-br from-amber-50 to-yellow-50 border-2 border-amber-200">
                   <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
                     <Camera className="w-5 h-5 text-amber-600" />
-                    Step 3: Upload Payment Proof 📸✅
+                    {t('worker.taskDetail.step3PaymentProof')} 📸✅
                   </h3>
                   
                   {task.paymentProof && !showPaymentProofCapture ? (
@@ -708,31 +710,31 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                       </div>
                       <div className="flex items-center justify-center gap-2 text-green-700 font-medium">
                         <CheckCircle className="w-5 h-5" />
-                        Payment proof uploaded successfully!
+                        {t('worker.taskDetail.paymentProofUploaded')}
                       </div>
                       {task.paymentProof.transactionId && (
                         <div className="bg-white border border-amber-200 rounded-lg p-3 space-y-1">
                           <div className="flex items-center justify-between text-sm">
-                            <span className="text-amber-700 font-medium">Transaction ID:</span>
+                            <span className="text-amber-700 font-medium">{t('worker.taskDetail.transactionIdLabel')}</span>
                             <span className="font-mono font-semibold text-foreground">{task.paymentProof.transactionId}</span>
                           </div>
                           {task.paymentProof.transactionTime && (
                             <div className="flex items-center justify-between text-sm">
-                              <span className="text-amber-700 font-medium">Transaction Time:</span>
+                              <span className="text-amber-700 font-medium">{t('worker.taskDetail.transactionTimeLabel')}</span>
                               <span className="text-foreground">{new Date(task.paymentProof.transactionTime).toLocaleString('en-IN')}</span>
                             </div>
                           )}
                         </div>
                       )}
                       <div className="bg-green-100 border border-green-300 rounded-lg p-3 text-center">
-                        <p className="text-green-800 font-semibold">🎉 Task Fully Completed!</p>
-                        <p className="text-xs text-green-700 mt-1">All documentation has been submitted</p>
+                        <p className="text-green-800 font-semibold">🎉 {t('worker.taskDetail.taskFullyCompleted')}</p>
+                        <p className="text-xs text-green-700 mt-1">{t('worker.taskDetail.allDocumented')}</p>
                       </div>
                       <button
                         onClick={() => { setPaymentTransactionId(''); setPaymentTransactionTime(new Date().toISOString()); setShowPaymentProofCapture(true); }}
                         className="w-full py-2 px-4 border-2 border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50 transition-colors"
                       >
-                        Re-upload Payment Proof
+                        {t('worker.taskDetail.reuploadPaymentProof')}
                       </button>
                     </div>
                   ) : showPaymentProofCapture ? (
@@ -745,25 +747,25 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                   ) : uploadingPaymentProof ? (
                     <div className="text-center py-8">
                       <div className="animate-spin w-12 h-12 border-4 border-amber-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-                      <p className="text-amber-700 font-medium">Uploading payment proof...</p>
-                      <p className="text-xs text-muted-foreground mt-2">Please wait</p>
+                      <p className="text-amber-700 font-medium">{t('worker.taskDetail.uploadingProof')}</p>
+                      <p className="text-xs text-muted-foreground mt-2">{t('worker.taskDetail.pleaseWait')}</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
                       {/* Transaction ID input - required before upload */}
                       <div>
                         <label className="block text-sm font-semibold text-amber-800 mb-1">
-                          Transaction ID <span className="text-red-500">*</span>
+                          {t('worker.taskDetail.transactionId')} <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
                           value={paymentTransactionId}
                           onChange={(e) => setPaymentTransactionId(e.target.value)}
-                          placeholder="Enter UPI / GPay / Bank reference number"
+                          placeholder={t('worker.taskDetail.enterUPIRef')}
                           className="w-full px-3 py-2.5 border-2 border-amber-200 rounded-lg focus:border-amber-500 focus:outline-none text-sm bg-white"
                         />
                         <p className="text-xs text-amber-600 mt-1">
-                          🕐 Transaction time will be captured automatically when you upload
+                          🕐 {t('worker.taskDetail.autoTimestamp')}
                         </p>
                       </div>
                       <button
@@ -772,14 +774,14 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                         className="btn-brand py-3 px-6 w-full bg-amber-600 hover:bg-amber-700"
                       >
                         <Camera className="w-5 h-5 inline-block mr-2" />
-                        Take & Upload Payment Proof
+                        {t('worker.taskDetail.takeUploadProof')}
                       </button>
                       <div className="text-xs bg-amber-100 text-amber-800 p-3 rounded-lg space-y-1">
-                        <p className="font-semibold">After customer makes payment:</p>
-                        <p>• Enter the UPI / transaction reference number above</p>
-                        <p>• Take a photo of the payment confirmation screen</p>
-                        <p>• Transaction ID + time will be recorded with the proof</p>
-                        <p className="text-green-700 font-medium mt-2">✓ Protects both you and the customer</p>
+                        <p className="font-semibold">{t('worker.taskDetail.afterPayment')}</p>
+                        <p>• {t('worker.taskDetail.enterRef')}</p>
+                        <p>• {t('worker.taskDetail.takePhoto')}</p>
+                        <p>• {t('worker.taskDetail.recordedWithProof')}</p>
+                        <p className="text-green-700 font-medium mt-2">✓ {t('worker.taskDetail.protectsBoth')}</p>
                       </div>
                     </div>
                   )}
@@ -795,7 +797,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                 onClick={onClose}
                 className="flex-1 py-3 border-2 border-green-600 text-green-600 rounded-lg font-medium hover:bg-green-50 transition-colors"
               >
-                Close
+                {t('worker.taskDetail.close')}
               </button>
             )}
             {task.status !== 'completed' && task.status !== 'in-progress' && (
@@ -803,7 +805,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                 onClick={onClose}
                 className="flex-1 py-3 border border-border rounded-lg text-foreground font-medium hover:bg-muted transition-colors"
               >
-                Close
+                {t('worker.taskDetail.close')}
               </button>
             )}
           </div>

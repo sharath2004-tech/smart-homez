@@ -93,19 +93,19 @@ const ProfilePage = () => {
     const cityVal = newAddress.city.trim();
     const zipVal = newAddress.zipCode.trim();
     if (!areaVal || !cityVal) {
-      setAddressError("Area and City are required.");
+      setAddressError(t('customer.profile.areaAndCityRequired'));
       return;
     }
     if (/^\d+$/.test(areaVal)) {
-      setAddressError("Area cannot be only numbers — enter a neighbourhood name.");
+      setAddressError(t('customer.profile.areaCannotBeNumbers'));
       return;
     }
     if (/^\d+$/.test(cityVal)) {
-      setAddressError("City cannot be only numbers — enter a valid city name.");
+      setAddressError(t('customer.profile.cityCannotBeNumbers'));
       return;
     }
     if (zipVal && !/^\d{6}$/.test(zipVal)) {
-      setAddressError("ZIP code must be 6 digits.");
+      setAddressError(t('customer.profile.zipCodeInvalid'));
       return;
     }
     // Validate city is serviceable
@@ -153,7 +153,7 @@ const ProfilePage = () => {
       await fetchProfileData();
     } catch (error) {
       console.error('Error adding address:', error);
-      alert('Failed to add address. Please try again.');
+      alert(t('customer.profile.failedToAddAddress'));
     } finally {
       setGeocoding(false);
     }
@@ -163,11 +163,11 @@ const ProfilePage = () => {
     setAccountError('');
     setAccountSuccess('');
     if (!accountForm.email.includes('@')) {
-      setAccountError('Please enter a valid email address.');
+      setAccountError(t('customer.profile.invalidEmail'));
       return;
     }
     if (accountForm.phone && !/^[+]?[\d\s()-]{7,15}$/.test(accountForm.phone)) {
-      setAccountError('Please enter a valid phone number.');
+      setAccountError(t('customer.profile.invalidPhone'));
       return;
     }
     try {
@@ -180,10 +180,10 @@ const ProfilePage = () => {
       } catch (_e) {
         // localStorage unavailable
       }
-      setAccountSuccess('Profile updated successfully!');
+      setAccountSuccess(t('customer.profile.profileUpdated'));
       await fetchProfileData();
     } catch (err) {
-      setAccountError(err instanceof Error ? err.message : 'Failed to update profile.');
+      setAccountError(err instanceof Error ? err.message : t('customer.profile.failedToUpdate'));
     } finally {
       setAccountSaving(false);
     }
@@ -191,31 +191,31 @@ const ProfilePage = () => {
 
   const handleChangePassword = async () => {
     setPasswordError('');
-    if (!passwordForm.current) { setPasswordError('Enter your current password.'); return; }
-    if (passwordForm.next.length < 8) { setPasswordError('New password must be at least 8 characters.'); return; }
-    if (passwordForm.next !== passwordForm.confirm) { setPasswordError('Passwords do not match.'); return; }
+    if (!passwordForm.current) { setPasswordError(t('customer.profile.enterCurrentPassword')); return; }
+    if (passwordForm.next.length < 8) { setPasswordError(t('customer.profile.passwordMinLength')); return; }
+    if (passwordForm.next !== passwordForm.confirm) { setPasswordError(t('customer.profile.passwordsDoNotMatch')); return; }
     try {
       setPasswordSaving(true);
       await authAPI.changePassword(passwordForm.current, passwordForm.next);
       setPasswordForm({ current: '', next: '', confirm: '' });
       setShowPasswordSection(false);
-      setAccountSuccess('Password changed successfully!');
+      setAccountSuccess(t('customer.profile.passwordChanged'));
     } catch (err) {
-      setPasswordError(err instanceof Error ? err.message : 'Failed to change password.');
+      setPasswordError(err instanceof Error ? err.message : t('customer.profile.failedToChangePassword'));
     } finally {
       setPasswordSaving(false);
     }
   };
 
   const handleDeleteAddress = async (addressId: string) => {
-    if (!confirm('Are you sure you want to delete this address?')) return;
+    if (!confirm(t('customer.profile.confirmDeleteAddress'))) return;
     
     try {
       await usersAPI.deleteAddress(addressId);
       await fetchProfileData();
     } catch (error) {
       console.error('Error deleting address:', error);
-      alert('Failed to delete address.');
+      alert(t('customer.profile.failedToDeleteAddress'));
     }
   };
 
@@ -225,7 +225,7 @@ const ProfilePage = () => {
       await fetchProfileData();
     } catch (error) {
       console.error('Error setting default address:', error);
-      alert('Failed to set default address.');
+      alert(t('customer.profile.failedToSetDefault'));
     }
   };
 
@@ -248,10 +248,10 @@ const ProfilePage = () => {
       <AppLayout userType="customer" userName="Guest">
         <div className="max-w-2xl mx-auto text-center py-20">
           <div className="text-4xl mb-4">👤</div>
-          <h2 className="text-xl font-bold mb-2">Please Log In</h2>
-          <p className="text-muted-foreground mb-4">You need to be logged in to view your profile.</p>
+          <h2 className="text-xl font-bold mb-2">{t('customer.profile.pleaseLogIn')}</h2>
+          <p className="text-muted-foreground mb-4">{t('customer.profile.needToBeLoggedIn')}</p>
           <a href="/login" className="btn-brand px-6 py-2 inline-block">
-            Go to Login
+            {t('customer.profile.goToLogin')}
           </a>
         </div>
       </AppLayout>
@@ -276,20 +276,20 @@ const ProfilePage = () => {
           {profile.phone && <p className="text-muted-foreground text-sm">{profile.phone}</p>}
           <div className="flex items-center justify-center gap-1 mt-3">
             <Star className="w-4 h-4 fill-warning text-warning" />
-            <span className="text-sm font-semibold text-foreground">Customer</span>
+            <span className="text-sm font-semibold text-foreground">{t('customer.profile.customer')}</span>
           </div>
         </div>
 
         {/* Stats */}
         <div className="card-elevated p-4 text-center">
           <p className="text-2xl font-bold font-heading text-foreground">{stats.totalBookings}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Total Bookings</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{t('customer.profile.totalBookings')}</p>
         </div>
 
         {/* Saved addresses */}
         <div className="card-elevated p-5">
           <h3 className="font-bold font-heading text-foreground mb-4 flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-primary" /> Saved Addresses
+            <MapPin className="w-4 h-4 text-primary" /> {t('customer.profile.savedAddresses')}
           </h3>
           
           {loading ? (
@@ -299,7 +299,7 @@ const ProfilePage = () => {
           ) : profile.addresses.length === 0 ? (
             <div className="text-center py-8">
               <MapPin className="w-12 h-12 text-muted-foreground mx-auto mb-2 opacity-50" />
-              <p className="text-sm text-muted-foreground">No addresses saved yet</p>
+              <p className="text-sm text-muted-foreground">{t('customer.profile.noAddressesSaved')}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -348,12 +348,12 @@ const ProfilePage = () => {
               {showAddressForm ? (
             <div className="mt-4 p-4 border-2 border-primary/20 rounded-xl bg-primary/5 space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="text-sm font-semibold text-foreground">Add New Address</h4>
+                <h4 className="text-sm font-semibold text-foreground">{t('customer.profile.addNewAddress')}</h4>
                 <button
                   onClick={() => setShowAddressForm(false)}
                   className="text-xs text-muted-foreground hover:text-foreground"
                 >
-                  Cancel
+                  {t('customer.profile.cancel')}
                 </button>
               </div>
               
@@ -403,7 +403,7 @@ const ProfilePage = () => {
                   disabled={!newAddress.area || !newAddress.city || geocoding}
                   className="flex-1 btn-brand py-2 text-xs disabled:opacity-50"
                 >
-                  {geocoding ? 'Adding...' : 'Add Address'}
+                  {geocoding ? t('customer.profile.adding') : t('customer.profile.addAddress')}
                 </button>
               </div>
             </div>
@@ -412,7 +412,7 @@ const ProfilePage = () => {
               onClick={() => { setShowAddressForm(true); setAddressError(''); }}
               className="w-full mt-3 py-2.5 border-2 border-dashed border-border rounded-xl text-sm font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-2"
             >
-              <Plus className="w-4 h-4" /> Add new address
+              <Plus className="w-4 h-4" /> {t('customer.profile.addNewAddress')}
             </button>
           )}
         </div>
@@ -422,8 +422,8 @@ const ProfilePage = () => {
         {/* Settings */}
         <div className="card-elevated overflow-hidden">
           {[
-            { icon: Bell, label: "Notifications", desc: "SMS, WhatsApp, push alerts", onClick: () => {} },
-            { icon: User, label: "Account Settings", desc: "Update email & phone", onClick: () => setShowAccountModal(true) },
+            { icon: Bell, label: t('customer.profile.notifications'), desc: t('customer.profile.notificationsDesc'), onClick: () => {} },
+            { icon: User, label: t('customer.profile.accountSettings'), desc: t('customer.profile.accountSettingsDesc'), onClick: () => setShowAccountModal(true) },
           ].map((item, i) => (
             <button
               key={item.label}
@@ -447,7 +447,7 @@ const ProfilePage = () => {
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/50">
             <div className="bg-card w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-4 animate-fade-in">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold font-heading text-foreground">Account Settings</h3>
+                <h3 className="text-lg font-bold font-heading text-foreground">{t('customer.profile.accountSettings')}</h3>
                 <button onClick={() => { setShowAccountModal(false); setAccountError(''); setAccountSuccess(''); setShowPasswordSection(false); }} className="text-muted-foreground hover:text-foreground p-1">
                   ✕
                 </button>
@@ -463,7 +463,7 @@ const ProfilePage = () => {
               {/* Only email and phone editable */}
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">Full Name</label>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">{t('customer.profile.fullName')}</label>
                   <input
                     type="text"
                     className="input-clean"
@@ -473,7 +473,7 @@ const ProfilePage = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">Email *</label>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">{t('customer.profile.emailLabel')}</label>
                   <input
                     type="email"
                     className="input-clean"
@@ -483,7 +483,7 @@ const ProfilePage = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">Phone</label>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">{t('customer.profile.phoneLabel')}</label>
                   <input
                     type="tel"
                     className="input-clean"
@@ -500,7 +500,7 @@ const ProfilePage = () => {
                 className="w-full btn-brand py-2.5 flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {accountSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                {accountSaving ? 'Saving...' : 'Save Changes'}
+                {accountSaving ? t('customer.profile.saving') : t('customer.profile.saveChanges')}
               </button>
 
               {/* Change Password */}
@@ -509,7 +509,7 @@ const ProfilePage = () => {
                   onClick={() => setShowPasswordSection(!showPasswordSection)}
                   className="text-sm text-primary font-medium hover:underline"
                 >
-                  {showPasswordSection ? 'Hide password change' : 'Change Password'}
+                  {showPasswordSection ? t('customer.profile.hidePasswordChange') : t('customer.profile.changePassword')}
                 </button>
 
                 {showPasswordSection && (
@@ -520,7 +520,7 @@ const ProfilePage = () => {
                     {(['current', 'next', 'confirm'] as const).map((field) => (
                       <div key={field} className="relative">
                         <label className="block text-xs font-medium text-muted-foreground mb-1">
-                          {field === 'current' ? 'Current Password' : field === 'next' ? 'New Password' : 'Confirm New Password'}
+                          {field === 'current' ? t('customer.profile.currentPassword') : field === 'next' ? t('customer.profile.newPassword') : t('customer.profile.confirmNewPassword')}
                         </label>
                         <input
                           type={showPwd[field] ? 'text' : 'password'}
@@ -543,7 +543,7 @@ const ProfilePage = () => {
                       className="w-full btn-brand py-2.5 flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       {passwordSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                      {passwordSaving ? 'Changing...' : 'Change Password'}
+                      {passwordSaving ? t('customer.profile.changing') : t('customer.profile.changePassword')}
                     </button>
                   </div>
                 )}

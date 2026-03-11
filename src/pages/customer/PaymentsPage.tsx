@@ -130,15 +130,15 @@ const PaymentsPage = () => {
     <AppLayout userType="customer" userName={profile?.name || "Customer"}>
       <div className="max-w-3xl mx-auto space-y-6 animate-fade-in pb-20 md:pb-0">
         <div>
-          <h1 className="text-2xl font-bold font-heading text-foreground mb-1">Payments</h1>
-          <p className="text-muted-foreground text-sm">Track your spending and payment history</p>
+          <h1 className="text-2xl font-bold font-heading text-foreground mb-1">{t('customer.payments.title')}</h1>
+          <p className="text-muted-foreground text-sm">{t('customer.payments.subtitle')}</p>
         </div>
 
         {/* Summary cards */}
         <div className="grid grid-cols-2 gap-4">
           {[
-            { icon: CheckCircle, label: "Total Services", value: stats.totalServices, color: "text-success", bg: "bg-success-light" },
-            { icon: Wallet, label: "Saved (Sub.)", value: `₹${stats.savedAmount}`, color: "text-warning", bg: "bg-warning-light" },
+            { icon: CheckCircle, label: t('customer.payments.totalServices'), value: stats.totalServices, color: "text-success", bg: "bg-success-light" },
+            { icon: Wallet, label: t('customer.payments.savedSub'), value: `₹${stats.savedAmount}`, color: "text-warning", bg: "bg-warning-light" },
           ].map((card) => (
             <div key={card.label} className="card-elevated p-4">
               <div className={`w-9 h-9 ${card.bg} rounded-xl flex items-center justify-center mb-3`}>
@@ -152,37 +152,37 @@ const PaymentsPage = () => {
 
         {/* Payment methods - UPI only */}
         <div className="card-elevated p-5">
-          <h2 className="text-base font-bold font-heading text-foreground mb-4">Payment Methods</h2>
+          <h2 className="text-base font-bold font-heading text-foreground mb-4">{t('customer.payments.paymentMethods')}</h2>
           <div className="flex items-start gap-3 p-4 bg-destructive/10 border border-destructive/30 rounded-xl mb-3">
             <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-            <p className="text-sm text-destructive font-medium">We only accept UPI / QR code payments. Cards and cash are not accepted.</p>
+            <p className="text-sm text-destructive font-medium">{t('customer.payments.upiOnly')}</p>
           </div>
           <div className="flex items-center gap-3 p-3 bg-muted rounded-xl">
             <span className="text-2xl">📱</span>
             <div className="flex-1">
-              <p className="text-sm font-medium text-foreground">UPI / QR Code</p>
-              <p className="text-xs text-muted-foreground">PhonePe, Google Pay, Paytm, any UPI app</p>
+              <p className="text-sm font-medium text-foreground">{t('customer.payments.upiQrCode')}</p>
+              <p className="text-xs text-muted-foreground">{t('customer.payments.upiApps')}</p>
             </div>
-            <span className="badge-success text-xs">Available</span>
+            <span className="badge-success text-xs">{t('customer.payments.available')}</span>
           </div>
         </div>
 
         {/* Transaction history */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-bold font-heading text-foreground">Transaction History</h2>
+            <h2 className="text-base font-bold font-heading text-foreground">{t('customer.payments.transactionHistory')}</h2>
             <button
-              onClick={() => alert('Export feature coming soon!')}
+              onClick={() => alert(t('customer.payments.exportComingSoon'))}
               className="flex items-center gap-1.5 text-sm text-primary font-medium"
             >
-              <Download className="w-3.5 h-3.5" /> Export
+              <Download className="w-3.5 h-3.5" /> {t('customer.payments.export')}
             </button>
           </div>
           {transactions.length === 0 ? (
             <div className="card-elevated p-12 text-center">
               <Wallet className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-              <h3 className="text-lg font-bold text-foreground mb-2">No transactions yet</h3>
-              <p className="text-sm text-muted-foreground">Your completed service payments will appear here</p>
+              <h3 className="text-lg font-bold text-foreground mb-2">{t('customer.payments.noTransactions')}</h3>
+              <p className="text-sm text-muted-foreground">{t('customer.payments.noTransactionsDesc')}</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -206,9 +206,9 @@ const PaymentsPage = () => {
                   <div className="text-right shrink-0">
                     <p className="text-sm font-bold text-foreground">₹{tx.totalAmount}</p>
                     {tx.paymentStatus === 'paid' ? (
-                      <span className="badge-success text-xs">Paid</span>
+                      <span className="badge-success text-xs">{t('customer.payments.paid')}</span>
                     ) : (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-warning/15 text-warning font-medium">Pending</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-warning/15 text-warning font-medium">{t('customer.payments.pending')}</span>
                     )}
                   </div>
                 </div>

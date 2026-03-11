@@ -5,6 +5,7 @@ import { Separator } from '@/components/ui/separator';
 import { api, authAPI } from '@/lib/api';
 import { CheckCircle, IndianRupee, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,6 +40,7 @@ function fmtDate(iso: string) {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const WorkerSalaryHistory = () => {
+  const { t } = useTranslation();
   const [userName, setUserName] = useState('Worker');
   const [records, setRecords] = useState<SalaryRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,8 +73,8 @@ const WorkerSalaryHistory = () => {
     <AppLayout userType="worker" userName={userName}>
       <div className="p-4 md:p-6 space-y-6 max-w-2xl mx-auto">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Salary History</h1>
-          <p className="text-sm text-muted-foreground mt-1">Your monthly salary payments sent by admin</p>
+          <h1 className="text-2xl font-bold text-foreground">{t('worker.salary.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t('worker.salary.subtitle')}</p>
         </div>
 
         {/* Summary card */}
@@ -80,11 +82,11 @@ const WorkerSalaryHistory = () => {
           <Card className="bg-primary text-primary-foreground">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
-                <p className="text-sm text-primary-foreground/80">Total Received</p>
+                <p className="text-sm text-primary-foreground/80">{t('worker.salary.totalReceived')}</p>
                 <p className="text-3xl font-bold mt-0.5">₹{totalEarned.toFixed(2)}</p>
               </div>
               <div className="text-right">
-                <p className="text-sm text-primary-foreground/80">Payments</p>
+                <p className="text-sm text-primary-foreground/80">{t('worker.salary.payments')}</p>
                 <p className="text-3xl font-bold mt-0.5">{records.length}</p>
               </div>
             </CardContent>
@@ -96,7 +98,7 @@ const WorkerSalaryHistory = () => {
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <IndianRupee className="w-4 h-4" />
-              Payment History
+              {t('worker.salary.paymentHistory')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -107,8 +109,8 @@ const WorkerSalaryHistory = () => {
             ) : records.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
                 <IndianRupee className="w-8 h-8 mb-2 opacity-30" />
-                <p className="text-sm">No salary payments yet</p>
-                <p className="text-xs text-center mt-1">Your salary will appear here once admin processes it</p>
+                <p className="text-sm">{t('worker.salary.noPayments')}</p>
+                <p className="text-xs text-center mt-1">{t('worker.salary.noPaymentsDesc')}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -120,27 +122,27 @@ const WorkerSalaryHistory = () => {
                           {fmtDate(rec.periodFrom)} – {fmtDate(rec.periodTo)}
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {rec.totalTasksCompleted} task{rec.totalTasksCompleted !== 1 ? 's' : ''} · {formatMinutes(rec.totalMinutesWorked)} worked
+                          {rec.totalTasksCompleted} {rec.totalTasksCompleted !== 1 ? t('worker.salary.tasks') : t('worker.salary.task')} · {formatMinutes(rec.totalMinutesWorked)} {t('worker.salary.worked')}
                         </p>
                       </div>
                       <Badge className="bg-green-100 text-green-800 flex items-center gap-1 text-xs shrink-0">
                         <CheckCircle className="w-3 h-3" />
-                        Paid
+                        {t('worker.salary.paid')}
                       </Badge>
                     </div>
 
                     <Separator />
 
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Rate: ₹{rec.hourlyRate}/hr</span>
+                      <span className="text-muted-foreground">{t('worker.salary.rate')}: ₹{rec.hourlyRate}/hr</span>
                       <span className="font-bold text-primary text-lg">₹{rec.requestedAmount.toFixed(2)}</span>
                     </div>
 
                     {rec.paidAt && (
-                      <p className="text-xs text-green-700">Received on {fmtDate(rec.paidAt)}</p>
+                      <p className="text-xs text-green-700">{t('worker.salary.receivedOn')} {fmtDate(rec.paidAt)}</p>
                     )}
                     {rec.adminNotes && (
-                      <p className="text-xs text-muted-foreground italic">Note: {rec.adminNotes}</p>
+                      <p className="text-xs text-muted-foreground italic">{t('worker.salary.note')} {rec.adminNotes}</p>
                     )}
                   </div>
                 ))}

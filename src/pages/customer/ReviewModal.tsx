@@ -1,6 +1,7 @@
 import { bookingsAPI, reviewsAPI } from "@/lib/api";
 import { ArrowLeft, Star } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from 'react-i18next';
 
 interface ReviewModalProps {
   bookingId: string;
@@ -11,6 +12,7 @@ interface ReviewModalProps {
 }
 
 const ReviewModal = ({ bookingId, workerId, workerName, onClose, onReviewSubmitted }: ReviewModalProps) => {
+  const { t } = useTranslation();
   const [overallRating, setOverallRating] = useState(0);
   const [qualityRating, setQualityRating] = useState(0);
   const [timelinessRating, setTimelinessRating] = useState(0);
@@ -22,11 +24,11 @@ const ReviewModal = ({ bookingId, workerId, workerName, onClose, onReviewSubmitt
 
   const handleSubmitReview = async () => {
     if (overallRating === 0) {
-      alert('Please select an overall rating');
+      alert(t('customer.review.selectRating'));
       return;
     }
     if (qualityRating === 0 || timelinessRating === 0 || professionalismRating === 0) {
-      alert('Please rate all categories: Quality, Timeliness, and Professionalism');
+      alert(t('customer.review.rateAllCategories'));
       return;
     }
 
@@ -53,18 +55,18 @@ const ReviewModal = ({ bookingId, workerId, workerName, onClose, onReviewSubmitt
         review: comment.trim() || undefined
       });
       
-      alert('✅ Thank you for your review! Your feedback helps improve our service.');
+      alert(t('customer.review.reviewSuccess'));
       onReviewSubmitted();
     } catch (error) {
       console.error('Error submitting review:', error);
-      alert('Failed to submit review. Please try again.');
+      alert(t('customer.review.reviewFailed'));
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleSkip = () => {
-    if (confirm('Are you sure you want to skip the review?')) {
+    if (confirm(t('customer.review.skipConfirm'))) {
       onClose();
     }
   };
@@ -82,21 +84,21 @@ const ReviewModal = ({ bookingId, workerId, workerName, onClose, onReviewSubmitt
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="flex-1">
-              <h2 className="text-xl font-bold">Rate Your Experience</h2>
-              <p className="text-sm opacity-90">Help us serve you better</p>
+              <h2 className="text-xl font-bold">{t('customer.review.rateExperience')}</h2>
+              <p className="text-sm opacity-90">{t('customer.review.helpUsServe')}</p>
             </div>
           </div>
 
           <div className="p-6 space-y-6">
             {/* Worker Info */}
             <div className="text-center">
-              <p className="text-sm text-muted-foreground mb-2">How was your experience with</p>
+              <p className="text-sm text-muted-foreground mb-2">{t('customer.review.howWasExperience')}</p>
               <p className="text-xl font-bold text-foreground">{workerName}?</p>
             </div>
 
             {/* Overall Rating */}
             <div className="flex flex-col items-center gap-4 py-4">
-              <p className="text-sm font-medium text-muted-foreground">Overall Rating</p>
+              <p className="text-sm font-medium text-muted-foreground">{t('customer.review.overallRating')}</p>
               <div className="flex gap-2">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
@@ -118,22 +120,22 @@ const ReviewModal = ({ bookingId, workerId, workerName, onClose, onReviewSubmitt
               </div>
               {overallRating > 0 && (
                 <p className="text-sm font-medium text-foreground">
-                  {overallRating === 1 && "Poor"}
-                  {overallRating === 2 && "Fair"}
-                  {overallRating === 3 && "Good"}
-                  {overallRating === 4 && "Very Good"}
-                  {overallRating === 5 && "Excellent"}
+                  {overallRating === 1 && t('customer.review.poor')}
+                  {overallRating === 2 && t('customer.review.fair')}
+                  {overallRating === 3 && t('customer.review.good')}
+                  {overallRating === 4 && t('customer.review.veryGood')}
+                  {overallRating === 5 && t('customer.review.excellent')}
                 </p>
               )}
             </div>
 
             {/* Category Ratings */}
             <div className="space-y-4 bg-muted/50 p-4 rounded-xl">
-              <h3 className="text-sm font-semibold text-foreground">Rate by Category</h3>
+              <h3 className="text-sm font-semibold text-foreground">{t('customer.review.rateByCategory')}</h3>
               
               {/* Quality */}
               <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1">Quality of Work</label>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">{t('customer.review.qualityOfWork')}</label>
                 <div className="flex gap-1">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
@@ -155,7 +157,7 @@ const ReviewModal = ({ bookingId, workerId, workerName, onClose, onReviewSubmitt
 
               {/* Timeliness */}
               <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1">Timeliness</label>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">{t('customer.review.timeliness')}</label>
                 <div className="flex gap-1">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
@@ -177,7 +179,7 @@ const ReviewModal = ({ bookingId, workerId, workerName, onClose, onReviewSubmitt
 
               {/* Professionalism */}
               <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1">Professionalism</label>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">{t('customer.review.professionalism')}</label>
                 <div className="flex gap-1">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
@@ -202,19 +204,19 @@ const ReviewModal = ({ bookingId, workerId, workerName, onClose, onReviewSubmitt
             <div>
               <label className="block mb-2">
                 <span className="text-sm font-medium text-foreground">
-                  Share your feedback (optional)
+                  {t('customer.review.shareFeedback')}
                 </span>
               </label>
               <textarea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                placeholder="Tell us about your experience..."
+                placeholder={t('customer.review.tellUs')}
                 rows={4}
                 maxLength={500}
                 className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary resize-none"
               />
               <p className="text-xs text-muted-foreground mt-1 text-right">
-                {comment.length}/500 characters
+                {comment.length}{t('customer.review.characters')}
               </p>
             </div>
 
@@ -228,7 +230,7 @@ const ReviewModal = ({ bookingId, workerId, workerName, onClose, onReviewSubmitt
                 className="w-4 h-4 text-primary border-border rounded focus:ring-2 focus:ring-primary"
               />
               <label htmlFor="anonymous" className="text-sm text-muted-foreground">
-                Submit anonymously
+                {t('customer.review.submitAnonymously')}
               </label>
             </div>
 
@@ -242,12 +244,12 @@ const ReviewModal = ({ bookingId, workerId, workerName, onClose, onReviewSubmitt
                 {submitting ? (
                   <>
                     <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                    Submitting...
+                    {t('customer.review.submitting')}
                   </>
                 ) : (
                   <>
                     <Star className="w-5 h-5" />
-                    Submit Review
+                    {t('customer.review.submitReview')}
                   </>
                 )}
               </button>
@@ -256,14 +258,14 @@ const ReviewModal = ({ bookingId, workerId, workerName, onClose, onReviewSubmitt
                 disabled={submitting}
                 className="w-full btn-secondary py-3"
               >
-                Skip for Now
+                {t('customer.review.skipForNow')}
               </button>
             </div>
 
             {/* Info Note */}
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
-              <p className="font-medium mb-1">💡 Your review helps us improve</p>
-              <p>Your honest feedback helps other customers and improves our service quality.</p>
+              <p className="font-medium mb-1">💡 {t('customer.review.reviewHelps')}</p>
+              <p>{t('customer.review.reviewHelpsDesc')}</p>
             </div>
           </div>
         </div>

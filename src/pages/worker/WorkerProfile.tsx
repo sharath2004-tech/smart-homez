@@ -71,10 +71,10 @@ const WorkerProfile = () => {
       <AppLayout userType="worker" userName="Guest">
         <div className="max-w-2xl mx-auto text-center py-20">
           <div className="text-4xl mb-4">👤</div>
-          <h2 className="text-xl font-bold mb-2">Please Log In</h2>
-          <p className="text-muted-foreground mb-4">You need to be logged in to view your profile.</p>
+          <h2 className="text-xl font-bold mb-2">{t('worker.profile.pleaseLogIn')}</h2>
+          <p className="text-muted-foreground mb-4">{t('worker.profile.needLogin')}</p>
           <a href="/login" className="btn-brand px-6 py-2 inline-block">
-            Go to Login
+            {t('worker.profile.goToLogin')}
           </a>
         </div>
       </AppLayout>
@@ -113,7 +113,7 @@ const WorkerProfile = () => {
                 )}
                 <div className="flex items-center gap-1 text-sm text-muted-foreground">
                   <CheckCircle className="w-4 h-4" />
-                  <span>{totalJobs} jobs completed</span>
+                  <span>{totalJobs} {t('worker.profile.jobsCompleted')}</span>
                 </div>
               </div>
             </div>
@@ -130,7 +130,7 @@ const WorkerProfile = () => {
             <div className="flex items-start gap-3">
               <Mail className="w-5 h-5 text-muted-foreground mt-0.5" />
               <div>
-                <p className="text-sm text-muted-foreground">Email</p>
+                <p className="text-sm text-muted-foreground">{t('worker.profile.email')}</p>
                 <p className="font-medium text-foreground">{profile.email}</p>
               </div>
             </div>
@@ -138,7 +138,7 @@ const WorkerProfile = () => {
               <div className="flex items-start gap-3">
                 <Phone className="w-5 h-5 text-muted-foreground mt-0.5" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Phone</p>
+                  <p className="text-sm text-muted-foreground">{t('worker.profile.phone')}</p>
                   <p className="font-medium text-foreground">{profile.phone}</p>
                 </div>
               </div>
@@ -167,7 +167,7 @@ const WorkerProfile = () => {
                   ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground text-sm">No specializations added yet.</p>
+                <p className="text-muted-foreground text-sm">{t('worker.profile.noSpecializations')}</p>
               )}
             </div>
 
@@ -176,7 +176,7 @@ const WorkerProfile = () => {
               <div className="card-elevated p-6">
                 <h3 className="font-bold font-heading text-foreground mb-4 flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-primary" />
-                  Assigned Locations
+                  {t('worker.profile.assignedLocations')}
                 </h3>
                 <div className="space-y-3">
                   {profile.workerProfile.assignedApartments.map((apartment, index: number) => (
@@ -201,20 +201,20 @@ const WorkerProfile = () => {
             <div className="card-elevated p-6">
               <h3 className="font-bold font-heading text-foreground mb-4 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-primary" />
-                Performance
+                {t('worker.profile.performance')}
               </h3>
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center p-4 bg-accent rounded-lg">
                   <p className="text-2xl font-bold text-foreground">{stats.today || 0}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Today</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t('worker.tasks.today')}</p>
                 </div>
                 <div className="text-center p-4 bg-accent rounded-lg">
                   <p className="text-2xl font-bold text-foreground">{stats.thisWeek || 0}</p>
-                  <p className="text-xs text-muted-foreground mt-1">This Week</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t('worker.tasks.thisWeek')}</p>
                 </div>
                 <div className="text-center p-4 bg-accent rounded-lg">
                   <p className="text-2xl font-bold text-foreground">{stats.thisMonth || 0}</p>
-                  <p className="text-xs text-muted-foreground mt-1">This Month</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t('worker.tasks.thisMonth')}</p>
                 </div>
               </div>
             </div>
@@ -223,9 +223,9 @@ const WorkerProfile = () => {
             <div className="card-elevated p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-bold text-foreground mb-1">Availability Status</h3>
+                  <h3 className="font-bold text-foreground mb-1">{t('worker.profile.availabilityStatus')}</h3>
                   <p className="text-sm text-muted-foreground">
-                    You are currently {profile.workerProfile.availability ? 'available' : 'unavailable'} for new bookings
+                    {profile.workerProfile.availability ? t('worker.profile.availableForBookings') : t('worker.profile.unavailableForBookings')}
                   </p>
                 </div>
                 <div className={`px-4 py-2 rounded-lg font-semibold ${
@@ -233,7 +233,7 @@ const WorkerProfile = () => {
                     ? 'bg-success-light text-success'
                     : 'bg-muted text-muted-foreground'
                 }`}>
-                  {profile.workerProfile.availability ? 'Active' : 'Inactive'}
+                  {profile.workerProfile.availability ? t('worker.profile.active') : t('worker.profile.inactive')}
                 </div>
               </div>
             </div>
@@ -242,22 +242,22 @@ const WorkerProfile = () => {
 
         {/* Account Information */}
         <div className="card-elevated p-6">
-          <h3 className="font-bold font-heading text-foreground mb-4">Account Information</h3>
+          <h3 className="font-bold font-heading text-foreground mb-4">{t('worker.profile.accountInfo')}</h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Account Status</span>
+              <span className="text-muted-foreground">{t('worker.profile.accountStatus')}</span>
               <span className={`font-medium ${profile.isActive ? 'text-success' : 'text-destructive'}`}>
-                {profile.isActive ? 'Active' : 'Inactive'}
+                {profile.isActive ? t('worker.profile.active') : t('worker.profile.inactive')}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Email Verified</span>
+              <span className="text-muted-foreground">{t('worker.profile.emailVerified')}</span>
               <span className={`font-medium ${profile.isVerified ? 'text-success' : 'text-warning'}`}>
-                {profile.isVerified ? 'Verified' : 'Not Verified'}
+                {profile.isVerified ? t('common.verified') : t('worker.profile.notVerified')}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Member Since</span>
+              <span className="text-muted-foreground">{t('worker.profile.memberSince')}</span>
               <span className="font-medium text-foreground">
                 {new Date(profile.createdAt).toLocaleDateString('en-IN', {
                   month: 'short',

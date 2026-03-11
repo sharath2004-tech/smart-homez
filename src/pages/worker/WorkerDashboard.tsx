@@ -144,14 +144,14 @@ const WorkerDashboard = () => {
   const handleCompleteService = async () => {
     if (!currentTask) return;
 
-    if (confirm('Mark this service as completed?')) {
+    if (confirm(t('worker.dashboard.markCompletedConfirm'))) {
       try {
         await bookingsAPI.update(currentTask._id, { status: 'completed', completedAt: new Date().toISOString() });
         await fetchDashboardData();
-        alert('Service completed successfully!');
+        alert(t('worker.dashboard.serviceCompletedSuccess'));
       } catch (error) {
         console.error('Error completing service:', error);
-        alert('Failed to complete service');
+        alert(t('worker.dashboard.failedCompleteService'));
       }
     }
   };
@@ -210,7 +210,7 @@ const WorkerDashboard = () => {
                 </div>
               )}
               <div>
-                <p className="text-muted-foreground text-sm">Welcome back 👋</p>
+                <p className="text-muted-foreground text-sm">{t('worker.dashboard.welcomeBack')}</p>
                 <h1 className="text-2xl font-bold font-heading text-foreground">{profile?.name}</h1>
               </div>
             </div>
@@ -226,13 +226,13 @@ const WorkerDashboard = () => {
             <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
               <Clock className="w-4 h-4 text-primary" />
             </div>
-            <p className="text-sm font-semibold text-foreground">Hours Worked</p>
+            <p className="text-sm font-semibold text-foreground">{t('worker.dashboard.hoursWorked')}</p>
           </div>
           <div className="grid grid-cols-3 gap-3">
             {[
-              { label: 'Today',      value: formatMinutes(stats.minutesToday) },
-              { label: 'This Week',  value: formatMinutes(stats.minutesThisWeek) },
-              { label: 'This Month', value: formatMinutes(stats.minutesThisMonth) },
+              { label: t('worker.tasks.today'),      value: formatMinutes(stats.minutesToday) },
+              { label: t('worker.tasks.thisWeek'),  value: formatMinutes(stats.minutesThisWeek) },
+              { label: t('worker.tasks.thisMonth'), value: formatMinutes(stats.minutesThisMonth) },
             ].map((item) => (
               <div key={item.label} className="bg-muted rounded-xl p-3 text-center">
                 <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
@@ -263,7 +263,7 @@ const WorkerDashboard = () => {
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-xs text-muted-foreground">Collect</p>
+                  <p className="text-xs text-muted-foreground">{t('worker.dashboard.collect')}</p>
                   <span className="text-base font-bold text-primary">₹{currentTask.totalAmount}</span>
                 </div>
               </div>
@@ -356,7 +356,7 @@ const WorkerDashboard = () => {
                         <Clock className="w-3 h-3" /> {formatTime(task.startTime)}
                       </span>
                       <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <MapPin className="w-3 h-3" /> {task.location?.city || 'Location TBD'}
+                        <MapPin className="w-3 h-3" /> {task.location?.city || t('worker.dashboard.locationTBD')}
                       </span>
                     </div>
                   </div>
