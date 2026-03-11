@@ -46,9 +46,9 @@ const CustomerDashboard = () => {
 
   // Only 3 service category cards
   const quickServices = [
-    { icon: "⚡", name: "Insta / Adhoc", subtitle: "Instant booking", badge: "On demand", category: "insta" },
-    { icon: "📅", name: "Subscription", subtitle: "Recurring plans", badge: "Save 20%", category: "subscription" },
-    { icon: "✨", name: "Deep Cleaning", subtitle: "Full home clean", badge: "Best value", category: "deep" },
+    { icon: "⚡", name: "Insta / Adhoc", subtitle: "Instant booking", badge: "On demand", path: "/customer/services/insta" },
+    { icon: "📅", name: "Subscription", subtitle: "Recurring plans", badge: "Save 20%", path: "/customer/services/subscription" },
+    { icon: "✨", name: "Deep Cleaning", subtitle: "Full home clean", badge: "Best value", path: "/customer/services/deep-cleaning" },
   ];
 
   useEffect(() => {
@@ -285,7 +285,7 @@ const CustomerDashboard = () => {
                 custom={index}
               >
                 <Link
-                  to={`/customer/services?category=${s.category}`}
+                  to={s.path}
                   className="card-elevated-hover p-4 text-center group block flex flex-col items-center justify-center min-h-[130px]"
                 >
                   <motion.div 

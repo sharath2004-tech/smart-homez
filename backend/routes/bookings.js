@@ -4,6 +4,7 @@ import { authenticate, authorize } from '../middleware/auth.js';
 import upload from '../middleware/upload.js';
 import Booking from '../models/Booking.js';
 import Location from '../models/Location.js';
+import Service from '../models/Service.js';
 import Settings from '../models/Settings.js';
 import User from '../models/User.js';
 import WorkerEarnings from '../models/WorkerEarnings.js';
@@ -358,7 +359,7 @@ router.post('/',
   authorize('customer', 'admin'),
   [
     body('worker').optional().isString(),
-    body('service').notEmpty().withMessage('Service ID is required'),
+    body('service').optional().isString(),
     body('bookingDate').isISO8601().withMessage('Valid booking date is required'),
     body('startTime').notEmpty().withMessage('Start time is required'),
     body('endTime').notEmpty().withMessage('End time is required'),
@@ -372,7 +373,7 @@ router.post('/',
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { 
+      let { 
         worker, 
         service, 
         bookingDate, 
@@ -388,6 +389,28 @@ router.post('/',
         subscriptionDetails,
         serviceDetails
       } = req.body;
+
+      // Resolve service: if not provided, find a matching active service by bookingType
+      if (!service) {
+        const serviceTypeMap = {
+          'adhoc': 'instant_hourly',
+          'monthly': 'monthly_subscription',
+        };
+        const targetType = serviceTypeMap[bookingType] || null;
+        const filter = { isActive: true, ...(targetType ? { serviceType: targetType } : {}) };
+        const fallbackService = await Service.findOne(filter).lean();
+        if (!fallbackService) {
+          return res.status(400).json({
+            error: {
+              message: 'No matching service found. Please ask your admin to create an active service.',
+              status: 400,
+              code: 'SERVICE_NOT_FOUND'
+            }
+          });
+        }
+        service = fallbackService._id.toString();
+        console.log(`✅ Service auto-resolved: ${fallbackService.name} (${fallbackService.serviceType})`);
+      }
 
       // Validate subscription bookings require a worker
       if (isSubscription && !worker) {
@@ -603,7 +626,7 @@ router.post('/',
         notes,
         assignmentMethod: worker ? 'manual' : 'auto',
         bookingType: bookingType || 'oneTime',
-        isRecurring: bookingType && bookingType !== 'oneTime',
+        isRecurring: ['daily', 'weekly', 'monthly', 'recurring-short', 'monthly-subscription'].includes(bookingType),
         preferences: preferences || {},
         ...(serviceDetails && { serviceDetails })
       };
