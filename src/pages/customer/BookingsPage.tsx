@@ -112,11 +112,11 @@ const BookingsPage = () => {
     if (!confirm('Are you sure you want to cancel this booking?')) return;
 
     try {
-      await bookingsAPI.update(bookingId, { status: 'cancelled' });
+      await bookingsAPI.cancel(bookingId);
       await fetchBookings();
     } catch (error) {
       console.error('Error cancelling booking:', error);
-      alert('Failed to cancel booking. Please try again.');
+      alert(error instanceof Error ? error.message : 'Failed to cancel booking. Please try again.');
     }
   };
 
@@ -396,16 +396,16 @@ const BookingsPage = () => {
                     {isUpcoming && booking.status !== 'cancelled' && (
                       <>
                         <button
-                          onClick={() => handleReschedule(booking)}
+                          onClick={(e) => { e.stopPropagation(); handleReschedule(booking); }}
                           className="flex-1 py-2.5 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors"
                         >
                           Reschedule
                         </button>
                         <button
-                          onClick={() => handleCancelBooking(booking._id)}
-                          disabled={booking.status === 'confirmed' || booking.status === 'in-progress'}
+                          onClick={(e) => { e.stopPropagation(); handleCancelBooking(booking._id); }}
+                          disabled={booking.status === 'in-progress'}
                           className="flex-1 py-2.5 bg-destructive text-destructive-foreground rounded-lg text-sm font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          title={booking.status === 'confirmed' || booking.status === 'in-progress' ? 'Cannot cancel confirmed or ongoing services' : ''}
+                          title={booking.status === 'in-progress' ? 'Cannot cancel a service already in progress' : ''}
                         >
                           Cancel
                         </button>

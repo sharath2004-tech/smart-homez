@@ -263,8 +263,8 @@ export const bookingsAPI = {
   },
 
   cancel: async (id: string, reason?: string) => {
-    return apiCall(`/bookings/${id}/cancel`, {
-      method: 'POST',
+    return apiCall(`/bookings/${id}`, {
+      method: 'DELETE',
       body: JSON.stringify({ reason })
     });
   },
