@@ -837,6 +837,11 @@ export const settingsAPI = {
     return apiCall('/settings/admin');
   },
 
+  // Public endpoint — works for every role
+  getBusinessHours: async () => {
+    return apiCall('/settings/business-hours');
+  },
+
   updateSettings: async (settings: {
     payment?: {
       upiId?: string;
@@ -1226,6 +1231,7 @@ export const superAdminAPI = {
     }>;
     timezone?: string;
     slotDurationMinutes?: number;
+    holidays?: Array<{ date: string; label: string }>;
   }) => {
     return apiCall('/super-admin/business-hours', {
       method: 'PUT',

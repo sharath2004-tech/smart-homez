@@ -1,6 +1,7 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
+import BusinessHours from '../models/BusinessHours.js';
 import Settings from '../models/Settings.js';
 
 const router = express.Router();
@@ -33,6 +34,63 @@ router.get('/', async (req, res) => {
     res.json({ settings: publicSettings });
   } catch (error) {
     console.error('Get settings error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   GET /api/settings/business-hours
+// @desc    Get today's business hours (public — all roles, no auth required)
+// @access  Public
+router.get('/business-hours', async (req, res) => {
+  try {
+    const config = await BusinessHours.getConfig();
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const now = new Date();
+    const dayName = dayNames[now.getDay()];
+    const dayConfig = config.schedule.find(d => d.day === dayName);
+    const todayStr = now.toISOString().split('T')[0];
+
+    // Format HH:MM → human-readable "9:00 AM"
+    const fmt = (t) => {
+      if (!t) return '';
+      const [h, m] = t.split(':').map(Number);
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const hour = h % 12 || 12;
+      return `${hour}:${String(m).padStart(2, '0')} ${ampm}`;
+    };
+
+    // Check if today is a declared holiday
+    const todayHoliday = config.holidays?.find(h => h.date === todayStr);
+
+    res.json({
+      success: true,
+      businessHours: {
+        isOpen: todayHoliday ? false : (dayConfig?.isActive ?? false),
+        holidayToday: todayHoliday ? (todayHoliday.label || 'Holiday') : null,
+        day: dayName,
+        openTime: dayConfig?.openTime ?? null,
+        closeTime: dayConfig?.closeTime ?? null,
+        openFormatted: (!todayHoliday && dayConfig?.isActive) ? fmt(dayConfig.openTime) : null,
+        closeFormatted: (!todayHoliday && dayConfig?.isActive) ? fmt(dayConfig.closeTime) : null,
+        breaks: dayConfig?.breaks ?? [],
+        slotDurationMinutes: config.slotDurationMinutes,
+        timezone: config.timezone,
+        // Upcoming holidays (next 60 days) for info display
+        upcomingHolidays: (config.holidays ?? [])
+          .filter(h => h.date >= todayStr)
+          .sort((a, b) => a.date.localeCompare(b.date))
+          .slice(0, 5),
+        // Full week summary for tooltip display
+        weekSchedule: config.schedule.map(d => ({
+          day: d.day,
+          isActive: d.isActive,
+          openTime: d.openTime,
+          closeTime: d.closeTime
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Get business hours (public) error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
   }
 });

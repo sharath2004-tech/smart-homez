@@ -905,7 +905,11 @@ router.put(
     body('schedule')
       .optional()
       .isArray()
-      .withMessage('Schedule must be an array')
+      .withMessage('Schedule must be an array'),
+    body('holidays')
+      .optional()
+      .isArray()
+      .withMessage('Holidays must be an array')
   ],
   async (req, res) => {
     try {
@@ -914,12 +918,13 @@ router.put(
         return res.status(400).json({ error: { message: errors.array()[0].msg, status: 400 } });
       }
 
-      const { schedule, timezone, slotDurationMinutes } = req.body;
+      const { schedule, timezone, slotDurationMinutes, holidays } = req.body;
       const config = await BusinessHours.getConfig();
 
       if (schedule !== undefined) config.schedule = schedule;
       if (timezone !== undefined) config.timezone = timezone;
       if (slotDurationMinutes !== undefined) config.slotDurationMinutes = slotDurationMinutes;
+      if (holidays !== undefined) config.holidays = holidays;
       config.updatedBy = req.user._id;
 
       await config.save();

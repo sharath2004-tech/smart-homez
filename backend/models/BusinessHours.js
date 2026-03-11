@@ -16,6 +16,11 @@ const dayConfigSchema = new mongoose.Schema({
   breaks:    { type: [breakPeriodSchema], default: [] }
 }, { _id: false });
 
+const holidaySchema = new mongoose.Schema({
+  date:  { type: String, required: true }, // YYYY-MM-DD
+  label: { type: String, default: 'Holiday' }
+}, { _id: false });
+
 const businessHoursSchema = new mongoose.Schema({
   schedule: {
     type: [dayConfigSchema],
@@ -27,6 +32,7 @@ const businessHoursSchema = new mongoose.Schema({
       breaks: [{ start: '13:00', end: '14:00', label: 'Lunch Break' }]
     }))
   },
+  holidays:             { type: [holidaySchema], default: [] },
   timezone:             { type: String, default: 'Asia/Kolkata' },
   slotDurationMinutes:  { type: Number, default: 30, min: 15, max: 120 },
   updatedBy:            { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }

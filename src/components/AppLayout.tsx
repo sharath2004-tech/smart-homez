@@ -1,5 +1,6 @@
-import { ArrowLeft, Bell, Calendar, ClipboardCheck, CreditCard, HelpCircle, Home, IndianRupee, LayoutDashboard, LogOut, MapPin, Menu, MessageSquare, RefreshCw, Settings, User, Users, Wrench, X } from "lucide-react";
-import { useState } from "react";
+import { settingsAPI } from "@/lib/api";
+import { ArrowLeft, Bell, Calendar, ClipboardCheck, Clock, CreditCard, HelpCircle, Home, IndianRupee, LayoutDashboard, LogOut, MapPin, Menu, MessageSquare, RefreshCw, Settings, User, Users, Wrench, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { LanguageSelector } from "./LanguageSelector";
@@ -15,6 +16,22 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Business hours badge
+  const [todayBH, setTodayBH] = useState<{
+    isOpen: boolean;
+    openFormatted?: string;
+    closeFormatted?: string;
+    day?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    settingsAPI.getBusinessHours()
+      .then((res: { businessHours: { isOpen: boolean; openFormatted?: string; closeFormatted?: string; day?: string } }) => {
+        if (res?.businessHours) setTodayBH(res.businessHours);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleLogout = () => {
     // Clear authentication data
@@ -104,6 +121,20 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
               <p className="text-xs text-muted-foreground capitalize">{userType === 'super_admin' ? 'Super Admin' : t(`nav.${userType}`)}</p>
             </div>
           </div>
+          {/* Business hours chip */}
+          {todayBH !== null && (
+            <div className={`mt-2.5 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium ${
+              todayBH.isOpen
+                ? 'bg-green-50 text-green-700 border border-green-200'
+                : 'bg-muted text-muted-foreground border border-border'
+            }`}>
+              <Clock className="w-3.5 h-3.5 shrink-0" />
+              {todayBH.isOpen
+                ? <span>Open <span className="font-semibold">{todayBH.openFormatted}&#8211;{todayBH.closeFormatted}</span></span>
+                : <span>Closed today</span>
+              }
+            </div>
+          )}
         </div>
 
         {/* Nav items */}
@@ -220,6 +251,20 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
                   <p className="text-xs text-muted-foreground capitalize">{userType === 'super_admin' ? 'Super Admin' : t(`nav.${userType}`)}</p>
                 </div>
               </div>
+              {/* Business hours chip */}
+              {todayBH !== null && (
+                <div className={`mt-2.5 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium ${
+                  todayBH.isOpen
+                    ? 'bg-green-50 text-green-700 border border-green-200'
+                    : 'bg-muted text-muted-foreground border border-border'
+                }`}>
+                  <Clock className="w-3.5 h-3.5 shrink-0" />
+                  {todayBH.isOpen
+                    ? <span>Open <span className="font-semibold">{todayBH.openFormatted}&#8211;{todayBH.closeFormatted}</span></span>
+                    : <span>Closed today</span>
+                  }
+                </div>
+              )}
             </div>
             {/* Nav items - scrollable */}
             <nav className="flex-1 overflow-y-auto p-4 space-y-1">
