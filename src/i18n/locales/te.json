@@ -1006,7 +1006,16 @@
       "limited": "పరిమితం",
       "workersNearby": "{{count}} కార్మికులు సమీపంలో",
       "bookNow": "ఇప్పుడే బుక్ చేయండి",
-      "view": "చూడండి"
+      "view": "చూడండి",
+      "catInstaLabel": "ఇన్స్టా / తక్షణ",
+      "catInstaDesc": "తక్షణ ఆన్-డిమాండ్ బుకింగ్",
+      "catInstaBadge": "డిమాండ్ మేరకు",
+      "catSubLabel": "సభ్యత్వం",
+      "catSubDesc": "పునరావృత ప్లాన్లు & 20% ఆదా",
+      "catSubBadge": "20% ఆదా",
+      "catDeepLabel": "డీప్ క్లీనింగ్",
+      "catDeepDesc": "పూర్తి ఇల్లు లోతైన శుభ్రం",
+      "catDeepBadge": "అత్యుత్తమ విలువ"
     },
     "review": {
       "rateExperience": "మీ అనుభవాన్ని రేట్ చేయండి",

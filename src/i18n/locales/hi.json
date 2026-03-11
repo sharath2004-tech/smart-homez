@@ -1006,7 +1006,16 @@
       "limited": "सीमित",
       "workersNearby": "{{count}} कर्मचारी नज़दीक",
       "bookNow": "अभी बुक करें",
-      "view": "देखें"
+      "view": "देखें",
+      "catInstaLabel": "इंस्टा / तत्काल",
+      "catInstaDesc": "तुरंत ऑन-डिमांड बुकिंग",
+      "catInstaBadge": "मांग पर",
+      "catSubLabel": "सदस्यता",
+      "catSubDesc": "आवर्ती योजनाएं और 20% बचाएं",
+      "catSubBadge": "20% बचाएं",
+      "catDeepLabel": "डीप क्लीनिंग",
+      "catDeepDesc": "पूरे घर की गहरी सफाई",
+      "catDeepBadge": "सर्वोत्तम मूल्य"
     },
     "review": {
       "rateExperience": "अपने अनुभव को रेट करें",

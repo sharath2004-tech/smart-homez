@@ -1010,7 +1010,16 @@
       "limited": "Limited",
       "workersNearby": "{{count}} workers nearby",
       "bookNow": "Book Now",
-      "view": "View"
+      "view": "View",
+      "catInstaLabel": "Insta / Adhoc",
+      "catInstaDesc": "Instant on-demand booking",
+      "catInstaBadge": "On demand",
+      "catSubLabel": "Subscription",
+      "catSubDesc": "Recurring plans & save 20%",
+      "catSubBadge": "Save 20%",
+      "catDeepLabel": "Deep Cleaning",
+      "catDeepDesc": "Full home deep clean service",
+      "catDeepBadge": "Best value"
     },
     "review": {
       "rateExperience": "Rate Your Experience",

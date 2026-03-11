@@ -22,10 +22,10 @@ interface Service {
 }
 
 const SERVICE_CATEGORIES = [
-  { key: 'insta',        label: 'Insta / Adhoc',    icon: '⚡', desc: 'Instant on-demand booking',     color: 'bg-amber-50 border-amber-300',  badge: 'On demand',  badgeColor: 'bg-teal-100 text-teal-700', path: '/customer/services/insta' },
-  { key: 'subscription', label: 'Subscription',      icon: '📅', desc: 'Recurring plans & save 20%',   color: 'bg-blue-50 border-blue-300',    badge: 'Save 20%',   badgeColor: 'bg-teal-100 text-teal-700', path: '/customer/services/subscription' },
-  { key: 'deep',         label: 'Deep Cleaning',     icon: '✨', desc: 'Full home deep clean service', color: 'bg-green-50 border-green-300',  badge: 'Best value', badgeColor: 'bg-teal-100 text-teal-700', path: '/customer/services/deep-cleaning' },
-] as const;
+  { key: 'insta',        labelKey: 'customer.services.catInstaLabel', icon: '⚡', descKey: 'customer.services.catInstaDesc', color: 'bg-amber-50 border-amber-300',  badgeKey: 'customer.services.catInstaBadge', badgeColor: 'bg-teal-100 text-teal-700', path: '/customer/services/insta' },
+  { key: 'subscription', labelKey: 'customer.services.catSubLabel',   icon: '📅', descKey: 'customer.services.catSubDesc',   color: 'bg-blue-50 border-blue-300',    badgeKey: 'customer.services.catSubBadge',   badgeColor: 'bg-teal-100 text-teal-700', path: '/customer/services/subscription' },
+  { key: 'deep',         labelKey: 'customer.services.catDeepLabel',  icon: '✨', descKey: 'customer.services.catDeepDesc',  color: 'bg-green-50 border-green-300',  badgeKey: 'customer.services.catDeepBadge',  badgeColor: 'bg-teal-100 text-teal-700', path: '/customer/services/deep-cleaning' },
+];
 
 const ServicesPage = () => {
   const { t } = useTranslation();
@@ -224,9 +224,9 @@ const ServicesPage = () => {
                   className={`p-3 rounded-2xl border-2 text-center transition-all ${cat.color} hover:border-primary/60 hover:shadow-md active:scale-95`}
                 >
                   <div className="text-2xl mb-1">{cat.icon}</div>
-                  <p className="text-xs font-semibold text-foreground leading-tight">{cat.label}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block leading-tight">{cat.desc}</p>
-                  <span className={`inline-block mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full ${cat.badgeColor}`}>{cat.badge}</span>
+                  <p className="text-xs font-semibold text-foreground leading-tight">{t(cat.labelKey)}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block leading-tight">{t(cat.descKey)}</p>
+                  <span className={`inline-block mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full ${cat.badgeColor}`}>{t(cat.badgeKey)}</span>
                 </button>
               ))}
             </div>
