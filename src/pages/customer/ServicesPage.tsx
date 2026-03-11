@@ -334,12 +334,12 @@ const ServicesPage = () => {
                     <Link
                       to={`/customer/book/${service._id}`}
                       className={`w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors ${
-                      service.availability?.available 
-                        ? 'btn-brand'
-                        : 'bg-muted text-muted-foreground hover:bg-border visited:text-muted-foreground'
+                      service.availability?.available === false
+                        ? 'bg-muted text-muted-foreground hover:bg-border'
+                        : 'btn-brand'
                     }`}
                   >
-                    {service.availability?.available ? t('customer.services.bookNow') : t('customer.services.view')}
+                    {service.availability?.available === false ? t('customer.services.view') : t('customer.services.bookNow')}
                     </Link>
                   </motion.div>
                 </div>
