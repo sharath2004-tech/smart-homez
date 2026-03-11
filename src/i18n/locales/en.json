@@ -601,5 +601,31 @@
       "addInstructions": "Add any special requirements",
       "savePreferences": "Save Preferences"
     }
+  },
+  "bh": {
+    "title": "Business Hours",
+    "subtitle": "Platform-wide slot generation config",
+    "saveChanges": "Save Changes",
+    "saving": "Saving\u2026",
+    "slotDuration": "Slot Duration (minutes)",
+    "timezone": "Timezone",
+    "weeklySchedule": "Weekly Schedule & Breaks",
+    "colDay": "Day",
+    "colActive": "Active",
+    "colOpens": "Opens",
+    "colCloses": "Closes",
+    "colBreaks": "Breaks",
+    "addBreak": "Add Break",
+    "breakEndBeforeStart": "Break end time must be after start time",
+    "holidayDeclarations": "Holiday Declarations",
+    "holidayDate": "Date",
+    "holidayLabel": "Label",
+    "holidayLabelPlaceholder": "e.g. Diwali, Republic Day",
+    "addHoliday": "Add Holiday",
+    "noHolidays": "No holidays declared yet.",
+    "alreadyHoliday": "This date is already marked as a holiday.",
+    "slotsNote": "Slots are auto-generated from these hours. Holidays will mark those dates as closed for all customers.",
+    "open": "Open",
+    "closedToday": "Closed today"
   }
 }

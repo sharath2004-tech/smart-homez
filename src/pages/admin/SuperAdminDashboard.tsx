@@ -25,6 +25,7 @@ import {
     Users
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
@@ -124,6 +125,7 @@ const statusBadge: Record<string, string> = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const SuperAdminDashboard = () => {
+  const { t } = useTranslation();
   const [userName, setUserName] = useState("Super Admin");
   const [overview, setOverview] = useState<LocationOverview[]>([]);
   const [globalStats, setGlobalStats] = useState<GlobalStats>({
@@ -287,6 +289,10 @@ const SuperAdminDashboard = () => {
   const commitAddBreak = (dayIdx: number) => {
     if (!bhDraft) return;
     if (!newBreak.start || !newBreak.end) return;
+    if (newBreak.start >= newBreak.end) {
+      alert(t('bh.breakEndBeforeStart'));
+      return;
+    }
     const schedule = bhDraft.schedule.map((d, i) => {
       if (i !== dayIdx) return d;
       return { ...d, breaks: [...d.breaks, { ...newBreak }] };
@@ -300,7 +306,7 @@ const SuperAdminDashboard = () => {
   const addHoliday = () => {
     if (!bhDraft || !newHolidayDate) return;
     const already = bhDraft.holidays?.some(h => h.date === newHolidayDate);
-    if (already) { alert('This date is already marked as a holiday.'); return; }
+    if (already) { alert(t('bh.alreadyHoliday')); return; }
     setBhDraft({
       ...bhDraft,
       holidays: [...(bhDraft.holidays ?? []), { date: newHolidayDate, label: newHolidayLabel || 'Holiday' }]
@@ -499,8 +505,8 @@ const SuperAdminDashboard = () => {
                     <Clock className="w-4 h-4 text-primary" />
                   </div>
                   <div>
-                    <h2 className="text-base font-bold font-heading text-foreground">Business Hours</h2>
-                    <p className="text-xs text-muted-foreground">Platform-wide slot generation config</p>
+                    <h2 className="text-base font-bold font-heading text-foreground">{t('bh.title')}</h2>
+                    <p className="text-xs text-muted-foreground">{t('bh.subtitle')}</p>
                   </div>
                 </div>
                 {bhDraft && (
@@ -509,7 +515,7 @@ const SuperAdminDashboard = () => {
                     disabled={bhSaving}
                     className="btn-brand text-sm py-2 px-4 disabled:opacity-60"
                   >
-                    {bhSaving ? 'Saving…' : 'Save Changes'}
+                    {bhSaving ? t('bh.saving') : t('bh.saveChanges')}
                   </button>
                 )}
               </div>
@@ -524,7 +530,7 @@ const SuperAdminDashboard = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">
-                        Slot Duration (minutes)
+                        {t('bh.slotDuration')}
                       </label>
                       <select
                         value={bhDraft.slotDurationMinutes}
@@ -538,7 +544,7 @@ const SuperAdminDashboard = () => {
                     </div>
                     <div>
                       <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">
-                        Timezone
+                        {t('bh.timezone')}
                       </label>
                       <input
                         value={bhDraft.timezone}
@@ -551,16 +557,16 @@ const SuperAdminDashboard = () => {
 
                   {/* Day schedule table with inline break editor */}
                   <div>
-                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Weekly Schedule & Breaks</h3>
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{t('bh.weeklySchedule')}</h3>
                     <div className="overflow-x-auto rounded-xl border border-border">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-muted/50 border-b border-border">
-                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-20">Day</th>
-                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-16">Active</th>
-                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-32">Opens</th>
-                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-32">Closes</th>
-                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Breaks</th>
+                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-20">{t('bh.colDay')}</th>
+                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-16">{t('bh.colActive')}</th>
+                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-32">{t('bh.colOpens')}</th>
+                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-32">{t('bh.colCloses')}</th>
+                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('bh.colBreaks')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -638,13 +644,13 @@ const SuperAdminDashboard = () => {
                                         onClick={() => commitAddBreak(idx)}
                                         className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:opacity-90"
                                       >
-                                        Add
+                                        {t('common.save')}
                                       </button>
                                       <button
                                         onClick={() => setAddBreakIdx(null)}
                                         className="text-xs text-muted-foreground hover:text-foreground px-1"
                                       >
-                                        Cancel
+                                        {t('common.cancel')}
                                       </button>
                                     </div>
                                   ) : (
@@ -653,7 +659,7 @@ const SuperAdminDashboard = () => {
                                         onClick={() => { setAddBreakIdx(idx); setNewBreak({ start: '13:00', end: '14:00', label: 'Break' }); }}
                                         className="inline-flex items-center gap-0.5 text-xs text-muted-foreground hover:text-primary border border-dashed border-muted-foreground/40 hover:border-primary rounded-full px-2 py-0.5 transition-colors"
                                       >
-                                        <Plus className="w-3 h-3" /> Add Break
+                                        <Plus className="w-3 h-3" /> {t('bh.addBreak')}
                                       </button>
                                     )
                                   )}
@@ -668,12 +674,12 @@ const SuperAdminDashboard = () => {
 
                   {/* ── Holiday Declarations ── */}
                   <div>
-                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Holiday Declarations</h3>
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">{t('bh.holidayDeclarations')}</h3>
 
                     {/* Add holiday form */}
                     <div className="flex flex-wrap items-end gap-2 mb-4">
                       <div>
-                        <label className="text-xs text-muted-foreground block mb-1">Date</label>
+                        <label className="text-xs text-muted-foreground block mb-1">{t('bh.holidayDate')}</label>
                         <input
                           type="date"
                           value={newHolidayDate}
@@ -683,10 +689,10 @@ const SuperAdminDashboard = () => {
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-muted-foreground block mb-1">Label</label>
+                        <label className="text-xs text-muted-foreground block mb-1">{t('bh.holidayLabel')}</label>
                         <input
                           type="text"
-                          placeholder="e.g. Diwali, Republic Day"
+                          placeholder={t('bh.holidayLabelPlaceholder')}
                           value={newHolidayLabel}
                           onChange={e => setNewHolidayLabel(e.target.value)}
                           className="input-clean py-1.5 text-sm w-48"
@@ -698,13 +704,13 @@ const SuperAdminDashboard = () => {
                         disabled={!newHolidayDate}
                         className="btn-brand text-sm py-1.5 px-4 disabled:opacity-50 flex items-center gap-1.5"
                       >
-                        <Plus className="w-3.5 h-3.5" /> Add Holiday
+                        <Plus className="w-3.5 h-3.5" /> {t('bh.addHoliday')}
                       </button>
                     </div>
 
                     {/* Holiday list */}
                     {(bhDraft.holidays ?? []).length === 0 ? (
-                      <p className="text-sm text-muted-foreground/60 italic">No holidays declared yet.</p>
+                      <p className="text-sm text-muted-foreground/60 italic">{t('bh.noHolidays')}</p>
                     ) : (
                       <div className="space-y-1.5">
                         {(bhDraft.holidays ?? []).map(h => {
@@ -738,7 +744,7 @@ const SuperAdminDashboard = () => {
                   </div>
 
                   <p className="text-xs text-muted-foreground">
-                    Slots are auto-generated from these hours. Holidays will mark those dates as closed for all customers.
+                    {t('bh.slotsNote')}
                   </p>
                 </div>
               )}

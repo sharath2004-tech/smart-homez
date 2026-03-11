@@ -130,8 +130,8 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
             }`}>
               <Clock className="w-3.5 h-3.5 shrink-0" />
               {todayBH.isOpen
-                ? <span>Open <span className="font-semibold">{todayBH.openFormatted}&#8211;{todayBH.closeFormatted}</span></span>
-                : <span>Closed today</span>
+                ? <span>{t('bh.open')} <span className="font-semibold">{todayBH.openFormatted}&#8211;{todayBH.closeFormatted}</span></span>
+                : <span>{t('bh.closedToday')}</span>
               }
             </div>
           )}

@@ -490,74 +490,74 @@ router.get('/worker/dashboard-stats', authenticate, authorize('worker'), async (
     
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
     
     const startOfWeek = new Date(today);
     startOfWeek.setDate(today.getDate() - today.getDay());
     
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    
-    // Today's jobs count
-    const todayCount = await Booking.countDocuments({
-      worker: workerId,
-      status: 'completed',
-      completedAt: { $gte: today }
-    });
-    
-    // This week's jobs count
-    const weekCount = await Booking.countDocuments({
-      worker: workerId,
-      status: 'completed',
-      completedAt: { $gte: startOfWeek }
-    });
-    
-    // This month's jobs count
-    const monthCount = await Booking.countDocuments({
-      worker: workerId,
-      status: 'completed',
-      completedAt: { $gte: startOfMonth }
-    });
 
-    // Total worked minutes — using actualStartTime/actualEndTime as the source of truth.
-    // Falls back to actualDurationMinutes if already stored, otherwise computes from timestamps.
+    // Jobs count — filter by bookingDate (the actual service date), run in parallel
+    const [todayCount, weekCount, monthCount] = await Promise.all([
+      Booking.countDocuments({
+        worker: workerId,
+        status: 'completed',
+        bookingDate: { $gte: today, $lt: tomorrow }
+      }),
+      Booking.countDocuments({
+        worker: workerId,
+        status: 'completed',
+        bookingDate: { $gte: startOfWeek }
+      }),
+      Booking.countDocuments({
+        worker: workerId,
+        status: 'completed',
+        bookingDate: { $gte: startOfMonth }
+      })
+    ]);
+
+    // Worked minutes — all completed bookings, with fallback duration chain:
+    // 1) actualDurationMinutes  2) actualStartTime/actualEndTime  3) scheduledDurationMinutes
     const workedMinutesAgg = await Booking.aggregate([
       {
         $match: {
           worker: workerId,
-          status: 'completed',
-          $or: [
-            { actualDurationMinutes: { $gt: 0 } },
-            { actualStartTime: { $exists: true }, actualEndTime: { $exists: true } }
-          ]
+          status: 'completed'
         }
       },
       {
         $addFields: {
           computedMinutes: {
-            $cond: [
-              { $and: [{ $gt: ['$actualDurationMinutes', 0] }] },
-              '$actualDurationMinutes',
-              {
-                $divide: [
-                  { $subtract: ['$actualEndTime', '$actualStartTime'] },
-                  60000
-                ]
+            $cond: {
+              if: { $gt: ['$actualDurationMinutes', 0] },
+              then: '$actualDurationMinutes',
+              else: {
+                $cond: {
+                  if: { $and: [
+                    { $ifNull: ['$actualStartTime', false] },
+                    { $ifNull: ['$actualEndTime', false] }
+                  ]},
+                  then: { $divide: [{ $subtract: ['$actualEndTime', '$actualStartTime'] }, 60000] },
+                  else: { $ifNull: ['$scheduledDurationMinutes', 0] }
+                }
               }
-            ]
+            }
           }
         }
       },
       {
         $facet: {
           today: [
-            { $match: { completedAt: { $gte: today } } },
+            { $match: { bookingDate: { $gte: today, $lt: tomorrow } } },
             { $group: { _id: null, total: { $sum: '$computedMinutes' } } }
           ],
           week: [
-            { $match: { completedAt: { $gte: startOfWeek } } },
+            { $match: { bookingDate: { $gte: startOfWeek } } },
             { $group: { _id: null, total: { $sum: '$computedMinutes' } } }
           ],
           month: [
-            { $match: { completedAt: { $gte: startOfMonth } } },
+            { $match: { bookingDate: { $gte: startOfMonth } } },
             { $group: { _id: null, total: { $sum: '$computedMinutes' } } }
           ]
         }

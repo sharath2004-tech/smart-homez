@@ -44,11 +44,23 @@ router.get('/', async (req, res) => {
 router.get('/business-hours', async (req, res) => {
   try {
     const config = await BusinessHours.getConfig();
-    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+    // Use the configured business timezone so day/date reflect local business time,
+    // not the server's UTC clock.
+    const tz = config.timezone || 'Asia/Kolkata';
     const now = new Date();
-    const dayName = dayNames[now.getDay()];
+    const tzDateFmt = new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit'
+    });
+    const todayStr = tzDateFmt.format(now); // YYYY-MM-DD in business timezone
+    const dayName = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, weekday: 'long'
+    }).format(now).toLowerCase(); // 'monday', 'tuesday', …
+
     const dayConfig = config.schedule.find(d => d.day === dayName);
-    const todayStr = now.toISOString().split('T')[0];
+
+    // 60-day cutoff for upcoming holidays
+    const cutoffStr = tzDateFmt.format(new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000));
 
     // Format HH:MM → human-readable "9:00 AM"
     const fmt = (t) => {
@@ -75,9 +87,9 @@ router.get('/business-hours', async (req, res) => {
         breaks: dayConfig?.breaks ?? [],
         slotDurationMinutes: config.slotDurationMinutes,
         timezone: config.timezone,
-        // Upcoming holidays (next 60 days) for info display
+        // Upcoming holidays — next 60 days in business timezone
         upcomingHolidays: (config.holidays ?? [])
-          .filter(h => h.date >= todayStr)
+          .filter(h => h.date >= todayStr && h.date <= cutoffStr)
           .sort((a, b) => a.date.localeCompare(b.date))
           .slice(0, 5),
         // Full week summary for tooltip display

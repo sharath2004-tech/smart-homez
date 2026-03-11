@@ -921,7 +921,24 @@ router.put(
       const { schedule, timezone, slotDurationMinutes, holidays } = req.body;
       const config = await BusinessHours.getConfig();
 
-      if (schedule !== undefined) config.schedule = schedule;
+      if (schedule !== undefined) {
+        // Validate break end > start for every day
+        for (const day of schedule) {
+          if (Array.isArray(day.breaks)) {
+            for (const br of day.breaks) {
+              if (br.start && br.end && br.start >= br.end) {
+                return res.status(400).json({
+                  error: {
+                    message: `Break end time must be after start time (${day.day}: ${br.start}–${br.end})`,
+                    status: 400
+                  }
+                });
+              }
+            }
+          }
+        }
+        config.schedule = schedule;
+      }
       if (timezone !== undefined) config.timezone = timezone;
       if (slotDurationMinutes !== undefined) config.slotDurationMinutes = slotDurationMinutes;
       if (holidays !== undefined) config.holidays = holidays;
