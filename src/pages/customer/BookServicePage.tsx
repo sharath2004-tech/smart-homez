@@ -1,5 +1,5 @@
 import AppLayout from "@/components/AppLayout";
-import { authAPI, bookingsAPI, servicesAPI } from "@/lib/api";
+import { authAPI, bookingsAPI, servicesAPI, settingsAPI } from "@/lib/api";
 import { Calendar, ChevronLeft, Clock, Info, MapPin, Sparkles, Star, User, Users, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -81,6 +81,7 @@ const BookServicePage = () => {
   // Booking form state
   const [bookingType, setBookingType] = useState<'oneTime' | 'daily' | 'weekly' | 'monthly'>('oneTime');
   const [selectedDate, setSelectedDate] = useState('');
+  const [holidays, setHolidays] = useState<Array<{ date: string; label: string }>>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('morning');
   const [selectedExactTime, setSelectedExactTime] = useState<string>('');
   const [selectedWorker, setSelectedWorker] = useState<string | null>(null);
@@ -123,6 +124,14 @@ const BookServicePage = () => {
       setService(serviceData.service);
       setProfile(profileData.user || profileData);
       
+      // Fetch upcoming holidays to block those dates
+      try {
+        const bhData = await settingsAPI.getBusinessHours();
+        setHolidays(bhData.businessHours?.upcomingHolidays || []);
+      } catch {
+        // non-fatal — holidays stay empty
+      }
+
       // Load saved preferences if any
       if (profileData.user?.preferences) {
         setPreferences({
@@ -675,11 +684,25 @@ const BookServicePage = () => {
                   <input
                     type="date"
                     value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const holiday = holidays.find(h => h.date === val);
+                      if (holiday) {
+                        toast.error(`${holiday.label || 'Holiday'} — bookings are not available on this date. Please choose another day.`);
+                        setSelectedDate('');
+                        return;
+                      }
+                      setSelectedDate(val);
+                    }}
                     min={getTodayDate()}
                     className="input-clean"
                     required={bookingMode === 'schedule'}
                   />
+                  {holidays.length > 0 && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                      ⚠️ Closed on: {holidays.map(h => `${h.label} (${h.date})`).join(', ')}
+                    </p>
+                  )}
                 </div>
                 
                 <div>
@@ -841,7 +864,16 @@ const BookServicePage = () => {
                   <input
                     type="date"
                     value={subscriptionStartDate}
-                    onChange={(e) => setSubscriptionStartDate(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const holiday = holidays.find(h => h.date === val);
+                      if (holiday) {
+                        toast.error(`${holiday.label || 'Holiday'} — bookings are not available on this date. Please choose another day.`);
+                        setSubscriptionStartDate('');
+                        return;
+                      }
+                      setSubscriptionStartDate(val);
+                    }}
                     min={getTodayDate()}
                     className="input-clean"
                     required

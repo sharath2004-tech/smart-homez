@@ -3,6 +3,7 @@ import { body, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
 import upload from '../middleware/upload.js';
 import Booking from '../models/Booking.js';
+import BusinessHours from '../models/BusinessHours.js';
 import Location from '../models/Location.js';
 import Service from '../models/Service.js';
 import Settings from '../models/Settings.js';
@@ -443,6 +444,36 @@ router.post('/',
           });
         }
       }
+
+      // ── Holiday guard ──────────────────────────────────────────────────
+      // Reject bookings on days declared as holidays by the super admin.
+      const effectiveBookingDate = isSubscription
+        ? (subscriptionDetails?.startDate || bookingDate)
+        : bookingDate;
+      if (effectiveBookingDate) {
+        try {
+          const bhConfig = await BusinessHours.getConfig();
+          const bookingDateStr = typeof effectiveBookingDate === 'string'
+            ? effectiveBookingDate.slice(0, 10)
+            : new Date(effectiveBookingDate).toISOString().slice(0, 10);
+          const holiday = bhConfig.holidays?.find(h => h.date === bookingDateStr);
+          if (holiday) {
+            return res.status(400).json({
+              error: {
+                message: `Bookings are not available on ${holiday.label || 'this holiday'} (${bookingDateStr}). Please choose a different date.`,
+                status: 400,
+                code: 'DATE_IS_HOLIDAY',
+                holidayLabel: holiday.label || 'Holiday',
+                holidayDate: bookingDateStr
+              }
+            });
+          }
+        } catch (bhErr) {
+          console.error('Holiday check error (non-fatal):', bhErr.message);
+          // Non-fatal — continue if BH config cannot be read
+        }
+      }
+      // ───────────────────────────────────────────────────────────────────
 
       // ⚠️ IMPORTANT: Get customer location with fallback to saved addresses
       let customerLocation = location;
