@@ -1572,7 +1572,7 @@ router.post('/:id/generate-start-qr',
       }
 
       // Verify worker is assigned to this booking
-      if (booking.worker.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      if (!booking.worker || (booking.worker.toString() !== req.user._id.toString() && req.user.role !== 'admin')) {
         return res.status(403).json({ 
           error: { message: 'You are not assigned to this booking', status: 403 } 
         });
@@ -1743,7 +1743,7 @@ router.post('/:id/generate-end-qr',
       }
 
       // Verify worker is assigned to this booking
-      if (booking.worker.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      if (!booking.worker || (booking.worker.toString() !== req.user._id.toString() && req.user.role !== 'admin')) {
         return res.status(403).json({ 
           error: { message: 'You are not assigned to this booking', status: 403 } 
         });
@@ -1825,7 +1825,7 @@ router.post('/:id/upload-completion-photo',
       });
 
       // Verify worker is assigned to this booking
-      if (booking.worker.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      if (!booking.worker || (booking.worker.toString() !== req.user._id.toString() && req.user.role !== 'admin')) {
         console.error('❌ Worker not assigned to booking');
         return res.status(403).json({ 
           error: { message: 'You are not assigned to this booking', status: 403 } 
@@ -1916,7 +1916,7 @@ router.post('/:id/upload-payment-proof',
       }
 
       // Verify worker is assigned to this booking
-      if (booking.worker.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      if (!booking.worker || (booking.worker.toString() !== req.user._id.toString() && req.user.role !== 'admin')) {
         return res.status(403).json({ 
           error: { message: 'You are not assigned to this booking', status: 403 } 
         });
@@ -2196,7 +2196,7 @@ router.post('/:id/upload-photo',
       }
 
       // Verify worker is assigned to this booking
-      if (booking.worker.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      if (!booking.worker || (booking.worker.toString() !== req.user._id.toString() && req.user.role !== 'admin')) {
         return res.status(403).json({ 
           error: { message: 'You are not assigned to this booking', status: 403 } 
         });
@@ -2306,7 +2306,7 @@ router.put('/:id/work-documentation/notes',
       }
 
       // Verify worker is assigned to this booking
-      if (booking.worker.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      if (!booking.worker || (booking.worker.toString() !== req.user._id.toString() && req.user.role !== 'admin')) {
         return res.status(403).json({ 
           error: { message: 'You are not assigned to this booking', status: 403 } 
         });
@@ -2349,7 +2349,7 @@ router.delete('/:id/work-documentation/photos/:photoId',
       }
 
       // Verify worker is assigned to this booking
-      if (booking.worker.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      if (!booking.worker || (booking.worker.toString() !== req.user._id.toString() && req.user.role !== 'admin')) {
         return res.status(403).json({ 
           error: { message: 'You are not assigned to this booking', status: 403 } 
         });

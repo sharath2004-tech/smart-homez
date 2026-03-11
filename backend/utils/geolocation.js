@@ -268,12 +268,11 @@ export const geocodeAddress = async (address) => {
       }
     }
     
-    // Final fallback to Mumbai
-    return { latitude: 19.0760, longitude: 72.8777 };
+    // Final fallback — return null so callers know geocoding failed
+    return null;
   } catch (error) {
     console.error('Geocoding error:', error);
-    // Fallback to Mumbai coordinates
-    return { latitude: 19.0760, longitude: 72.8777 };
+    return null;
   }
 };
 
@@ -316,8 +315,8 @@ export const reverseGeocode = async (latitude, longitude) => {
     return {
       street: '',
       area: 'Unknown Area',
-      city: 'Mumbai',
-      state: 'Maharashtra',
+      city: 'Unknown',
+      state: '',
       zipCode: '',
       country: 'India'
     };
@@ -326,8 +325,8 @@ export const reverseGeocode = async (latitude, longitude) => {
     return {
       street: '',
       area: 'Unknown Area',
-      city: 'Mumbai',
-      state: 'Maharashtra',
+      city: 'Unknown',
+      state: '',
       zipCode: '',
       country: 'India'
     };

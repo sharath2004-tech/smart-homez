@@ -17,9 +17,10 @@ router.get('/', authenticate, authorize('admin'), async (req, res) => {
     const query = {};
     if (role) query.role = role;
     if (search) {
+      const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
+        { name: { $regex: escapedSearch, $options: 'i' } },
+        { email: { $regex: escapedSearch, $options: 'i' } }
       ];
     }
 
@@ -329,6 +330,38 @@ router.post('/addresses', authenticate, async (req, res) => {
   try {
     const { label, street, apartment, building, area, city, state, zipCode, location, isDefault } = req.body;
 
+    // Validate required fields
+    const areaVal = (area || '').trim();
+    const cityVal = (city || '').trim();
+    const zipVal = (zipCode || '').trim();
+    const aptVal = (apartment || '').trim();
+
+    if (!areaVal || !cityVal) {
+      return res.status(400).json({ error: { message: 'Area and City are required.', status: 400 } });
+    }
+
+    // Helper: check value is a meaningful name (at least 3 chars, contains a vowel, mostly alphabetic)
+    const isValidName = (val) => {
+      if (val.length < 3) return false;
+      if (!/[aeiouAEIOU]/.test(val)) return false;
+      const alphaCount = (val.match(/[a-zA-Z]/g) || []).length;
+      if (alphaCount / val.length < 0.4) return false;
+      return true;
+    };
+
+    if (!isValidName(areaVal)) {
+      return res.status(400).json({ error: { message: 'Please enter a valid area name.', status: 400 } });
+    }
+    if (!isValidName(cityVal)) {
+      return res.status(400).json({ error: { message: 'Please enter a valid city name.', status: 400 } });
+    }
+    if (aptVal && !isValidName(aptVal)) {
+      return res.status(400).json({ error: { message: 'Please enter a valid apartment/building name.', status: 400 } });
+    }
+    if (zipVal && !/^\d{6}$/.test(zipVal)) {
+      return res.status(400).json({ error: { message: 'ZIP code must be exactly 6 digits.', status: 400 } });
+    }
+
     const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ error: { message: 'User not found', status: 404 } });
@@ -343,12 +376,12 @@ router.post('/addresses', authenticate, async (req, res) => {
     user.addresses.push({
       label: label || 'Home',
       street,
-      apartment,
+      apartment: aptVal || undefined,
       building,
-      area,
-      city,
+      area: areaVal,
+      city: cityVal,
       state,
-      zipCode,
+      zipCode: zipVal || undefined,
       location,
       isDefault: isDefault || user.addresses.length === 0 // First address is default
     });

@@ -21,7 +21,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useGeolocation } from "@/hooks/useGeolocation";
-import { preferencesAPI } from "@/lib/api";
+import { authAPI, preferencesAPI } from "@/lib/api";
 import {
     AlertCircle,
     Check,
@@ -101,7 +101,7 @@ const PreferencesPage = () => {
       setLoading(true);
       const [prefData, profileData] = await Promise.all([
         preferencesAPI.getPreferences(),
-        import('@/lib/api').then(m => m.authAPI.getProfile())
+        authAPI.getProfile()
       ]);
       setPreferences(prefData.preferences || {});
       setProfile(profileData.user || profileData);

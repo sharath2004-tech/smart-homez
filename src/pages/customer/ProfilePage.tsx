@@ -86,12 +86,26 @@ const ProfilePage = () => {
     }
   };
 
+  const isValidName = (value: string) => {
+    // Must be at least 3 characters
+    if (value.length < 3) return false;
+    // Must contain at least one vowel (filters out random consonant strings like "wefnjk")
+    if (!/[aeiouAEIOU]/.test(value)) return false;
+    // Must be mostly letters/spaces/hyphens/dots (allow some digits for addresses like "Sector 5")
+    if (!/^[a-zA-Z\s.'-]+( \d{1,4})?$/.test(value) && !/^[a-zA-Z0-9\s.,'()-]+$/.test(value)) return false;
+    // Reject if more than 60% characters are non-alphabetic
+    const alphaCount = (value.match(/[a-zA-Z]/g) || []).length;
+    if (alphaCount / value.length < 0.4) return false;
+    return true;
+  };
+
   const handleAddAddress = async () => {
     setAddressError("");
     // Validate area and city are non-empty text (not purely numeric)
     const areaVal = newAddress.area.trim();
     const cityVal = newAddress.city.trim();
     const zipVal = newAddress.zipCode.trim();
+    const aptVal = newAddress.apartment.trim();
     if (!areaVal || !cityVal) {
       setAddressError(t('customer.profile.areaAndCityRequired'));
       return;
@@ -102,6 +116,18 @@ const ProfilePage = () => {
     }
     if (/^\d+$/.test(cityVal)) {
       setAddressError(t('customer.profile.cityCannotBeNumbers'));
+      return;
+    }
+    if (!isValidName(areaVal)) {
+      setAddressError(t('customer.profile.invalidArea'));
+      return;
+    }
+    if (!isValidName(cityVal)) {
+      setAddressError(t('customer.profile.invalidCity'));
+      return;
+    }
+    if (aptVal && !isValidName(aptVal)) {
+      setAddressError(t('customer.profile.invalidApartment'));
       return;
     }
     if (zipVal && !/^\d{6}$/.test(zipVal)) {

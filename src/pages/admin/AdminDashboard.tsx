@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
-import { adminAPI } from "@/lib/api";
+import { adminAPI, authAPI } from "@/lib/api";
 import { AlertCircle, BarChart2, Calendar, CheckCircle, ChevronRight, Settings, TrendingUp, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -49,6 +49,7 @@ const statusConfig: Record<string, string> = {
 
 const AdminDashboard = () => {
   const { role, name } = useAdminRole();
+  const [locationLabel, setLocationLabel] = useState('');
   const [stats, setStats] = useState<Stats>({
     todayBookings: 0,
     bookingsChange: '+0%',
@@ -66,15 +67,26 @@ const AdminDashboard = () => {
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
-      const [statsData, alertsData, bookingsData] = await Promise.all([
+      const [statsData, alertsData, bookingsData, profileRes] = await Promise.all([
         adminAPI.getDashboardStats(),
         adminAPI.getAlerts(),
-        adminAPI.getRecentBookings(5)
+        adminAPI.getRecentBookings(5),
+        authAPI.getProfile()
       ]);
 
       if (statsData.stats) setStats(statsData.stats);
       setAlerts(alertsData.alerts || []);
       setRecentBookings(bookingsData.bookings || []);
+
+      // Set location label from admin's assigned locations
+      const user = profileRes?.user || profileRes;
+      const locs = user?.adminProfile?.assignedLocations;
+      if (locs && locs.length > 0) {
+        const parts = locs.map((l: { locationName?: string; city?: string }) => l.locationName || l.city).filter(Boolean);
+        setLocationLabel(parts.join(', ') + ' Operations');
+      } else if (user?.role === 'super_admin') {
+        setLocationLabel('All Locations');
+      }
     } catch (error) {
       console.error('Error fetching admin dashboard data:', error);
     } finally {
@@ -134,7 +146,7 @@ const AdminDashboard = () => {
           </div>
           <div className="text-right text-sm">
             <p className="font-semibold text-foreground">{formatDate()}</p>
-            <p className="text-muted-foreground">Mumbai Operations</p>
+            {locationLabel && <p className="text-muted-foreground">{locationLabel}</p>}
           </div>
         </div>
 

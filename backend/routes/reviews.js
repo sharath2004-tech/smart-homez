@@ -25,6 +25,10 @@ router.post('/', authenticate, [
     await review.save();
 
     const worker = await User.findById(req.body.worker);
+    if (!worker) {
+      // Review saved but worker not found for rating update
+      return res.status(201).json({ review });
+    }
     const totalRating = worker.workerProfile.rating * worker.workerProfile.totalReviews + req.body.overallRating;
     worker.workerProfile.totalReviews += 1;
     worker.workerProfile.rating = totalRating / worker.workerProfile.totalReviews;

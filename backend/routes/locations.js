@@ -363,6 +363,13 @@ router.post('/geocode', authenticate, async (req, res) => {
 
     const coordinates = await geocodeAddress(address);
 
+    if (!coordinates) {
+      return res.status(400).json({
+        success: false,
+        message: 'Could not find coordinates for this address. Please check the address details.'
+      });
+    }
+
     res.status(200).json({
       success: true,
       data: coordinates
