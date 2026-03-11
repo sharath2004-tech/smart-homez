@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { authAPI, servicesAPI, superAdminAPI } from "@/lib/api";
-import { CheckCircle, ChevronRight, Clock, Edit, Info, Plus, Save, Search, Trash2, X, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle, ChevronRight, Clock, Edit, Info, Plus, Save, Search, Trash2, X, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -9,6 +9,7 @@ interface Service {
   name: string;
   description: string;
   category: string;
+  serviceType?: string;
   price: number;
   pricingPlans: {
     oneTime: number;
@@ -336,8 +337,11 @@ const AdminServices = () => {
         monthly: Math.round(service.price * 0.65 * 30)
       },
       duration: service.duration,
-      isActive: service.isActive
+      isActive: service.isActive,
+      subscriptionPlans: service.subscriptionPlans,
+      additionalServiceOptions: service.additionalServiceOptions,
     });
+    setSelectedServiceType(service.serviceType || null);
     setEditingId(service._id!);
     setShowForm(true);
   };
@@ -391,6 +395,15 @@ const AdminServices = () => {
     service.category.toLowerCase().includes(search.toLowerCase())
   );
 
+  // Detect which core service types are already configured
+  const configuredTypes = new Set(services.map(s => s.serviceType).filter(Boolean));
+  const coverageItems = SERVICE_TYPE_CARDS.map(card => ({
+    ...card,
+    isConfigured: configuredTypes.has(card.id),
+    activeService: services.find(s => s.serviceType === card.id && s.isActive),
+  }));
+  const missingCount = coverageItems.filter(c => !c.isConfigured).length;
+
   return (
     <AppLayout userType={isSuperAdmin ? 'super_admin' : 'admin'} userName={profile?.name || 'Admin'}>
       <div className="space-y-6 pb-20 md:pb-0">
@@ -414,6 +427,64 @@ const AdminServices = () => {
             <Plus className="w-4 h-4" />
             {isSuperAdmin ? 'Create Service' : 'Request Service'}
           </button>
+        </div>
+
+        {/* Service Coverage */}
+        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              {missingCount > 0
+                ? <AlertTriangle className="w-4 h-4 text-amber-500" />
+                : <CheckCircle className="w-4 h-4 text-green-500" />}
+              Service Coverage
+            </h2>
+            {missingCount > 0 && (
+              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+                {missingCount} not configured
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {coverageItems.map((item) => (
+              <div
+                key={item.id}
+                className={`flex items-center gap-3 p-3 rounded-lg border ${
+                  item.isConfigured
+                    ? 'border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-900'
+                    : 'border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900'
+                }`}
+              >
+                <span className="text-2xl shrink-0">{item.emoji}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-foreground truncate">{item.label}</p>
+                  {item.isConfigured ? (
+                    <p className="text-xs text-green-700 dark:text-green-400">
+                      ✓ {item.activeService ? `₹${item.activeService.price}/hr · Active` : 'Configured (inactive)'}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-amber-700 dark:text-amber-400">Not configured</p>
+                  )}
+                </div>
+                {item.isConfigured ? (
+                  item.activeService && (
+                    <button
+                      onClick={() => handleEdit(item.activeService!)}
+                      className="text-xs px-2 py-1 rounded-md bg-muted hover:bg-muted/80 text-muted-foreground shrink-0"
+                    >
+                      Edit
+                    </button>
+                  )
+                ) : (
+                  <button
+                    onClick={() => handleTypeSelect(item)}
+                    className="text-xs px-2 py-1 rounded-md bg-amber-600 hover:bg-amber-700 text-white font-medium shrink-0"
+                  >
+                    Setup
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Super Admin: Pending Requests */}
@@ -723,6 +794,9 @@ const AdminServices = () => {
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
                     Base Price (₹) *
+                    {selectedServiceType === 'instant_hourly' && (
+                      <span className="ml-2 text-xs font-normal text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">per hour — shown to customers</span>
+                    )}
                   </label>
                   <input
                     type="number"

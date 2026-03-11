@@ -213,15 +213,14 @@ const InstaServicePage = () => {
 
         {/* No-service notice */}
         {noServiceWarning && (
-          <div className="flex items-start gap-3 p-3 rounded-xl bg-warning/10 border border-warning/30 text-sm">
-            <span className="text-warning text-base shrink-0">⚠️</span>
+          <div className="flex items-start gap-3 p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-sm">
+            <span className="text-destructive text-base shrink-0">🚫</span>
             <div className="flex-1">
-              <p className="font-medium text-foreground text-xs">No Insta services configured</p>
+              <p className="font-medium text-destructive text-xs">Instant booking unavailable</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Admin hasn't added an "instant_hourly" service yet. The system will use a default service for your booking. Prices shown are estimates.
+                No instant hourly service has been configured yet. Bookings cannot be placed at this time. Please contact support.
               </p>
             </div>
-            <button onClick={() => setNoServiceWarning(false)} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>
           </div>
         )}
 
