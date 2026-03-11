@@ -13,7 +13,7 @@ import {
     assignWorkersWithBackup,
     checkBackupActivationNeeded
 } from '../utils/advancedWorkerAssignment.js';
-import { updateBookingStatuses, processQueuedBookings } from '../utils/bookingStatusUpdater.js';
+import { processQueuedBookings, updateBookingStatuses } from '../utils/bookingStatusUpdater.js';
 import notificationService from '../utils/notificationService.js';
 import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
 import { checkIfOnTime, updateWorkerStats } from '../utils/updateWorkerStats.js';
