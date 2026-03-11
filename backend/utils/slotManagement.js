@@ -1,13 +1,62 @@
 /**
- * Utility functions for 15-minute slot management
+ * Utility functions for slot management.
+ * Slots are derived at runtime from the BusinessHours config (never hardcoded).
  */
 
 /**
- * Generate 15-minute time slots for a given date
+ * Generate time slots from the live BusinessHours configuration.
+ * Falls back to a default 06:00–22:00 / 30-min grid if no config is available.
+ *
+ * @param {Date}   date               - The date to generate slots for
+ * @param {Object} BusinessHoursModel - The BusinessHours mongoose model
+ * @returns {Promise<string[]>} Array of slot start times in HH:MM format
+ */
+export const generateTimeSlotsFromConfig = async (date = new Date(), BusinessHoursModel) => {
+  try {
+    const config = await BusinessHoursModel.getConfig();
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayName = dayNames[date.getDay()];
+    const dayConfig = config.schedule.find((d) => d.day === dayName);
+
+    if (!dayConfig || !dayConfig.isActive) return []; // closed day
+
+    const slotDuration = config.slotDurationMinutes || 30;
+    const [openHour, openMin] = dayConfig.openTime.split(':').map(Number);
+    const [closeHour, closeMin] = dayConfig.closeTime.split(':').map(Number);
+    const openMinutes  = openHour  * 60 + openMin;
+    const closeMinutes = closeHour * 60 + closeMin;
+
+    const breaks = (dayConfig.breaks || []).map((b) => {
+      const [sh, sm] = b.start.split(':').map(Number);
+      const [eh, em] = b.end.split(':').map(Number);
+      return { start: sh * 60 + sm, end: eh * 60 + em };
+    });
+
+    const slots = [];
+    for (let t = openMinutes; t + slotDuration <= closeMinutes; t += slotDuration) {
+      const slotEnd = t + slotDuration;
+      const inBreak = breaks.some((b) => t < b.end && slotEnd > b.start);
+      if (!inBreak) {
+        const hh = String(Math.floor(t / 60)).padStart(2, '0');
+        const mm = String(t % 60).padStart(2, '0');
+        slots.push(`${hh}:${mm}`);
+      }
+    }
+    return slots;
+  } catch (err) {
+    console.error('generateTimeSlotsFromConfig fallback:', err.message);
+    return generateTimeSlots(date); // graceful fallback
+  }
+};
+
+/**
+ * Legacy: Generate 15-minute time slots for a given date (hardcoded range).
+ * Prefer generateTimeSlotsFromConfig() for runtime-configurable slots.
+ *
  * @param {Date} date - The date to generate slots for
  * @param {number} startHour - Start hour (default: 6 for 6 AM)
  * @param {number} endHour - End hour (default: 22 for 10 PM)
- * @returns {Array} Array of time slots in HH:MM format
+ * @returns {string[]} Array of time slots in HH:MM format
  */
 export const generateTimeSlots = (date = new Date(), startHour = 6, endHour = 22) => {
   const slots = [];

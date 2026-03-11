@@ -13,7 +13,8 @@ import {
     assignWorkersWithBackup,
     checkBackupActivationNeeded
 } from '../utils/advancedWorkerAssignment.js';
-import { updateBookingStatuses } from '../utils/bookingStatusUpdater.js';
+import { updateBookingStatuses, processQueuedBookings } from '../utils/bookingStatusUpdater.js';
+import notificationService from '../utils/notificationService.js';
 import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
 import { checkIfOnTime, updateWorkerStats } from '../utils/updateWorkerStats.js';
 import { assignWorkerToBooking, reassignWorker } from '../utils/workerAssignment.js';
@@ -336,7 +337,7 @@ router.get('/:id', authenticate, async (req, res) => {
     const isAuthorized = 
       req.user.role === 'admin' ||
       booking.customer._id.toString() === req.user._id.toString() ||
-      booking.worker._id.toString() === req.user._id.toString();
+      (booking.worker && booking.worker._id && booking.worker._id.toString() === req.user._id.toString());
 
     if (!isAuthorized) {
       return res.status(403).json({ 
@@ -988,7 +989,6 @@ router.delete('/:id', authenticate, async (req, res) => {
     }
 
     // Get cancellation policy from settings
-    const Settings = require('../models/Settings');
     const settings = await Settings.findOne();
     const policy = settings?.cancellationPolicy || {
       fullRefundHours: 1,
@@ -1050,9 +1050,12 @@ router.delete('/:id', authenticate, async (req, res) => {
     
     await booking.save();
 
+    // Trigger queue — freed slot should be assigned to waiting pending bookings
+    processQueuedBookings(booking.location?.locationId).catch(err =>
+      console.error('Queue processing error after cancellation:', err.message)
+    );
+
     // Send multi-channel notifications
-    const notificationService = require('../utils/notificationService');
-    
     // Notify customer about cancellation
     await notificationService.sendTemplatedNotification(
       booking.customer._id,
@@ -1283,8 +1286,6 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
     if (!workerAvailable && oldWorker) {
       // Worker not available - need to reassign
       try {
-        const { assignWorkerToBooking } = require('../utils/workerAssignment');
-        
         // Temporarily remove current worker
         booking.worker = null;
         await booking.save();
@@ -1294,7 +1295,7 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
         
         if (updatedBooking.worker) {
           workerReassigned = true;
-          newWorkerInfo = await require('../models/User').findById(updatedBooking.worker).select('name phone');
+          newWorkerInfo = await User.findById(updatedBooking.worker).select('name phone');
           booking.worker = updatedBooking.worker;
         }
       } catch (assignError) {
@@ -1318,8 +1319,6 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
 
     // Send notifications (wrapped in try-catch to prevent notification failures from breaking reschedule)
     try {
-      const notificationService = require('../utils/notificationService');
-
       // Notify customer about reschedule
       await notificationService.sendTemplatedNotification(
         booking.customer._id,
@@ -1432,9 +1431,6 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
 // Helper function to check worker availability
 async function checkWorkerAvailability(workerId, scheduledDate, duration) {
   try {
-    const Booking = require('../models/Booking');
-    const User = require('../models/User');
-    
     // Check if worker exists and is available
     const worker = await User.findById(workerId);
     if (!worker || !worker.workerDetails?.isAvailable) {
@@ -2086,6 +2082,11 @@ router.post('/:id/scan-end-qr',
 
       booking.status = 'completed';
       await booking.save();
+
+      // Trigger queue — this worker's slot is now free; assign to next pending booking
+      processQueuedBookings(booking.location?.locationId).catch(err =>
+        console.error('Queue processing error after completion:', err.message)
+      );
 
       // ✅ AUTO-CREATE WORKER EARNINGS
       if (booking.worker) {

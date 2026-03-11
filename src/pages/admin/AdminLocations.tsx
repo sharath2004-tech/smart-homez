@@ -49,10 +49,23 @@ interface UserProfile {
 
 // Indian cities for selection
 const indianCities = [
-  "Mumbai", "Delhi", "Bengaluru", "Hyderabad", "Chennai", 
+  "Mumbai", "Delhi", "Bengaluru", "Hyderabad", "Chennai",
   "Kolkata", "Ahmedabad", "Pune", "Jaipur", "Surat",
   "Lucknow", "Kanpur", "Nagpur", "Indore", "Thane",
-  "Bhopal", "Visakhapatnam", "Patna", "Vadodara", "Ghaziabad"
+  "Bhopal", "Visakhapatnam", "Patna", "Vadodara", "Ghaziabad",
+  "Ludhiana", "Agra", "Nashik", "Faridabad", "Meerut",
+  "Rajkot", "Kalyan", "Varanasi", "Srinagar", "Aurangabad",
+  "Dhanbad", "Amritsar", "Navi Mumbai", "Allahabad", "Ranchi",
+  "Howrah", "Coimbatore", "Jabalpur", "Gwalior", "Vijayawada",
+  "Jodhpur", "Madurai", "Raipur", "Kota", "Guwahati",
+  "Chandigarh", "Solapur", "Hubballi", "Tiruchirappalli", "Bareilly",
+  "Mysuru", "Tiruppur", "Gurgaon", "Noida", "Aligarh",
+  "Jalandhar", "Bhubaneswar", "Salem", "Warangal", "Guntur",
+  "Bhiwandi", "Gorakhpur", "Bikaner", "Jamshedpur", "Bhilai",
+  "Cuttack", "Kochi", "Nellore", "Bhavnagar", "Dehradun",
+  "Durgapur", "Asansol", "Rourkela", "Nanded", "Kolhapur",
+  "Ajmer", "Ujjain", "Udaipur", "Siliguri", "Jhansi",
+  "Mangalore", "Erode", "Belgaum", "Tirunelveli", "Malegaon"
 ];
 
 const AdminLocations = () => {

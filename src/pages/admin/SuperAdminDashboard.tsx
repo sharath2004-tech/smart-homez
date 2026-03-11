@@ -1,5 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { authAPI, superAdminAPI } from "@/lib/api";
+import ExcelJS from "exceljs";
 import {
     Archive,
     ArchiveRestore,
@@ -9,6 +10,8 @@ import {
     Calendar,
     CheckCircle,
     ChevronRight,
+    Clock,
+    FileSpreadsheet,
     IndianRupee,
     Loader2,
     MapPin,
@@ -82,6 +85,28 @@ interface GlobalStats {
   fulfillmentChange: string;
 }
 
+// ─── Business Hours Types ─────────────────────────────────────────────────────
+
+interface BreakPeriod {
+  start: string;
+  end: string;
+  label?: string;
+}
+
+interface DaySchedule {
+  day: string;
+  isActive: boolean;
+  openTime: string;
+  closeTime: string;
+  breaks: BreakPeriod[];
+}
+
+interface BusinessHoursConfig {
+  schedule: DaySchedule[];
+  timezone: string;
+  slotDurationMinutes: number;
+}
+
 // ─── Status helpers ───────────────────────────────────────────────────────────
 
 const statusBadge: Record<string, string> = {
@@ -118,6 +143,13 @@ const SuperAdminDashboard = () => {
 
   const [loading, setLoading] = useState(true);
   const [tabLoading, setTabLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  // Business Hours state
+  const [businessHours, setBusinessHours] = useState<BusinessHoursConfig | null>(null);
+  const [bhLoading, setBhLoading] = useState(false);
+  const [bhSaving, setBhSaving] = useState(false);
+  const [bhDraft, setBhDraft] = useState<BusinessHoursConfig | null>(null);
 
   // ── Initial load ──────────────────────────────────────────────────────────
 
@@ -144,6 +176,19 @@ const SuperAdminDashboard = () => {
     }).catch(() => {});
     fetchOverview();
   }, [fetchOverview]);
+
+  // ── Business Hours fetch ─────────────────────────────────────────────────
+
+  useEffect(() => {
+    setBhLoading(true);
+    superAdminAPI.getBusinessHours()
+      .then((res: { config: BusinessHoursConfig }) => {
+        setBusinessHours(res.config);
+        setBhDraft(JSON.parse(JSON.stringify(res.config)));
+      })
+      .catch(console.error)
+      .finally(() => setBhLoading(false));
+  }, []);
 
   // ── Location-filtered load ─────────────────────────────────────────────────
 
@@ -192,6 +237,74 @@ const SuperAdminDashboard = () => {
       fetchLocationData(selectedLocationId);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to restore worker");
+    }
+  };
+
+  // Business Hours helpers
+  const updateDayField = (idx: number, field: keyof DaySchedule, value: unknown) => {
+    if (!bhDraft) return;
+    const next = { ...bhDraft, schedule: bhDraft.schedule.map((d, i) => i === idx ? { ...d, [field]: value } : d) };
+    setBhDraft(next);
+  };
+
+  const saveBh = async () => {
+    if (!bhDraft) return;
+    setBhSaving(true);
+    try {
+      const res = await superAdminAPI.updateBusinessHours(bhDraft) as { config: BusinessHoursConfig };
+      setBusinessHours(res.config);
+      setBhDraft(JSON.parse(JSON.stringify(res.config)));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to save business hours');
+    } finally {
+      setBhSaving(false);
+    }
+  };
+
+  // Export bookings for selected location
+  const handleExportBookings = async () => {
+    try {
+      setExporting(true);
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet('Bookings');
+      ws.columns = [
+        { header: 'Booking ID', key: 'id', width: 15 },
+        { header: 'Customer', key: 'customer', width: 22 },
+        { header: 'Worker', key: 'worker', width: 22 },
+        { header: 'Service', key: 'service', width: 28 },
+        { header: 'Date', key: 'date', width: 14 },
+        { header: 'Start Time', key: 'startTime', width: 12 },
+        { header: 'End Time', key: 'endTime', width: 12 },
+        { header: 'Amount (₹)', key: 'amount', width: 14 },
+        { header: 'Status', key: 'status', width: 15 },
+        { header: 'Created At', key: 'createdAt', width: 22 },
+      ];
+      bookings.forEach(b => ws.addRow({
+        id: b._id.slice(-8).toUpperCase(),
+        customer: b.customer?.name || 'Unknown',
+        worker: b.worker?.name || '—',
+        service: b.service?.name || 'Unknown',
+        date: b.bookingDate ? new Date(b.bookingDate).toLocaleDateString('en-IN') : '—',
+        startTime: b.startTime,
+        endTime: b.endTime,
+        amount: b.totalAmount,
+        status: b.status.charAt(0).toUpperCase() + b.status.slice(1),
+        createdAt: new Date(b.createdAt).toLocaleString('en-IN'),
+      }));
+      ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1e293b' } };
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      const locName = selectedLocation?.apartmentName?.replace(/\s+/g, '-') ?? 'location';
+      link.download = `bookings-${locName}-${new Date().toISOString().split('T')[0]}.xlsx`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch (err) {
+      console.error('Export error:', err);
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -322,6 +435,133 @@ const SuperAdminDashboard = () => {
                   <p className="text-xs text-muted-foreground mt-0.5">{item.value}</p>
                 </Link>
               ))}
+            </div>
+
+            {/* ── Business Hours Settings ── */}
+            <div className="card-elevated p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 bg-primary-light rounded-xl flex items-center justify-center">
+                    <Clock className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold font-heading text-foreground">Business Hours</h2>
+                    <p className="text-xs text-muted-foreground">Platform-wide slot generation config</p>
+                  </div>
+                </div>
+                {bhDraft && (
+                  <button
+                    onClick={saveBh}
+                    disabled={bhSaving}
+                    className="btn-brand text-sm py-2 px-4 disabled:opacity-60"
+                  >
+                    {bhSaving ? 'Saving…' : 'Save Changes'}
+                  </button>
+                )}
+              </div>
+
+              {bhLoading || !bhDraft ? (
+                <div className="flex items-center justify-center py-10">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Slot duration + timezone row */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">
+                        Slot Duration (minutes)
+                      </label>
+                      <select
+                        value={bhDraft.slotDurationMinutes}
+                        onChange={e => setBhDraft({ ...bhDraft, slotDurationMinutes: parseInt(e.target.value) })}
+                        className="input-clean w-full"
+                      >
+                        {[15, 30, 45, 60, 90, 120].map(m => (
+                          <option key={m} value={m}>{m} min</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">
+                        Timezone
+                      </label>
+                      <input
+                        value={bhDraft.timezone}
+                        onChange={e => setBhDraft({ ...bhDraft, timezone: e.target.value })}
+                        className="input-clean w-full"
+                        placeholder="Asia/Kolkata"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Day schedule table */}
+                  <div className="overflow-x-auto rounded-xl border border-border">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-muted/50 border-b border-border">
+                          <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Day</th>
+                          <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Active</th>
+                          <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Opens</th>
+                          <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Closes</th>
+                          <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Break</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {bhDraft.schedule.map((day, idx) => (
+                          <tr key={day.day} className="border-b border-border last:border-0">
+                            <td className="px-4 py-2.5">
+                              <span className="font-medium text-foreground capitalize">{day.day.slice(0, 3)}</span>
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <button
+                                onClick={() => updateDayField(idx, 'isActive', !day.isActive)}
+                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${day.isActive ? 'bg-primary' : 'bg-muted-foreground/30'}`}
+                              >
+                                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${day.isActive ? 'translate-x-4' : 'translate-x-1'}`} />
+                              </button>
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <input
+                                type="time"
+                                value={day.openTime}
+                                disabled={!day.isActive}
+                                onChange={e => updateDayField(idx, 'openTime', e.target.value)}
+                                className="input-clean py-1.5 w-28 disabled:opacity-40"
+                              />
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <input
+                                type="time"
+                                value={day.closeTime}
+                                disabled={!day.isActive}
+                                onChange={e => updateDayField(idx, 'closeTime', e.target.value)}
+                                className="input-clean py-1.5 w-28 disabled:opacity-40"
+                              />
+                            </td>
+                            <td className="px-4 py-2.5">
+                              {day.breaks && day.breaks.length > 0 ? (
+                                <span className="text-xs text-muted-foreground">
+                                  {day.breaks[0].start}–{day.breaks[0].end}
+                                  {day.breaks[0].label ? ` (${day.breaks[0].label})` : ''}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground/50">None</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {businessHours && (
+                    <p className="text-xs text-muted-foreground">
+                      Slots are auto-generated from these hours every time a customer selects a date.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Location cards grid */}
@@ -658,9 +898,19 @@ const SuperAdminDashboard = () => {
                         </div>
                         <div className="px-4 py-3 border-t border-border bg-muted/30 flex justify-between items-center">
                           <p className="text-xs text-muted-foreground">{bookings.length} bookings shown</p>
-                          <Link to="/admin/bookings" className="text-xs text-primary font-medium flex items-center gap-1 hover:underline">
-                            View all bookings <ChevronRight className="w-3 h-3" />
-                          </Link>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={handleExportBookings}
+                              disabled={exporting}
+                              className="flex items-center gap-1.5 text-xs font-medium text-primary hover:underline disabled:opacity-60"
+                            >
+                              <FileSpreadsheet className="w-3.5 h-3.5" />
+                              {exporting ? 'Exporting…' : 'Export Excel'}
+                            </button>
+                            <Link to="/admin/bookings" className="text-xs text-primary font-medium flex items-center gap-1 hover:underline">
+                              View all bookings <ChevronRight className="w-3 h-3" />
+                            </Link>
+                          </div>
                         </div>
                       </div>
                     )}

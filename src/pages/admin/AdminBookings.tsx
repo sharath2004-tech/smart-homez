@@ -1,6 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { bookingsAPI, superAdminAPI } from "@/lib/api";
+import ExcelJS from "exceljs";
 import { Download, Eye, MapPin, Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -49,6 +50,7 @@ const AdminBookings = () => {
   const [filter, setFilter] = useState("all");
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [selectedProofBooking, setSelectedProofBooking] = useState<Booking | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocation, setSelectedLocation] = useState("");
@@ -121,6 +123,53 @@ const AdminBookings = () => {
 
   const hasProofs = (b: Booking) => !!(b.completionPhoto?.url || b.paymentProof?.url);
 
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet('Bookings');
+      ws.columns = [
+        { header: 'Booking ID', key: 'id', width: 15 },
+        { header: 'Customer', key: 'customer', width: 22 },
+        { header: 'Worker', key: 'worker', width: 22 },
+        { header: 'Service', key: 'service', width: 28 },
+        { header: 'Date', key: 'date', width: 14 },
+        { header: 'Start Time', key: 'startTime', width: 12 },
+        { header: 'End Time', key: 'endTime', width: 12 },
+        { header: 'City', key: 'city', width: 18 },
+        { header: 'Amount (₹)', key: 'amount', width: 14 },
+        { header: 'Status', key: 'status', width: 15 },
+        { header: 'Created At', key: 'createdAt', width: 22 },
+      ];
+      filtered.forEach(b => ws.addRow({
+        id: b._id.slice(-8).toUpperCase(),
+        customer: b.customer?.name || 'Unknown',
+        worker: b.worker?.name || '—',
+        service: b.service?.name || 'Unknown',
+        date: b.bookingDate ? new Date(b.bookingDate).toLocaleDateString('en-IN') : '—',
+        startTime: b.startTime,
+        endTime: b.endTime,
+        city: b.location ? [b.location.city, b.location.state].filter(Boolean).join(', ') : '—',
+        amount: b.totalAmount,
+        status: b.status.charAt(0).toUpperCase() + b.status.slice(1).replace('-', ' '),
+        createdAt: formatDateTime(b.createdAt),
+      }));
+      ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1e293b' } };
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `bookings-${new Date().toISOString().split('T')[0]}.xlsx`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch (err) {
+      console.error('Export error:', err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <AppLayout userType={role} userName={name}>
@@ -145,8 +194,8 @@ const AdminBookings = () => {
             </h1>
             <p className="text-muted-foreground text-sm mt-1">{bookings.length} total bookings</p>
           </div>
-          <button className="flex items-center gap-2 btn-brand text-sm py-2.5 px-4">
-            <Download className="w-4 h-4" /> Export
+          <button onClick={handleExport} disabled={exporting} className="flex items-center gap-2 btn-brand text-sm py-2.5 px-4 disabled:opacity-60">
+            <Download className="w-4 h-4" /> {exporting ? 'Exporting…' : 'Export Excel'}
           </button>
         </div>
 

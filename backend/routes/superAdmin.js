@@ -8,10 +8,32 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
 import Booking from '../models/Booking.js';
+import BusinessHours from '../models/BusinessHours.js';
 import Location from '../models/Location.js';
 import Settings from '../models/Settings.js';
 import User from '../models/User.js';
 import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/emailService.js';
+
+// Canonical list of valid Indian cities — prevents free-text garbage input
+const VALID_INDIAN_CITIES = [
+  'Mumbai', 'Delhi', 'Bengaluru', 'Hyderabad', 'Chennai',
+  'Kolkata', 'Ahmedabad', 'Pune', 'Jaipur', 'Surat',
+  'Lucknow', 'Kanpur', 'Nagpur', 'Indore', 'Thane',
+  'Bhopal', 'Visakhapatnam', 'Patna', 'Vadodara', 'Ghaziabad',
+  'Ludhiana', 'Agra', 'Nashik', 'Faridabad', 'Meerut',
+  'Rajkot', 'Kalyan', 'Varanasi', 'Srinagar', 'Aurangabad',
+  'Dhanbad', 'Amritsar', 'Navi Mumbai', 'Allahabad', 'Ranchi',
+  'Howrah', 'Coimbatore', 'Jabalpur', 'Gwalior', 'Vijayawada',
+  'Jodhpur', 'Madurai', 'Raipur', 'Kota', 'Guwahati',
+  'Chandigarh', 'Solapur', 'Hubballi', 'Tiruchirappalli', 'Bareilly',
+  'Mysuru', 'Tiruppur', 'Gurgaon', 'Noida', 'Aligarh',
+  'Jalandhar', 'Bhubaneswar', 'Salem', 'Warangal', 'Guntur',
+  'Bhiwandi', 'Gorakhpur', 'Bikaner', 'Jamshedpur', 'Bhilai',
+  'Cuttack', 'Kochi', 'Nellore', 'Bhavnagar', 'Dehradun',
+  'Durgapur', 'Asansol', 'Rourkela', 'Nanded', 'Kolhapur',
+  'Ajmer', 'Ujjain', 'Udaipur', 'Siliguri', 'Jhansi',
+  'Mangalore', 'Erode', 'Belgaum', 'Tirunelveli', 'Malegaon'
+];
 
 const router = express.Router();
 
@@ -370,7 +392,16 @@ router.post(
   [
     body('apartmentName').notEmpty().withMessage('Apartment name is required'),
     body('area').notEmpty().withMessage('Area is required'),
-    body('city').notEmpty().withMessage('City is required'),
+    body('city')
+      .notEmpty().withMessage('City is required')
+      .custom((val) => {
+        const normalised = val.trim();
+        const match = VALID_INDIAN_CITIES.find(
+          (c) => c.toLowerCase() === normalised.toLowerCase()
+        );
+        if (!match) throw new Error(`"${normalised}" is not a recognised Indian city. Please select a city from the list.`);
+        return true;
+      }),
     body('coordinates').isArray().withMessage('Coordinates must be an array [longitude, latitude]')
   ],
   async (req, res) => {
@@ -381,13 +412,17 @@ router.post(
       }
 
       const { apartmentName, building, area, city, state, zipCode, coordinates, maxServiceRadius } = req.body;
+      // Normalise city to canonical capitalisation
+      const canonicalCity = VALID_INDIAN_CITIES.find(
+        (c) => c.toLowerCase() === city.trim().toLowerCase()
+      ) || city.trim();
       const settings = await Settings.getSettings();
 
       const location = new Location({
         apartmentName,
         building,
         area,
-        city,
+        city: canonicalCity,
         state: state || settings.company.defaultState,
         zipCode,
         location: { type: 'Point', coordinates },
@@ -810,6 +845,134 @@ router.post('/service-requests/:id/reject', async (req, res) => {
     res.json({ message: 'Service request rejected', request });
   } catch (error) {
     console.error('Reject service request error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// ─── Business Hours ──────────────────────────────────────────────────────────
+
+// Helper: generate time slots from a day config + slot duration
+function generateSlotsFromDayConfig(dayConfig, slotDurationMinutes) {
+  const slots = [];
+  const [openHour, openMin] = dayConfig.openTime.split(':').map(Number);
+  const [closeHour, closeMin] = dayConfig.closeTime.split(':').map(Number);
+  const openMinutes = openHour * 60 + openMin;
+  const closeMinutes = closeHour * 60 + closeMin;
+
+  const breaks = (dayConfig.breaks || []).map((b) => {
+    const [sh, sm] = b.start.split(':').map(Number);
+    const [eh, em] = b.end.split(':').map(Number);
+    return { start: sh * 60 + sm, end: eh * 60 + em };
+  });
+
+  for (let t = openMinutes; t + slotDurationMinutes <= closeMinutes; t += slotDurationMinutes) {
+    const slotEnd = t + slotDurationMinutes;
+    const inBreak = breaks.some((b) => t < b.end && slotEnd > b.start);
+    if (!inBreak) {
+      const hh = String(Math.floor(t / 60)).padStart(2, '0');
+      const mm = String(t % 60).padStart(2, '0');
+      slots.push(`${hh}:${mm}`);
+    }
+  }
+  return slots;
+}
+
+// @route   GET /api/super-admin/business-hours
+// @desc    Get the current business hours configuration
+router.get('/business-hours', async (req, res) => {
+  try {
+    const config = await BusinessHours.getConfig();
+    res.json({ success: true, businessHours: config });
+  } catch (error) {
+    console.error('Get business hours error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   PUT /api/super-admin/business-hours
+// @desc    Update business hours configuration (Super Admin only)
+router.put(
+  '/business-hours',
+  [
+    body('slotDurationMinutes')
+      .optional()
+      .isInt({ min: 15, max: 120 })
+      .withMessage('Slot duration must be between 15 and 120 minutes'),
+    body('timezone')
+      .optional()
+      .notEmpty()
+      .withMessage('Timezone cannot be empty'),
+    body('schedule')
+      .optional()
+      .isArray()
+      .withMessage('Schedule must be an array')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: { message: errors.array()[0].msg, status: 400 } });
+      }
+
+      const { schedule, timezone, slotDurationMinutes } = req.body;
+      const config = await BusinessHours.getConfig();
+
+      if (schedule !== undefined) config.schedule = schedule;
+      if (timezone !== undefined) config.timezone = timezone;
+      if (slotDurationMinutes !== undefined) config.slotDurationMinutes = slotDurationMinutes;
+      config.updatedBy = req.user._id;
+
+      await config.save();
+      res.json({ success: true, message: 'Business hours updated successfully', businessHours: config });
+    } catch (error) {
+      console.error('Update business hours error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   GET /api/super-admin/business-hours/available-slots
+// @desc    Preview the slots generated for a given date
+// @query   date=YYYY-MM-DD
+router.get('/business-hours/available-slots', async (req, res) => {
+  try {
+    const { date } = req.query;
+    if (!date) {
+      return res.status(400).json({ error: { message: 'Query param ?date=YYYY-MM-DD is required', status: 400 } });
+    }
+
+    const config = await BusinessHours.getConfig();
+    const targetDate = new Date(date);
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayName = dayNames[targetDate.getDay()];
+    const dayConfig = config.schedule.find((d) => d.day === dayName);
+
+    if (!dayConfig || !dayConfig.isActive) {
+      return res.json({
+        success: true,
+        slots: [],
+        date,
+        day: dayName,
+        reason: 'Business is closed on this day'
+      });
+    }
+
+    const slots = generateSlotsFromDayConfig(dayConfig, config.slotDurationMinutes);
+    res.json({
+      success: true,
+      slots,
+      date,
+      day: dayName,
+      config: {
+        openTime: dayConfig.openTime,
+        closeTime: dayConfig.closeTime,
+        breaks: dayConfig.breaks,
+        slotDurationMinutes: config.slotDurationMinutes,
+        timezone: config.timezone
+      }
+    });
+  } catch (error) {
+    console.error('Get available slots error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
   }
 });

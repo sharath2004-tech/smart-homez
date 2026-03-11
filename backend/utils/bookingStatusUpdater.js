@@ -1,4 +1,6 @@
 import Booking from '../models/Booking.js';
+import { assignWorkersWithBackup } from './advancedWorkerAssignment.js';
+import notificationService from './notificationService.js';
 
 /**
  * Update booking statuses based on current time
@@ -163,4 +165,78 @@ export const scheduleRecurringBookings = async () => {
 export const runBookingUpdates = async () => {
   await updateBookingStatuses();
   await scheduleRecurringBookings();
+};
+
+/**
+ * Process queued (pending/unassigned) bookings for a location when a worker slot opens up.
+ * Called after booking completion or cancellation to automatically confirm waiting bookings.
+ */
+export const processQueuedBookings = async (locationId) => {
+  if (!locationId) return { processed: 0, confirmed: 0 };
+  try {
+    const pendingBookings = await Booking.find({
+      'location.locationId': locationId,
+      status: 'pending',
+      $or: [{ worker: null }, { worker: { $exists: false } }]
+    })
+      .populate('service')
+      .populate('customer', 'name email preferences')
+      .sort({ createdAt: 1 }) // FIFO - oldest pending first
+      .limit(10);
+
+    if (pendingBookings.length === 0) return { processed: 0, confirmed: 0 };
+
+    console.log(`🔄 Processing ${pendingBookings.length} queued booking(s) at location ${locationId}`);
+    let confirmed = 0;
+
+    for (const pendingBooking of pendingBookings) {
+      try {
+        const assignmentResult = await assignWorkersWithBackup({
+          customerId: pendingBooking.customer._id || pendingBooking.customer,
+          service: pendingBooking.service?._id || pendingBooking.service,
+          bookingDate: pendingBooking.bookingDate,
+          startTime: pendingBooking.startTime,
+          endTime: pendingBooking.endTime,
+          location: pendingBooking.location,
+          bookingType: pendingBooking.bookingType,
+          preferences: pendingBooking.preferences || {}
+        });
+
+        if (assignmentResult.success) {
+          pendingBooking.worker = assignmentResult.primaryWorker;
+          pendingBooking.backupWorkers = assignmentResult.backupWorkers || [];
+          pendingBooking.assignmentMethod = assignmentResult.assignmentMethod;
+          pendingBooking.assignedAt = new Date();
+          pendingBooking.status = 'confirmed';
+          pendingBooking.confirmedAt = new Date();
+          await pendingBooking.save();
+          confirmed++;
+
+          console.log(`✅ Queued booking ${pendingBooking._id} confirmed — worker assigned from queue`);
+
+          // Notify customer that their queued booking is now confirmed
+          try {
+            await notificationService.sendNotification({
+              userId: pendingBooking.customer._id || pendingBooking.customer,
+              type: 'booking',
+              title: 'Booking Confirmed',
+              message: `Great news! A worker has been assigned to your booking. Your service is now confirmed.`,
+              priority: 'high',
+              data: { bookingId: pendingBooking._id }
+            });
+          } catch (notifErr) {
+            console.error(`Notification error for booking ${pendingBooking._id}:`, notifErr.message);
+          }
+        }
+      } catch (err) {
+        console.error(`Failed to process queued booking ${pendingBooking._id}:`, err.message);
+      }
+    }
+
+    console.log(`📊 Queue result: ${confirmed}/${pendingBookings.length} booking(s) confirmed`);
+    return { processed: pendingBookings.length, confirmed };
+  } catch (error) {
+    console.error('Error in processQueuedBookings:', error);
+    return { processed: 0, confirmed: 0 };
+  }
 };

@@ -10,6 +10,27 @@ import User from '../models/User.js';
 import WorkerEarnings from '../models/WorkerEarnings.js';
 import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/emailService.js';
 
+// Canonical list of valid Indian cities — shared with super-admin routes for consistency
+const VALID_INDIAN_CITIES = [
+  'Mumbai', 'Delhi', 'Bengaluru', 'Hyderabad', 'Chennai',
+  'Kolkata', 'Ahmedabad', 'Pune', 'Jaipur', 'Surat',
+  'Lucknow', 'Kanpur', 'Nagpur', 'Indore', 'Thane',
+  'Bhopal', 'Visakhapatnam', 'Patna', 'Vadodara', 'Ghaziabad',
+  'Ludhiana', 'Agra', 'Nashik', 'Faridabad', 'Meerut',
+  'Rajkot', 'Kalyan', 'Varanasi', 'Srinagar', 'Aurangabad',
+  'Dhanbad', 'Amritsar', 'Navi Mumbai', 'Allahabad', 'Ranchi',
+  'Howrah', 'Coimbatore', 'Jabalpur', 'Gwalior', 'Vijayawada',
+  'Jodhpur', 'Madurai', 'Raipur', 'Kota', 'Guwahati',
+  'Chandigarh', 'Solapur', 'Hubballi', 'Tiruchirappalli', 'Bareilly',
+  'Mysuru', 'Tiruppur', 'Gurgaon', 'Noida', 'Aligarh',
+  'Jalandhar', 'Bhubaneswar', 'Salem', 'Warangal', 'Guntur',
+  'Bhiwandi', 'Gorakhpur', 'Bikaner', 'Jamshedpur', 'Bhilai',
+  'Cuttack', 'Kochi', 'Nellore', 'Bhavnagar', 'Dehradun',
+  'Durgapur', 'Asansol', 'Rourkela', 'Nanded', 'Kolhapur',
+  'Ajmer', 'Ujjain', 'Udaipur', 'Siliguri', 'Jhansi',
+  'Mangalore', 'Erode', 'Belgaum', 'Tirunelveli', 'Malegaon'
+];
+
 const router = express.Router();
 
 // ============== SUPER ADMIN ROUTES ==============
@@ -23,7 +44,16 @@ router.post('/locations',
   [
     body('apartmentName').notEmpty().withMessage('Apartment name is required'),
     body('area').notEmpty().withMessage('Area is required'),
-    body('city').notEmpty().withMessage('City is required'),
+    body('city')
+      .notEmpty().withMessage('City is required')
+      .custom((val) => {
+        const normalised = val.trim();
+        const match = VALID_INDIAN_CITIES.find(
+          (c) => c.toLowerCase() === normalised.toLowerCase()
+        );
+        if (!match) throw new Error(`"${normalised}" is not a recognised Indian city. Please select a city from the list.`);
+        return true;
+      }),
     body('coordinates')
       .isArray({ min: 2, max: 2 }).withMessage('Coordinates must be an array of exactly 2 values [longitude, latitude]')
       .custom((coords) => {
@@ -42,13 +72,17 @@ router.post('/locations',
       }
 
       const { apartmentName, building, area, city, state, zipCode, coordinates, maxServiceRadius } = req.body;
+      // Normalise to canonical capitalisation
+      const canonicalCity = VALID_INDIAN_CITIES.find(
+        (c) => c.toLowerCase() === city.trim().toLowerCase()
+      ) || city.trim();
       const settings = await Settings.getSettings();
 
       const location = new Location({
         apartmentName,
         building,
         area,
-        city,
+        city: canonicalCity,
         state: state || settings.company.defaultState,
         zipCode,
         location: {

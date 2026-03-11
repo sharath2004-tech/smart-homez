@@ -1208,6 +1208,33 @@ export const superAdminAPI = {
       method: 'POST',
       body: JSON.stringify({ reason })
     });
+  },
+
+  // ─── Business Hours ───────────────────────────────────────────────────────
+
+  getBusinessHours: async () => {
+    return apiCall('/super-admin/business-hours');
+  },
+
+  updateBusinessHours: async (data: {
+    schedule?: Array<{
+      day: string;
+      isActive: boolean;
+      openTime: string;
+      closeTime: string;
+      breaks: Array<{ start: string; end: string; label?: string }>;
+    }>;
+    timezone?: string;
+    slotDurationMinutes?: number;
+  }) => {
+    return apiCall('/super-admin/business-hours', {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  getAvailableSlotsByDate: async (date: string) => {
+    return apiCall(`/super-admin/business-hours/available-slots?date=${date}`);
   }
 };
 
