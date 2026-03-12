@@ -67,6 +67,7 @@ const AdminWorkers = () => {
   const [loading, setLoading] = useState(true);
   const [showWorkerForm, setShowWorkerForm] = useState(false);
   const [creatingWorker, setCreatingWorker] = useState(false);
+  const [credentialDelivery, setCredentialDelivery] = useState<"email" | "phone" | "both">("email");
 
   const [workerForm, setWorkerForm] = useState({
     name: "",
@@ -169,6 +170,7 @@ const AdminWorkers = () => {
       formData.append('specialization', JSON.stringify(workerForm.specialization));
       formData.append('assignedApartmentIds', JSON.stringify(workerForm.selectedLocations));
       if (workerForm.aadhaarNumber) formData.append('aadhaarNumber', workerForm.aadhaarNumber);
+      formData.append('credentialDelivery', credentialDelivery);
       if (docFiles.profilePicture) formData.append('profilePicture', docFiles.profilePicture);
       if (docFiles.aadhaarFront) formData.append('aadhaarFront', docFiles.aadhaarFront);
       if (docFiles.aadhaarBack) formData.append('aadhaarBack', docFiles.aadhaarBack);
@@ -176,13 +178,17 @@ const AdminWorkers = () => {
       const response = await adminAPI.createWorker(formData);
       
       // Show temporary password to admin
-      if (response.temporaryPassword) {
-        alert(`Worker created successfully! ✅\n\nTemporary Password: ${response.temporaryPassword}\n\n📧 An email with login credentials is being sent to: ${workerForm.email}\n\nPlease save this password as a backup and share it with the worker if they don't receive the email.`);
-      } else {
-        alert('Worker created successfully! ✅\n\nTemporary password is being sent to their email.');
-      }
+      const deliveryLabel =
+        credentialDelivery === "both" ? `📧 Email: ${workerForm.email}\n📱 Phone: ${workerForm.phone}` :
+        credentialDelivery === "phone" ? `📱 Phone: ${workerForm.phone}` :
+        `📧 Email: ${workerForm.email}`;
+      const deliveryStatus = response.deliveryResults
+        ? Object.entries(response.deliveryResults).map(([k, v]) => `${k}: ${v}`).join(', ')
+        : 'pending';
+      alert(`Worker created successfully! ✅\n\nTemporary Password: ${response.temporaryPassword || '(see delivery channel)'}\n\nCredentials sent via:\n${deliveryLabel}\nStatus: ${deliveryStatus}\n\nPlease save this password as backup.`);
       
       setShowWorkerForm(false);
+      setCredentialDelivery("email");
       setWorkerForm({
         name: "",
         email: "",
@@ -435,7 +441,7 @@ const AdminWorkers = () => {
                     value={workerForm.email}
                     onChange={(e) => setWorkerForm({...workerForm, email: e.target.value})}
                   />
-                  <p className="text-xs text-muted-foreground mt-1">A temporary password will be sent to this email</p>
+                  <p className="text-xs text-muted-foreground mt-1">Worker's login email address</p>
                 </div>
 
                 <div>
@@ -448,6 +454,32 @@ const AdminWorkers = () => {
                     value={workerForm.phone}
                     onChange={(e) => setWorkerForm({...workerForm, phone: e.target.value})}
                   />
+                </div>
+
+                {/* Credential delivery method */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Send temporary password via</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(["email", "phone", "both"] as const).map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setCredentialDelivery(opt)}
+                        className={`py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
+                          credentialDelivery === opt
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background border-border hover:bg-muted text-foreground"
+                        }`}
+                      >
+                        {opt === "email" ? "📧 Email" : opt === "phone" ? "📱 Phone" : "📧+📱 Both"}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {credentialDelivery === "email" && "Temporary password will be sent to the email address."}
+                    {credentialDelivery === "phone" && "Temporary password will be sent as an SMS to the phone number."}
+                    {credentialDelivery === "both" && "Temporary password will be sent to both email and phone."}
+                  </p>
                 </div>
 
                 <div>

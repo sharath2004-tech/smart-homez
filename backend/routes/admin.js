@@ -1,5 +1,6 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
+import twilio from 'twilio';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { uploadAdminDoc, uploadWorkerFiles } from '../middleware/upload.js';
 import Booking from '../models/Booking.js';
@@ -10,6 +11,29 @@ import Settings from '../models/Settings.js';
 import User from '../models/User.js';
 import WorkerEarnings from '../models/WorkerEarnings.js';
 import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/emailService.js';
+
+// Send temporary password via SMS (plain message, not Twilio Verify)
+async function sendTemporaryPasswordSMS(phone, name, temporaryPassword) {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const from = process.env.TWILIO_PHONE_NUMBER;
+  if (!sid || !token || !from) {
+    console.warn('⚠️ Twilio SMS not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER.');
+    return { success: false, reason: 'SMS service not configured' };
+  }
+  try {
+    const client = twilio(sid, token);
+    const digits = phone.replace(/\D/g, '').slice(-10);
+    const to = `+91${digits}`;
+    const body = `Hi ${name}, welcome to Healthy Homez! Your temporary password is: ${temporaryPassword}  Please log in and change it immediately. App: ${process.env.FRONTEND_URL || 'https://healthyhomez.app'}`;
+    await client.messages.create({ body, from, to });
+    console.log(`✅ Temporary password SMS sent to ${to}`);
+    return { success: true };
+  } catch (error) {
+    console.error('❌ SMS send error:', error.message);
+    return { success: false, reason: error.message };
+  }
+}
 
 // Canonical list of valid Indian cities — shared with super-admin routes for consistency
 const VALID_INDIAN_CITIES = [
@@ -718,31 +742,37 @@ router.post('/workers',
         { $push: { assignedWorkers: { worker: worker._id, assignedAt: new Date() } } }
       );
 
-      // Send temporary password email (non-blocking)
-      let emailStatus = 'pending';
-      console.log(`📧 Attempting to send email to: ${normalizedEmail}`);
-      
-      // Fire and forget - don't wait for email
-      sendTemporaryPasswordEmail(normalizedEmail, name, temporaryPassword)
-        .then(result => {
-          if (result.success) {
-            console.log('✅ Email sent successfully to:', normalizedEmail);
-            emailStatus = 'sent';
-          } else {
-            console.log('⚠️ Email not sent:', result.reason);
-            emailStatus = 'failed';
-          }
-        })
-        .catch(error => {
-          console.error('❌ Failed to send email:', error.message);
-          emailStatus = 'failed';
-        });
+      // Send credentials via the channel chosen by the admin
+      const credentialDelivery = req.body.credentialDelivery || 'email'; // 'email' | 'phone' | 'both'
+      const deliveryResults = {};
+
+      if (credentialDelivery === 'email' || credentialDelivery === 'both') {
+        console.log(`📧 Sending temporary password email to: ${normalizedEmail}`);
+        const result = await sendTemporaryPasswordEmail(normalizedEmail, name, temporaryPassword);
+        deliveryResults.email = result.success ? 'sent' : `failed: ${result.reason}`;
+        console.log(`Email delivery: ${deliveryResults.email}`);
+      }
+
+      if (credentialDelivery === 'phone' || credentialDelivery === 'both') {
+        console.log(`📱 Sending temporary password SMS to: ${phone}`);
+        const result = await sendTemporaryPasswordSMS(phone, name, temporaryPassword);
+        deliveryResults.sms = result.success ? 'sent' : `failed: ${result.reason}`;
+        console.log(`SMS delivery: ${deliveryResults.sms}`);
+      }
+
+      const deliveryMessage =
+        credentialDelivery === 'both'
+          ? `Credentials sent via email (${deliveryResults.email}) and SMS (${deliveryResults.sms}).`
+          : credentialDelivery === 'phone'
+          ? `Credentials sent via SMS (${deliveryResults.sms}).`
+          : `Credentials sent via email (${deliveryResults.email}).`;
 
       // Return response immediately
       res.status(201).json({
         success: true,
-        message: 'Worker created successfully. Temporary password is being sent to email.',
-        emailStatus, // 'sending' status
+        message: `Worker created successfully. ${deliveryMessage}`,
+        deliveryResults,
+        credentialDelivery,
         worker: {
           _id: worker._id,
           name: worker.name,
