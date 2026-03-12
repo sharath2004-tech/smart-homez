@@ -7,13 +7,13 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { uploadWorkerFiles } from '../middleware/upload.js';
 import Booking from '../models/Booking.js';
 import BusinessHours from '../models/BusinessHours.js';
 import Location from '../models/Location.js';
 import Settings from '../models/Settings.js';
 import User from '../models/User.js';
 import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/emailService.js';
-import { uploadWorkerFiles } from '../middleware/upload.js';
 
 // Canonical list of valid Indian cities — prevents free-text garbage input
 const VALID_INDIAN_CITIES = [

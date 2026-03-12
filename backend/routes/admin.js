@@ -1,6 +1,7 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { uploadWorkerFiles } from '../middleware/upload.js';
 import Booking from '../models/Booking.js';
 import Location from '../models/Location.js';
 import Notification from '../models/Notification.js';
@@ -9,7 +10,6 @@ import Settings from '../models/Settings.js';
 import User from '../models/User.js';
 import WorkerEarnings from '../models/WorkerEarnings.js';
 import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/emailService.js';
-import { uploadWorkerFiles } from '../middleware/upload.js';
 
 // Canonical list of valid Indian cities — shared with super-admin routes for consistency
 const VALID_INDIAN_CITIES = [
