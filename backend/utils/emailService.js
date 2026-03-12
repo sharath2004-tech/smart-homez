@@ -12,27 +12,21 @@ const isEmailConfigured = () => {
   return !!(process.env.SMTP_USER && process.env.SMTP_PASS);
 };
 
-// Singleton transporter — created once and reused across calls
-let _transporter = null;
-
-// Discard the cached transporter so the next call recreates it fresh.
-const resetTransporter = () => {
-  _transporter = null;
-};
-
-// Create (or return cached) transporter
+// Create a fresh transporter for every send to avoid stale-connection timeouts.
+// A long-lived singleton SMTP connection can be silently dropped by firewalls or
+// the SMTP server's idle timeout (common on cloud hosts like Render). The next
+// send attempt would then block until the socket timeout fires. Using a new
+// transporter each time guarantees a clean TCP connection for every email.
 const createTransporter = () => {
   if (!isEmailConfigured()) {
     console.warn('⚠️ Email not configured. Set SMTP_USER and SMTP_PASS in .env file.');
     return null;
   }
 
-  if (_transporter) return _transporter;
-
   try {
     const port = parseInt(process.env.SMTP_PORT || '465');
     const secure = port === 465;
-    _transporter = nodemailer.createTransport({
+    return nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port,
       secure, // true for 465 (SSL), false for 587 (STARTTLS)
@@ -49,7 +43,6 @@ const createTransporter = () => {
       greetingTimeout: 30000,
       socketTimeout: 45000
     });
-    return _transporter;
   } catch (error) {
     console.error('❌ Failed to create email transporter:', error.message);
     return null;
@@ -188,7 +181,6 @@ export const sendTemporaryPasswordEmail = async (email, name, temporaryPassword)
     console.log('❌ Email rejected by:', info.rejected);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    resetTransporter(); // discard broken connection so next call reconnects fresh
     console.error('❌ Error sending temporary password email:');
     console.error('   Error message:', error.message);
     console.error('   Error code:', error.code);
@@ -254,7 +246,6 @@ export const sendPasswordChangeConfirmation = async (email, name) => {
     console.log('✅ Password change confirmation email sent:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    resetTransporter(); // discard broken connection so next call reconnects fresh
     console.error('❌ Error sending password change confirmation:', error.message);
     return { success: false, reason: error.message };
   }
@@ -317,7 +308,6 @@ export const sendPasswordResetEmail = async (email, name, resetUrl) => {
     console.log('✅ Password reset email sent to:', email, 'Message ID:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    resetTransporter(); // discard broken connection so next call reconnects fresh
     console.error('❌ Error sending password reset email:', error.message);
     return { success: false, reason: error.message };
   }
@@ -382,7 +372,6 @@ export const sendPasswordResetOtpEmail = async (email, name, otp) => {
     console.log('✅ Password reset OTP email sent to:', email, 'Message ID:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    resetTransporter(); // discard broken connection so next call reconnects fresh
     console.error('❌ Error sending password reset OTP email:', error.message);
     return { success: false, reason: error.message };
   }
