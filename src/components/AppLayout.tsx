@@ -331,6 +331,19 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
 
       {/* Main content */}
       <main className="flex-1 md:ml-64 pt-16 md:pt-0">
+        {/* Desktop back button — shown on all non-dashboard pages */}
+        {location.pathname !== dashboardPath && (
+          <div className="hidden md:flex items-center px-6 md:px-8 pt-5 pb-0">
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors group"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+              Back
+            </button>
+          </div>
+        )}
         <div className="p-6 md:p-8">
           {children}
         </div>
