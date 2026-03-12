@@ -26,6 +26,7 @@ const createTransporter = () => {
       port,
       secure, // true for 465 (SSL), false for 587 (STARTTLS)
       requireTLS: !secure, // force STARTTLS upgrade on port 587
+      family: 4, // force IPv4 — Render does not support outbound IPv6
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
