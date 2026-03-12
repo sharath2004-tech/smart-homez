@@ -1,4 +1,4 @@
-import { settingsAPI } from "@/lib/api";
+import { api, settingsAPI } from "@/lib/api";
 import { ArrowLeft, Bell, Calendar, ClipboardCheck, Clock, CreditCard, HelpCircle, Home, IndianRupee, LayoutDashboard, LogOut, MapPin, Menu, MessageSquare, RefreshCw, Settings, User, Users, Wrench, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -16,6 +16,15 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    api.get('/notifications')
+      .then((res: { notifications: { isRead: boolean }[] }) => {
+        setUnreadCount(res.notifications?.filter((n) => !n.isRead).length ?? 0);
+      })
+      .catch(() => {});
+  }, [location.pathname]);
 
   // Business hours badge
   const [todayBH, setTodayBH] = useState<{
@@ -34,13 +43,16 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
   }, []);
 
   const handleLogout = () => {
-    // Clear authentication data
     localStorage.removeItem('token');
     localStorage.removeItem('userLocation');
     localStorage.removeItem('user');
-    // Redirect to login
     window.location.href = '/login';
   };
+
+  const notificationsPath =
+    userType === 'worker' ? '/worker/notifications'
+    : userType === 'admin' || userType === 'super_admin' ? '/admin/notifications'
+    : '/customer/notifications';
 
   const customerNav = [
     { to: "/customer/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },
@@ -160,10 +172,25 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
 
         {/* Bottom actions */}
         <div className="p-4 border-t border-sidebar-border space-y-1 shrink-0">
-          <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent transition-all">
-            <Bell className="w-4 h-4" />
+          <Link
+            to={notificationsPath}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent transition-all"
+          >
+            <span className="relative">
+              <Bell className="w-4 h-4" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-0.5 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full flex items-center justify-center">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </span>
             {t('nav.notifications')}
-          </button>
+            {unreadCount > 0 && (
+              <span className="ml-auto bg-destructive text-destructive-foreground text-xs font-bold px-1.5 py-0.5 rounded-full">
+                {unreadCount}
+              </span>
+            )}
+          </Link>
           <LanguageSelector variant="full" />
           <button 
             onClick={handleLogout}
