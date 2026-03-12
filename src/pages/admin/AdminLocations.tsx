@@ -1082,8 +1082,9 @@ const AdminLocations = () => {
                   <input
                     type="password"
                     required
+                    minLength={8}
                     className="input-clean"
-                    placeholder="Min 6 characters"
+                    placeholder="Min 8 characters"
                     value={adminForm.password}
                     onChange={(e) => setAdminForm({...adminForm, password: e.target.value})}
                   />

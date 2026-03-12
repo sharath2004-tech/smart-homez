@@ -124,7 +124,12 @@ router.post('/create-admin',
     body('email').isEmail().withMessage('Valid email is required'),
     body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
     body('phone').notEmpty().withMessage('Phone is required'),
-    body('assignedLocationIds').optional().isArray().withMessage('Assigned locations must be an array')
+    body('assignedLocationIds').optional().custom((val) => {
+      if (!val) return true;
+      if (Array.isArray(val)) return true;
+      if (typeof val === 'string') return true; // single location sent as string by FormData
+      throw new Error('Assigned locations must be an array');
+    })
   ],
   async (req, res) => {
     try {
@@ -133,7 +138,11 @@ router.post('/create-admin',
         return res.status(400).json({ error: { message: errors.array()[0].msg, status: 400 } });
       }
 
-      const { name, email, password, phone, assignedLocationIds, idDocumentType } = req.body;
+      const { name, email, password, phone, idDocumentType } = req.body;
+      // Normalize: FormData sends a single selected item as a string, multiple as array
+      let assignedLocationIds = req.body.assignedLocationIds;
+      if (typeof assignedLocationIds === 'string') assignedLocationIds = [assignedLocationIds];
+      else if (!assignedLocationIds) assignedLocationIds = [];
       const idDocumentPath = req.file ? `/uploads/admin-docs/${req.file.filename}` : null;
 
       // Check if email exists
@@ -166,7 +175,7 @@ router.post('/create-admin',
       // Create admin user
       const admin = new User({
         name,
-        email,
+        email: email.toLowerCase().trim(),
         password,
         phone,
         role: 'admin',
