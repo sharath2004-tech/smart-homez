@@ -102,9 +102,9 @@ export const sendTemporaryPasswordEmail = async (email, name, temporaryPassword)
     
     console.log('✅ Transporter created. Preparing email...');
     const mailOptions = {
-      from: `"Smart Homez" <${process.env.SMTP_USER}>`,
+      from: `"Healthy Homez" <${process.env.SMTP_USER}>`,
       to: email,
-      subject: 'Welcome to Smart Homez - Your Temporary Password',
+      subject: 'Welcome to Healthy Homez - Your Temporary Password',
       html: `
         <!DOCTYPE html>
         <html>
@@ -124,12 +124,12 @@ export const sendTemporaryPasswordEmail = async (email, name, temporaryPassword)
         <body>
           <div class="container">
             <div class="header">
-              <h1>Welcome to Smart Homez!</h1>
+              <h1>Welcome to Healthy Homez!</h1>
               <p>Your worker account has been created</p>
             </div>
             <div class="content">
               <p>Hi ${name},</p>
-              <p>Welcome to the Smart Homez team! Your worker account has been created by an administrator.</p>
+              <p>Welcome to the Healthy Homez team! Your worker account has been created by an administrator.</p>
               
               <div class="password-box">
                 <p style="margin: 0 0 10px 0; font-size: 14px; color: #666;">Your Temporary Password:</p>
@@ -158,10 +158,10 @@ export const sendTemporaryPasswordEmail = async (email, name, temporaryPassword)
               
               <p>If you have any questions or need assistance, please contact our support team.</p>
               
-              <p>Best regards,<br>The Smart Homez Team</p>
+              <p>Best regards,<br>The Healthy Homez Team</p>
             </div>
             <div class="footer">
-              <p>© ${new Date().getFullYear()} Smart Homez. All rights reserved.</p>
+              <p>© ${new Date().getFullYear()} Healthy Homez. All rights reserved.</p>
               <p>This is an automated email. Please do not reply to this message.</p>
             </div>
           </div>
@@ -200,9 +200,9 @@ export const sendPasswordChangeConfirmation = async (email, name) => {
     }
     
     const mailOptions = {
-      from: `"Smart Homez" <${process.env.SMTP_USER}>`,
+      from: `"Healthy Homez" <${process.env.SMTP_USER}>`,
       to: email,
-      subject: 'Password Changed Successfully - Smart Homez',
+      subject: 'Password Changed Successfully - Healthy Homez',
       html: `
         <!DOCTYPE html>
         <html>
@@ -225,12 +225,12 @@ export const sendPasswordChangeConfirmation = async (email, name) => {
               
               <div class="success-box">
                 <strong>✓ Your password has been changed successfully!</strong>
-                <p style="margin: 10px 0 0 0;">Your Smart Homez account is now secured with your new password.</p>
+                <p style="margin: 10px 0 0 0;">Your Healthy Homez account is now secured with your new password.</p>
               </div>
               
               <p>If you did not make this change, please contact our support team immediately.</p>
               
-              <p>Best regards,<br>The Smart Homez Team</p>
+              <p>Best regards,<br>The Healthy Homez Team</p>
             </div>
           </div>
         </body>
@@ -261,9 +261,9 @@ export const sendPasswordResetEmail = async (email, name, resetUrl) => {
     }
 
     const mailOptions = {
-      from: `"Smart Homez" <${process.env.SMTP_USER}>`,
+      from: `"Healthy Homez" <${process.env.SMTP_USER}>`,
       to: email,
-      subject: 'Reset Your Password - Smart Homez',
+      subject: 'Reset Your Password - Healthy Homez',
       html: `
         <!DOCTYPE html>
         <html>
@@ -291,9 +291,9 @@ export const sendPasswordResetEmail = async (email, name, resetUrl) => {
                 <strong>⚠️ This link expires in 1 hour.</strong><br>
                 If you did not request a password reset, please ignore this email — your password will remain unchanged.
               </div>
-              <p>Best regards,<br>The Smart Homez Team</p>
+              <p>Best regards,<br>The Healthy Homez Team</p>
             </div>
-            <div class="footer"><p>© ${new Date().getFullYear()} Smart Homez. All rights reserved.</p></div>
+            <div class="footer"><p>© ${new Date().getFullYear()} Healthy Homez. All rights reserved.</p></div>
           </div>
         </body>
         </html>

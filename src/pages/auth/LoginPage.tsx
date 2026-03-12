@@ -157,7 +157,7 @@ const LoginPage = () => {
             <div className="w-10 h-10 bg-primary-foreground/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
               <Home className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold font-heading">Smart Homez</span>
+            <span className="text-xl font-bold font-heading">Healthy Homez</span>
           </div>
           <div>
             <h1 className="text-4xl font-bold font-heading mb-4 leading-tight">
@@ -191,7 +191,7 @@ const LoginPage = () => {
             <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center">
               <Home className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="text-lg font-bold font-heading text-foreground">Smart Homez</span>
+            <span className="text-lg font-bold font-heading text-foreground">Healthy Homez</span>
           </div>
 
           <h2 className="text-3xl font-bold font-heading text-foreground mb-1">{t("auth.login.title")}</h2>

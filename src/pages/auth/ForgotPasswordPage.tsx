@@ -86,7 +86,7 @@ const ForgotPasswordPage = () => {
           <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center">
             <Home className="w-4 h-4 text-primary-foreground" />
           </div>
-          <span className="text-lg font-bold font-heading text-foreground">Smart Homez</span>
+          <span className="text-lg font-bold font-heading text-foreground">Healthy Homez</span>
         </div>
 
         {/* Email success state */}

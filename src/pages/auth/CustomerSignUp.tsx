@@ -1,4 +1,4 @@
-﻿import { LanguageSelector } from "@/components/LanguageSelector";
+import { LanguageSelector } from "@/components/LanguageSelector";
 import { authAPI, publicAPI } from "@/lib/api";
 import {
     CheckCircle,
@@ -86,7 +86,7 @@ const CustomerSignUp = () => {
   const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
-  // ── Step 1: validate and send OTP ─────────────────────────────────────
+  // -- Step 1: validate and send OTP -------------------------------------
   const handleFormNext = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) { setError("Name is required"); return; }
@@ -109,7 +109,7 @@ const CustomerSignUp = () => {
     }
   };
 
-  // ── Step 2: verify OTP ─────────────────────────────────────────────────
+  // -- Step 2: verify OTP -------------------------------------------------
   const handleVerifyOTP = async () => {
     if (!otpCode || otpCode.length < 6) { setError("Enter the 6-digit OTP"); return; }
     setOtpLoading(true);
@@ -138,7 +138,7 @@ const CustomerSignUp = () => {
     }
   };
 
-  // ── Register account ───────────────────────────────────────────────────
+  // -- Register account ---------------------------------------------------
   const registerAccount = async (geo: GeoResult | null) => {
     setLoading(true);
     try {
@@ -223,7 +223,7 @@ const CustomerSignUp = () => {
 
   const handleSkipLocation = () => registerAccount(null);
 
-  // ── Register with selected city/location from the picker ─────────────────
+  // -- Register with selected city/location from the picker -----------------
   const handleConfirmLocation = async () => {
     if (!selectedCity) { setError("Please select your city"); return; }
     if (!selectedLocationId) { setError("Please select your area / apartment"); return; }
@@ -245,7 +245,7 @@ const CustomerSignUp = () => {
     await registerAccount(geo);
   };
 
-  // ── Left panel step indicator ──────────────────────────────────────────
+  // -- Left panel step indicator ------------------------------------------
   const steps = ["Your details", "Verify phone", "Your area", "All set!"];
   const stepIdx = step === "form" ? 0 : step === "otp" ? 1 : step === "location" ? 2 : 3;
 
@@ -256,8 +256,8 @@ const CustomerSignUp = () => {
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-10 h-10 text-green-600" />
           </div>
-          <h2 className="text-3xl font-bold font-heading text-foreground mb-3">Welcome to Smart Homez! 🎉</h2>
-          <p className="text-muted-foreground">Your account is ready. Redirecting to your dashboard…</p>
+          <h2 className="text-3xl font-bold font-heading text-foreground mb-3">Welcome to Healthy Homez! ??</h2>
+          <p className="text-muted-foreground">Your account is ready. Redirecting to your dashboard�</p>
         </div>
       </div>
     );
@@ -272,7 +272,7 @@ const CustomerSignUp = () => {
             <div className="w-10 h-10 bg-primary-foreground/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
               <Home className="w-5 h-5" />
             </div>
-            <span className="text-xl font-bold font-heading">Smart Homez</span>
+            <span className="text-xl font-bold font-heading">Healthy Homez</span>
           </Link>
           <div>
             <h1 className="text-3xl font-bold font-heading mb-4 leading-tight">
@@ -289,7 +289,7 @@ const CustomerSignUp = () => {
                     : i === stepIdx ? "bg-primary-foreground/80 text-primary"
                     : "bg-primary-foreground/20 text-primary-foreground/50"
                   }`}>
-                    {i < stepIdx ? "✓" : i + 1}
+                    {i < stepIdx ? "?" : i + 1}
                   </div>
                   <span className={`text-sm ${i <= stepIdx ? "text-primary-foreground" : "text-primary-foreground/50"}`}>
                     {label}
@@ -310,7 +310,7 @@ const CustomerSignUp = () => {
             <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center">
               <Home className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="text-lg font-bold font-heading text-foreground">Smart Homez</span>
+            <span className="text-lg font-bold font-heading text-foreground">Healthy Homez</span>
           </div>
 
           {error && (
@@ -319,11 +319,11 @@ const CustomerSignUp = () => {
             </div>
           )}
 
-          {/* ── STEP: form ── */}
+          {/* -- STEP: form -- */}
           {step === "form" && (
             <>
               <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Create your account</h2>
-              <p className="text-muted-foreground mb-6">Join Smart Homez as a customer</p>
+              <p className="text-muted-foreground mb-6">Join Healthy Homez as a customer</p>
 
               <form onSubmit={handleFormNext} className="space-y-4">
                 <div>
@@ -401,7 +401,7 @@ const CustomerSignUp = () => {
                 </div>
 
                 <button type="submit" disabled={otpLoading} className="btn-brand w-full mt-2 flex items-center justify-center gap-2">
-                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTP…</> : <><Phone className="w-4 h-4" /> Continue &amp; Verify Phone</>}
+                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTP�</> : <><Phone className="w-4 h-4" /> Continue &amp; Verify Phone</>}
                 </button>
               </form>
 
@@ -412,14 +412,14 @@ const CustomerSignUp = () => {
             </>
           )}
 
-          {/* ── STEP: otp ── */}
+          {/* -- STEP: otp -- */}
           {step === "otp" && (
             <>
               <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Verify your number</h2>
               <p className="text-muted-foreground mb-6">
                 {otpSent
                   ? `OTP sent to +91${form.phone}. Enter the 6-digit code below.`
-                  : "Sending OTP…"}
+                  : "Sending OTP�"}
               </p>
 
               <div className="space-y-4">
@@ -430,7 +430,7 @@ const CustomerSignUp = () => {
                     inputMode="numeric"
                     maxLength={6}
                     className="input-clean tracking-widest text-center text-lg"
-                    placeholder="· · · · · ·"
+                    placeholder="� � � � � �"
                     value={otpCode}
                     onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
                   />
@@ -441,7 +441,7 @@ const CustomerSignUp = () => {
                   disabled={otpLoading}
                   className="btn-brand w-full flex items-center justify-center gap-2"
                 >
-                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</> : "Verify & Continue"}
+                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying�</> : "Verify & Continue"}
                 </button>
 
                 <button
@@ -462,7 +462,7 @@ const CustomerSignUp = () => {
             </>
           )}
 
-          {/* ── STEP: location ── */}
+          {/* -- STEP: location -- */}
           {step === "location" && (
             <>
               <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Select your area</h2>
@@ -473,7 +473,7 @@ const CustomerSignUp = () => {
               {citiesLoading ? (
                 <div className="flex items-center justify-center py-10">
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                  <span className="ml-2 text-muted-foreground text-sm">Loading service areas…</span>
+                  <span className="ml-2 text-muted-foreground text-sm">Loading service areas�</span>
                 </div>
               ) : serviceCities.length === 0 ? (
                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 mb-4">
@@ -490,7 +490,7 @@ const CustomerSignUp = () => {
                         value={selectedCity}
                         onChange={(e) => { setSelectedCity(e.target.value); setSelectedLocationId(""); setError(""); }}
                       >
-                        <option value="">— Select your city —</option>
+                        <option value="">� Select your city �</option>
                         {serviceCities.map((c) => (
                           <option key={c.city} value={c.city}>
                             {c.city}{c.hasService ? "" : " (coming soon)"}
@@ -514,11 +514,11 @@ const CustomerSignUp = () => {
                             value={selectedLocationId}
                             onChange={(e) => { setSelectedLocationId(e.target.value); setError(""); }}
                           >
-                            <option value="">— Select your area —</option>
+                            <option value="">� Select your area �</option>
                             {locs.map((loc) => (
                               <option key={loc._id} value={loc._id}>
                                 {loc.apartmentName}{loc.area ? `, ${loc.area}` : ""}
-                                {loc.isServiceAvailable ? " ✓" : " (coming soon)"}
+                                {loc.isServiceAvailable ? " ?" : " (coming soon)"}
                               </option>
                             ))}
                           </select>
@@ -549,7 +549,7 @@ const CustomerSignUp = () => {
                   disabled={loading || !selectedCity || !selectedLocationId}
                   className="btn-brand w-full flex items-center justify-center gap-2"
                 >
-                  {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating account…</> : <><MapPin className="w-4 h-4" /> Confirm &amp; Create Account</>}
+                  {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating account�</> : <><MapPin className="w-4 h-4" /> Confirm &amp; Create Account</>}
                 </button>
 
                 <button
@@ -557,7 +557,7 @@ const CustomerSignUp = () => {
                   disabled={loading}
                   className="w-full py-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Skip — I'll set location later
+                  Skip � I'll set location later
                 </button>
 
                 <button onClick={() => { setStep("otp"); setError(""); }} className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm">

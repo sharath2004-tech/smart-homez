@@ -122,7 +122,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
             <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center">
               <Home className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="text-base font-bold font-heading text-foreground">Smart Homez</span>
+            <span className="text-base font-bold font-heading text-foreground">Healthy Homez</span>
           </Link>
         </div>
 
@@ -231,7 +231,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
           </Link>
         )}
         <Link to={dashboardPath} className="flex-1 font-bold text-foreground text-sm truncate">
-          Smart Homez
+          Healthy Homez
         </Link>
         <div className="flex items-center gap-1">
           <LanguageSelector />
@@ -261,7 +261,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
                 <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                   <Home className="w-4 h-4 text-primary-foreground" />
                 </div>
-                <span className="font-bold text-foreground">Smart Homez</span>
+                <span className="font-bold text-foreground">Healthy Homez</span>
               </Link>
               <button
                 onClick={() => setMobileOpen(false)}
