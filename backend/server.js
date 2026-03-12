@@ -46,6 +46,9 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Trust the first proxy (required for express-rate-limit when deployed behind a reverse proxy)
+app.set('trust proxy', 1);
+
 // CORS Configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
