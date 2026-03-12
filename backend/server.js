@@ -95,8 +95,8 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Serve static files - for uploaded photos
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -130,25 +130,14 @@ app.get('/health', (req, res) => {
 // Public statistics endpoint (no authentication required)
 app.get('/api/public/stats', async (req, res) => {
   try {
-    // Count active customers
-    const totalCustomers = await User.countDocuments({ 
-      role: 'customer',
-      isActive: true
-    });
+    // Run all count queries in parallel for better performance
+    const [totalCustomers, totalWorkers, servicesDone, totalBookings] = await Promise.all([
+      User.countDocuments({ role: 'customer', isActive: true }),
+      User.countDocuments({ role: 'worker', isActive: true }),
+      Booking.countDocuments({ status: 'completed' }),
+      Booking.countDocuments({})
+    ]);
 
-    // Count active workers
-    const totalWorkers = await User.countDocuments({ 
-      role: 'worker',
-      isActive: true
-    });
-
-    // Count completed bookings (services done)
-    const servicesDone = await Booking.countDocuments({ 
-      status: 'completed' 
-    });
-
-    // Calculate fulfillment rate (completed / total bookings)
-    const totalBookings = await Booking.countDocuments({});
     const fulfillmentRate = totalBookings > 0 
       ? Math.round((servicesDone / totalBookings) * 100)
       : 95;
@@ -201,9 +190,10 @@ app.use('/api/help', helpRoutes);
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
+  const isProd = process.env.NODE_ENV === 'production';
   res.status(err.status || 500).json({
     error: {
-      message: err.message || 'Internal Server Error',
+      message: isProd && !err.status ? 'Internal Server Error' : (err.message || 'Internal Server Error'),
       status: err.status || 500
     }
   });

@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import express from 'express';
 import { body, validationResult } from 'express-validator';
+import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import twilio from 'twilio';
 import { authenticate } from '../middleware/auth.js';
@@ -30,6 +31,15 @@ function toE164(phone) {
 }
 
 const router = express.Router();
+
+// Rate limiter for sensitive auth endpoints (OTP / password reset)
+const sensitiveAuthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { message: 'Too many requests, please try again later.', status: 429 } }
+});
 
 // @route   POST /api/auth/register
 // @desc    Register a new user
@@ -479,6 +489,7 @@ router.post('/reset-password',
 // @desc    Send OTP to phone for password reset
 // @access  Public
 router.post('/forgot-password-phone',
+  sensitiveAuthLimiter,
   [body('phone').notEmpty().withMessage('Phone number is required')],
   async (req, res) => {
     try {
@@ -492,7 +503,9 @@ router.post('/forgot-password-phone',
       // Check user exists with this phone (don't reveal if not found)
       const e164 = toE164(phone);
 
-      const user = await User.findOne({ phone: { $regex: phone.replace(/\D/g, '').slice(-10) + '$' } });
+      // Use only digits for matching — all digits are safe in regex so no escaping needed
+      const digits = phone.replace(/\D/g, '').slice(-10);
+      const user = await User.findOne({ phone: { $regex: `${digits}$` } });
       if (!user) {
         return res.json({ success: true, message: 'If that phone is registered, an OTP has been sent.' });
       }
@@ -515,6 +528,7 @@ router.post('/forgot-password-phone',
 // @desc    Verify OTP and reset password via phone
 // @access  Public
 router.post('/reset-password-phone',
+  sensitiveAuthLimiter,
   [
     body('phone').notEmpty().withMessage('Phone is required'),
     body('otp').notEmpty().withMessage('OTP is required'),
@@ -543,7 +557,7 @@ router.post('/reset-password-phone',
       }
 
       const digits = phone.replace(/\D/g, '').slice(-10);
-      const user = await User.findOne({ phone: { $regex: digits + '$' } }).select('+password');
+      const user = await User.findOne({ phone: { $regex: `${digits}$` } }).select('+password');
       if (!user) {
         return res.status(404).json({ error: { message: 'User not found', status: 404 } });
       }

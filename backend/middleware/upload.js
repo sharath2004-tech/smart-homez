@@ -16,11 +16,16 @@ const adminDocsDir = path.join(__dirname, '..', 'uploads', 'admin-docs');
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
+// Shared regex patterns for file type validation (anchored for exact matching)
+const IMAGE_EXTENSION_REGEX = /\.(jpeg|jpg|png|webp)$/i;
+const IMAGE_MIME_REGEX = /^image\/(jpeg|png|webp)$/;
+const DOC_EXTENSION_REGEX = /\.(jpeg|jpg|png|webp|pdf)$/i;
+const DOC_MIME_REGEX = /^(image\/(jpeg|png|webp)|application\/pdf)$/;
+
 // File filter to only allow images
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|webp/;
-  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowedTypes.test(file.mimetype);
+  const extname = IMAGE_EXTENSION_REGEX.test(path.extname(file.originalname));
+  const mimetype = IMAGE_MIME_REGEX.test(file.mimetype);
   if (extname && mimetype) return cb(null, true);
   cb(new Error('Only image files (JPEG, JPG, PNG, WEBP) are allowed!'));
 };
@@ -28,16 +33,13 @@ const fileFilter = (req, file, cb) => {
 // File filter for worker verification documents — allows images AND PDFs
 const docFileFilter = (req, file, cb) => {
   if (file.fieldname === 'profilePicture') {
-    const allowed = /jpeg|jpg|png|webp/;
-    if (allowed.test(path.extname(file.originalname).toLowerCase()) && allowed.test(file.mimetype)) {
+    if (IMAGE_EXTENSION_REGEX.test(path.extname(file.originalname)) && IMAGE_MIME_REGEX.test(file.mimetype)) {
       return cb(null, true);
     }
     return cb(new Error('Profile picture must be an image (JPEG, JPG, PNG, WEBP)'));
   }
   // ID documents: images and PDFs accepted
-  const allowedExt = /jpeg|jpg|png|webp|pdf/;
-  const allowedMime = /image\/(jpeg|jpg|png|webp)|application\/pdf/;
-  if (allowedExt.test(path.extname(file.originalname).toLowerCase()) && allowedMime.test(file.mimetype)) {
+  if (DOC_EXTENSION_REGEX.test(path.extname(file.originalname)) && DOC_MIME_REGEX.test(file.mimetype)) {
     return cb(null, true);
   }
   cb(new Error('Documents must be images (JPEG, PNG, WEBP) or PDF files'));
