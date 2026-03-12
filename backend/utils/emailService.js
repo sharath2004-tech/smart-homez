@@ -16,14 +16,17 @@ const createTransporter = () => {
     return nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: false, // true for 465, false for other ports
+      secure: parseInt(process.env.SMTP_PORT || '587') === 465,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
       },
       tls: {
-        rejectUnauthorized: false // Allow self-signed certificates
-      }
+        rejectUnauthorized: false
+      },
+      connectionTimeout: 10000,  // 10s to establish TCP connection
+      greetingTimeout: 10000,    // 10s for SMTP greeting
+      socketTimeout: 15000       // 15s idle socket timeout
     });
   } catch (error) {
     console.error('❌ Failed to create email transporter:', error.message);

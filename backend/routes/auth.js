@@ -406,19 +406,17 @@ router.post('/forgot-password',
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
       const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
 
-      try {
-        await sendPasswordResetEmail(user.email, user.name, resetUrl);
-      } catch (emailError) {
-        console.error('Failed to send reset email:', emailError);
-        user.passwordResetToken = undefined;
-        user.passwordResetExpires = undefined;
-        await user.save({ validateBeforeSave: false });
-        // Return generic message to prevent user enumeration
-        return res.json({ message: 'If that email exists, a reset link has been sent.' });
-      }
-
+      // Respond immediately so client never times out waiting for SMTP
       res.json({ message: 'If that email exists, a reset link has been sent.' });
+
+      // Send email in the background after responding
+      sendPasswordResetEmail(user.email, user.name, resetUrl).catch((emailError) => {
+        console.error('Failed to send reset email:', emailError);
+      });
+
+      return; // prevent outer catch from sending another response
     } catch (error) {
+      if (res.headersSent) return;
       console.error('Forgot password error:', error);
       res.status(500).json({ error: { message: 'Server error', status: 500 } });
     }

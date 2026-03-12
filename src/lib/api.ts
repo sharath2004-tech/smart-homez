@@ -113,7 +113,7 @@ export const authAPI = {
     return apiCall('/auth/forgot-password', {
       method: 'POST',
       body: JSON.stringify({ email })
-    });
+    }, 35000); // extended timeout — SMTP send can be slow on first request
   },
 
   forgotPasswordPhone: async (phone: string) => {
