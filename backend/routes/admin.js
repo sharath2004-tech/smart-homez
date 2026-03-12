@@ -124,7 +124,7 @@ router.post('/create-admin',
     body('email').isEmail().withMessage('Valid email is required'),
     body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
     body('phone').notEmpty().withMessage('Phone is required'),
-    body('assignedLocationIds').optional().withMessage('Assigned locations must be an array')
+    body('assignedLocationIds').optional().isArray().withMessage('Assigned locations must be an array')
   ],
   async (req, res) => {
     try {
