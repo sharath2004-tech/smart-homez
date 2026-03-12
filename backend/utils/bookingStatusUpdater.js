@@ -22,13 +22,16 @@ export const updateBookingStatuses = async () => {
       worker: { $ne: null } // Only confirm if worker is assigned
     });
 
+    const pendingToConfirm = [];
     for (const booking of pendingBookings) {
       const bookingDateTime = new Date(`${booking.bookingDate.toISOString().split('T')[0]}T${booking.startTime}`);
       if (bookingDateTime <= twoHoursFromNow && bookingDateTime > now) {
-        booking.status = 'confirmed';
-        await booking.save();
-        console.log(`Booking ${booking._id} confirmed`);
+        pendingToConfirm.push(booking._id);
       }
+    }
+    if (pendingToConfirm.length > 0) {
+      await Booking.updateMany({ _id: { $in: pendingToConfirm } }, { $set: { status: 'confirmed' } });
+      console.log(`Confirmed ${pendingToConfirm.length} pending booking(s)`);
     }
 
     // 2. Start confirmed bookings (only if NOT using QR code workflow)
@@ -38,12 +41,15 @@ export const updateBookingStatuses = async () => {
       serviceStartQRCode: { $exists: false } // Only auto-start if no QR code workflow
     });
 
+    const confirmedToStart = [];
     for (const booking of confirmedBookings) {
       if (booking.startTime <= currentTime) {
-        booking.status = 'in-progress';
-        await booking.save();
-        console.log(`Booking ${booking._id} started (in-progress)`);
+        confirmedToStart.push(booking._id);
       }
+    }
+    if (confirmedToStart.length > 0) {
+      await Booking.updateMany({ _id: { $in: confirmedToStart } }, { $set: { status: 'in-progress' } });
+      console.log(`Started ${confirmedToStart.length} confirmed booking(s) (in-progress)`);
     }
 
     // 3. Complete in-progress bookings
@@ -52,6 +58,7 @@ export const updateBookingStatuses = async () => {
       bookingDate: { $lte: today }
     });
 
+    const inProgressToComplete = [];
     for (const booking of inProgressBookings) {
       const bookingDate = booking.bookingDate.toISOString().split('T')[0];
       
@@ -65,17 +72,17 @@ export const updateBookingStatuses = async () => {
       // If booking is today, check if end time has passed
       if (bookingDate === today) {
         if (booking.endTime < currentTime) {
-          booking.status = 'completed';
-          await booking.save();
-          console.log(`Booking ${booking._id} completed`);
+          inProgressToComplete.push(booking._id);
         }
       } 
       // If booking date is in the past, mark as completed
       else if (bookingDate < today) {
-        booking.status = 'completed';
-        await booking.save();
-        console.log(`Booking ${booking._id} completed (past date)`);
+        inProgressToComplete.push(booking._id);
       }
+    }
+    if (inProgressToComplete.length > 0) {
+      await Booking.updateMany({ _id: { $in: inProgressToComplete } }, { $set: { status: 'completed' } });
+      console.log(`Completed ${inProgressToComplete.length} in-progress booking(s)`);
     }
 
     return {
