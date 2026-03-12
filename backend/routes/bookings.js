@@ -1922,6 +1922,74 @@ router.post('/:id/upload-completion-photo',
   }
 );
 
+// @route   POST /api/bookings/:id/add-completion-photo
+// @desc    Worker adds one completion photo to the completionPhotos array (min 2 required)
+// @access  Private/Worker
+router.post('/:id/add-completion-photo',
+  authenticate,
+  authorize('worker', 'admin'),
+  (req, res, next) => {
+    upload.single('photo')(req, res, (err) => {
+      if (err) return handleMulterError(err, req, res, next);
+      next();
+    });
+  },
+  async (req, res) => {
+    try {
+      const booking = await Booking.findById(req.params.id);
+      if (!booking) {
+        return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
+      }
+
+      if (!booking.worker || (booking.worker.toString() !== req.user._id.toString() && req.user.role !== 'admin')) {
+        return res.status(403).json({ error: { message: 'You are not assigned to this booking', status: 403 } });
+      }
+
+      if (booking.status !== 'in-progress' && booking.status !== 'pending-review') {
+        return res.status(400).json({ error: { message: 'Service must be in-progress to add completion photos', status: 400 } });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: { message: 'Photo file is required', status: 400 } });
+      }
+
+      const photoUrl = `/uploads/completion-photos/${req.file.filename}`;
+      if (!booking.completionPhotos) booking.completionPhotos = [];
+
+      booking.completionPhotos.push({
+        url: photoUrl,
+        timestamp: new Date(),
+        uploadedBy: req.user._id,
+        verified: false
+      });
+
+      // Keep legacy single completionPhoto field in sync with the latest photo
+      booking.completionPhoto = {
+        url: photoUrl,
+        timestamp: new Date(),
+        uploadedBy: req.user._id,
+        verified: true
+      };
+
+      await booking.save();
+
+      console.log(`✅ Completion photo added (${booking.completionPhotos.length} total) for booking ${booking._id}`);
+
+      res.json({
+        message: 'Completion photo added successfully',
+        completionPhotos: booking.completionPhotos,
+        totalPhotos: booking.completionPhotos.length
+      });
+    } catch (error) {
+      console.error('❌ Add completion photo error:', error);
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: { message: 'File size too large. Maximum 5MB allowed.', status: 400 } });
+      }
+      res.status(500).json({ error: { message: error.message || 'Server error', status: 500 } });
+    }
+  }
+);
+
 // @route   POST /api/bookings/:id/upload-payment-proof
 // @desc    Worker uploads payment proof photo from customer
 // @access  Private/Worker
@@ -1953,10 +2021,10 @@ router.post('/:id/upload-payment-proof',
         });
       }
 
-      // Check if service is completed
-      if (booking.status !== 'completed') {
+      // Check if service is completed or pending admin review
+      if (booking.status !== 'completed' && booking.status !== 'pending-review') {
         return res.status(400).json({ 
-          error: { message: 'Service must be completed to upload payment proof', status: 400 } 
+          error: { message: 'Service must be completed or pending review to upload payment proof', status: 400 } 
         });
       }
 
@@ -2111,7 +2179,7 @@ router.post('/:id/scan-end-qr',
         booking.overtimeCharges = 0;
       }
 
-      booking.status = 'completed';
+      booking.status = 'pending-review';
       await booking.save();
 
       // Trigger queue — this worker's slot is now free; assign to next pending booking
@@ -2119,60 +2187,10 @@ router.post('/:id/scan-end-qr',
         console.error('Queue processing error after completion:', err.message)
       );
 
-      // ✅ AUTO-CREATE WORKER EARNINGS
-      if (booking.worker) {
-        try {
-          // Get worker ID (handle both populated and non-populated cases)
-          const workerId = booking.worker._id || booking.worker;
-          
-          // Get platform settings
-          const settings = await Settings.getSettings();
-          const commissionRate = settings.earnings?.platformCommissionRate || 0;
-          const convenienceFee = settings.earnings?.bookingConvenienceFee || 0;
-
-          // Calculate earnings
-          const baseAmount = booking.totalAmount - (booking.overtimeCharges || 0);
-          const overtimeAmount = booking.overtimeCharges || 0;
-          const totalEarning = baseAmount + overtimeAmount;
-          
-          // Calculate platform commission (only on base amount, not overtime)
-          const platformCommission = baseAmount * commissionRate;
-          
-          // Worker gets: base + overtime - commission
-          const netEarning = totalEarning - platformCommission;
-
-          // Check if earnings already exist for this booking
-          const existingEarnings = await WorkerEarnings.findOne({ booking: booking._id });
-          
-          if (!existingEarnings) {
-            const earnings = new WorkerEarnings({
-              worker: workerId,
-              booking: booking._id,
-              baseAmount: baseAmount,
-              overtimeAmount: overtimeAmount,
-              bonus: 0,
-              incentive: 0,
-              totalEarning: totalEarning,
-              platformCommission: platformCommission,
-              netEarning: netEarning,
-              payoutStatus: 'pending',
-              workDuration: booking.actualDurationMinutes || 0,
-              date: new Date()
-            });
-            
-            await earnings.save();
-            const workerName = booking.worker.name || 'Worker';
-            console.log(`✅ Earnings created for ${workerName}: ₹${netEarning.toFixed(2)} (Commission: ₹${platformCommission.toFixed(2)})`);
-          }
-        } catch (earningsError) {
-          // Log error but don't fail the booking completion
-          console.error('❌ Error creating worker earnings:', earningsError);
-          console.error('Error details:', earningsError.message);
-        }
-      }
+      console.log(`✅ Service ended for booking ${booking._id}. Status set to pending-review, awaiting admin approval.`);
 
       res.json({ 
-        message: 'Service completed successfully',
+        message: 'Service ended. Awaiting admin review before marking complete.',
         booking: {
           _id: booking._id,
           status: booking.status,
@@ -2184,6 +2202,7 @@ router.post('/:id/scan-end-qr',
           overtimeCharges: booking.overtimeCharges,
           totalAmount: booking.totalAmount,
           completionPhoto: booking.completionPhoto,
+          completionPhotos: booking.completionPhotos,
           service: booking.service,
           worker: booking.worker
         }
@@ -2191,6 +2210,109 @@ router.post('/:id/scan-end-qr',
 
     } catch (error) {
       console.error('Scan end QR error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   POST /api/bookings/:id/admin-approve
+// @desc    Admin approves booking completion and creates worker earnings
+// @access  Private/Admin
+router.post('/:id/admin-approve',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  async (req, res) => {
+    try {
+      const booking = await Booking.findById(req.params.id)
+        .populate('worker', 'name email phone');
+
+      if (!booking) {
+        return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
+      }
+
+      if (booking.status !== 'pending-review') {
+        return res.status(400).json({
+          error: { message: `Booking is not pending review. Current status: ${booking.status}`, status: 400 }
+        });
+      }
+
+      booking.status = 'completed';
+
+      // Mark all photos as verified
+      if (booking.completionPhotos && booking.completionPhotos.length > 0) {
+        booking.completionPhotos.forEach(p => { p.verified = true; });
+      }
+      if (booking.completionPhoto && booking.completionPhoto.url) {
+        booking.completionPhoto.verified = true;
+      }
+      if (booking.paymentProof && booking.paymentProof.url) {
+        booking.paymentProof.verified = true;
+      }
+
+      await booking.save();
+
+      // ✅ CREATE WORKER EARNINGS on admin approval
+      if (booking.worker) {
+        try {
+          const workerId = booking.worker._id || booking.worker;
+          const settings = await Settings.getSettings();
+          const commissionRate = settings.earnings?.platformCommissionRate || 0;
+
+          const baseAmount = booking.totalAmount - (booking.overtimeCharges || 0);
+          const overtimeAmount = booking.overtimeCharges || 0;
+          const totalEarning = baseAmount + overtimeAmount;
+          const platformCommission = baseAmount * commissionRate;
+          const netEarning = totalEarning - platformCommission;
+
+          const existingEarnings = await WorkerEarnings.findOne({ booking: booking._id });
+          if (!existingEarnings) {
+            const earnings = new WorkerEarnings({
+              worker: workerId,
+              booking: booking._id,
+              baseAmount,
+              overtimeAmount,
+              bonus: 0,
+              incentive: 0,
+              totalEarning,
+              platformCommission,
+              netEarning,
+              payoutStatus: 'pending',
+              workDuration: booking.actualDurationMinutes || 0,
+              date: new Date()
+            });
+            await earnings.save();
+            const workerName = booking.worker.name || 'Worker';
+            console.log(`✅ Earnings created on admin approval for ${workerName}: ₹${netEarning.toFixed(2)}`);
+          }
+        } catch (earningsError) {
+          console.error('❌ Error creating worker earnings on approval:', earningsError);
+        }
+      }
+
+      // Notify worker
+      try {
+        const workerId = booking.worker?._id || booking.worker;
+        if (workerId) {
+          await notificationService.sendNotification({
+            userId: workerId,
+            type: 'booking_approved',
+            title: 'Service Approved',
+            message: 'Your completed service has been reviewed and approved by the admin.',
+            data: { bookingId: booking._id },
+            priority: 'high'
+          });
+        }
+      } catch (notifError) {
+        console.error('Notification error on approval:', notifError);
+      }
+
+      res.json({
+        message: 'Booking approved and marked as completed',
+        booking: { _id: booking._id, status: booking.status }
+      });
+
+    } catch (error) {
+      console.error('Admin approve error:', error);
       res.status(500).json({ error: { message: 'Server error', status: 500 } });
     }
   }

@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { bookingsAPI, superAdminAPI } from "@/lib/api";
 import ExcelJS from "exceljs";
-import { Download, Eye, MapPin, Search, X } from "lucide-react";
+import { CheckCircle, Download, Eye, MapPin, Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface ProofPhoto {
@@ -26,6 +26,7 @@ interface Booking {
   totalAmount: number;
   createdAt: string;
   completionPhoto?: ProofPhoto;
+  completionPhotos?: ProofPhoto[];
   paymentProof?: ProofPhoto;
 }
 
@@ -33,6 +34,7 @@ const statusConfig: Record<string, string> = {
   pending: "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold bg-muted text-muted-foreground",
   confirmed: "badge-primary",
   'in-progress': "badge-warning",
+  'pending-review': "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold bg-orange-100 text-orange-700",
   completed: "badge-success",
   cancelled: "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold bg-destructive/10 text-destructive",
 };
@@ -52,6 +54,7 @@ const AdminBookings = () => {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [selectedProofBooking, setSelectedProofBooking] = useState<Booking | null>(null);
+  const [approvingBookingId, setApprovingBookingId] = useState<string | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocation, setSelectedLocation] = useState("");
 
@@ -121,7 +124,21 @@ const AdminBookings = () => {
     });
   };
 
-  const hasProofs = (b: Booking) => !!(b.completionPhoto?.url || b.paymentProof?.url);
+  const hasProofs = (b: Booking) => !!(b.completionPhoto?.url || b.paymentProof?.url || (b.completionPhotos && b.completionPhotos.length > 0));
+
+  const handleApproveBooking = async (bookingId: string) => {
+    try {
+      setApprovingBookingId(bookingId);
+      await bookingsAPI.adminApproveBooking(bookingId);
+      setSelectedProofBooking(null);
+      await fetchBookings();
+    } catch (error) {
+      console.error('Approve error:', error);
+      alert((error as Error).message || 'Failed to approve booking');
+    } finally {
+      setApprovingBookingId(null);
+    }
+  };
 
   const handleExport = async () => {
     try {
@@ -227,6 +244,7 @@ const AdminBookings = () => {
             <option value="pending">Pending</option>
             <option value="confirmed">Confirmed</option>
             <option value="in-progress">In Progress</option>
+            <option value="pending-review">Pending Review</option>
             <option value="completed">Completed</option>
             <option value="cancelled">Cancelled</option>
           </select>
@@ -263,21 +281,23 @@ const AdminBookings = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {b.status === 'completed' ? (
+                      {(b.status === 'completed' || b.status === 'pending-review') ? (
                         <button
                           onClick={() => setSelectedProofBooking(b)}
                           className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors ${
                             hasProofs(b)
-                              ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                              ? b.status === 'pending-review' ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                               : 'bg-muted text-muted-foreground hover:bg-muted/70'
                           }`}
                         >
                           <Eye className="w-3.5 h-3.5" />
-                          {hasProofs(b) ? (
-                            <span>
-                              {[b.completionPhoto?.url && '📸', b.paymentProof?.url && '💳'].filter(Boolean).join(' ')}
-                            </span>
-                          ) : 'No proofs'}
+                          {b.status === 'pending-review' ? '⏳ Review' : (
+                            hasProofs(b) ? (
+                              <span>
+                                {[b.completionPhotos && b.completionPhotos.length > 0 && `📸×${b.completionPhotos.length}`, b.paymentProof?.url && '💳'].filter(Boolean).join(' ')}
+                              </span>
+                            ) : 'No proofs'
+                          )}
                         </button>
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
@@ -338,12 +358,30 @@ const AdminBookings = () => {
                 </div>
               </div>
 
-              {/* Completion Photo */}
+              {/* Completion Photos */}
               <div className="space-y-3">
                 <h3 className="font-semibold text-foreground flex items-center gap-2">
                   📸 Work Completion Proof
+                  {selectedProofBooking.completionPhotos && selectedProofBooking.completionPhotos.length > 0 && (
+                    <span className="text-xs font-normal text-muted-foreground">({selectedProofBooking.completionPhotos.length} photo{selectedProofBooking.completionPhotos.length > 1 ? 's' : ''})</span>
+                  )}
                 </h3>
-                {selectedProofBooking.completionPhoto?.url ? (
+                {selectedProofBooking.completionPhotos && selectedProofBooking.completionPhotos.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {selectedProofBooking.completionPhotos.map((photo, i) => (
+                      <div key={i} className="space-y-1">
+                        <div className="rounded-xl overflow-hidden border-2 border-blue-200 bg-black aspect-square">
+                          <img
+                            src={bookingsAPI.getCompletionPhotoUrl(photo.url)}
+                            alt={`Completion photo ${i + 1}`}
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground text-center">Photo {i + 1} · {formatDateTime(photo.timestamp)}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : selectedProofBooking.completionPhoto?.url ? (
                   <div className="space-y-2">
                     <div className="rounded-xl overflow-hidden border-2 border-blue-200 bg-black">
                       <img
@@ -362,7 +400,7 @@ const AdminBookings = () => {
                 ) : (
                   <div className="border-2 border-dashed border-muted rounded-xl p-8 text-center text-muted-foreground">
                     <p className="text-2xl mb-2">📷</p>
-                    <p className="text-sm">No completion photo uploaded</p>
+                    <p className="text-sm">No completion photos uploaded</p>
                   </div>
                 )}
               </div>
@@ -409,6 +447,18 @@ const AdminBookings = () => {
                   </div>
                 )}
               </div>
+
+              {/* Approve Button for pending-review bookings */}
+              {selectedProofBooking.status === 'pending-review' && (
+                <button
+                  onClick={() => handleApproveBooking(selectedProofBooking._id)}
+                  disabled={approvingBookingId === selectedProofBooking._id}
+                  className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
+                >
+                  <CheckCircle className="w-5 h-5" />
+                  {approvingBookingId === selectedProofBooking._id ? 'Approving…' : 'Approve & Mark Complete'}
+                </button>
+              )}
 
               <button
                 onClick={() => setSelectedProofBooking(null)}

@@ -52,6 +52,11 @@ interface Task {
     timestamp: string;
     verified: boolean;
   };
+  completionPhotos?: {
+    url: string;
+    timestamp: string;
+    verified: boolean;
+  }[];
   paymentProof?: {
     url: string;
     timestamp: string;
@@ -83,6 +88,8 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   const [uploadingPaymentProof, setUploadingPaymentProof] = useState(false);
   const [paymentTransactionId, setPaymentTransactionId] = useState('');
   const [paymentTransactionTime, setPaymentTransactionTime] = useState('');
+  const [showCompletionCapture, setShowCompletionCapture] = useState(false);
+  const [uploadingCompletionPhoto, setUploadingCompletionPhoto] = useState(false);
   
   const OVERTIME_RATE = 2.5; // ₹2.5 per minute
 
@@ -174,9 +181,9 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
     }
   }, [task?.status, task?.actualStartTime, task?.bookingDate, task?.endTime, task?._id]);
 
-  // Generate payment QR when task is completed
+  // Generate payment QR when task is completed or pending-review
   useEffect(() => {
-    if (task?.status === 'completed' && task?.actualEndTime && !paymentQRImage) {
+    if ((task?.status === 'completed' || task?.status === 'pending-review') && task?.actualEndTime && !paymentQRImage) {
       generatePaymentQR();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -219,6 +226,21 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
     } catch (error) {
       console.error('Error generating end QR:', error);
       alert(t('worker.taskDetail.failedEndQR'));
+    }
+  };
+
+  const handleCompletionPhotoCapture = async (file: File) => {
+    try {
+      setShowCompletionCapture(false);
+      setUploadingCompletionPhoto(true);
+      const result = await bookingsAPI.addCompletionPhoto(taskId, file);
+      setTask({ ...task!, completionPhotos: result.completionPhotos });
+      await fetchTaskDetail(true);
+    } catch (error) {
+      console.error('Error uploading completion photo:', error);
+      alert((error as Error).message || 'Failed to upload completion photo');
+    } finally {
+      setUploadingCompletionPhoto(false);
     }
   };
 
@@ -356,6 +378,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       case 'in-progress': return 'bg-primary-light text-primary';
       case 'completed': return 'bg-success-light text-success';
       case 'confirmed': return 'bg-blue-100 text-blue-800';
+      case 'pending-review': return 'bg-orange-100 text-orange-700';
       default: return 'bg-warning-light text-warning';
     }
   };
@@ -391,7 +414,9 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
           </div>
           <span className={`text-xs font-semibold px-3 py-1.5 rounded-full ${getStatusColor(task.status)}`}>
             {task.status === 'in-progress' ? t('worker.taskDetail.inProgress') : 
-             task.status === 'completed' ? t('worker.taskDetail.completed') : t('worker.taskDetail.scheduled')}
+             task.status === 'completed' ? t('worker.taskDetail.completed') :
+             task.status === 'pending-review' ? '⏳ Pending Review' :
+             t('worker.taskDetail.scheduled')}
           </span>
         </div>
 
@@ -600,11 +625,67 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
           {/* End QR Code Section - Show for in-progress tasks */}
           {task.status === 'in-progress' && task.actualStartTime && (
             <div className="space-y-4">
-              {/* Step 1: End QR Code Section */}
+              {/* Step 1: Upload Completion Photos (min 2 required) */}
+              <div className="card-elevated p-5 bg-gradient-to-br from-teal-50 to-cyan-50 border-2 border-teal-200">
+                <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
+                  <Camera className="w-5 h-5 text-teal-600" />
+                  Step 1: Upload Proof Photos ({task.completionPhotos?.length ?? 0}/2 min)
+                </h3>
+                {/* Photo thumbnails grid */}
+                {task.completionPhotos && task.completionPhotos.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {task.completionPhotos.map((p, i) => (
+                      <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden border-2 border-teal-400">
+                        <img
+                          src={bookingsAPI.getCompletionPhotoUrl(p.url)}
+                          alt={`Proof ${i + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <span className="absolute bottom-0 right-0 bg-teal-600 text-white text-xs px-1 rounded-tl">
+                          {i + 1}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {uploadingCompletionPhoto ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin w-8 h-8 border-4 border-teal-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                    <p className="text-teal-700 text-sm font-medium">Uploading photo...</p>
+                  </div>
+                ) : showCompletionCapture ? (
+                  <PhotoCapture
+                    onPhotoCapture={handleCompletionPhotoCapture}
+                    onCancel={() => setShowCompletionCapture(false)}
+                    showPreview={false}
+                    autoUpload={true}
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setShowCompletionCapture(true)}
+                      className="w-full py-3 px-4 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-lg flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <Camera className="w-4 h-4" />
+                      {task.completionPhotos && task.completionPhotos.length > 0 ? 'Add Another Photo' : 'Take Completion Photo'}
+                    </button>
+                    {(task.completionPhotos?.length ?? 0) < 2 && (
+                      <p className="text-xs text-teal-700 text-center">
+                        ⚠️ Minimum 2 photos required before ending service
+                      </p>
+                    )}
+                    {(task.completionPhotos?.length ?? 0) >= 2 && (
+                      <p className="text-xs text-green-700 text-center flex items-center justify-center gap-1">
+                        <CheckCircle className="w-3.5 h-3.5" /> {task.completionPhotos!.length} photos uploaded — you can end service
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
               <div className="card-elevated p-5 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200">
                 <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
                   <QrCode className="w-5 h-5 text-green-600" />
-                  {t('worker.taskDetail.step1ServiceEnd')}
+                  Step 2: {t('worker.taskDetail.step1ServiceEnd')}
                 </h3>
                 
                 {task.serviceEndQRCode ? (
@@ -636,22 +717,43 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                   <div>
                     <button
                       onClick={handleGenerateEndQR}
-                      className="font-semibold py-3 px-6 rounded-lg transition-colors shadow-md w-full bg-green-600 hover:bg-green-700 text-white"
+                      disabled={(task.completionPhotos?.length ?? 0) < 2}
+                      className={`font-semibold py-3 px-6 rounded-lg transition-colors shadow-md w-full text-white ${
+                        (task.completionPhotos?.length ?? 0) < 2
+                          ? 'bg-gray-400 cursor-not-allowed'
+                          : 'bg-green-600 hover:bg-green-700'
+                      }`}
                     >
                       <QrCode className="w-5 h-5 inline-block mr-2" />
                       {t('worker.taskDetail.generateEndQR')}
                     </button>
-                    <p className="text-xs text-muted-foreground mt-2 text-center">
-                      {t('worker.taskDetail.customerScanEndCalc')}
-                    </p>
+                    {(task.completionPhotos?.length ?? 0) < 2 ? (
+                      <p className="text-xs text-orange-600 mt-2 text-center font-medium">
+                        ⚠️ Upload at least 2 completion photos first (Step 1)
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground mt-2 text-center">
+                        {t('worker.taskDetail.customerScanEndCalc')}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          {/* Payment QR and proof - shown once task is completed */}
-          {task.status === 'completed' && task.actualEndTime && (
+          {/* Payment QR and proof - shown for pending-review and completed tasks */}
+          {(task.status === 'pending-review' || task.status === 'completed') && task.actualEndTime && (
+            <div className="space-y-4">
+              {/* Review Banner - only for pending-review */}
+              {task.status === 'pending-review' && (
+                <div className="card-elevated p-4 bg-orange-50 border-2 border-orange-300 text-center">
+                  <p className="text-lg font-bold text-orange-700">⏳ Awaiting Admin Review</p>
+                  <p className="text-sm text-orange-600 mt-1">
+                    Your work photos have been submitted. The admin will review and confirm payment received.
+                  </p>
+                </div>
+              )}
             <div className="space-y-4">
               {/* Step 2: Payment QR Code */}
               <div className="card-elevated p-5 bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200">
@@ -788,22 +890,19 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                 </div>
               )}
             </div>
+            </div>
           )}
 
           {/* Action Buttons */}
           <div className="flex gap-3">
-            {task.status === 'in-progress' && (
+            {(task.status as string) !== 'completed' && (
               <button
                 onClick={onClose}
-                className="flex-1 py-3 border-2 border-green-600 text-green-600 rounded-lg font-medium hover:bg-green-50 transition-colors"
-              >
-                {t('worker.taskDetail.close')}
-              </button>
-            )}
-            {task.status !== 'completed' && task.status !== 'in-progress' && (
-              <button
-                onClick={onClose}
-                className="flex-1 py-3 border border-border rounded-lg text-foreground font-medium hover:bg-muted transition-colors"
+                className={`flex-1 py-3 rounded-lg font-medium transition-colors ${
+                  (task.status as string) === 'in-progress'
+                    ? 'border-2 border-green-600 text-green-600 hover:bg-green-50'
+                    : 'border border-border text-foreground hover:bg-muted'
+                }`}
               >
                 {t('worker.taskDetail.close')}
               </button>

@@ -70,7 +70,7 @@ const bookingSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'confirmed', 'in-progress', 'completed', 'cancelled'],
+    enum: ['pending', 'confirmed', 'in-progress', 'pending-review', 'completed', 'cancelled'],
     default: 'pending'
   },
   totalAmount: {
@@ -442,6 +442,26 @@ const bookingSchema = new mongoose.Schema({
       default: false
     }
   },
+  // Multiple Completion Photos (minimum 2 required for admin review)
+  completionPhotos: [{
+    url: {
+      type: String,
+      required: true
+    },
+    timestamp: {
+      type: Date,
+      default: Date.now
+    },
+    uploadedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    verified: {
+      type: Boolean,
+      default: false
+    }
+  }],
   // Payment Proof Photo
   paymentProof: {
     url: {

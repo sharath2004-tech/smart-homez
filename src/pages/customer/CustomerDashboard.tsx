@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { AlertCircle, ArrowRight, Bell, ChevronRight, Clock, MapPin, Settings, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 interface Booking {
   _id: string;
@@ -36,6 +36,7 @@ interface UserProfile {
 
 const CustomerDashboard = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
   const [ongoingBooking, setOngoingBooking] = useState<Booking | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -195,6 +196,7 @@ const CustomerDashboard = () => {
             className="relative p-2.5 bg-card rounded-xl border border-border"
             whileHover={{ scale: 1.05, rotate: 15 }}
             whileTap={{ scale: 0.95 }}
+            onClick={() => navigate('/customer/notifications')}
           >
             <Bell className="w-5 h-5 text-muted-foreground" />
             {upcomingBookings.length > 0 && (
@@ -353,9 +355,9 @@ const CustomerDashboard = () => {
               variants={containerVariants}
             >
               {upcomingBookings.map((b, index) => (
+                <Link key={b._id} to={`/customer/bookings`} state={{ openBookingId: b._id }}>
                 <motion.div 
-                  key={b._id} 
-                  className="card-elevated p-4 flex items-center gap-4"
+                  className="card-elevated p-4 flex items-center gap-4 cursor-pointer"
                   variants={itemVariants}
                   custom={index}
                   whileHover={{ scale: 1.02, x: 5 }}
@@ -393,6 +395,7 @@ const CustomerDashboard = () => {
                     {b.status === "confirmed" ? t('customer.dashboard.confirmed') : t('customer.dashboard.pending')}
                   </motion.span>
                 </motion.div>
+                </Link>
               ))}
             </motion.div>
           )}

@@ -204,6 +204,13 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
 
       {/* Mobile top bar */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b border-border px-3 py-3 flex items-center gap-2">
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-muted transition-colors shrink-0"
+          aria-label="Open menu"
+        >
+          <Menu className="w-5 h-5 text-foreground" />
+        </button>
         {location.pathname !== dashboardPath ? (
           <button
             onClick={() => navigate(-1)}
@@ -230,13 +237,6 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
             aria-label="Sign out"
           >
             <LogOut className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-muted transition-colors"
-            aria-label="Open menu"
-          >
-            <Menu className="w-5 h-5 text-foreground" />
           </button>
         </div>
       </div>

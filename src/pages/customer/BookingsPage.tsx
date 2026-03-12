@@ -5,6 +5,7 @@ import { bookingsAPI } from "@/lib/api";
 import { Calendar, Clock, MapPin, Phone, QrCode, RefreshCw, Star } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useLocation } from "react-router-dom";
 import BookingDetailModal from "./BookingDetailModal";
 
 interface Worker {
@@ -61,6 +62,7 @@ const statusConfig: Record<string, { label: string; bg: string; text: string }> 
 
 const BookingsPage = () => {
   const { t } = useTranslation();
+  const routeLocation = useLocation();
   const [activeTab, setActiveTab] = useState<"upcoming" | "ongoing" | "past">("upcoming");
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +71,15 @@ const BookingsPage = () => {
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
   const [bookingToReschedule, setBookingToReschedule] = useState<Booking | null>(null);
+
+  // Auto-open a booking detail when navigated here with state.openBookingId
+  useEffect(() => {
+    const state = routeLocation.state as { openBookingId?: string } | null;
+    if (state?.openBookingId) {
+      setSelectedBookingId(state.openBookingId);
+      window.history.replaceState({}, '');
+    }
+  }, [routeLocation.state]);
 
   const fetchBookings = useCallback(async (silent = false) => {
     try {

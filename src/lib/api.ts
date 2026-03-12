@@ -341,6 +341,28 @@ export const bookingsAPI = {
     return data;
   },
 
+  addCompletionPhoto: async (id: string, file: File) => {
+    const token = getAuthToken();
+    const formData = new FormData();
+    formData.append('photo', file);
+
+    const response = await fetch(`${API_BASE_URL}/bookings/${id}/add-completion-photo`, {
+      method: 'POST',
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` })
+      },
+      body: formData
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error?.message || 'Failed to add completion photo');
+    }
+
+    return data;
+  },
+
   uploadPaymentProof: async (id: string, file: File, transactionId?: string, transactionTime?: string) => {
     const token = getAuthToken();
     const formData = new FormData();
@@ -365,6 +387,10 @@ export const bookingsAPI = {
     }
 
     return data;
+  },
+
+  adminApproveBooking: async (id: string) => {
+    return apiCall(`/bookings/${id}/admin-approve`, { method: 'POST' });
   },
 
   getCompletionPhotoUrl: (photoPath: string) => {
