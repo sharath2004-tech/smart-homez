@@ -2,12 +2,32 @@ import crypto from 'crypto';
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
+import twilio from 'twilio';
 import { authenticate } from '../middleware/auth.js';
 import { uploadWorkerFiles } from '../middleware/upload.js';
 import Notification from '../models/Notification.js';
 import Settings from '../models/Settings.js';
 import User from '../models/User.js';
 import { sendPasswordChangeConfirmation, sendPasswordResetEmail } from '../utils/emailService.js';
+
+function getTwilioClient() {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  if (!sid || !token) throw new Error('SMS service not configured');
+  return twilio(sid, token);
+}
+
+function getVerifySid() {
+  const sid = process.env.TWILIO_VERIFY_SID;
+  if (!sid) throw new Error('SMS verify service not configured');
+  return sid;
+}
+
+function toE164(phone) {
+  const digits = phone.replace(/\D/g, '').slice(-10);
+  if (digits.length < 10) throw new Error('Enter a valid 10-digit mobile number');
+  return `+91${digits}`;
+}
 
 const router = express.Router();
 
@@ -453,6 +473,95 @@ router.post('/reset-password',
     } catch (error) {
       console.error('Reset password error:', error);
       res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   POST /api/auth/forgot-password-phone
+// @desc    Send OTP to phone for password reset
+// @access  Public
+router.post('/forgot-password-phone',
+  [body('phone').notEmpty().withMessage('Phone number is required')],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { phone } = req.body;
+
+      // Check user exists with this phone (don't reveal if not found)
+      const e164 = toE164(phone);
+
+      const user = await User.findOne({ phone: { $regex: phone.replace(/\D/g, '').slice(-10) + '$' } });
+      if (!user) {
+        return res.json({ success: true, message: 'If that phone is registered, an OTP has been sent.' });
+      }
+
+      const client = getTwilioClient();
+      await client.verify.v2.services(getVerifySid()).verifications.create({ to: e164, channel: 'sms' });
+
+      res.json({ success: true, message: 'OTP sent to your phone.' });
+    } catch (error) {
+      console.error('Forgot password phone error:', error.message);
+      if (error.message.includes('not configured')) {
+        return res.status(500).json({ error: { message: 'SMS service not available. Use email reset instead.', status: 500 } });
+      }
+      res.status(400).json({ error: { message: error.message || 'Failed to send OTP', status: 400 } });
+    }
+  }
+);
+
+// @route   POST /api/auth/reset-password-phone
+// @desc    Verify OTP and reset password via phone
+// @access  Public
+router.post('/reset-password-phone',
+  [
+    body('phone').notEmpty().withMessage('Phone is required'),
+    body('otp').notEmpty().withMessage('OTP is required'),
+    body('newPassword')
+      .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+      .matches(/[A-Z]/).withMessage('Must contain uppercase letter')
+      .matches(/[a-z]/).withMessage('Must contain lowercase letter')
+      .matches(/[0-9]/).withMessage('Must contain a number')
+      .matches(/[!@#$%^&*(),.?":{}|<>]/).withMessage('Must contain a special character')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { phone, otp, newPassword } = req.body;
+      const e164 = toE164(phone);
+
+      const client = getTwilioClient();
+      const check = await client.verify.v2.services(getVerifySid()).verificationChecks.create({ to: e164, code: otp });
+
+      if (check.status !== 'approved') {
+        return res.status(400).json({ error: { message: 'Invalid or expired OTP', status: 400 } });
+      }
+
+      const digits = phone.replace(/\D/g, '').slice(-10);
+      const user = await User.findOne({ phone: { $regex: digits + '$' } }).select('+password');
+      if (!user) {
+        return res.status(404).json({ error: { message: 'User not found', status: 404 } });
+      }
+
+      user.password = newPassword;
+      user.isFirstLogin = false;
+      await user.save();
+
+      try { await sendPasswordChangeConfirmation(user.email, user.name); } catch {}
+
+      res.json({ success: true, message: 'Password reset successfully. You can now log in.' });
+    } catch (error) {
+      console.error('Reset password phone error:', error.message, error.code);
+      if (error.code === 60200) return res.status(400).json({ error: { message: 'Invalid phone number', status: 400 } });
+      if (error.code === 60202) return res.status(400).json({ error: { message: 'Incorrect OTP', status: 400 } });
+      res.status(500).json({ error: { message: error.message || 'Server error', status: 500 } });
     }
   }
 );

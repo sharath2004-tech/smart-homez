@@ -53,11 +53,6 @@ const ChangePasswordPage = () => {
       
       const data = await authAPI.getProfile();
       setProfile(data.user || data);
-      
-      // If user doesn't need to change password, redirect to dashboard
-      if (!data.user?.isFirstLogin && data.isFirstLogin !== true) {
-        redirectToDashboard(data.user?.role || 'customer');
-      }
     } catch (error) {
       console.error('Error fetching profile:', error);
       navigate('/login');
@@ -161,6 +156,7 @@ const ChangePasswordPage = () => {
             <span className="text-lg font-bold font-heading text-foreground">Healthy Homez</span>
           </div>
 
+          {profile?.isFirstLogin && (
           <div className="mb-6 p-4 bg-warning/10 border border-warning/20 rounded-xl">
             <div className="flex items-start gap-3">
               <Lock className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
@@ -172,6 +168,7 @@ const ChangePasswordPage = () => {
               </div>
             </div>
           </div>
+          )}
 
           <h2 className="text-2xl font-bold font-heading text-foreground mb-1">
             Change Your Password

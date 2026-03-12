@@ -3,7 +3,7 @@ import { adminAPI, authAPI, locationsAPI } from "@/lib/api";
 import { cropQRFromImage } from "@/utils/cropQRFromImage";
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Building, MapPin, Plus, QrCode, Search, Shield, Trash2, Upload, UserPlus, X } from "lucide-react";
+import { Building, FileText, MapPin, Pencil, Plus, QrCode, Search, Shield, Trash2, Upload, UserPlus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface Location {
@@ -37,6 +37,14 @@ interface Admin {
     area: string;
     city: string;
   }>;
+  permissions?: {
+    canCreateWorkers: boolean;
+    canDeleteWorkers: boolean;
+    canManageApartments: boolean;
+    canViewReports: boolean;
+  };
+  idDocument?: string | null;
+  idDocumentType?: string | null;
   workerCount: number;
   createdAt: string;
 }
@@ -112,8 +120,26 @@ const AdminLocations = () => {
     password: "",
     phone: "",
     city: "",
-    selectedLocations: [] as string[]
+    selectedLocations: [] as string[],
+    idDocumentFile: null as File | null,
+    idDocumentType: ""
   });
+
+  const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null);
+  const [editAdminForm, setEditAdminForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    city: "",
+    selectedLocations: [] as string[],
+    permissions: {
+      canCreateWorkers: true,
+      canDeleteWorkers: true,
+      canManageApartments: true,
+      canViewReports: true
+    }
+  });
+  const [updatingAdmin, setUpdatingAdmin] = useState(false);
 
   const isSuperAdmin = profile?.role === 'super_admin';
 
@@ -424,7 +450,9 @@ const AdminLocations = () => {
         password: adminForm.password,
         phone: adminForm.phone,
         city: adminForm.city,
-        assignedLocationIds: adminForm.selectedLocations
+        assignedLocationIds: adminForm.selectedLocations,
+        idDocument: adminForm.idDocumentFile,
+        idDocumentType: adminForm.idDocumentType || undefined
       });
       alert('Admin created successfully!');
       setShowAdminForm(false);
@@ -434,13 +462,65 @@ const AdminLocations = () => {
         password: "",
         phone: "",
         city: "",
-        selectedLocations: []
+        selectedLocations: [],
+        idDocumentFile: null,
+        idDocumentType: ""
       });
       fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create admin';
       alert(message);
     }
+  };
+
+  const handleOpenEditAdmin = (admin: Admin) => {
+    setEditingAdmin(admin);
+    const currentCity = admin.assignedLocations?.[0]?.city || '';
+    setEditAdminForm({
+      name: admin.name,
+      email: admin.email,
+      phone: admin.phone || '',
+      city: currentCity,
+      selectedLocations: admin.assignedLocations?.map(loc => loc.locationId) || [],
+      permissions: {
+        canCreateWorkers: admin.permissions?.canCreateWorkers ?? true,
+        canDeleteWorkers: admin.permissions?.canDeleteWorkers ?? true,
+        canManageApartments: admin.permissions?.canManageApartments ?? true,
+        canViewReports: admin.permissions?.canViewReports ?? true
+      }
+    });
+  };
+
+  const handleUpdateAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAdmin) return;
+    try {
+      setUpdatingAdmin(true);
+      await adminAPI.updateAdmin(editingAdmin._id, {
+        name: editAdminForm.name,
+        email: editAdminForm.email,
+        phone: editAdminForm.phone,
+        assignedLocationIds: editAdminForm.selectedLocations,
+        permissions: editAdminForm.permissions
+      });
+      alert('Admin updated successfully!');
+      setEditingAdmin(null);
+      fetchData();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update admin';
+      alert(message);
+    } finally {
+      setUpdatingAdmin(false);
+    }
+  };
+
+  const toggleEditLocationSelection = (locationId: string) => {
+    setEditAdminForm(prev => ({
+      ...prev,
+      selectedLocations: prev.selectedLocations.includes(locationId)
+        ? prev.selectedLocations.filter(id => id !== locationId)
+        : [...prev.selectedLocations, locationId]
+    }));
   };
 
   const toggleLocationSelection = (locationId: string) => {
@@ -678,14 +758,23 @@ const AdminLocations = () => {
               <div className="grid gap-4 md:grid-cols-2">
                 {filteredAdmins.map((admin) => (
                   <div key={admin._id} className="card-elevated p-5 relative overflow-hidden">
-                    {/* Delete button for super admin */}
-                    <button
-                      onClick={() => handleDeleteAdmin(admin._id, admin.name)}
-                      className="absolute top-3 right-3 w-7 h-7 rounded-lg bg-destructive/10 hover:bg-destructive/20 flex items-center justify-center text-destructive transition-colors"
-                      title="Delete admin"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                    {/* Action buttons for super admin */}
+                    <div className="absolute top-3 right-3 flex gap-1">
+                      <button
+                        onClick={() => handleOpenEditAdmin(admin)}
+                        className="w-7 h-7 rounded-lg bg-primary/10 hover:bg-primary/20 flex items-center justify-center text-primary transition-colors"
+                        title="Edit admin"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteAdmin(admin._id, admin.name)}
+                        className="w-7 h-7 rounded-lg bg-destructive/10 hover:bg-destructive/20 flex items-center justify-center text-destructive transition-colors"
+                        title="Delete admin"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
                     
                     <div className="flex items-start gap-3 mb-4">
                       <div className="w-12 h-12 bg-secondary rounded-full flex items-center justify-center text-secondary-foreground font-bold shrink-0">
@@ -730,6 +819,12 @@ const AdminLocations = () => {
                         </div>
                       </div>
                     )}
+
+                    {/* Document verification status */}
+                    <div className={`mt-3 flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg ${admin.idDocument ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                      <FileText className="w-3 h-3 shrink-0" />
+                      <span>{admin.idDocument ? `ID Verified (${admin.idDocumentType || 'document'})` : 'No ID document uploaded'}</span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1058,12 +1153,211 @@ const AdminLocations = () => {
                   </div>
                 )}
 
+                {/* Document Verification Upload */}
+                <div className="border border-border rounded-xl p-4 bg-muted/30">
+                  <div className="flex items-center gap-2 mb-3">
+                    <FileText className="w-4 h-4 text-primary" />
+                    <p className="text-sm font-medium">ID Document Verification</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div className="col-span-2">
+                      <label className="block text-xs text-muted-foreground mb-1">Document Type</label>
+                      <select
+                        className="input-clean"
+                        value={adminForm.idDocumentType}
+                        onChange={(e) => setAdminForm({...adminForm, idDocumentType: e.target.value})}
+                      >
+                        <option value="">Select document type</option>
+                        <option value="aadhaar">Aadhaar Card</option>
+                        <option value="pan">PAN Card</option>
+                        <option value="passport">Passport</option>
+                        <option value="driving_license">Driving License</option>
+                        <option value="voter_id">Voter ID</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+                  {adminForm.idDocumentFile ? (
+                    <div className="flex items-center gap-3 p-2 bg-green-50 border border-green-200 rounded-lg">
+                      <FileText className="w-4 h-4 text-green-600 shrink-0" />
+                      <span className="text-xs text-green-800 truncate flex-1">{adminForm.idDocumentFile.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setAdminForm({...adminForm, idDocumentFile: null})}
+                        className="text-red-500 shrink-0"
+                      ><X className="w-3 h-3" /></button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-border rounded-lg cursor-pointer hover:bg-muted transition-colors">
+                      <Upload className="w-6 h-6 text-muted-foreground mb-1" />
+                      <p className="text-xs text-muted-foreground">Upload ID document (JPG, PNG, PDF)</p>
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) setAdminForm({...adminForm, idDocumentFile: file});
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+
                 <div className="flex gap-3 pt-4">
                   <button type="button" onClick={() => setShowAdminForm(false)} className="flex-1 py-2 border border-border rounded-xl">
                     Cancel
                   </button>
                   <button type="submit" className="flex-1 btn-brand py-2">
                     Create Admin
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Admin Modal - Super Admin Only */}
+        {editingAdmin && isSuperAdmin && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-background rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold">Edit Admin</h2>
+                <button onClick={() => setEditingAdmin(null)} className="text-muted-foreground hover:text-foreground">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateAdmin} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    className="input-clean"
+                    value={editAdminForm.name}
+                    onChange={(e) => setEditAdminForm({...editAdminForm, name: e.target.value})}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Email</label>
+                  <input
+                    type="email"
+                    required
+                    className="input-clean"
+                    value={editAdminForm.email}
+                    onChange={(e) => setEditAdminForm({...editAdminForm, email: e.target.value})}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Phone</label>
+                  <input
+                    type="tel"
+                    className="input-clean"
+                    value={editAdminForm.phone}
+                    onChange={(e) => setEditAdminForm({...editAdminForm, phone: e.target.value})}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Reassign to City</label>
+                  <select
+                    className="input-clean"
+                    value={editAdminForm.city}
+                    onChange={(e) => setEditAdminForm({...editAdminForm, city: e.target.value, selectedLocations: []})}
+                  >
+                    <option value="">-- Keep current city --</option>
+                    {[...new Set(locations.map(l => l.city))].map(city => (
+                      <option key={city} value={city}>{city}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Location assignment */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Assigned Locations</label>
+                  {locations.filter(loc => !editAdminForm.city || loc.city.toLowerCase() === editAdminForm.city.toLowerCase()).length === 0 ? (
+                    <p className="text-xs text-muted-foreground bg-muted p-3 rounded-lg">No locations in selected city.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {locations
+                        .filter(loc => !editAdminForm.city || loc.city.toLowerCase() === editAdminForm.city.toLowerCase())
+                        .map(loc => (
+                          <label
+                            key={loc._id}
+                            className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                              editAdminForm.selectedLocations.includes(loc._id)
+                                ? 'bg-primary/10 border-primary'
+                                : 'bg-muted/50 border-border hover:bg-muted'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={editAdminForm.selectedLocations.includes(loc._id)}
+                              onChange={() => toggleEditLocationSelection(loc._id)}
+                              className="w-4 h-4"
+                            />
+                            <div>
+                              <p className="text-sm font-medium">{loc.apartmentName}</p>
+                              <p className="text-xs text-muted-foreground">{loc.area}, {loc.city}</p>
+                            </div>
+                          </label>
+                        ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Permissions */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Permissions</label>
+                  <div className="space-y-2">
+                    {[
+                      { key: 'canCreateWorkers', label: 'Create Workers' },
+                      { key: 'canDeleteWorkers', label: 'Delete Workers' },
+                      { key: 'canManageApartments', label: 'Manage Apartments' },
+                      { key: 'canViewReports', label: 'View Reports' }
+                    ].map(({ key, label }) => (
+                      <label key={key} className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editAdminForm.permissions[key as keyof typeof editAdminForm.permissions]}
+                          onChange={(e) => setEditAdminForm(prev => ({
+                            ...prev,
+                            permissions: { ...prev.permissions, [key]: e.target.checked }
+                          }))}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-sm">{label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Existing document info */}
+                {editingAdmin.idDocument && (
+                  <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <FileText className="w-5 h-5 text-green-600 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-green-800">ID Document on file</p>
+                      <p className="text-xs text-green-600 truncate">{editingAdmin.idDocumentType || 'Document'}</p>
+                    </div>
+                    <a
+                      href={`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${editingAdmin.idDocument}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-green-700 underline shrink-0"
+                    >View</a>
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-4">
+                  <button type="button" onClick={() => setEditingAdmin(null)} className="flex-1 py-2 border border-border rounded-xl">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={updatingAdmin} className="flex-1 btn-brand py-2 disabled:opacity-50">
+                    {updatingAdmin ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </form>

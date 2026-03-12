@@ -1,7 +1,7 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
-import { uploadWorkerFiles } from '../middleware/upload.js';
+import { uploadAdminDoc, uploadWorkerFiles } from '../middleware/upload.js';
 import Booking from '../models/Booking.js';
 import Location from '../models/Location.js';
 import Notification from '../models/Notification.js';
@@ -115,12 +115,16 @@ router.post('/locations',
 router.post('/create-admin',
   authenticate,
   authorize('super_admin'),
+  (req, res, next) => uploadAdminDoc(req, res, (err) => {
+    if (err) return res.status(400).json({ error: { message: err.message, status: 400 } });
+    next();
+  }),
   [
     body('name').notEmpty().withMessage('Name is required'),
     body('email').isEmail().withMessage('Valid email is required'),
     body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
     body('phone').notEmpty().withMessage('Phone is required'),
-    body('assignedLocationIds').optional().isArray().withMessage('Assigned locations must be an array')
+    body('assignedLocationIds').optional().withMessage('Assigned locations must be an array')
   ],
   async (req, res) => {
     try {
@@ -129,7 +133,8 @@ router.post('/create-admin',
         return res.status(400).json({ error: { message: errors.array()[0].msg, status: 400 } });
       }
 
-      const { name, email, password, phone, assignedLocationIds } = req.body;
+      const { name, email, password, phone, assignedLocationIds, idDocumentType } = req.body;
+      const idDocumentPath = req.file ? `/uploads/admin-docs/${req.file.filename}` : null;
 
       // Check if email exists
       const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
@@ -173,7 +178,9 @@ router.post('/create-admin',
             canManageApartments: true,
             canViewReports: true
           },
-          createdBy: req.user._id
+          createdBy: req.user._id,
+          idDocument: idDocumentPath,
+          idDocumentType: idDocumentType || null
         }
       });
 
@@ -419,6 +426,8 @@ router.get('/admins', authenticate, authorize('super_admin'), async (req, res) =
         role: admin.role,
         assignedLocations: admin.adminProfile?.assignedLocations || [],
         permissions: admin.adminProfile?.permissions,
+        idDocument: admin.adminProfile?.idDocument || null,
+        idDocumentType: admin.adminProfile?.idDocumentType || null,
         workerCount,
         createdAt: admin.createdAt
       };
@@ -440,7 +449,7 @@ router.get('/admins', authenticate, authorize('super_admin'), async (req, res) =
 router.patch('/admins/:adminId', authenticate, authorize('super_admin'), async (req, res) => {
   try {
     const { adminId } = req.params;
-    const { name, phone, assignedLocationIds } = req.body;
+    const { name, phone, email, assignedLocationIds, permissions } = req.body;
 
     const admin = await User.findOne({ _id: adminId, role: 'admin' });
     if (!admin) {
@@ -450,6 +459,19 @@ router.patch('/admins/:adminId', authenticate, authorize('super_admin'), async (
     // Update basic fields
     if (name) admin.name = name;
     if (phone) admin.phone = phone;
+    if (email) {
+      const normalizedEmail = email.toLowerCase().trim();
+      const existing = await User.findOne({ email: normalizedEmail, _id: { $ne: adminId } });
+      if (existing) {
+        return res.status(400).json({ error: { message: 'Email already in use', status: 400 } });
+      }
+      admin.email = normalizedEmail;
+    }
+
+    // Update permissions if provided
+    if (permissions && typeof permissions === 'object') {
+      admin.adminProfile.permissions = { ...admin.adminProfile.permissions.toObject?.() || admin.adminProfile.permissions, ...permissions };
+    }
 
     // Update assigned locations if provided
     if (assignedLocationIds) {

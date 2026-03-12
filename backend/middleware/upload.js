@@ -10,8 +10,9 @@ const __dirname = dirname(__filename);
 const uploadsDir = path.join(__dirname, '..', 'uploads', 'completion-photos');
 const profilePicsDir = path.join(__dirname, '..', 'uploads', 'profile-pics');
 const workerDocsDir = path.join(__dirname, '..', 'uploads', 'worker-docs');
+const adminDocsDir = path.join(__dirname, '..', 'uploads', 'admin-docs');
 
-[uploadsDir, profilePicsDir, workerDocsDir].forEach(dir => {
+[uploadsDir, profilePicsDir, workerDocsDir, adminDocsDir].forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
@@ -77,5 +78,22 @@ export const uploadWorkerFiles = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: docFileFilter
 });
+
+// ── Admin ID document upload ──────────────────────────────────────────────────
+const adminDocsStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, adminDocsDir);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname);
+    cb(null, `admin-doc-${Date.now()}${ext}`);
+  }
+});
+
+export const uploadAdminDoc = multer({
+  storage: adminDocsStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: docFileFilter
+}).single('idDocument');
 
 export default upload;

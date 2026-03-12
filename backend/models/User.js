@@ -70,7 +70,13 @@ const userSchema = new mongoose.Schema({
       },
       requestedAt: { type: Date, default: Date.now },
       approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
-    }]
+    }],
+    idDocument: { type: String, default: null },
+    idDocumentType: {
+      type: String,
+      enum: ['aadhaar', 'pan', 'passport', 'driving_license', 'voter_id', 'other', null],
+      default: null
+    }
   },
   phone: {
     type: String,

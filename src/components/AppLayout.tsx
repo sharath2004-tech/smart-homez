@@ -1,5 +1,5 @@
 import { api, settingsAPI } from "@/lib/api";
-import { ArrowLeft, Bell, Calendar, ClipboardCheck, Clock, CreditCard, HelpCircle, Home, IndianRupee, LayoutDashboard, LogOut, MapPin, Menu, MessageSquare, RefreshCw, Settings, User, Users, Wrench, X } from "lucide-react";
+import { ArrowLeft, Bell, Calendar, ClipboardCheck, Clock, CreditCard, HelpCircle, Home, IndianRupee, KeyRound, LayoutDashboard, LogOut, MapPin, Menu, MessageSquare, RefreshCw, Settings, User, Users, Wrench, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -62,6 +62,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
     { to: "/customer/payments", icon: CreditCard, label: t('nav.payments') },
     { to: "/customer/profile", icon: User, label: t('nav.profile') },
     { to: "/customer/help", icon: HelpCircle, label: "Help" },
+    { to: "/change-password", icon: KeyRound, label: "Change Password" },
   ];
 
   const workerNav = [
@@ -72,6 +73,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
     { to: "/worker/leaves", icon: Bell, label: t('nav.myLeaves') },
     { to: "/worker/profile", icon: User, label: t('nav.profile') },
     { to: "/worker/help", icon: HelpCircle, label: "Help" },
+    { to: "/change-password", icon: KeyRound, label: "Change Password" },
   ];
 
   const adminNav = [
@@ -87,6 +89,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
     { to: "/admin/locations", icon: MapPin, label: t('nav.locations') },
     { to: "/admin/help-messages", icon: MessageSquare, label: "Help Messages" },
     { to: "/admin/settings", icon: Settings, label: t('nav.settings') },
+    { to: "/change-password", icon: KeyRound, label: "Change Password" },
   ];
 
   const superAdminNav = [
@@ -102,6 +105,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
     { to: "/admin/services", icon: Wrench, label: t('nav.services') },
     { to: "/admin/help-messages", icon: MessageSquare, label: "Help Messages" },
     { to: "/admin/settings", icon: Settings, label: t('nav.settings') },
+    { to: "/change-password", icon: KeyRound, label: "Change Password" },
   ];
 
   const navItems = userType === "admin" ? adminNav : userType === "super_admin" ? superAdminNav : userType === "worker" ? workerNav : customerNav;

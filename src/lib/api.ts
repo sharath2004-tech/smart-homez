@@ -116,6 +116,20 @@ export const authAPI = {
     });
   },
 
+  forgotPasswordPhone: async (phone: string) => {
+    return apiCall('/auth/forgot-password-phone', {
+      method: 'POST',
+      body: JSON.stringify({ phone })
+    });
+  },
+
+  resetPasswordPhone: async (phone: string, otp: string, newPassword: string) => {
+    return apiCall('/auth/reset-password-phone', {
+      method: 'POST',
+      body: JSON.stringify({ phone, otp, newPassword })
+    });
+  },
+
   resetPassword: async (token: string, newPassword: string) => {
     return apiCall('/auth/reset-password', {
       method: 'POST',
@@ -758,17 +772,43 @@ export const adminAPI = {
     phone?: string;
     city: string;
     assignedLocationIds: string[];
+    idDocument?: File | null;
+    idDocumentType?: string;
   }) => {
-    return apiCall('/admin/create-admin', {
+    const token = getAuthToken();
+    const formData = new FormData();
+    formData.append('name', adminData.name);
+    formData.append('email', adminData.email);
+    formData.append('password', adminData.password);
+    if (adminData.phone) formData.append('phone', adminData.phone);
+    if (adminData.city) formData.append('city', adminData.city);
+    if (adminData.assignedLocationIds) {
+      adminData.assignedLocationIds.forEach(id => formData.append('assignedLocationIds', id));
+    }
+    if (adminData.idDocument) formData.append('idDocument', adminData.idDocument);
+    if (adminData.idDocumentType) formData.append('idDocumentType', adminData.idDocumentType);
+
+    const response = await fetch(`${API_BASE_URL}/admin/create-admin`, {
       method: 'POST',
-      body: JSON.stringify(adminData)
+      headers: { ...(token && { Authorization: `Bearer ${token}` }) },
+      body: formData
     });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error?.message || data.message || 'Failed to create admin');
+    return data;
   },
 
   updateAdmin: async (adminId: string, adminData: {
     name?: string;
     phone?: string;
+    email?: string;
     assignedLocationIds?: string[];
+    permissions?: {
+      canCreateWorkers?: boolean;
+      canDeleteWorkers?: boolean;
+      canManageApartments?: boolean;
+      canViewReports?: boolean;
+    };
   }) => {
     return apiCall(`/admin/admins/${adminId}`, {
       method: 'PATCH',
