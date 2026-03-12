@@ -46,7 +46,7 @@ const serviceSchema = new mongoose.Schema({
     oneTime: {
       type: Number
     },
-    daily: {09
+    daily: {
       type: Number
     },
     weekly: {
