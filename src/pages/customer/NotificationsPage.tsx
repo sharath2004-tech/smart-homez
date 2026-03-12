@@ -1,9 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import AppLayout from '../../components/AppLayout';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { api } from '../../lib/api';
+
+const getUserFromStorage = () => {
+  try {
+    const stored = localStorage.getItem('user');
+    if (stored) return JSON.parse(stored);
+  } catch {}
+  return null;
+};
 
 interface Notification {
   _id: string;
@@ -16,6 +25,13 @@ interface Notification {
 export default function NotificationCenter() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const storedUser = getUserFromStorage();
+  const userType: 'customer' | 'worker' | 'admin' | 'super_admin' =
+    storedUser?.role === 'worker' ? 'worker'
+    : storedUser?.role === 'admin' ? 'admin'
+    : storedUser?.role === 'super_admin' ? 'super_admin'
+    : 'customer';
+  const userName: string = storedUser?.name || 'User';
 
   const { data: notifications, isLoading } = useQuery<Notification[]>({
     queryKey: ['notifications'],
@@ -39,14 +55,17 @@ export default function NotificationCenter() {
 
   if (isLoading) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-[200px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
+      <AppLayout userType={userType} userName={userName}>
+        <div className="flex items-center justify-center min-h-[200px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="p-6">
+    <AppLayout userType={userType} userName={userName}>
+    <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Bell className="w-6 h-6" />
@@ -97,5 +116,6 @@ export default function NotificationCenter() {
         </div>
       )}
     </div>
+    </AppLayout>
   );
 }

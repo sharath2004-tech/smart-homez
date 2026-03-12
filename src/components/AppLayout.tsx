@@ -213,7 +213,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
         </button>
         {location.pathname !== dashboardPath ? (
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => window.history.length > 1 ? navigate(-1) : navigate(dashboardPath)}
             className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-muted transition-colors shrink-0"
             aria-label="Go back"
           >
@@ -335,7 +335,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
         {location.pathname !== dashboardPath && (
           <div className="hidden md:flex items-center px-6 md:px-8 pt-5 pb-0">
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => window.history.length > 1 ? navigate(-1) : navigate(dashboardPath)}
               className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors group"
               aria-label="Go back"
             >
