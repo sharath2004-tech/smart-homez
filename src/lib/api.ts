@@ -116,6 +116,20 @@ export const authAPI = {
     }, 35000); // extended timeout — SMTP send can be slow on first request
   },
 
+  forgotPasswordEmailOtp: async (email: string) => {
+    return apiCall('/auth/forgot-password-email-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    }, 35000); // extended timeout — SMTP send can be slow on first request
+  },
+
+  resetPasswordEmailOtp: async (email: string, otp: string, newPassword: string) => {
+    return apiCall('/auth/reset-password-email-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp, newPassword })
+    });
+  },
+
   forgotPasswordPhone: async (phone: string) => {
     return apiCall('/auth/forgot-password-phone', {
       method: 'POST',

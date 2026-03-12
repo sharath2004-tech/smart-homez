@@ -672,7 +672,7 @@ router.get('/worker/upcoming-tasks', authenticate, authorize('worker'), async (r
     console.log(`✅ Found ${upcomingTasks.length} upcoming tasks`);
     if (upcomingTasks.length > 0) {
       upcomingTasks.forEach(task => {
-        console.log(`   - ${task.service.name} on ${task.bookingDate} at ${task.startTime} (${task.status})`);
+        console.log(`   - ${task.service?.name ?? 'Unknown service'} on ${task.bookingDate} at ${task.startTime} (${task.status})`);
       });
     }
     
