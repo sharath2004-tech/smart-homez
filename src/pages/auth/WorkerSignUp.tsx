@@ -8,14 +8,16 @@ import {
     EyeOff,
     Home,
     Loader2,
+    Mail,
     MapPin,
     Navigation,
+    Phone,
     Upload,
 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-type Step = "form" | "otp" | "skills" | "documents" | "location" | "pending";
+type Step = "method" | "form" | "phone-entry" | "otp" | "skills" | "documents" | "location" | "pending";
 
 const SKILLS = [
   "General Cleaning",
@@ -38,7 +40,7 @@ interface GeoResult {
 }
 
 const WorkerSignUp = () => {
-  const [step, setStep] = useState<Step>("form");
+  const [step, setStep] = useState<Step>("method");
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -61,6 +63,8 @@ const WorkerSignUp = () => {
   const [otpCode, setOtpCode] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  const [signupMethod, setSignupMethod] = useState<"email" | "phone" | null>(null);
+  const [phoneForm, setPhoneForm] = useState({ name: "", phone: "", gender: "", experience: "" });
 
   // Document upload state
   const [profilePic, setProfilePic] = useState<File | null>(null);
@@ -107,7 +111,28 @@ const WorkerSignUp = () => {
     setOtpLoading(true);
     setError("");
     try {
-      await authAPI.sendOTP(form.phone.replace(/\D/g, "").slice(-10));
+      const phone = signupMethod === "phone"
+        ? phoneForm.phone.replace(/\D/g, "").slice(-10)
+        : form.phone.replace(/\D/g, "").slice(-10);
+      await authAPI.sendOTP(phone);
+      setOtpSent(true);
+      setStep("otp");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send OTP. Please try again.");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  // -- Phone-only path: collect name + phone then send OTP ----------------
+  const handlePhoneEntryNext = async () => {
+    if (!phoneForm.name.trim()) { setError("Name is required"); return; }
+    const digits = phoneForm.phone.replace(/\D/g, "").slice(-10);
+    if (digits.length < 10) { setError("Enter a valid 10-digit mobile number"); return; }
+    setError("");
+    setOtpLoading(true);
+    try {
+      await authAPI.sendOTP(digits);
       setOtpSent(true);
       setStep("otp");
     } catch (err) {
@@ -122,7 +147,10 @@ const WorkerSignUp = () => {
     setOtpLoading(true);
     setError("");
     try {
-      await authAPI.checkOTP(form.phone, otpCode);
+      const phone = signupMethod === "phone"
+        ? phoneForm.phone.replace(/\D/g, "").slice(-10)
+        : form.phone.replace(/\D/g, "").slice(-10);
+      await authAPI.checkOTP(phone, otpCode);
       setStep("skills");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Incorrect OTP. Please check and try again.");
@@ -170,13 +198,14 @@ const WorkerSignUp = () => {
     setLoading(true);
     setError("");
     try {
+      const digits = (signupMethod === "phone" ? phoneForm.phone : form.phone).replace(/\D/g, "").slice(-10);
       const formData = new FormData();
-      formData.append("name", form.name.trim());
-      formData.append("email", form.email.trim().toLowerCase());
-      formData.append("password", form.password);
-      formData.append("phone", "+91" + form.phone.replace(/\D/g, "").slice(-10));
-      formData.append("gender", form.gender || "prefer_not_to_say");
-      formData.append("experience", form.experience || "0");
+      formData.append("name", signupMethod === "phone" ? phoneForm.name.trim() : form.name.trim());
+      formData.append("email", signupMethod === "phone" ? `${digits}@healthyhomez.app` : form.email.trim().toLowerCase());
+      formData.append("password", signupMethod === "phone" ? `Hh${digits}!` : form.password);
+      formData.append("phone", "+91" + digits);
+      formData.append("gender", (signupMethod === "phone" ? phoneForm.gender : form.gender) || "prefer_not_to_say");
+      formData.append("experience", (signupMethod === "phone" ? phoneForm.experience : form.experience) || "0");
       formData.append("skills", JSON.stringify(selectedSkills));
       formData.append("phoneVerified", "true");
 
@@ -246,8 +275,10 @@ const WorkerSignUp = () => {
   const handleSkipLocation = () => registerAccount(null);
 
   // -- Steps for left panel -----------------------------------------------
-  const stepLabels = ["Your details", "Verify phone", "Skills", "Documents", "Service area"];
-  const stepIdx = step === "form" ? 0 : step === "otp" ? 1 : step === "skills" ? 2 : step === "documents" ? 3 : 4;
+  const stepLabels = (step === "phone-entry" || signupMethod === "phone")
+    ? ["Your details", "Verify phone", "Skills", "Documents", "Service area"]
+    : ["Your details", "Verify phone", "Skills", "Documents", "Service area"];
+  const stepIdx = (step === "form" || step === "phone-entry") ? 0 : step === "otp" ? 1 : step === "skills" ? 2 : step === "documents" ? 3 : 4;
 
   // -- Pending approval screen -------------------------------------------
   if (step === "pending") {
@@ -329,6 +360,122 @@ const WorkerSignUp = () => {
             <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">
               {error}
             </div>
+          )}
+
+          {/* -- STEP: method -- */}
+          {step === "method" && (
+            <>
+              <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Join as a Worker</h2>
+              <p className="text-muted-foreground mb-8">How would you like to sign up?</p>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => { setSignupMethod("email"); setStep("form"); setError(""); }}
+                  className="w-full flex items-center gap-4 p-5 border-2 border-border rounded-xl hover:border-primary hover:bg-primary/5 transition-all text-left group"
+                >
+                  <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary transition-all shrink-0">
+                    <Mail className="w-5 h-5 text-primary group-hover:text-white" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-foreground">Continue with Email</div>
+                    <div className="text-sm text-muted-foreground mt-0.5">Sign up with your email address &amp; password</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { setSignupMethod("phone"); setStep("phone-entry"); setError(""); }}
+                  className="w-full flex items-center gap-4 p-5 border-2 border-border rounded-xl hover:border-primary hover:bg-primary/5 transition-all text-left group"
+                >
+                  <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary transition-all shrink-0">
+                    <Phone className="w-5 h-5 text-primary group-hover:text-white" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-foreground">Continue with Phone</div>
+                    <div className="text-sm text-muted-foreground mt-0.5">Sign up instantly with your mobile number &amp; OTP</div>
+                  </div>
+                </button>
+              </div>
+
+              <p className="text-center text-sm text-muted-foreground mt-6">
+                Already have an account?{" "}
+                <Link to="/login" className="text-primary font-semibold hover:underline">Log in</Link>
+              </p>
+            </>
+          )}
+
+          {/* -- STEP: phone-entry -- */}
+          {step === "phone-entry" && (
+            <>
+              <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Your details</h2>
+              <p className="text-muted-foreground mb-6">Enter your name and mobile number to get started</p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Full Name</label>
+                  <input
+                    className="input-clean"
+                    placeholder="e.g. Ravi Kumar"
+                    value={phoneForm.name}
+                    onChange={(e) => setPhoneForm(p => ({ ...p, name: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Mobile Number <span className="text-destructive">*</span></label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">+91</span>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      className="input-clean pl-12"
+                      placeholder="98765 43210"
+                      value={phoneForm.phone}
+                      onChange={(e) => setPhoneForm(p => ({ ...p, phone: e.target.value.replace(/\D/g, "") }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Gender <span className="text-muted-foreground font-normal">(opt.)</span></label>
+                    <select className="input-clean" value={phoneForm.gender} onChange={(e) => setPhoneForm(p => ({ ...p, gender: e.target.value }))}>
+                      <option value="">Select</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                      <option value="prefer_not_to_say">Prefer not to say</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Experience (yrs)</label>
+                    <input
+                      type="number"
+                      className="input-clean"
+                      placeholder="0"
+                      min="0"
+                      max="50"
+                      value={phoneForm.experience}
+                      onChange={(e) => setPhoneForm(p => ({ ...p, experience: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={handlePhoneEntryNext}
+                  disabled={otpLoading}
+                  className="btn-brand w-full flex items-center justify-center gap-2"
+                >
+                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTP…</> : <><Phone className="w-4 h-4" /> Send OTP</>}
+                </button>
+                <button
+                  onClick={() => { setStep("method"); setError(""); }}
+                  className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm"
+                >
+                  Back
+                </button>
+              </div>
+            </>
           )}
 
           {/* -- STEP: form -- */}
@@ -432,10 +579,15 @@ const WorkerSignUp = () => {
                 </button>
               </form>
 
-              <p className="text-center text-sm text-muted-foreground mt-6">
-                Already have an account?{" "}
-                <Link to="/login" className="text-primary font-semibold hover:underline">Log in</Link>
-              </p>
+              <div className="flex items-center justify-between mt-6 flex-wrap gap-2">
+                <button onClick={() => { setStep("method"); setError(""); }} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  ← Back
+                </button>
+                <p className="text-sm text-muted-foreground">
+                  Already have an account?{" "}
+                  <Link to="/login" className="text-primary font-semibold hover:underline">Log in</Link>
+                </p>
+              </div>
             </>
           )}
 
@@ -445,7 +597,7 @@ const WorkerSignUp = () => {
               <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Verify your number</h2>
               <p className="text-muted-foreground mb-6">
                 {otpSent
-                  ? `OTP sent to +91${form.phone}. Enter the 6-digit code below.`
+                  ? `OTP sent to +91${signupMethod === "phone" ? phoneForm.phone : form.phone}. Enter the 6-digit code below.`
                   : "Sending OTP�"}
               </p>
 
@@ -479,7 +631,7 @@ const WorkerSignUp = () => {
                   Resend OTP
                 </button>
 
-                <button onClick={() => { setStep("form"); setError(""); }} className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm">
+                <button onClick={() => { setStep(signupMethod === "phone" ? "phone-entry" : "form"); setError(""); }} className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm">
                   Back
                 </button>
               </div>

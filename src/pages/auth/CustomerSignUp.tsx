@@ -7,6 +7,7 @@ import {
     EyeOff,
     Home,
     Loader2,
+    Mail,
     MapPin,
     Navigation,
     Phone,
@@ -14,7 +15,7 @@ import {
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-type Step = "form" | "otp" | "location" | "done";
+type Step = "method" | "form" | "phone-entry" | "otp" | "location" | "done";
 
 interface GeoResult {
   address: string;
@@ -44,7 +45,7 @@ interface ServiceCity {
 }
 
 const CustomerSignUp = () => {
-  const [step, setStep] = useState<Step>("form");
+  const [step, setStep] = useState<Step>("method");
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -64,6 +65,8 @@ const CustomerSignUp = () => {
   const [otpCode, setOtpCode] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  const [signupMethod, setSignupMethod] = useState<"email" | "phone" | null>(null);
+  const [phoneForm, setPhoneForm] = useState({ name: "", phone: "" });
 
   // City / location picker state
   const [serviceCities, setServiceCities] = useState<ServiceCity[]>([]);
@@ -109,14 +112,45 @@ const CustomerSignUp = () => {
     }
   };
 
+  // -- Phone-only path: collect name + phone then send OTP ----------------
+  const handlePhoneEntryNext = async () => {
+    if (!phoneForm.name.trim()) { setError("Name is required"); return; }
+    const digits = phoneForm.phone.replace(/\D/g, "").slice(-10);
+    if (digits.length < 10) { setError("Enter a valid 10-digit mobile number"); return; }
+    setError("");
+    setOtpLoading(true);
+    try {
+      await authAPI.sendOTP(digits);
+      setOtpSent(true);
+      setStep("otp");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send OTP. Please try again.");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
   // -- Step 2: verify OTP -------------------------------------------------
   const handleVerifyOTP = async () => {
     if (!otpCode || otpCode.length < 6) { setError("Enter the 6-digit OTP"); return; }
     setOtpLoading(true);
     setError("");
     try {
-      await authAPI.checkOTP(form.phone, otpCode);
-      setStep("location");
+      if (signupMethod === "phone") {
+        const response = await authAPI.verifyOTP(
+          phoneForm.phone.replace(/\D/g, "").slice(-10),
+          otpCode,
+          "customer",
+          phoneForm.name.trim()
+        );
+        localStorage.setItem("token", response.token);
+        localStorage.setItem("user", JSON.stringify(response.user));
+        setStep("done");
+        setTimeout(() => { window.location.href = "/customer/dashboard"; }, 2000);
+      } else {
+        await authAPI.checkOTP(form.phone, otpCode);
+        setStep("location");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Incorrect OTP. Please check and try again.");
     } finally {
@@ -129,7 +163,10 @@ const CustomerSignUp = () => {
     setError("");
     setOtpCode("");
     try {
-      await authAPI.sendOTP(form.phone.replace(/\D/g, "").slice(-10));
+      const phone = signupMethod === "phone"
+        ? phoneForm.phone.replace(/\D/g, "").slice(-10)
+        : form.phone.replace(/\D/g, "").slice(-10);
+      await authAPI.sendOTP(phone);
       setOtpSent(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to resend OTP.");
@@ -246,8 +283,10 @@ const CustomerSignUp = () => {
   };
 
   // -- Left panel step indicator ------------------------------------------
-  const steps = ["Your details", "Verify phone", "Your area", "All set!"];
-  const stepIdx = step === "form" ? 0 : step === "otp" ? 1 : step === "location" ? 2 : 3;
+  const steps = signupMethod === "phone"
+    ? ["Your details", "Verify phone", "All set!"]
+    : ["Your details", "Verify phone", "Your area", "All set!"];
+  const stepIdx = (step === "form" || step === "phone-entry") ? 0 : step === "otp" ? 1 : step === "location" ? 2 : 3;
 
   if (step === "done") {
     return (
@@ -257,7 +296,7 @@ const CustomerSignUp = () => {
             <CheckCircle className="w-10 h-10 text-green-600" />
           </div>
           <h2 className="text-3xl font-bold font-heading text-foreground mb-3">Welcome to Healthy Homez! ??</h2>
-          <p className="text-muted-foreground">Your account is ready. Redirecting to your dashboardÖ</p>
+          <p className="text-muted-foreground">Your account is ready. Redirecting to your dashboardÔøΩ</p>
         </div>
       </div>
     );
@@ -317,6 +356,97 @@ const CustomerSignUp = () => {
             <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">
               {error}
             </div>
+          )}
+
+          {/* -- STEP: method -- */}
+          {step === "method" && (
+            <>
+              <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Create your account</h2>
+              <p className="text-muted-foreground mb-8">How would you like to sign up?</p>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => { setSignupMethod("email"); setStep("form"); setError(""); }}
+                  className="w-full flex items-center gap-4 p-5 border-2 border-border rounded-xl hover:border-primary hover:bg-primary/5 transition-all text-left group"
+                >
+                  <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary transition-all shrink-0">
+                    <Mail className="w-5 h-5 text-primary group-hover:text-white" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-foreground">Continue with Email</div>
+                    <div className="text-sm text-muted-foreground mt-0.5">Sign up with your email address &amp; password</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { setSignupMethod("phone"); setStep("phone-entry"); setError(""); }}
+                  className="w-full flex items-center gap-4 p-5 border-2 border-border rounded-xl hover:border-primary hover:bg-primary/5 transition-all text-left group"
+                >
+                  <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary transition-all shrink-0">
+                    <Phone className="w-5 h-5 text-primary group-hover:text-white" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-foreground">Continue with Phone</div>
+                    <div className="text-sm text-muted-foreground mt-0.5">Sign up instantly with your mobile number &amp; OTP</div>
+                  </div>
+                </button>
+              </div>
+
+              <p className="text-center text-sm text-muted-foreground mt-6">
+                Already have an account?{" "}
+                <Link to="/login" className="text-primary font-semibold hover:underline">Log in</Link>
+              </p>
+            </>
+          )}
+
+          {/* -- STEP: phone-entry -- */}
+          {step === "phone-entry" && (
+            <>
+              <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Your details</h2>
+              <p className="text-muted-foreground mb-6">Enter your name and mobile number to get started</p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Full Name</label>
+                  <input
+                    className="input-clean"
+                    placeholder="e.g. Priya Sharma"
+                    value={phoneForm.name}
+                    onChange={(e) => setPhoneForm(p => ({ ...p, name: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Mobile Number</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">+91</span>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      className="input-clean pl-12"
+                      placeholder="98765 43210"
+                      value={phoneForm.phone}
+                      onChange={(e) => setPhoneForm(p => ({ ...p, phone: e.target.value.replace(/\D/g, "") }))}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={handlePhoneEntryNext}
+                  disabled={otpLoading}
+                  className="btn-brand w-full flex items-center justify-center gap-2"
+                >
+                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTP‚Ä¶</> : <><Phone className="w-4 h-4" /> Send OTP</>}
+                </button>
+                <button
+                  onClick={() => { setStep("method"); setError(""); }}
+                  className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm"
+                >
+                  Back
+                </button>
+              </div>
+            </>
           )}
 
           {/* -- STEP: form -- */}
@@ -401,14 +531,19 @@ const CustomerSignUp = () => {
                 </div>
 
                 <button type="submit" disabled={otpLoading} className="btn-brand w-full mt-2 flex items-center justify-center gap-2">
-                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTPÖ</> : <><Phone className="w-4 h-4" /> Continue &amp; Verify Phone</>}
+                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTPÔøΩ</> : <><Phone className="w-4 h-4" /> Continue &amp; Verify Phone</>}
                 </button>
               </form>
 
-              <p className="text-center text-sm text-muted-foreground mt-6">
-                Already have an account?{" "}
-                <Link to="/login" className="text-primary font-semibold hover:underline">Log in</Link>
-              </p>
+              <div className="flex items-center justify-between mt-6 flex-wrap gap-2">
+                <button onClick={() => { setStep("method"); setError(""); }} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  ‚Üê Back
+                </button>
+                <p className="text-sm text-muted-foreground">
+                  Already have an account?{" "}
+                  <Link to="/login" className="text-primary font-semibold hover:underline">Log in</Link>
+                </p>
+              </div>
             </>
           )}
 
@@ -418,8 +553,8 @@ const CustomerSignUp = () => {
               <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Verify your number</h2>
               <p className="text-muted-foreground mb-6">
                 {otpSent
-                  ? `OTP sent to +91${form.phone}. Enter the 6-digit code below.`
-                  : "Sending OTPÖ"}
+                  ? `OTP sent to +91${signupMethod === "phone" ? phoneForm.phone : form.phone}. Enter the 6-digit code below.`
+                  : "Sending OTPÔøΩ"}
               </p>
 
               <div className="space-y-4">
@@ -430,7 +565,7 @@ const CustomerSignUp = () => {
                     inputMode="numeric"
                     maxLength={6}
                     className="input-clean tracking-widest text-center text-lg"
-                    placeholder="∑ ∑ ∑ ∑ ∑ ∑"
+                    placeholder="ÔøΩ ÔøΩ ÔøΩ ÔøΩ ÔøΩ ÔøΩ"
                     value={otpCode}
                     onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
                   />
@@ -441,7 +576,7 @@ const CustomerSignUp = () => {
                   disabled={otpLoading}
                   className="btn-brand w-full flex items-center justify-center gap-2"
                 >
-                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> VerifyingÖ</> : "Verify & Continue"}
+                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> VerifyingÔøΩ</> : "Verify & Continue"}
                 </button>
 
                 <button
@@ -453,7 +588,7 @@ const CustomerSignUp = () => {
                 </button>
 
                 <button
-                  onClick={() => { setStep("form"); setError(""); setOtpCode(""); }}
+                  onClick={() => { setStep(signupMethod === "phone" ? "phone-entry" : "form"); setError(""); setOtpCode(""); }}
                   className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm"
                 >
                   Back
@@ -473,7 +608,7 @@ const CustomerSignUp = () => {
               {citiesLoading ? (
                 <div className="flex items-center justify-center py-10">
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                  <span className="ml-2 text-muted-foreground text-sm">Loading service areasÖ</span>
+                  <span className="ml-2 text-muted-foreground text-sm">Loading service areasÔøΩ</span>
                 </div>
               ) : serviceCities.length === 0 ? (
                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 mb-4">
@@ -490,7 +625,7 @@ const CustomerSignUp = () => {
                         value={selectedCity}
                         onChange={(e) => { setSelectedCity(e.target.value); setSelectedLocationId(""); setError(""); }}
                       >
-                        <option value="">ó Select your city ó</option>
+                        <option value="">ÔøΩ Select your city ÔøΩ</option>
                         {serviceCities.map((c) => (
                           <option key={c.city} value={c.city}>
                             {c.city}{c.hasService ? "" : " (coming soon)"}
@@ -514,7 +649,7 @@ const CustomerSignUp = () => {
                             value={selectedLocationId}
                             onChange={(e) => { setSelectedLocationId(e.target.value); setError(""); }}
                           >
-                            <option value="">ó Select your area ó</option>
+                            <option value="">ÔøΩ Select your area ÔøΩ</option>
                             {locs.map((loc) => (
                               <option key={loc._id} value={loc._id}>
                                 {loc.apartmentName}{loc.area ? `, ${loc.area}` : ""}
@@ -549,7 +684,7 @@ const CustomerSignUp = () => {
                   disabled={loading || !selectedCity || !selectedLocationId}
                   className="btn-brand w-full flex items-center justify-center gap-2"
                 >
-                  {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating accountÖ</> : <><MapPin className="w-4 h-4" /> Confirm &amp; Create Account</>}
+                  {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating accountÔøΩ</> : <><MapPin className="w-4 h-4" /> Confirm &amp; Create Account</>}
                 </button>
 
                 <button
@@ -557,7 +692,7 @@ const CustomerSignUp = () => {
                   disabled={loading}
                   className="w-full py-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Skip ó I'll set location later
+                  Skip ÔøΩ I'll set location later
                 </button>
 
                 <button onClick={() => { setStep("otp"); setError(""); }} className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm">
