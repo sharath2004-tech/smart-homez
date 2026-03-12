@@ -59,6 +59,22 @@ const LoginPage = () => {
       }
 
       const role = response.user.role;
+
+      // Enforce tab-role match
+      const allowedRoles: Record<string, string[]> = {
+        customer: ["customer"],
+        worker: ["worker"],
+        admin: ["admin", "super_admin"],
+      };
+      if (!allowedRoles[tab].includes(role)) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        const label = tab === "admin" ? "Admin" : tab === "worker" ? "Worker" : "Customer";
+        setError(`This account is not registered as a ${label}. Please select the correct role tab.`);
+        setLoading(false);
+        return;
+      }
+
       if (role === "super_admin") window.location.href = "/super-admin/dashboard";
       else if (role === "admin") window.location.href = "/admin/dashboard";
       else if (role === "worker") window.location.href = "/worker/dashboard";
@@ -125,6 +141,22 @@ const LoginPage = () => {
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
       const role = response.user.role;
+
+      // Enforce tab-role match
+      const allowedRoles: Record<string, string[]> = {
+        customer: ["customer"],
+        worker: ["worker"],
+        admin: ["admin", "super_admin"],
+      };
+      if (!allowedRoles[tab].includes(role)) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        const label = tab === "admin" ? "Admin" : tab === "worker" ? "Worker" : "Customer";
+        setError(`This account is not registered as a ${label}. Please select the correct role tab.`);
+        setOtpLoading(false);
+        return;
+      }
+
       if (role === "super_admin") window.location.href = "/super-admin/dashboard";
       else if (role === "admin") window.location.href = "/admin/dashboard";
       else if (role === "worker") window.location.href = "/worker/dashboard";

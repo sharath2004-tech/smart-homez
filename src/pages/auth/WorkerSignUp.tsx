@@ -92,7 +92,7 @@ const WorkerSignUp = () => {
     reader.readAsDataURL(file);
   };
 
-  // -- Step 1: basic details -----------------------------------------------
+  // -- Step 1 (email path): validate form and go directly to skills -----
   const handleFormNext = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) { setError("Name is required"); return; }
@@ -101,9 +101,12 @@ const WorkerSignUp = () => {
       setError("Enter a valid 10-digit mobile number"); return;
     }
     if (form.password.length < 8) { setError("Password must be at least 8 characters"); return; }
+    if (!/[A-Z]/.test(form.password)) { setError("Password must contain at least one uppercase letter"); return; }
+    if (!/[0-9]/.test(form.password)) { setError("Password must contain at least one number"); return; }
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(form.password)) { setError('Password must include a special character (e.g. @, #, $, !)'); return; }
     if (form.password !== form.confirmPassword) { setError("Passwords do not match"); return; }
     setError("");
-    sendOTP();
+    setStep("skills"); // Email path: skip phone OTP, go directly to skills
   };
 
   // -- OTP helpers ---------------------------------------------------------
@@ -207,7 +210,7 @@ const WorkerSignUp = () => {
       formData.append("gender", (signupMethod === "phone" ? phoneForm.gender : form.gender) || "prefer_not_to_say");
       formData.append("experience", (signupMethod === "phone" ? phoneForm.experience : form.experience) || "0");
       formData.append("skills", JSON.stringify(selectedSkills));
-      formData.append("phoneVerified", "true");
+      formData.append("phoneVerified", signupMethod === "phone" ? "true" : "false");
 
       if (geo) {
         formData.append("location", JSON.stringify({
@@ -275,10 +278,12 @@ const WorkerSignUp = () => {
   const handleSkipLocation = () => registerAccount(null);
 
   // -- Steps for left panel -----------------------------------------------
-  const stepLabels = (step === "phone-entry" || signupMethod === "phone")
+  const stepLabels = signupMethod === "phone"
     ? ["Your details", "Verify phone", "Skills", "Documents", "Service area"]
-    : ["Your details", "Verify phone", "Skills", "Documents", "Service area"];
-  const stepIdx = (step === "form" || step === "phone-entry") ? 0 : step === "otp" ? 1 : step === "skills" ? 2 : step === "documents" ? 3 : 4;
+    : ["Your details", "Skills", "Documents", "Service area"];
+  const stepIdx = signupMethod === "phone"
+    ? ((step === "phone-entry") ? 0 : step === "otp" ? 1 : step === "skills" ? 2 : step === "documents" ? 3 : 4)
+    : ((step === "form") ? 0 : step === "skills" ? 1 : step === "documents" ? 2 : 3);
 
   // -- Pending approval screen -------------------------------------------
   if (step === "pending") {
@@ -288,7 +293,7 @@ const WorkerSignUp = () => {
           <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <Clock className="w-10 h-10 text-amber-600" />
           </div>
-          <h2 className="text-3xl font-bold font-heading text-foreground mb-3">Application Submitted! ??</h2>
+          <h2 className="text-3xl font-bold font-heading text-foreground mb-3">Application Submitted! 🎉</h2>
           <p className="text-muted-foreground mb-4">
             Your worker application is under review. Our admin team will verify your documents and approve your account.
           </p>
@@ -574,8 +579,8 @@ const WorkerSignUp = () => {
                   </div>
                 </div>
 
-                <button type="submit" disabled={otpLoading} className="btn-brand w-full mt-2 flex items-center justify-center gap-2">
-                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTP�</> : "Continue & Verify Phone"}
+                <button type="submit" className="btn-brand w-full mt-2">
+                  Continue
                 </button>
               </form>
 
@@ -827,7 +832,7 @@ const WorkerSignUp = () => {
                 </div>
 
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800">
-                  ?? You can update your service area anytime from your profile settings.
+                  You can update your service area anytime from your profile settings.
                 </div>
 
                 <button

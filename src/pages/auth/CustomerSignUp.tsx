@@ -89,27 +89,18 @@ const CustomerSignUp = () => {
   const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
-  // -- Step 1: validate and send OTP -------------------------------------
-  const handleFormNext = async (e: React.FormEvent) => {
+  // -- Step 1 (email path): validate and go directly to location ---------
+  const handleFormNext = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) { setError("Name is required"); return; }
     if (!form.email.trim()) { setError("Email is required"); return; }
-    if (!form.phone.trim() || form.phone.replace(/\D/g, "").length < 10) {
-      setError("Enter a valid 10-digit mobile number"); return;
-    }
     if (form.password.length < 8) { setError("Password must be at least 8 characters"); return; }
+    if (!/[A-Z]/.test(form.password)) { setError("Password must contain at least one uppercase letter"); return; }
+    if (!/[0-9]/.test(form.password)) { setError("Password must contain at least one number"); return; }
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(form.password)) { setError('Password must include a special character (e.g. @, #, $, !)'); return; }
     if (form.password !== form.confirmPassword) { setError("Passwords do not match"); return; }
     setError("");
-    setOtpLoading(true);
-    try {
-      await authAPI.sendOTP(form.phone.replace(/\D/g, "").slice(-10));
-      setOtpSent(true);
-      setStep("otp");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send OTP. Please try again.");
-    } finally {
-      setOtpLoading(false);
-    }
+    setStep("location");
   };
 
   // -- Phone-only path: collect name + phone then send OTP ----------------
@@ -183,11 +174,12 @@ const CustomerSignUp = () => {
         name: form.name.trim(),
         email: form.email.trim().toLowerCase(),
         password: form.password,
-        phone: "+91" + form.phone.replace(/\D/g, "").slice(-10),
         role: "customer",
         gender: form.gender || "prefer_not_to_say",
-        isPhoneVerified: true,
+        isPhoneVerified: false,
       };
+      const phoneDigits = form.phone.replace(/\D/g, "").slice(-10);
+      if (phoneDigits.length === 10) payload.phone = "+91" + phoneDigits;
 
       if (geo) {
         payload.location = {
@@ -285,8 +277,10 @@ const CustomerSignUp = () => {
   // -- Left panel step indicator ------------------------------------------
   const steps = signupMethod === "phone"
     ? ["Your details", "Verify phone", "All set!"]
-    : ["Your details", "Verify phone", "Your area", "All set!"];
-  const stepIdx = (step === "form" || step === "phone-entry") ? 0 : step === "otp" ? 1 : step === "location" ? 2 : 3;
+    : ["Your details", "Your area", "All set!"];
+  const stepIdx = signupMethod === "phone"
+    ? ((step === "phone-entry") ? 0 : step === "otp" ? 1 : 2)
+    : ((step === "form") ? 0 : step === "location" ? 1 : 2);
 
   if (step === "done") {
     return (
@@ -295,7 +289,7 @@ const CustomerSignUp = () => {
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-10 h-10 text-green-600" />
           </div>
-          <h2 className="text-3xl font-bold font-heading text-foreground mb-3">Welcome to Healthy Homez! ??</h2>
+          <h2 className="text-3xl font-bold font-heading text-foreground mb-3">Welcome to Healthy Homez! 🎉</h2>
           <p className="text-muted-foreground">Your account is ready. Redirecting to your dashboard�</p>
         </div>
       </div>
@@ -467,7 +461,7 @@ const CustomerSignUp = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Mobile Number</label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Mobile Number <span className="text-muted-foreground font-normal">(optional)</span></label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">+91</span>
                     <input
@@ -478,7 +472,6 @@ const CustomerSignUp = () => {
                       placeholder="98765 43210"
                       value={form.phone}
                       onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value.replace(/\D/g, "") }))}
-                      required
                     />
                   </div>
                 </div>
@@ -530,8 +523,8 @@ const CustomerSignUp = () => {
                   </div>
                 </div>
 
-                <button type="submit" disabled={otpLoading} className="btn-brand w-full mt-2 flex items-center justify-center gap-2">
-                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTP�</> : <><Phone className="w-4 h-4" /> Continue &amp; Verify Phone</>}
+                <button type="submit" className="btn-brand w-full mt-2">
+                  Continue
                 </button>
               </form>
 
