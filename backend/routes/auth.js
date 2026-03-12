@@ -9,7 +9,7 @@ import { uploadWorkerFiles } from '../middleware/upload.js';
 import Notification from '../models/Notification.js';
 import Settings from '../models/Settings.js';
 import User from '../models/User.js';
-import { sendPasswordChangeConfirmation, sendPasswordResetEmail } from '../utils/emailService.js';
+import { sendPasswordChangeConfirmation, sendPasswordResetEmail, sendPasswordResetOtpEmail } from '../utils/emailService.js';
 
 function getTwilioClient() {
   const sid = process.env.TWILIO_ACCOUNT_SID;
@@ -480,6 +480,107 @@ router.post('/reset-password',
       res.json({ message: 'Password reset successfully. You can now log in.', success: true });
     } catch (error) {
       console.error('Reset password error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   POST /api/auth/forgot-password-email-otp
+// @desc    Send OTP to email for password reset
+// @access  Public
+router.post('/forgot-password-email-otp',
+  sensitiveAuthLimiter,
+  [body('email').isEmail().withMessage('Valid email is required')],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { email } = req.body;
+      const user = await User.findOne({ email: email.toLowerCase().trim() });
+
+      // Always return success to prevent user enumeration
+      if (!user) {
+        return res.json({ success: true, message: 'If that email exists, an OTP has been sent.' });
+      }
+
+      // Generate a 6-digit numeric OTP
+      const otp = String(100000 + crypto.randomInt(900000));
+      const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
+
+      user.passwordResetToken = hashedOtp;
+      user.passwordResetExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+      await user.save({ validateBeforeSave: false });
+
+      // Respond immediately so client never times out waiting for SMTP
+      res.json({ success: true, message: 'If that email exists, an OTP has been sent.' });
+
+      // Send email in the background after responding
+      sendPasswordResetOtpEmail(user.email, user.name, otp).catch((emailError) => {
+        console.error('Failed to send reset OTP email:', emailError);
+      });
+
+      return;
+    } catch (error) {
+      if (res.headersSent) return;
+      console.error('Forgot password email OTP error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   POST /api/auth/reset-password-email-otp
+// @desc    Verify email OTP and reset password
+// @access  Public
+router.post('/reset-password-email-otp',
+  sensitiveAuthLimiter,
+  [
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('otp').notEmpty().withMessage('OTP is required'),
+    body('newPassword')
+      .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+      .matches(/[A-Z]/).withMessage('Must contain uppercase letter')
+      .matches(/[a-z]/).withMessage('Must contain lowercase letter')
+      .matches(/[0-9]/).withMessage('Must contain a number')
+      .matches(/[!@#$%^&*(),.?":{}|<>]/).withMessage('Must contain a special character')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { email, otp, newPassword } = req.body;
+      const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
+
+      const user = await User.findOne({
+        email: email.toLowerCase().trim(),
+        passwordResetToken: hashedOtp,
+        passwordResetExpires: { $gt: Date.now() }
+      }).select('+password +passwordResetToken +passwordResetExpires');
+
+      if (!user) {
+        return res.status(400).json({ error: { message: 'Invalid or expired OTP.', status: 400 } });
+      }
+
+      user.password = newPassword;
+      user.passwordResetToken = undefined;
+      user.passwordResetExpires = undefined;
+      user.isFirstLogin = false;
+      await user.save();
+
+      try {
+        await sendPasswordChangeConfirmation(user.email, user.name);
+      } catch (emailError) {
+        console.error('Failed to send confirmation email:', emailError);
+      }
+
+      res.json({ message: 'Password reset successfully. You can now log in.', success: true });
+    } catch (error) {
+      console.error('Reset password email OTP error:', error);
       res.status(500).json({ error: { message: 'Server error', status: 500 } });
     }
   }

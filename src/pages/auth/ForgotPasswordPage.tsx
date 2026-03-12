@@ -4,15 +4,20 @@ import { Link } from "react-router-dom";
 import { authAPI } from "../../lib/api";
 
 type Tab = "email" | "phone";
+type EmailStep = "sendOtp" | "resetPassword";
 type PhoneStep = "sendOtp" | "resetPassword";
 
 const ForgotPasswordPage = () => {
   const [tab, setTab] = useState<Tab>("email");
 
-  // Email flow
+  // Email OTP flow
   const [email, setEmail] = useState("");
+  const [emailOtp, setEmailOtp] = useState("");
+  const [emailNewPassword, setEmailNewPassword] = useState("");
+  const [emailConfirmPassword, setEmailConfirmPassword] = useState("");
+  const [emailStep, setEmailStep] = useState<EmailStep>("sendOtp");
   const [emailLoading, setEmailLoading] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState(false);
   const [emailError, setEmailError] = useState("");
 
   // Phone flow
@@ -25,15 +30,41 @@ const ForgotPasswordPage = () => {
   const [phoneSuccess, setPhoneSuccess] = useState(false);
   const [phoneError, setPhoneError] = useState("");
 
-  const handleEmailSubmit = async (e: React.FormEvent) => {
+  const handleSendEmailOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setEmailLoading(true);
     setEmailError("");
     try {
-      await authAPI.forgotPassword(email);
-      setEmailSent(true);
+      await authAPI.forgotPasswordEmailOtp(email);
+      setEmailStep("resetPassword");
     } catch (err) {
-      setEmailError(err instanceof Error ? err.message : "Failed to send reset email. Please try again.");
+      setEmailError(err instanceof Error ? err.message : "Failed to send OTP. Please try again.");
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
+  const handleResetWithEmailOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmailError("");
+    if (!/^\d{6}$/.test(emailOtp)) {
+      setEmailError("Please enter the 6-digit OTP sent to your email.");
+      return;
+    }
+    if (emailNewPassword.length < 8) {
+      setEmailError("Password must be at least 8 characters.");
+      return;
+    }
+    if (emailNewPassword !== emailConfirmPassword) {
+      setEmailError("Passwords do not match.");
+      return;
+    }
+    setEmailLoading(true);
+    try {
+      await authAPI.resetPasswordEmailOtp(email, emailOtp, emailNewPassword);
+      setEmailSuccess(true);
+    } catch (err) {
+      setEmailError(err instanceof Error ? err.message : "Failed to reset password. Please check the OTP and try again.");
     } finally {
       setEmailLoading(false);
     }
@@ -90,22 +121,15 @@ const ForgotPasswordPage = () => {
         </div>
 
         {/* Email success state */}
-        {tab === "email" && emailSent ? (
+        {tab === "email" && emailSuccess ? (
           <div className="text-center animate-scale-in">
             <div className="w-16 h-16 bg-primary-light rounded-full flex items-center justify-center mx-auto mb-6">
               <Check className="w-8 h-8 text-primary" />
             </div>
-            <h2 className="text-2xl font-bold font-heading text-foreground mb-2">Check your email</h2>
-            <p className="text-muted-foreground mb-2">We sent a password reset link to</p>
-            <p className="font-semibold text-foreground mb-8">{email}</p>
-            <p className="text-sm text-muted-foreground mb-6">
-              Didn't receive the email?{" "}
-              <button onClick={() => setEmailSent(false)} className="text-primary font-medium hover:underline">
-                Try again
-              </button>
-            </p>
-            <Link to="/login" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-              <ArrowLeft className="w-4 h-4" /> Back to login
+            <h2 className="text-2xl font-bold font-heading text-foreground mb-2">Password Reset!</h2>
+            <p className="text-muted-foreground mb-8">Your password has been successfully reset. You can now log in with your new password.</p>
+            <Link to="/login" className="btn-brand inline-flex items-center gap-2">
+              Back to login
             </Link>
           </div>
         ) : tab === "phone" && phoneSuccess ? (
@@ -140,7 +164,7 @@ const ForgotPasswordPage = () => {
                   tab === "email" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-muted"
                 }`}
               >
-                <Mail className="w-4 h-4" /> Email
+                <Mail className="w-4 h-4" /> Email OTP
               </button>
               <button
                 type="button"
@@ -153,25 +177,76 @@ const ForgotPasswordPage = () => {
               </button>
             </div>
 
-            {/* Email form */}
+            {/* Email OTP form */}
             {tab === "email" && (
-              <form onSubmit={handleEmailSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Email address</label>
-                  <input
-                    type="email"
-                    className="input-clean"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <button type="submit" disabled={emailLoading} className="btn-brand w-full flex items-center justify-center gap-2">
-                  {emailLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</> : "Send reset link"}
-                </button>
-                {emailError && <p className="text-sm text-red-600 text-center mt-2">{emailError}</p>}
-              </form>
+              <>
+                {emailStep === "sendOtp" ? (
+                  <form onSubmit={handleSendEmailOtp} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">Email address</label>
+                      <input
+                        type="email"
+                        className="input-clean"
+                        placeholder="you@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <button type="submit" disabled={emailLoading} className="btn-brand w-full flex items-center justify-center gap-2">
+                      {emailLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTP...</> : "Send OTP"}
+                    </button>
+                    {emailError && <p className="text-sm text-red-600 text-center mt-2">{emailError}</p>}
+                  </form>
+                ) : (
+                  <form onSubmit={handleResetWithEmailOtp} className="space-y-4">
+                    <p className="text-sm text-muted-foreground">OTP sent to <span className="font-semibold text-foreground">{email}</span>.{" "}
+                      <button type="button" onClick={() => { setEmailStep("sendOtp"); setEmailOtp(""); setEmailError(""); }} className="text-primary hover:underline">
+                        Change email
+                      </button>
+                    </p>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">OTP</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className="input-clean tracking-widest text-center text-lg"
+                        placeholder="------"
+                        value={emailOtp}
+                        onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                        required
+                        maxLength={6}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">New password</label>
+                      <input
+                        type="password"
+                        className="input-clean"
+                        placeholder="Min 8 characters"
+                        value={emailNewPassword}
+                        onChange={(e) => setEmailNewPassword(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">Confirm new password</label>
+                      <input
+                        type="password"
+                        className="input-clean"
+                        placeholder="Repeat new password"
+                        value={emailConfirmPassword}
+                        onChange={(e) => setEmailConfirmPassword(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <button type="submit" disabled={emailLoading} className="btn-brand w-full flex items-center justify-center gap-2">
+                      {emailLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Resetting...</> : "Reset password"}
+                    </button>
+                    {emailError && <p className="text-sm text-red-600 text-center mt-2">{emailError}</p>}
+                  </form>
+                )}
+              </>
             )}
 
             {/* Phone form */}

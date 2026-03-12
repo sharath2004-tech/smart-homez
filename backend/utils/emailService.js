@@ -1,5 +1,11 @@
 import crypto from 'crypto';
+import dns from 'node:dns';
 import nodemailer from 'nodemailer';
+
+// Force IPv4 DNS resolution so SMTP connections are never attempted over IPv6.
+// Many hosting providers (e.g. Render free tier) block outbound IPv6 traffic,
+// causing ENETUNREACH errors when smtp.gmail.com resolves to an AAAA record.
+dns.setDefaultResultOrder('ipv4first');
 
 // Check if email is configured
 const isEmailConfigured = () => {
@@ -8,6 +14,11 @@ const isEmailConfigured = () => {
 
 // Singleton transporter — created once and reused across calls
 let _transporter = null;
+
+// Discard the cached transporter so the next call recreates it fresh.
+const resetTransporter = () => {
+  _transporter = null;
+};
 
 // Create (or return cached) transporter
 const createTransporter = () => {
@@ -26,7 +37,7 @@ const createTransporter = () => {
       port,
       secure, // true for 465 (SSL), false for 587 (STARTTLS)
       requireTLS: !secure, // force STARTTLS upgrade on port 587
-      family: 4, // force IPv4 — Render does not support outbound IPv6
+      family: 4, // force IPv4 socket — belt-and-suspenders alongside dns.setDefaultResultOrder
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
@@ -177,6 +188,7 @@ export const sendTemporaryPasswordEmail = async (email, name, temporaryPassword)
     console.log('❌ Email rejected by:', info.rejected);
     return { success: true, messageId: info.messageId };
   } catch (error) {
+    resetTransporter(); // discard broken connection so next call reconnects fresh
     console.error('❌ Error sending temporary password email:');
     console.error('   Error message:', error.message);
     console.error('   Error code:', error.code);
@@ -242,6 +254,7 @@ export const sendPasswordChangeConfirmation = async (email, name) => {
     console.log('✅ Password change confirmation email sent:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
+    resetTransporter(); // discard broken connection so next call reconnects fresh
     console.error('❌ Error sending password change confirmation:', error.message);
     return { success: false, reason: error.message };
   }
@@ -304,7 +317,73 @@ export const sendPasswordResetEmail = async (email, name, resetUrl) => {
     console.log('✅ Password reset email sent to:', email, 'Message ID:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
+    resetTransporter(); // discard broken connection so next call reconnects fresh
     console.error('❌ Error sending password reset email:', error.message);
+    return { success: false, reason: error.message };
+  }
+};
+
+// Send password reset OTP email
+export const sendPasswordResetOtpEmail = async (email, name, otp) => {
+  try {
+    if (!isEmailConfigured()) {
+      console.log('ℹ️ Email not configured. Skipping password reset OTP email for:', name);
+      return { success: false, reason: 'Email not configured' };
+    }
+
+    const transporter = createTransporter();
+    if (!transporter) {
+      return { success: false, reason: 'Transporter creation failed' };
+    }
+
+    const mailOptions = {
+      from: `"Healthy Homez" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: 'Your Password Reset OTP - Healthy Homez',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+            .otp-box { background: white; border: 2px solid #667eea; padding: 20px; margin: 20px 0; text-align: center; border-radius: 8px; }
+            .otp { font-size: 36px; font-weight: bold; color: #667eea; letter-spacing: 8px; font-family: monospace; }
+            .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; }
+            .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header"><h1>🔒 Password Reset OTP</h1></div>
+            <div class="content">
+              <p>Hi ${name},</p>
+              <p>We received a request to reset your password. Use the OTP below to continue:</p>
+              <div class="otp-box">
+                <p style="margin: 0 0 10px 0; font-size: 14px; color: #666;">Your One-Time Password:</p>
+                <div class="otp">${otp}</div>
+              </div>
+              <div class="warning">
+                <strong>⚠️ This OTP expires in 10 minutes.</strong><br>
+                If you did not request a password reset, please ignore this email — your password will remain unchanged.
+              </div>
+              <p>Best regards,<br>The Healthy Homez Team</p>
+            </div>
+            <div class="footer"><p>© ${new Date().getFullYear()} Healthy Homez. All rights reserved.</p></div>
+          </div>
+        </body>
+        </html>
+      `
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Password reset OTP email sent to:', email, 'Message ID:', info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    resetTransporter(); // discard broken connection so next call reconnects fresh
+    console.error('❌ Error sending password reset OTP email:', error.message);
     return { success: false, reason: error.message };
   }
 };
@@ -313,5 +392,6 @@ export default {
   generateTemporaryPassword,
   sendTemporaryPasswordEmail,
   sendPasswordChangeConfirmation,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendPasswordResetOtpEmail
 };
