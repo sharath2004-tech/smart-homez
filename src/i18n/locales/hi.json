@@ -457,7 +457,10 @@
       "uploadingPaymentProof": "भुगतान प्रमाण अपलोड हो रहा है...",
       "pleaseWait": "कृपया प्रतीक्षा करें",
       "collectLabel": "वसूलें:",
-      "tapToViewDetails": "पूर्ण विवरण और नेविगेशन देखने के लिए टैप करें"
+      "tapToViewDetails": "पूर्ण विवरण और नेविगेशन देखने के लिए टैप करें",
+      "today": "आज",
+      "thisWeek": "इस सप्ताह",
+      "thisMonth": "इस महीने"
     },
     "earnings": {
       "title": "मेरी कमाई",

@@ -461,7 +461,10 @@
       "uploadingPaymentProof": "Uploading payment proof...",
       "pleaseWait": "Please wait",
       "collectLabel": "Collect:",
-      "tapToViewDetails": "Tap to view full details and navigation"
+      "tapToViewDetails": "Tap to view full details and navigation",
+      "today": "Today",
+      "thisWeek": "This Week",
+      "thisMonth": "This Month"
     },
     "earnings": {
       "title": "My Earnings",
