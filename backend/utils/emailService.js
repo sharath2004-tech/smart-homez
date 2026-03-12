@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 
 // Check if email is configured
@@ -5,17 +6,26 @@ const isEmailConfigured = () => {
   return !!(process.env.SMTP_USER && process.env.SMTP_PASS);
 };
 
-// Create transporter
+// Singleton transporter — created once and reused across calls
+let _transporter = null;
+
+// Create (or return cached) transporter
 const createTransporter = () => {
   if (!isEmailConfigured()) {
     console.warn('⚠️ Email not configured. Set SMTP_USER and SMTP_PASS in .env file.');
     return null;
   }
 
+  if (_transporter) return _transporter;
+
   try {
     const port = parseInt(process.env.SMTP_PORT || '465');
+<<<<<<< HEAD
     const secure = port === 465;
     return nodemailer.createTransport({
+=======
+    _transporter = nodemailer.createTransport({
+>>>>>>> 685ca214539a48900ee077401f0a182dfaba337e
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port,
       secure, // true for 465 (SSL), false for 587 (STARTTLS)
@@ -31,32 +41,47 @@ const createTransporter = () => {
       greetingTimeout: 30000,
       socketTimeout: 45000
     });
+    return _transporter;
   } catch (error) {
     console.error('❌ Failed to create email transporter:', error.message);
     return null;
   }
 };
 
-// Generate temporary password
+// Generate temporary password using cryptographically secure random bytes
 export const generateTemporaryPassword = () => {
-  // Generate a random 10-character password with uppercase, lowercase, numbers, and special chars
-  const length = 10;
-  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-  let password = '';
-  
-  // Ensure at least one of each type
-  password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)]; // uppercase
-  password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; // lowercase
-  password += '0123456789'[Math.floor(Math.random() * 10)]; // number
-  password += '!@#$%^&*'[Math.floor(Math.random() * 8)]; // special char
-  
-  // Fill the rest randomly
-  for (let i = password.length; i < length; i++) {
-    password += charset[Math.floor(Math.random() * charset.length)];
+  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const lower = 'abcdefghijklmnopqrstuvwxyz';
+  const digits = '0123456789';
+  const special = '!@#$%^&*';
+  const all = upper + lower + digits + special;
+
+  // Rejection sampling for unbiased random index within [0, max)
+  const randomIndex = (max) => {
+    const limit = Math.floor(256 / max) * max;
+    let byte;
+    do {
+      byte = crypto.randomBytes(1)[0];
+    } while (byte >= limit);
+    return byte % max;
+  };
+
+  // Ensure at least one character from each required category
+  const password = [
+    upper[randomIndex(upper.length)],
+    lower[randomIndex(lower.length)],
+    digits[randomIndex(digits.length)],
+    special[randomIndex(special.length)],
+    ...Array.from({ length: 6 }, () => all[randomIndex(all.length)])
+  ];
+
+  // Fisher-Yates shuffle using rejection-sampled random indices
+  for (let i = password.length - 1; i > 0; i--) {
+    const j = randomIndex(i + 1);
+    [password[i], password[j]] = [password[j], password[i]];
   }
-  
-  // Shuffle the password
-  return password.split('').sort(() => Math.random() - 0.5).join('');
+
+  return password.join('');
 };
 
 // Send temporary password email
