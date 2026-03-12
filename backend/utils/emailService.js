@@ -14,10 +14,12 @@ const createTransporter = () => {
 
   try {
     const port = parseInt(process.env.SMTP_PORT || '465');
+    const secure = port === 465;
     return nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port,
-      secure: port === 465, // true for 465 (SSL), false for 587 (STARTTLS)
+      secure, // true for 465 (SSL), false for 587 (STARTTLS)
+      requireTLS: !secure, // force STARTTLS upgrade on port 587
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
@@ -25,9 +27,9 @@ const createTransporter = () => {
       tls: {
         rejectUnauthorized: false
       },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 15000
+      connectionTimeout: 30000,
+      greetingTimeout: 30000,
+      socketTimeout: 45000
     });
   } catch (error) {
     console.error('❌ Failed to create email transporter:', error.message);
