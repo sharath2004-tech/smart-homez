@@ -1,3 +1,7 @@
+import dns from 'dns';
+// Force IPv4 for all outbound connections — Render does not support outbound IPv6
+dns.setDefaultResultOrder('ipv4first');
+
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
