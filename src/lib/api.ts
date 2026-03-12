@@ -757,21 +757,16 @@ export const adminAPI = {
   },
 
   // Worker Management
-  createWorker: async (workerData: {
-    name: string;
-    email: string;
-    password?: string;
-    phone?: string;
-    gender?: string;
-    religion?: string;
-    experience?: number;
-    specialization: string[];
-    assignedApartmentIds: string[];
-  }) => {
-    return apiCall('/admin/workers', {
+  createWorker: async (formData: FormData) => {
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/admin/workers`, {
       method: 'POST',
-      body: JSON.stringify(workerData)
+      headers: { ...(token && { Authorization: `Bearer ${token}` }) },
+      body: formData
     });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error?.message || data.message || 'Failed to create worker');
+    return data;
   },
 
   getWorkers: async (locationId?: string) => {
@@ -1066,21 +1061,16 @@ export const superAdminAPI = {
     return apiCall(`/super-admin/workers${params}`);
   },
 
-  createWorker: async (workerData: {
-    name: string;
-    email: string;
-    phone: string;
-    gender?: string;
-    religion?: string;
-    experience?: number;
-    specialization: string[];
-    hourlyRate?: number;
-    assignedApartmentIds: string[];
-  }) => {
-    return apiCall('/super-admin/workers', {
+  createWorker: async (formData: FormData) => {
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/super-admin/workers`, {
       method: 'POST',
-      body: JSON.stringify(workerData)
+      headers: { ...(token && { Authorization: `Bearer ${token}` }) },
+      body: formData
     });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error?.message || data.message || 'Failed to create worker');
+    return data;
   },
 
   archiveWorker: async (workerId: string) => {

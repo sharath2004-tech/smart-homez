@@ -1,8 +1,8 @@
 import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { adminAPI } from "@/lib/api";
-import { Archive, ArchiveRestore, CheckCircle, Loader2, MapPin, Plus, Search, Star, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Archive, ArchiveRestore, CheckCircle, FileText, Loader2, MapPin, Plus, Search, Star, Upload, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 interface Location {
   _id: string;
@@ -76,8 +76,23 @@ const AdminWorkers = () => {
     religion: "",
     experience: "" as string,
     specialization: [] as string[],
-    selectedLocations: [] as string[]
+    selectedLocations: [] as string[],
+    aadhaarNumber: ""
   });
+
+  const [docFiles, setDocFiles] = useState<{
+    profilePicture: File | null;
+    aadhaarFront: File | null;
+    aadhaarBack: File | null;
+  }>({
+    profilePicture: null,
+    aadhaarFront: null,
+    aadhaarBack: null
+  });
+
+  const profilePicRef = useRef<HTMLInputElement>(null);
+  const aadhaarFrontRef = useRef<HTMLInputElement>(null);
+  const aadhaarBackRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchData();
@@ -144,16 +159,21 @@ const AdminWorkers = () => {
     setCreatingWorker(true);
 
     try {
-      const response = await adminAPI.createWorker({
-        name: workerForm.name,
-        email: workerForm.email,
-        phone: workerForm.phone,
-        gender: workerForm.gender,
-        religion: workerForm.religion || undefined,
-        experience: parseInt(workerForm.experience) || 0,
-        specialization: workerForm.specialization,
-        assignedApartmentIds: workerForm.selectedLocations
-      });
+      const formData = new FormData();
+      formData.append('name', workerForm.name);
+      formData.append('email', workerForm.email);
+      formData.append('phone', workerForm.phone);
+      if (workerForm.gender) formData.append('gender', workerForm.gender);
+      if (workerForm.religion) formData.append('religion', workerForm.religion);
+      formData.append('experience', String(parseInt(workerForm.experience) || 0));
+      formData.append('specialization', JSON.stringify(workerForm.specialization));
+      formData.append('assignedApartmentIds', JSON.stringify(workerForm.selectedLocations));
+      if (workerForm.aadhaarNumber) formData.append('aadhaarNumber', workerForm.aadhaarNumber);
+      if (docFiles.profilePicture) formData.append('profilePicture', docFiles.profilePicture);
+      if (docFiles.aadhaarFront) formData.append('aadhaarFront', docFiles.aadhaarFront);
+      if (docFiles.aadhaarBack) formData.append('aadhaarBack', docFiles.aadhaarBack);
+
+      const response = await adminAPI.createWorker(formData);
       
       // Show temporary password to admin
       if (response.temporaryPassword) {
@@ -171,8 +191,10 @@ const AdminWorkers = () => {
         religion: "",
         experience: "",
         specialization: [],
-        selectedLocations: []
+        selectedLocations: [],
+        aadhaarNumber: ""
       });
+      setDocFiles({ profilePicture: null, aadhaarFront: null, aadhaarBack: null });
       fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create worker';
@@ -514,6 +536,99 @@ const AdminWorkers = () => {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">Worker will only be visible to admins of selected locations</p>
+                </div>
+
+                {/* Verification Documents */}
+                <div className="border border-border rounded-xl p-4 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-primary" />
+                    <h3 className="text-sm font-semibold">Verification Documents <span className="text-muted-foreground font-normal">(Optional)</span></h3>
+                  </div>
+
+                  {/* Profile Picture */}
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Profile Picture</label>
+                    <input
+                      ref={profilePicRef}
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(e) => setDocFiles(prev => ({ ...prev, profilePicture: e.target.files?.[0] || null }))}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => profilePicRef.current?.click()}
+                      className="flex items-center gap-2 text-xs px-3 py-2 border border-dashed border-border rounded-lg hover:bg-muted transition-colors w-full"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-muted-foreground" />
+                      {docFiles.profilePicture ? (
+                        <span className="text-foreground">{docFiles.profilePicture.name}</span>
+                      ) : (
+                        <span className="text-muted-foreground">Upload profile photo (JPEG/PNG)</span>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Aadhaar Front */}
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Aadhaar Card — Front</label>
+                    <input
+                      ref={aadhaarFrontRef}
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
+                      className="hidden"
+                      onChange={(e) => setDocFiles(prev => ({ ...prev, aadhaarFront: e.target.files?.[0] || null }))}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => aadhaarFrontRef.current?.click()}
+                      className="flex items-center gap-2 text-xs px-3 py-2 border border-dashed border-border rounded-lg hover:bg-muted transition-colors w-full"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-muted-foreground" />
+                      {docFiles.aadhaarFront ? (
+                        <span className="text-foreground">{docFiles.aadhaarFront.name}</span>
+                      ) : (
+                        <span className="text-muted-foreground">Upload Aadhaar front (image or PDF)</span>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Aadhaar Back */}
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Aadhaar Card — Back</label>
+                    <input
+                      ref={aadhaarBackRef}
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
+                      className="hidden"
+                      onChange={(e) => setDocFiles(prev => ({ ...prev, aadhaarBack: e.target.files?.[0] || null }))}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => aadhaarBackRef.current?.click()}
+                      className="flex items-center gap-2 text-xs px-3 py-2 border border-dashed border-border rounded-lg hover:bg-muted transition-colors w-full"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-muted-foreground" />
+                      {docFiles.aadhaarBack ? (
+                        <span className="text-foreground">{docFiles.aadhaarBack.name}</span>
+                      ) : (
+                        <span className="text-muted-foreground">Upload Aadhaar back (image or PDF)</span>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Aadhaar Number */}
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Aadhaar Number</label>
+                    <input
+                      type="text"
+                      className="input-clean"
+                      placeholder="XXXX XXXX XXXX"
+                      maxLength={14}
+                      value={workerForm.aadhaarNumber}
+                      onChange={(e) => setWorkerForm({ ...workerForm, aadhaarNumber: e.target.value })}
+                    />
+                  </div>
                 </div>
 
                 <div className="flex gap-3 pt-4">

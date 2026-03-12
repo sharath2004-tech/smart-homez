@@ -13,6 +13,7 @@ import Location from '../models/Location.js';
 import Settings from '../models/Settings.js';
 import User from '../models/User.js';
 import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/emailService.js';
+import { uploadWorkerFiles } from '../middleware/upload.js';
 
 // Canonical list of valid Indian cities — prevents free-text garbage input
 const VALID_INDIAN_CITIES = [
@@ -187,6 +188,11 @@ router.get('/workers', async (req, res) => {
 // @desc    Create a new worker
 router.post(
   '/workers',
+  uploadWorkerFiles.fields([
+    { name: 'profilePicture', maxCount: 1 },
+    { name: 'aadhaarFront', maxCount: 1 },
+    { name: 'aadhaarBack', maxCount: 1 }
+  ]),
   [
     body('name').notEmpty().withMessage('Name is required'),
     body('email').isEmail().withMessage('Valid email is required'),
@@ -201,7 +207,27 @@ router.post(
         return res.status(400).json({ error: { message: errors.array()[0].msg, status: 400 } });
       }
 
-      const { name, email, phone, gender, religion, experience, specialization, hourlyRate, assignedApartmentIds } = req.body;
+      const { name, email, phone, gender, religion, experience, hourlyRate, aadhaarNumber } = req.body;
+
+      // Parse array fields that may come as JSON strings from multipart forms
+      let specialization = req.body.specialization;
+      if (typeof specialization === 'string') {
+        try { specialization = JSON.parse(specialization); } catch { specialization = [specialization]; }
+      }
+      let assignedApartmentIds = req.body.assignedApartmentIds;
+      if (typeof assignedApartmentIds === 'string') {
+        try { assignedApartmentIds = JSON.parse(assignedApartmentIds); } catch { assignedApartmentIds = [assignedApartmentIds]; }
+      }
+
+      // Extract uploaded verification document paths
+      const files = req.files || {};
+      const profileImagePath = files.profilePicture?.[0]
+        ? `/uploads/profile-pics/${files.profilePicture[0].filename}` : null;
+      const aadhaarFrontPath = files.aadhaarFront?.[0]
+        ? `/uploads/worker-docs/${files.aadhaarFront[0].filename}` : null;
+      const aadhaarBackPath = files.aadhaarBack?.[0]
+        ? `/uploads/worker-docs/${files.aadhaarBack[0].filename}` : null;
+
       const normalizedEmail = email.toLowerCase().trim();
 
       if (await User.findOne({ email: normalizedEmail })) {
@@ -241,13 +267,20 @@ router.post(
         role: 'worker',
         isActive: true,
         isVerified: false,
+        profileImage: profileImagePath,
         workerProfile: {
           specialization,
           experience: experience || 0,
           hourlyRate: hourlyRate || 0,
           assignedApartments,
           availability: true,
-          serviceRadius: settings.booking.serviceRadius
+          serviceRadius: settings.booking.serviceRadius,
+          documents: {
+            aadhaarFront: aadhaarFrontPath,
+            aadhaarBack: aadhaarBackPath,
+            aadhaarNumber: aadhaarNumber || null,
+            uploadedAt: (aadhaarFrontPath || aadhaarBackPath) ? new Date() : null
+          }
         }
       });
 

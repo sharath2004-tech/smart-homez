@@ -24,6 +24,24 @@ const fileFilter = (req, file, cb) => {
   cb(new Error('Only image files (JPEG, JPG, PNG, WEBP) are allowed!'));
 };
 
+// File filter for worker verification documents — allows images AND PDFs
+const docFileFilter = (req, file, cb) => {
+  if (file.fieldname === 'profilePicture') {
+    const allowed = /jpeg|jpg|png|webp/;
+    if (allowed.test(path.extname(file.originalname).toLowerCase()) && allowed.test(file.mimetype)) {
+      return cb(null, true);
+    }
+    return cb(new Error('Profile picture must be an image (JPEG, JPG, PNG, WEBP)'));
+  }
+  // ID documents: images and PDFs accepted
+  const allowedExt = /jpeg|jpg|png|webp|pdf/;
+  const allowedMime = /image\/(jpeg|jpg|png|webp)|application\/pdf/;
+  if (allowedExt.test(path.extname(file.originalname).toLowerCase()) && allowedMime.test(file.mimetype)) {
+    return cb(null, true);
+  }
+  cb(new Error('Documents must be images (JPEG, PNG, WEBP) or PDF files'));
+};
+
 // ── Booking completion photo upload ──────────────────────────────────────────
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -57,7 +75,7 @@ const workerFilesStorage = multer.diskStorage({
 export const uploadWorkerFiles = multer({
   storage: workerFilesStorage,
   limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: fileFilter
+  fileFilter: docFileFilter
 });
 
 export default upload;
