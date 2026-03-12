@@ -377,10 +377,73 @@ export const sendPasswordResetOtpEmail = async (email, name, otp) => {
   }
 };
 
+// Send signup email OTP (for new user email verification)
+export const sendSignupOtpEmail = async (email, otp) => {
+  try {
+    if (!isEmailConfigured()) {
+      console.log(`ℹ️ Email not configured. Signup OTP for ${email}: ${otp}`);
+      return { success: false, reason: 'Email not configured' };
+    }
+
+    const transporter = createTransporter();
+    if (!transporter) return { success: false, reason: 'Transporter creation failed' };
+
+    const mailOptions = {
+      from: `"Healthy Homez" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: 'Your Sign-Up OTP - Healthy Homez',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+            .otp-box { background: white; border: 2px solid #667eea; padding: 20px; margin: 20px 0; text-align: center; border-radius: 8px; }
+            .otp { font-size: 36px; font-weight: bold; color: #667eea; letter-spacing: 8px; font-family: monospace; }
+            .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; }
+            .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header"><h1>✉️ Verify Your Email</h1></div>
+            <div class="content">
+              <p>Welcome to Healthy Homez!</p>
+              <p>Use the OTP below to verify your email address and complete your sign-up:</p>
+              <div class="otp-box">
+                <p style="margin: 0 0 10px 0; font-size: 14px; color: #666;">Your One-Time Password:</p>
+                <div class="otp">${otp}</div>
+              </div>
+              <div class="warning">
+                <strong>⚠️ This OTP expires in 10 minutes.</strong><br>
+                If you did not create a Healthy Homez account, please ignore this email.
+              </div>
+              <p>Best regards,<br>The Healthy Homez Team</p>
+            </div>
+            <div class="footer"><p>© ${new Date().getFullYear()} Healthy Homez. All rights reserved.</p></div>
+          </div>
+        </body>
+        </html>
+      `
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Signup OTP email sent to:', email, 'Message ID:', info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('❌ Error sending signup OTP email:', error.message);
+    return { success: false, reason: error.message };
+  }
+};
+
 export default {
   generateTemporaryPassword,
   sendTemporaryPasswordEmail,
   sendPasswordChangeConfirmation,
   sendPasswordResetEmail,
-  sendPasswordResetOtpEmail
+  sendPasswordResetOtpEmail,
+  sendSignupOtpEmail
 };

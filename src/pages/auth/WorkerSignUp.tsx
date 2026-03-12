@@ -92,13 +92,13 @@ const WorkerSignUp = () => {
     reader.readAsDataURL(file);
   };
 
-  // -- Step 1 (email path): validate form and go directly to skills -----
-  const handleFormNext = (e: React.FormEvent) => {
+  // -- Step 1 (email path): validate form and send OTP to email -----
+  const handleFormNext = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) { setError("Name is required"); return; }
     if (!form.email.trim()) { setError("Email is required"); return; }
-    if (!form.phone.trim() || form.phone.replace(/\D/g, "").length < 10) {
-      setError("Enter a valid 10-digit mobile number"); return;
+    if (form.phone.trim() && form.phone.replace(/\D/g, "").length < 10) {
+      setError("Mobile number must be 10 digits"); return;
     }
     if (form.password.length < 8) { setError("Password must be at least 8 characters"); return; }
     if (!/[A-Z]/.test(form.password)) { setError("Password must contain at least one uppercase letter"); return; }
@@ -106,7 +106,16 @@ const WorkerSignUp = () => {
     if (!/[!@#$%^&*(),.?":{}|<>]/.test(form.password)) { setError('Password must include a special character (e.g. @, #, $, !)'); return; }
     if (form.password !== form.confirmPassword) { setError("Passwords do not match"); return; }
     setError("");
-    setStep("skills"); // Email path: skip phone OTP, go directly to skills
+    setOtpLoading(true);
+    try {
+      await authAPI.sendEmailOTP(form.email.trim().toLowerCase());
+      setOtpSent(true);
+      setStep("otp");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send OTP to your email. Please try again.");
+    } finally {
+      setOtpLoading(false);
+    }
   };
 
   // -- OTP helpers ---------------------------------------------------------
@@ -150,10 +159,14 @@ const WorkerSignUp = () => {
     setOtpLoading(true);
     setError("");
     try {
-      const phone = signupMethod === "phone"
-        ? phoneForm.phone.replace(/\D/g, "").slice(-10)
-        : form.phone.replace(/\D/g, "").slice(-10);
-      await authAPI.checkOTP(phone, otpCode);
+      if (signupMethod === "email") {
+        // Verify email OTP then proceed to skills
+        await authAPI.verifyEmailOTP(form.email.trim().toLowerCase(), otpCode);
+      } else {
+        // Phone path: verify SMS OTP
+        const phone = phoneForm.phone.replace(/\D/g, "").slice(-10);
+        await authAPI.checkOTP(phone, otpCode);
+      }
       setStep("skills");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Incorrect OTP. Please check and try again.");
@@ -280,10 +293,10 @@ const WorkerSignUp = () => {
   // -- Steps for left panel -----------------------------------------------
   const stepLabels = signupMethod === "phone"
     ? ["Your details", "Verify phone", "Skills", "Documents", "Service area"]
-    : ["Your details", "Skills", "Documents", "Service area"];
+    : ["Your details", "Verify email", "Skills", "Documents", "Service area"];
   const stepIdx = signupMethod === "phone"
     ? ((step === "phone-entry") ? 0 : step === "otp" ? 1 : step === "skills" ? 2 : step === "documents" ? 3 : 4)
-    : ((step === "form") ? 0 : step === "skills" ? 1 : step === "documents" ? 2 : 3);
+    : (step === "form" ? 0 : step === "otp" ? 1 : step === "skills" ? 2 : step === "documents" ? 3 : 4);
 
   // -- Pending approval screen -------------------------------------------
   if (step === "pending") {
@@ -501,7 +514,7 @@ const WorkerSignUp = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Mobile Number <span className="text-destructive">*</span></label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Mobile Number <span className="text-muted-foreground font-normal">(optional)</span></label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">+91</span>
                     <input
@@ -512,10 +525,9 @@ const WorkerSignUp = () => {
                       placeholder="98765 43210"
                       value={form.phone}
                       onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value.replace(/\D/g, "") }))}
-                      required
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">An OTP will be sent to verify this number</p>
+                  <p className="text-xs text-muted-foreground mt-1">Used for customer communication (can be added later)</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -599,11 +611,15 @@ const WorkerSignUp = () => {
           {/* -- STEP: otp -- */}
           {step === "otp" && (
             <>
-              <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Verify your number</h2>
+              <h2 className="text-2xl font-bold font-heading text-foreground mb-1">
+                {signupMethod === "email" ? "Verify your email" : "Verify your number"}
+              </h2>
               <p className="text-muted-foreground mb-6">
                 {otpSent
-                  ? `OTP sent to +91${signupMethod === "phone" ? phoneForm.phone : form.phone}. Enter the 6-digit code below.`
-                  : "Sending OTP�"}
+                  ? signupMethod === "email"
+                    ? `OTP sent to ${form.email}. Enter the 6-digit code below.`
+                    : `OTP sent to +91${phoneForm.phone}. Enter the 6-digit code below.`
+                  : "Sending OTP..."}
               </p>
 
               <div className="space-y-4">
@@ -629,7 +645,16 @@ const WorkerSignUp = () => {
                 </button>
 
                 <button
-                  onClick={() => { setOtpSent(false); setOtpCode(""); setError(""); sendOTP(); }}
+                  onClick={() => {
+                    setOtpSent(false); setOtpCode(""); setError("");
+                    if (signupMethod === "email") {
+                      authAPI.sendEmailOTP(form.email.trim().toLowerCase())
+                        .then(() => setOtpSent(true))
+                        .catch(err => setError(err instanceof Error ? err.message : "Failed to resend OTP."));
+                    } else {
+                      sendOTP();
+                    }
+                  }}
                   disabled={otpLoading}
                   className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >

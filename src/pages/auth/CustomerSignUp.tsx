@@ -89,8 +89,8 @@ const CustomerSignUp = () => {
   const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
-  // -- Step 1 (email path): validate and go directly to location ---------
-  const handleFormNext = (e: React.FormEvent) => {
+  // -- Step 1 (email path): validate and send OTP to email ---------
+  const handleFormNext = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) { setError("Name is required"); return; }
     if (!form.email.trim()) { setError("Email is required"); return; }
@@ -100,7 +100,16 @@ const CustomerSignUp = () => {
     if (!/[!@#$%^&*(),.?":{}|<>]/.test(form.password)) { setError('Password must include a special character (e.g. @, #, $, !)'); return; }
     if (form.password !== form.confirmPassword) { setError("Passwords do not match"); return; }
     setError("");
-    setStep("location");
+    setOtpLoading(true);
+    try {
+      await authAPI.sendEmailOTP(form.email.trim().toLowerCase());
+      setOtpSent(true);
+      setStep("otp");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send OTP to your email. Please try again.");
+    } finally {
+      setOtpLoading(false);
+    }
   };
 
   // -- Phone-only path: collect name + phone then send OTP ----------------
@@ -127,7 +136,12 @@ const CustomerSignUp = () => {
     setOtpLoading(true);
     setError("");
     try {
-      if (signupMethod === "phone") {
+      if (signupMethod === "email") {
+        // Verify email OTP then proceed to location selection
+        await authAPI.verifyEmailOTP(form.email.trim().toLowerCase(), otpCode);
+        setStep("location");
+      } else {
+        // Phone path: verify SMS OTP and complete registration
         const response = await authAPI.verifyOTP(
           phoneForm.phone.replace(/\D/g, "").slice(-10),
           otpCode,
@@ -138,9 +152,6 @@ const CustomerSignUp = () => {
         localStorage.setItem("user", JSON.stringify(response.user));
         setStep("done");
         setTimeout(() => { window.location.href = "/customer/dashboard"; }, 2000);
-      } else {
-        await authAPI.checkOTP(form.phone, otpCode);
-        setStep("location");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Incorrect OTP. Please check and try again.");
@@ -154,10 +165,12 @@ const CustomerSignUp = () => {
     setError("");
     setOtpCode("");
     try {
-      const phone = signupMethod === "phone"
-        ? phoneForm.phone.replace(/\D/g, "").slice(-10)
-        : form.phone.replace(/\D/g, "").slice(-10);
-      await authAPI.sendOTP(phone);
+      if (signupMethod === "email") {
+        await authAPI.sendEmailOTP(form.email.trim().toLowerCase());
+      } else {
+        const phone = phoneForm.phone.replace(/\D/g, "").slice(-10);
+        await authAPI.sendOTP(phone);
+      }
       setOtpSent(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to resend OTP.");
@@ -277,10 +290,10 @@ const CustomerSignUp = () => {
   // -- Left panel step indicator ------------------------------------------
   const steps = signupMethod === "phone"
     ? ["Your details", "Verify phone", "All set!"]
-    : ["Your details", "Your area", "All set!"];
+    : ["Your details", "Verify email", "Your area", "All set!"];
   const stepIdx = signupMethod === "phone"
     ? ((step === "phone-entry") ? 0 : step === "otp" ? 1 : 2)
-    : ((step === "form") ? 0 : step === "location" ? 1 : 2);
+    : (step === "form" ? 0 : step === "otp" ? 1 : step === "location" ? 2 : 3);
 
   if (step === "done") {
     return (
@@ -543,11 +556,15 @@ const CustomerSignUp = () => {
           {/* -- STEP: otp -- */}
           {step === "otp" && (
             <>
-              <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Verify your number</h2>
+              <h2 className="text-2xl font-bold font-heading text-foreground mb-1">
+                {signupMethod === "email" ? "Verify your email" : "Verify your number"}
+              </h2>
               <p className="text-muted-foreground mb-6">
                 {otpSent
-                  ? `OTP sent to +91${signupMethod === "phone" ? phoneForm.phone : form.phone}. Enter the 6-digit code below.`
-                  : "Sending OTP�"}
+                  ? signupMethod === "email"
+                    ? `OTP sent to ${form.email}. Enter the 6-digit code below.`
+                    : `OTP sent to +91${phoneForm.phone}. Enter the 6-digit code below.`
+                  : "Sending OTP..."}
               </p>
 
               <div className="space-y-4">

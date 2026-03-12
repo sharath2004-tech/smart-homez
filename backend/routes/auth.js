@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import express from 'express';
-import { body, validationResult } from 'express-validator';
 import rateLimit from 'express-rate-limit';
+import { body, validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
 import twilio from 'twilio';
 import { authenticate } from '../middleware/auth.js';
@@ -9,7 +9,7 @@ import { uploadWorkerFiles } from '../middleware/upload.js';
 import Notification from '../models/Notification.js';
 import Settings from '../models/Settings.js';
 import User from '../models/User.js';
-import { sendPasswordChangeConfirmation, sendPasswordResetEmail, sendPasswordResetOtpEmail } from '../utils/emailService.js';
+import { sendPasswordChangeConfirmation, sendPasswordResetEmail, sendPasswordResetOtpEmail, sendSignupOtpEmail } from '../utils/emailService.js';
 
 function getTwilioClient() {
   const sid = process.env.TWILIO_ACCOUNT_SID;
@@ -702,6 +702,61 @@ router.patch('/preferences', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Update preferences error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// In-memory store for signup email OTPs: email → { hash, expiresAt }
+const signupEmailOtpStore = new Map();
+
+// @route   POST /api/auth/send-email-otp
+// @desc    Send a 6-digit OTP to an email address for signup verification
+// @access  Public
+router.post('/send-email-otp', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ message: 'Valid email is required' });
+    }
+    const key = email.toLowerCase().trim();
+    const otp = String(100000 + crypto.randomInt(900000));
+    const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
+    signupEmailOtpStore.set(key, { hash: hashedOtp, expiresAt: Date.now() + 10 * 60 * 1000 });
+    // Respond immediately so the client doesn't wait for SMTP
+    res.json({ success: true, message: 'OTP sent to your email' });
+    sendSignupOtpEmail(key, otp).catch(err => {
+      console.error('Failed to deliver signup OTP email:', err.message);
+    });
+  } catch (err) {
+    if (!res.headersSent) res.status(500).json({ message: 'Failed to send OTP' });
+  }
+});
+
+// @route   POST /api/auth/verify-email-otp
+// @desc    Verify the 6-digit signup email OTP (does NOT create the user)
+// @access  Public
+router.post('/verify-email-otp', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ message: 'Email and OTP are required' });
+    }
+    const key = email.toLowerCase().trim();
+    const record = signupEmailOtpStore.get(key);
+    if (!record) {
+      return res.status(400).json({ message: 'No OTP found for this email. Please request a new one.' });
+    }
+    if (Date.now() > record.expiresAt) {
+      signupEmailOtpStore.delete(key);
+      return res.status(400).json({ message: 'OTP has expired. Please request a new one.' });
+    }
+    const hashedInput = crypto.createHash('sha256').update(String(otp)).digest('hex');
+    if (hashedInput !== record.hash) {
+      return res.status(400).json({ message: 'Incorrect OTP. Please try again.' });
+    }
+    signupEmailOtpStore.delete(key); // Consume OTP — one-time use
+    res.json({ success: true, verified: true });
+  } catch (err) {
+    res.status(500).json({ message: 'Verification failed' });
   }
 });
 

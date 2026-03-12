@@ -159,6 +159,22 @@ export const authAPI = {
     });
   },
 
+  // Email OTP — send a 6-digit OTP to the given email for signup verification
+  sendEmailOTP: async (email: string) => {
+    return apiCall('/auth/send-email-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    });
+  },
+
+  // Email OTP — verify the code sent to email during signup
+  verifyEmailOTP: async (email: string, otp: string) => {
+    return apiCall('/auth/verify-email-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp })
+    });
+  },
+
   // Twilio OTP — verify code and return platform JWT (creates user if new)
   verifyOTP: async (phone: string, code: string, role?: string, name?: string, gender?: string) => {
     return apiCall('/auth/verify-otp', {
