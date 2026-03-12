@@ -721,11 +721,13 @@ router.post('/send-email-otp', async (req, res) => {
     const otp = String(100000 + crypto.randomInt(900000));
     const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
     signupEmailOtpStore.set(key, { hash: hashedOtp, expiresAt: Date.now() + 10 * 60 * 1000 });
-    // Respond immediately so the client doesn't wait for SMTP
+    // Actually send the email and fail if it can't be delivered
+    const result = await sendSignupOtpEmail(key, otp);
+    if (!result.success) {
+      signupEmailOtpStore.delete(key);
+      return res.status(503).json({ message: 'Email service is unavailable. Please sign up with phone number instead.' });
+    }
     res.json({ success: true, message: 'OTP sent to your email' });
-    sendSignupOtpEmail(key, otp).catch(err => {
-      console.error('Failed to deliver signup OTP email:', err.message);
-    });
   } catch (err) {
     if (!res.headersSent) res.status(500).json({ message: 'Failed to send OTP' });
   }
