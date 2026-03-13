@@ -2379,25 +2379,55 @@ router.post('/worker-requests/:id/reject', authenticate, authorize('admin', 'sup
 // @access  Admin
 router.get('/area-stats', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
   try {
-    // Workers per area
-    const workerAgg = await User.aggregate([
-      { $match: { role: 'worker', isActive: true } },
-      { $unwind: { path: '$workerProfile.assignedApartments', preserveNullAndEmptyArrays: false } },
-      { $group: {
-        _id: {
-          area: '$workerProfile.assignedApartments.area',
-          city: '$workerProfile.assignedApartments.city'
-        },
-        workerCount: { $sum: 1 }
-      }},
-      { $project: { _id: 0, area: '$_id.area', city: '$_id.city', workerCount: 1 } },
-      { $sort: { workerCount: -1 } }
-    ]);
+    // Get all active workers
+    let workers = await User.find({ role: 'worker', isActive: true })
+      .select('workerProfile.assignedApartments')
+      .lean();
 
-    // Active bookings per area (last 30 days)
+    // Filter workers by admin's assigned locations
+    if (req.user.role === 'admin') {
+      const adminLocationIds = req.user.adminProfile?.assignedLocations?.map(loc => loc.locationId?.toString()) || [];
+
+      if (adminLocationIds.length === 0) {
+        return res.json({ stats: [] });
+      }
+
+      // Filter workers who are assigned to admin's locations
+      workers = workers.filter(worker => {
+        const workerLocationIds = worker.workerProfile?.assignedApartments?.map(apt => apt.locationId?.toString()).filter(Boolean) || [];
+        return workerLocationIds.some(locId => adminLocationIds.includes(locId));
+      });
+    }
+    // Super admin sees all workers (no filter)
+
+    // Count workers per area
+    const areaWorkerMap = new Map();
+    for (const worker of workers) {
+      const apartments = worker.workerProfile?.assignedApartments || [];
+      for (const apt of apartments) {
+        if (apt.area && apt.city) {
+          const key = `${apt.area}||${apt.city}`;
+          if (!areaWorkerMap.has(key)) {
+            areaWorkerMap.set(key, { area: apt.area, city: apt.city, workerCount: 0, bookingCount: 0 });
+          }
+          areaWorkerMap.get(key).workerCount++;
+        }
+      }
+    }
+
+    // Get worker IDs for booking filtering
+    const workerIds = workers.map(w => w._id);
+
+    // Active bookings per area (last 30 days) - only for filtered workers
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const bookingAgg = await Booking.aggregate([
-      { $match: { createdAt: { $gte: thirtyDaysAgo }, status: { $ne: 'cancelled' } } },
+      {
+        $match: {
+          createdAt: { $gte: thirtyDaysAgo },
+          status: { $ne: 'cancelled' },
+          worker: { $in: workerIds }
+        }
+      },
       { $group: {
         _id: { area: '$location.area', city: '$location.city' },
         bookingCount: { $sum: 1 }
@@ -2405,22 +2435,20 @@ router.get('/area-stats', authenticate, authorize('admin', 'super_admin'), async
       { $project: { _id: 0, area: '$_id.area', city: '$_id.city', bookingCount: 1 } }
     ]);
 
-    // Merge into area map
-    const areaMap = new Map();
-    for (const w of workerAgg) {
-      const key = `${w.area}||${w.city}`;
-      areaMap.set(key, { area: w.area, city: w.city, workerCount: w.workerCount, bookingCount: 0 });
-    }
+    // Merge booking counts into area map
     for (const b of bookingAgg) {
-      const key = `${b.area}||${b.city}`;
-      if (areaMap.has(key)) {
-        areaMap.get(key).bookingCount = b.bookingCount;
-      } else if (b.area) {
-        areaMap.set(key, { area: b.area, city: b.city, workerCount: 0, bookingCount: b.bookingCount });
+      if (b.area && b.city) {
+        const key = `${b.area}||${b.city}`;
+        if (areaWorkerMap.has(key)) {
+          areaWorkerMap.get(key).bookingCount = b.bookingCount;
+        } else {
+          // Area with bookings but no workers (critical)
+          areaWorkerMap.set(key, { area: b.area, city: b.city, workerCount: 0, bookingCount: b.bookingCount });
+        }
       }
     }
 
-    const stats = Array.from(areaMap.values())
+    const stats = Array.from(areaWorkerMap.values())
       .filter(a => a.area)
       .sort((a, b) => b.bookingCount - a.bookingCount);
 

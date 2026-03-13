@@ -55,14 +55,32 @@ router.get('/public', async (req, res) => {
 });
 
 // Get all locations (admin only)
-router.get('/', authenticate, authorize('admin'), async (req, res) => {
+router.get('/', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
   try {
     const { city, area, isActive } = req.query;
     const filter = {};
-    
+
     if (city) filter.city = new RegExp(city, 'i');
     if (area) filter.area = new RegExp(area, 'i');
     if (isActive !== undefined) filter.isActive = isActive === 'true';
+
+    // If regular admin, only show their assigned locations
+    if (req.user.role === 'admin') {
+      const adminLocationIds = req.user.adminProfile?.assignedLocations?.map(loc => loc.locationId) || [];
+
+      if (adminLocationIds.length === 0) {
+        // Admin has no assigned locations, return empty list
+        return res.status(200).json({
+          success: true,
+          count: 0,
+          data: []
+        });
+      }
+
+      // Add filter to only show admin's assigned locations
+      filter._id = { $in: adminLocationIds };
+    }
+    // Super admin sees all locations (no additional filter needed)
 
     const locations = await Location.find(filter)
       .populate('createdBy', 'name email')
