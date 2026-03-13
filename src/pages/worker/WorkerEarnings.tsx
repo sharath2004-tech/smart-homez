@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { authAPI, workersAPI } from "@/lib/api";
-import { Calendar, Clock, Download, IndianRupee } from "lucide-react";
+import { BarChart2, Calendar, Clock, Download, IndianRupee, TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -71,6 +71,93 @@ const calculateEarningsBreakdown = (earning: Earning) => {
     totalGross,
     hourlyRate: HOURLY_RATE
   };
+};
+
+// Weekly bar chart — last 7 days
+const WeeklyEarningsChart = ({ earnings }: { earnings: Earning[] }) => {
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    return d;
+  });
+
+  const dailyTotals = days.map(d => {
+    const label = d.toLocaleDateString('en-IN', { weekday: 'short' });
+    const total = earnings.reduce((sum, e) => {
+      if (!e.completedAt) return sum;
+      const ed = new Date(e.completedAt);
+      if (ed.toDateString() === d.toDateString()) return sum + (e.totalAmount || 0);
+      return sum;
+    }, 0);
+    return { label, total };
+  });
+
+  const maxTotal = Math.max(...dailyTotals.map(d => d.total), 1);
+
+  return (
+    <div className="card-elevated p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <BarChart2 className="w-4 h-4 text-primary" />
+        <h2 className="text-sm font-bold text-foreground">Last 7 Days Earnings</h2>
+      </div>
+      <div className="flex items-end gap-2 h-24">
+        {dailyTotals.map((d, i) => (
+          <div key={i} className="flex-1 flex flex-col items-center gap-1">
+            <div
+              className="w-full rounded-t-md bg-primary/80 min-h-[4px] transition-all"
+              style={{ height: `${Math.max((d.total / maxTotal) * 80, d.total > 0 ? 4 : 0)}px` }}
+              title={`₹${d.total}`}
+            />
+            <span className="text-[10px] text-muted-foreground">{d.label}</span>
+          </div>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground text-center">
+        Peak day: {dailyTotals.reduce((a, b) => b.total > a.total ? b : a).label} — ₹{Math.round(dailyTotals.reduce((a, b) => b.total > a.total ? b : a).total).toLocaleString('en-IN')}
+      </p>
+    </div>
+  );
+};
+
+// Top services by earnings
+const TopServicesCard = ({ earnings }: { earnings: Earning[] }) => {
+  const byService: Record<string, { count: number; total: number }> = {};
+  earnings.forEach(e => {
+    const name = e.service?.name || 'Other';
+    if (!byService[name]) byService[name] = { count: 0, total: 0 };
+    byService[name].count++;
+    byService[name].total += e.totalAmount || 0;
+  });
+
+  const sorted = Object.entries(byService)
+    .map(([name, v]) => ({ name, ...v }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 4);
+
+  if (sorted.length === 0) return null;
+  const maxTotal = sorted[0].total;
+
+  return (
+    <div className="card-elevated p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <TrendingUp className="w-4 h-4 text-primary" />
+        <h2 className="text-sm font-bold text-foreground">Top Services</h2>
+      </div>
+      <div className="space-y-2">
+        {sorted.map(s => (
+          <div key={s.name}>
+            <div className="flex justify-between text-xs mb-1">
+              <span className="text-foreground font-medium truncate max-w-[60%]">{s.name}</span>
+              <span className="text-muted-foreground">{s.count} job{s.count > 1 ? 's' : ''} · ₹{Math.round(s.total).toLocaleString('en-IN')}</span>
+            </div>
+            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+              <div className="h-full bg-primary rounded-full" style={{ width: `${(s.total / maxTotal) * 100}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 const WorkerEarnings = () => {
@@ -293,6 +380,12 @@ const WorkerEarnings = () => {
           </div>
         </div>
 
+        {/* Weekly Earnings Chart */}
+        <WeeklyEarningsChart earnings={earnings} />
+
+        {/* Top Services */}
+        <TopServicesCard earnings={earnings} />
+
         {/* Transaction history */}
         <div>
           <div className="flex items-center justify-between mb-4">
@@ -301,8 +394,6 @@ const WorkerEarnings = () => {
               <Download className="w-3.5 h-3.5" /> {t('worker.earnings.export')}
             </button>
           </div>
-          
-          {getRecentEarnings().length === 0 ? (
             <div className="card-elevated p-12 text-center">
               <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
                 <IndianRupee className="w-8 h-8 text-muted-foreground" />

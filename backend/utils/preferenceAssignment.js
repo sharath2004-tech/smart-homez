@@ -270,7 +270,9 @@ const checkWorkerAvailability = async (
   }
 
   // Check location proximity (if location provided)
-  if (location && location.latitude && location.longitude) {
+  const hasLatLng = location && location.latitude && location.longitude;
+  const hasCoords = location && Array.isArray(location.coordinates) && location.coordinates.length === 2;
+  if (hasLatLng || hasCoords) {
     const isInRadius = await checkWorkerInRadius(worker._id, location, radius);
     if (!isInRadius) {
       return {
@@ -384,13 +386,20 @@ const findNearestAvailableWorker = async (
  */
 const checkWorkerInRadius = async (workerId, location, radius) => {
   try {
+    let lng, lat;
+    if (Array.isArray(location.coordinates) && location.coordinates.length === 2) {
+      [lng, lat] = location.coordinates;
+    } else {
+      lng = parseFloat(location.longitude);
+      lat = parseFloat(location.latitude);
+    }
     const worker = await User.findOne({
       _id: workerId,
       'workerProfile.assignedApartments.location': {
         $near: {
           $geometry: {
             type: 'Point',
-            coordinates: [parseFloat(location.longitude), parseFloat(location.latitude)]
+            coordinates: [lng, lat]
           },
           $maxDistance: radius
         }

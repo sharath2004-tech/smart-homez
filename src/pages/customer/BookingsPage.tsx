@@ -1,11 +1,12 @@
 import AppLayout from "@/components/AppLayout";
 import RescheduleModal from "@/components/RescheduleModal";
+import WorkerTrackingMap from "@/components/WorkerTrackingMap";
 import { Badge } from "@/components/ui/badge";
 import { bookingsAPI } from "@/lib/api";
-import { Calendar, Clock, MapPin, Phone, QrCode, RefreshCw, Star } from "lucide-react";
+import { Calendar, CalendarPlus, Clock, MapPin, Phone, QrCode, RefreshCw, Star } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import BookingDetailModal from "./BookingDetailModal";
 
 interface Worker {
@@ -63,6 +64,7 @@ const statusConfig: Record<string, { label: string; bg: string; text: string }> 
 const BookingsPage = () => {
   const { t } = useTranslation();
   const routeLocation = useLocation();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"upcoming" | "ongoing" | "past">("upcoming");
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,6 +73,7 @@ const BookingsPage = () => {
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
   const [bookingToReschedule, setBookingToReschedule] = useState<Booking | null>(null);
+  const [trackingBooking, setTrackingBooking] = useState<Booking | null>(null);
 
   // Auto-open a booking detail when navigated here with state.openBookingId
   useEffect(() => {
@@ -161,9 +164,7 @@ const BookingsPage = () => {
       alert(t('customer.bookings.workerNotAssigned'));
       return;
     }
-    
-    // In a real app, this would open a map view showing worker's real-time location
-    alert(`Tracking ${booking.worker.name}. Real-time tracking coming soon!`);
+    setTrackingBooking(booking);
   };
 
   const handleContactWorker = (worker: Worker) => {
@@ -440,6 +441,18 @@ const BookingsPage = () => {
                         Write Review
                       </button>
                     )}
+
+                    {isPast && booking.status === 'completed' && booking.worker && (
+                      <button
+                        onClick={() => navigate(
+                          `/customer/book?preferredWorker=${booking.worker!._id}&preferredWorkerName=${encodeURIComponent(booking.worker!.name)}`
+                        )}
+                        className="flex-1 btn-outline py-2.5 text-sm flex items-center justify-center gap-1"
+                      >
+                        <CalendarPlus className="w-4 h-4" />
+                        Book Again
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -469,6 +482,14 @@ const BookingsPage = () => {
           currentDate={bookingToReschedule.bookingDate}
           currentTime={bookingToReschedule.startTime}
           bookingId={bookingToReschedule._id}
+        />
+      )}
+      {/* Worker Tracking Modal */}
+      {trackingBooking && (
+        <WorkerTrackingMap
+          bookingId={trackingBooking._id}
+          workerName={trackingBooking.worker?.name}
+          onClose={() => setTrackingBooking(null)}
         />
       )}
     </AppLayout>

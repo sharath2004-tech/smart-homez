@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { authAPI, bookingsAPI, servicesAPI, settingsAPI } from "@/lib/api";
 import { Calendar, ChevronLeft, Clock, Info, MapPin, Sparkles, Star, User, Users, Zap } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 interface Service {
@@ -68,6 +68,9 @@ type BookingMode = 'now' | 'schedule';
 const BookServicePage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const preferredWorkerId = searchParams.get('preferredWorker') ?? null;
+  const preferredWorkerName = searchParams.get('preferredWorkerName') ?? null;
   const [service, setService] = useState<Service | null>(null);
   const [profile, setProfile] = useState<{ name: string; currentLocation?: { area: string; city: string } } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -84,7 +87,7 @@ const BookServicePage = () => {
   const [holidays, setHolidays] = useState<Array<{ date: string; label: string }>>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('morning');
   const [selectedExactTime, setSelectedExactTime] = useState<string>('');
-  const [selectedWorker, setSelectedWorker] = useState<string | null>(null);
+  const [selectedWorker, setSelectedWorker] = useState<string | null>(preferredWorkerId);
   const [bookedRanges, setBookedRanges] = useState<{ workerId: string | null; startTime: string; endTime: string }[]>([]);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [totalWorkersCount, setTotalWorkersCount] = useState(0);
@@ -1092,6 +1095,24 @@ const BookServicePage = () => {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Preferred Worker Banner */}
+          {preferredWorkerId && selectedWorker === preferredWorkerId && (
+            <div className="card-elevated p-4 bg-blue-50 border-2 border-blue-200 flex items-center justify-between gap-3">
+              <div>
+                <p className="font-semibold text-blue-800 text-sm">Preferred Worker Selected</p>
+                <p className="text-xs text-blue-600">
+                  Your previous worker {preferredWorkerName ? <strong>{preferredWorkerName}</strong> : 'from last booking'} will be requested.
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedWorker(null)}
+                className="text-xs text-blue-700 underline shrink-0"
+              >
+                Remove
+              </button>
             </div>
           )}
 

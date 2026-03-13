@@ -206,6 +206,7 @@ router.post('/:id/assign-worker', authenticate, authorize('admin'), async (req, 
 
     // Add to worker's assigned apartments
     worker.workerProfile.assignedApartments.push({
+      locationId: location._id,
       apartmentName: location.apartmentName,
       building: location.building,
       area: location.area,

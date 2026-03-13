@@ -13,6 +13,7 @@ import { fileURLToPath } from 'url';
 import adminRoutes from './routes/admin.js';
 import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
+import chatRoutes from './routes/chat.js';
 import earningsRoutes from './routes/earnings.js';
 import helpRoutes from './routes/help.js';
 import leavesRoutes from './routes/leaves.js';
@@ -36,6 +37,7 @@ import userRoutes from './routes/users.js';
 
 // Import utilities
 import { runBookingUpdates } from './utils/bookingStatusUpdater.js';
+import { runRenewalChecker } from './utils/subscriptionRenewalChecker.js';
 
 // Import models for stats endpoint
 import Booking from './models/Booking.js';
@@ -198,6 +200,7 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/service-areas', serviceAreaRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/sos', sosRoutes);
+app.use('/api/chat', chatRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/tracking', trackingRoutes);
 app.use('/api/preferences', preferencesRoutes);
@@ -236,6 +239,10 @@ app.listen(PORT, () => {
   console.log('⏰ Starting booking status updater...');
   runBookingUpdates(); // Run immediately on startup
   setInterval(runBookingUpdates, 60000); // Run every 60 seconds
+
+  // Start subscription renewal checker (runs daily)
+  console.log('📅 Starting subscription renewal checker...');
+  runRenewalChecker();
 });
 
 export default app;

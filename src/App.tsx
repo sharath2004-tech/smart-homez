@@ -53,6 +53,8 @@ import AdminSalarySettlements from "./pages/admin/AdminSalarySettlements";
 import AdminServiceAreas from "./pages/admin/AdminServiceAreas";
 import AdminServices from "./pages/admin/AdminServices";
 import AdminSettings from "./pages/admin/AdminSettings";
+import AdminSOS from "./pages/admin/AdminSOS";
+import AdminHeatmap from "./pages/admin/AdminHeatmap";
 import AdminWorkerRequests from "./pages/admin/AdminWorkerRequests";
 import AdminWorkers from "./pages/admin/AdminWorkers";
 import AdminWorkerSchedule from "./pages/admin/AdminWorkerSchedule";
@@ -123,6 +125,8 @@ const App = () => (
           <Route path="/admin/salary-settlements" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminSalarySettlements /></ProtectedRoute>} />
           <Route path="/admin/notifications" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><NotificationsPage /></ProtectedRoute>} />
           <Route path="/admin/help-messages" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminHelpMessages /></ProtectedRoute>} />
+          <Route path="/admin/sos" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminSOS /></ProtectedRoute>} />
+          <Route path="/admin/heatmap" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminHeatmap /></ProtectedRoute>} />
 
           {/* Super Admin */}
           <Route path="/super-admin/dashboard" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminDashboard /></ProtectedRoute>} />

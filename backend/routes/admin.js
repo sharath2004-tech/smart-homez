@@ -2374,4 +2374,61 @@ router.post('/worker-requests/:id/reject', authenticate, authorize('admin', 'sup
   }
 });
 
+// @route   GET /api/admin/area-stats
+// @desc    Aggregate worker count and booking demand per area for heatmap
+// @access  Admin
+router.get('/area-stats', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    // Workers per area
+    const workerAgg = await User.aggregate([
+      { $match: { role: 'worker', isActive: true } },
+      { $unwind: { path: '$workerProfile.assignedApartments', preserveNullAndEmptyArrays: false } },
+      { $group: {
+        _id: {
+          area: '$workerProfile.assignedApartments.area',
+          city: '$workerProfile.assignedApartments.city'
+        },
+        workerCount: { $sum: 1 }
+      }},
+      { $project: { _id: 0, area: '$_id.area', city: '$_id.city', workerCount: 1 } },
+      { $sort: { workerCount: -1 } }
+    ]);
+
+    // Active bookings per area (last 30 days)
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const bookingAgg = await Booking.aggregate([
+      { $match: { createdAt: { $gte: thirtyDaysAgo }, status: { $ne: 'cancelled' } } },
+      { $group: {
+        _id: { area: '$location.area', city: '$location.city' },
+        bookingCount: { $sum: 1 }
+      }},
+      { $project: { _id: 0, area: '$_id.area', city: '$_id.city', bookingCount: 1 } }
+    ]);
+
+    // Merge into area map
+    const areaMap = new Map();
+    for (const w of workerAgg) {
+      const key = `${w.area}||${w.city}`;
+      areaMap.set(key, { area: w.area, city: w.city, workerCount: w.workerCount, bookingCount: 0 });
+    }
+    for (const b of bookingAgg) {
+      const key = `${b.area}||${b.city}`;
+      if (areaMap.has(key)) {
+        areaMap.get(key).bookingCount = b.bookingCount;
+      } else if (b.area) {
+        areaMap.set(key, { area: b.area, city: b.city, workerCount: 0, bookingCount: b.bookingCount });
+      }
+    }
+
+    const stats = Array.from(areaMap.values())
+      .filter(a => a.area)
+      .sort((a, b) => b.bookingCount - a.bookingCount);
+
+    res.json({ stats });
+  } catch (error) {
+    console.error('Area stats error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
 export default router;

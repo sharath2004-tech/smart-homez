@@ -1,6 +1,7 @@
+import ChatModal from "@/components/ChatModal";
 import EmbeddedQRScanner from "@/components/EmbeddedQRScanner";
 import { API_BASE_URL, bookingsAPI } from "@/lib/api";
-import { ArrowLeft, Calendar, Camera, CheckCircle, DollarSign, Phone, QrCode, Timer, User } from "lucide-react";
+import { ArrowLeft, Calendar, Camera, CheckCircle, ClipboardCheck, Clock3, DollarSign, MapPin, MessageCircle, Phone, QrCode, Timer, User, XCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ReviewModal from "./ReviewModal";
@@ -67,6 +68,10 @@ interface Booking {
     timestamp: string;
     verified: boolean;
   };
+  arrivalPhoto?: {
+    url: string;
+    timestamp: string;
+  };
 }
 
 interface BookingDetailModalProps {
@@ -75,12 +80,77 @@ interface BookingDetailModalProps {
   onRefresh: () => void;
 }
 
+const STATUS_STEPS = [
+  { key: 'pending',        label: 'Booking Placed',   icon: ClipboardCheck },
+  { key: 'confirmed',      label: 'Worker Assigned',  icon: User },
+  { key: 'in-progress',    label: 'In Progress',      icon: Clock3 },
+  { key: 'pending-review', label: 'Pending Review',   icon: Camera },
+  { key: 'completed',      label: 'Completed',        icon: CheckCircle },
+];
+
+const STATUS_ORDER: Record<string, number> = {
+  pending: 0, confirmed: 1, 'in-progress': 2, 'pending-review': 3, completed: 4,
+};
+
+const BookingStatusStepper = ({ status }: { status: string }) => {
+  if (status === 'cancelled') {
+    return (
+      <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
+        <XCircle className="w-6 h-6 text-red-500 shrink-0" />
+        <div>
+          <p className="font-semibold text-red-700">Booking Cancelled</p>
+          <p className="text-xs text-red-500">This booking has been cancelled.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const currentStep = STATUS_ORDER[status] ?? 0;
+
+  return (
+    <div className="space-y-2">
+      <h3 className="font-semibold text-foreground flex items-center gap-2">
+        <MapPin className="w-5 h-5 text-primary" />
+        Booking Progress
+      </h3>
+      <div className="bg-muted rounded-xl p-4">
+        <div className="flex items-start justify-between relative">
+          {/* connecting line */}
+          <div className="absolute top-4 left-0 right-0 h-0.5 bg-border mx-6" />
+          {STATUS_STEPS.map((step, index) => {
+            const Icon = step.icon;
+            const done = index < currentStep;
+            const active = index === currentStep;
+            return (
+              <div key={step.key} className="flex flex-col items-center gap-1 z-10 flex-1">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${
+                  done    ? 'bg-primary border-primary text-primary-foreground' :
+                  active  ? 'bg-white border-primary text-primary ring-4 ring-primary/20' :
+                            'bg-white border-border text-muted-foreground'
+                }`}>
+                  {done ? <CheckCircle className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
+                </div>
+                <span className={`text-[10px] text-center leading-tight max-w-[52px] font-medium ${
+                  active ? 'text-primary' : done ? 'text-foreground' : 'text-muted-foreground'
+                }`}>
+                  {step.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModalProps) => {
   const { t } = useTranslation();
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
   const [showScanner, setShowScanner] = useState(false);
   const [showEndScanner, setShowEndScanner] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [overtimeMinutes, setOvertimeMinutes] = useState(0);
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -315,6 +385,9 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
               <p className="text-sm text-muted-foreground capitalize">{booking.service.category}</p>
             </div>
 
+            {/* Booking Status Stepper */}
+            <BookingStatusStepper status={booking.status} />
+
             {/* Status Badge */}
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">{t('customer.bookings.status')}</span>
@@ -384,6 +457,42 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                       <span className="text-sm font-medium">{booking.worker.phone}</span>
                     </a>
                   )}
+                  {booking.status !== 'completed' && booking.status !== 'cancelled' && (
+                    <button
+                      onClick={() => setShowChat(true)}
+                      className="flex items-center gap-2 p-3 bg-muted hover:bg-muted/70 text-foreground rounded-lg transition-colors w-full"
+                    >
+                      <MessageCircle className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-medium">Chat with Worker</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Arrival Photo - shown when worker has arrived */}
+            {booking.arrivalPhoto?.url && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <Camera className="w-5 h-5 text-primary" />
+                  Worker Arrival Confirmed
+                </h3>
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-2">
+                  <img
+                    src={bookingsAPI.getCompletionPhotoUrl(booking.arrivalPhoto.url)}
+                    alt="Worker arrival"
+                    className="w-full max-h-48 object-cover rounded-lg border border-blue-300"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                  <p className="text-xs text-blue-700 flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" />
+                    Worker photo verified at arrival
+                    {booking.arrivalPhoto.timestamp && (
+                      <span className="ml-auto text-muted-foreground">
+                        {new Date(booking.arrivalPhoto.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </p>
                 </div>
               </div>
             )}
@@ -601,6 +710,17 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
         <EmbeddedQRScanner
           onScanSuccess={handleScanEndQR}
           onClose={() => setShowEndScanner(false)}
+        />
+      )}
+
+      {/* Chat Modal */}
+      {showChat && booking.worker && (
+        <ChatModal
+          bookingId={bookingId}
+          currentUserId={booking.customer._id}
+          currentUserRole="customer"
+          otherPartyName={booking.worker.name}
+          onClose={() => setShowChat(false)}
         />
       )}
     </div>

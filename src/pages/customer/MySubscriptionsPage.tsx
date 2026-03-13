@@ -1,6 +1,7 @@
 import AppLayout from "@/components/AppLayout";
+import SubscriptionCalendar from "@/components/SubscriptionCalendar";
 import { authAPI, bookingsAPI } from "@/lib/api";
-import { Calendar, CheckCircle, Clock, Edit2, MapPin, RefreshCw, User, UserCheck, XCircle } from "lucide-react";
+import { AlertTriangle, Calendar, CalendarDays, CheckCircle, Clock, Edit2, MapPin, RefreshCw, User, UserCheck, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -74,6 +75,14 @@ const MySubscriptionsPage = () => {
   const [changingWorker, setChangingWorker] = useState<string | null>(null);
   const [availableWorkers, setAvailableWorkers] = useState<Worker[]>([]);
   const [loadingWorkers, setLoadingWorkers] = useState(false);
+  const [expandedCalendars, setExpandedCalendars] = useState<Set<string>>(new Set());
+
+  const toggleCalendar = (id: string) =>
+    setExpandedCalendars(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
   useEffect(() => {
     fetchData();
@@ -243,6 +252,35 @@ const MySubscriptionsPage = () => {
           <p className="text-muted-foreground">Manage your active subscriptions and assigned workers</p>
         </div>
 
+        {/* Renewal reminder banners */}
+        {subscriptions
+          .filter(s => {
+            const end = s.subscription?.subscriptionEndDate;
+            if (!end) return false;
+            const daysLeft = Math.ceil((new Date(end).getTime() - Date.now()) / 86400000);
+            return daysLeft >= 0 && daysLeft <= 3;
+          })
+          .map(s => {
+            const daysLeft = Math.ceil((new Date(s.subscription!.subscriptionEndDate!).getTime() - Date.now()) / 86400000);
+            return (
+              <div key={`renewal-${s._id}`} className="mb-3 flex items-start gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3">
+                <AlertTriangle className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-orange-800">
+                    {s.service.name} subscription expires {daysLeft <= 0 ? 'today' : daysLeft === 1 ? 'tomorrow' : `in ${daysLeft} days`}
+                  </p>
+                  <p className="text-xs text-orange-600 mt-0.5">
+                    Renew before {new Date(s.subscription!.subscriptionEndDate!).toLocaleDateString()} to keep your service uninterrupted.
+                  </p>
+                </div>
+                <a href="/customer/services" className="text-xs font-semibold text-orange-700 underline underline-offset-2 shrink-0">
+                  Renew
+                </a>
+              </div>
+            );
+          })
+        }
+
         {/* Subscriptions List */}
         {subscriptions.length === 0 ? (
           <div className="card-elevated p-12 text-center">
@@ -353,7 +391,16 @@ const MySubscriptionsPage = () => {
                 {/* Subscription Features */}
                 {subscription.recurringSchedule?.selectedDays && subscription.recurringSchedule.selectedDays.length > 0 && (
                   <div className="mb-4 p-3 bg-muted/50 rounded-lg">
-                    <p className="text-xs font-semibold text-foreground mb-2">📅 Service Days</p>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-foreground">📅 Service Days</p>
+                      <button
+                        onClick={() => toggleCalendar(subscription._id)}
+                        className="flex items-center gap-1 text-xs text-primary hover:underline"
+                      >
+                        <CalendarDays className="w-3 h-3" />
+                        {expandedCalendars.has(subscription._id) ? 'Hide Calendar' : 'View Calendar'}
+                      </button>
+                    </div>
                     <div className="flex flex-wrap gap-2">
                       {subscription.recurringSchedule.selectedDays.map((day) => (
                         <span
@@ -364,6 +411,17 @@ const MySubscriptionsPage = () => {
                         </span>
                       ))}
                     </div>
+                    {expandedCalendars.has(subscription._id) && (
+                      <div className="mt-3">
+                        <SubscriptionCalendar
+                          selectedDays={subscription.recurringSchedule.selectedDays}
+                          startDate={subscription.recurringSchedule.startDate || subscription.subscription?.subscriptionStartDate}
+                          endDate={subscription.recurringSchedule.endDate || subscription.subscription?.subscriptionEndDate}
+                          isPaused={subscription.subscription?.isPaused}
+                          preferredTime={subscription.subscription?.preferredTime || subscription.startTime}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
 

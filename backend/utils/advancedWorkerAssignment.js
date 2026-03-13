@@ -250,10 +250,11 @@ export const assignWorkersWithBackup = async (bookingDetails) => {
     if (workers.length === 0) {
       // Fallback: try without specialization filter
       delete workerQuery['workerProfile.specialization'];
+      delete workerQuery['workerProfile.assignedApartments.locationId'];
       workers = await User.find(workerQuery).select(
         'name email phone workerProfile currentLocation addresses'
       );
-      console.log(`📊 Fallback: Found ${workers.length} workers without specialization filter`);
+      console.log(`📊 Fallback: Found ${workers.length} workers without specialization/location filter`);
     }
 
     if (workers.length === 0) {

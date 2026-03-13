@@ -228,8 +228,9 @@ router.post('/:id/accept-order', authenticate, authorize('worker'), async (req, 
 
     // Verify worker is assigned to this location
     const worker = await User.findById(req.user._id);
+    const bookingLocationId = (booking.location.locationId?._id || booking.location.locationId)?.toString();
     const workerInLocation = worker.workerProfile?.assignedApartments?.some(
-      apt => apt.locationId.toString() === booking.location.locationId._id.toString()
+      apt => apt.locationId?.toString() === bookingLocationId
     );
 
     if (!workerInLocation) {
@@ -620,8 +621,8 @@ router.post('/',
         }
 
         // ✅ STRICT VERIFICATION: Worker must be assigned to the customer's location
-        const workerInLocation = workerUser.workerProfile.assignedApartments?.some(apt => 
-          apt.locationId.toString() === nearbyLocation._id.toString()
+        const workerInLocation = workerUser.workerProfile.assignedApartments?.some(apt =>
+          apt.locationId?.toString() === nearbyLocation._id.toString()
         );
 
         if (!workerInLocation) {
@@ -1816,6 +1817,60 @@ router.post('/:id/generate-end-qr',
 );
 
 // @route   POST /api/bookings/:id/scan-end-qr
+// @route   POST /api/bookings/:id/upload-arrival-photo
+// @desc    Worker uploads a selfie on arrival before service starts
+// @access  Private/Worker
+router.post('/:id/upload-arrival-photo',
+  authenticate,
+  authorize('worker'),
+  (req, res, next) => {
+    upload.single('arrivalPhoto')(req, res, (err) => {
+      if (err) return handleMulterError(err, req, res, next);
+      next();
+    });
+  },
+  async (req, res) => {
+    try {
+      const booking = await Booking.findById(req.params.id);
+      if (!booking) return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
+
+      if (!booking.worker || booking.worker.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ error: { message: 'You are not assigned to this booking', status: 403 } });
+      }
+      if (booking.status !== 'confirmed') {
+        return res.status(400).json({ error: { message: 'Arrival photo can only be uploaded for confirmed bookings', status: 400 } });
+      }
+      if (!req.file) {
+        return res.status(400).json({ error: { message: 'Arrival photo file is required', status: 400 } });
+      }
+
+      booking.arrivalPhoto = {
+        url: `/uploads/${req.file.filename}`,
+        timestamp: new Date(),
+        uploadedBy: req.user._id
+      };
+      if (!booking.workerArrivalTime) booking.workerArrivalTime = new Date();
+      await booking.save();
+
+      // Notify customer that worker has arrived
+      try {
+        await notificationService.sendNotification({
+          recipient: booking.customer,
+          type: 'worker-enroute',
+          title: 'Worker Has Arrived',
+          message: 'Your worker has arrived and is ready to start. Service will begin shortly.',
+          data: { bookingId: booking._id }
+        });
+      } catch (_) { /* non-critical */ }
+
+      res.json({ message: 'Arrival photo uploaded', arrivalPhoto: booking.arrivalPhoto });
+    } catch (error) {
+      console.error('Upload arrival photo error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
 // @route   POST /api/bookings/:id/upload-completion-photo
 // @desc    Worker uploads completion photo to prove work is done
 // @access  Private/Worker
@@ -2916,5 +2971,48 @@ router.post('/:id/resume-subscription',
     }
   }
 );
+
+// @route   PATCH /api/bookings/:id/checklist
+// @desc    Initialize or replace checklist items for the booking (worker only)
+// @access  Private/Worker
+router.patch('/:id/checklist', authenticate, authorize('worker'), async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
+    if (!booking.worker || booking.worker.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: { message: 'Not assigned to this booking', status: 403 } });
+    }
+    const items = (req.body.items || []).map(text => ({ text, completed: false }));
+    booking.workerChecklist = items;
+    await booking.save();
+    res.json({ checklist: booking.workerChecklist });
+  } catch (error) {
+    console.error('Init checklist error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   PATCH /api/bookings/:id/checklist/:itemId/toggle
+// @desc    Toggle a checklist item completion (worker only)
+// @access  Private/Worker
+router.patch('/:id/checklist/:itemId/toggle', authenticate, authorize('worker'), async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
+    if (!booking.worker || booking.worker.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: { message: 'Not assigned to this booking', status: 403 } });
+    }
+    const item = booking.workerChecklist.id(req.params.itemId);
+    if (!item) return res.status(404).json({ error: { message: 'Checklist item not found', status: 404 } });
+
+    item.completed = !item.completed;
+    item.completedAt = item.completed ? new Date() : null;
+    await booking.save();
+    res.json({ item });
+  } catch (error) {
+    console.error('Toggle checklist error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
 
 export default router;

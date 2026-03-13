@@ -407,6 +407,20 @@ export const bookingsAPI = {
     return data;
   },
 
+  uploadArrivalPhoto: async (id: string, file: File) => {
+    const token = getAuthToken();
+    const formData = new FormData();
+    formData.append('arrivalPhoto', file);
+    const response = await fetch(`${API_BASE_URL}/bookings/${id}/upload-arrival-photo`, {
+      method: 'POST',
+      headers: { ...(token && { Authorization: `Bearer ${token}` }) },
+      body: formData
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error?.message || 'Failed to upload arrival photo');
+    return data;
+  },
+
   uploadPaymentProof: async (id: string, file: File, transactionId?: string, transactionTime?: string) => {
     const token = getAuthToken();
     const formData = new FormData();
@@ -436,6 +450,12 @@ export const bookingsAPI = {
   adminApproveBooking: async (id: string) => {
     return apiCall(`/bookings/${id}/admin-approve`, { method: 'POST' });
   },
+
+  initChecklist: (id: string, items: string[]) =>
+    apiCall(`/bookings/${id}/checklist`, { method: 'PATCH', body: JSON.stringify({ items }) }),
+
+  toggleChecklistItem: (id: string, itemId: string) =>
+    apiCall(`/bookings/${id}/checklist/${itemId}/toggle`, { method: 'PATCH' }),
 
   getCompletionPhotoUrl: (photoPath: string) => {
     if (!photoPath) return '';

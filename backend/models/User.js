@@ -467,6 +467,9 @@ userSchema.methods.toJSON = function() {
   return user;
 };
 
+// 2dsphere index for geospatial queries on worker assigned apartments
+userSchema.index({ 'workerProfile.assignedApartments.location': '2dsphere' }, { sparse: true });
+
 const User = mongoose.model('User', userSchema);
 
 export default User;
