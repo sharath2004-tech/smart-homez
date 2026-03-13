@@ -1,15 +1,15 @@
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { API_BASE_URL, authAPI } from "@/lib/api";
 import {
-    Camera,
-    CheckCircle,
-    Clock,
-    Eye,
-    EyeOff,
-    Home,
-    Loader2,
-    MapPin,
-    Upload,
+  Camera,
+  CheckCircle,
+  Clock,
+  Eye,
+  EyeOff,
+  Home,
+  Loader2,
+  MapPin,
+  Upload,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
