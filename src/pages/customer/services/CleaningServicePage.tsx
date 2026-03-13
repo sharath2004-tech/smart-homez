@@ -45,11 +45,24 @@ interface CleaningDetails {
   specialInstructions: string;
 }
 
+interface Worker {
+  _id: string;
+  name: string;
+  email: string;
+  phone: string;
+  workerProfile: {
+    specialization: string;
+    rating: number;
+    completedBookings: number;
+    availability: boolean;
+  };
+}
+
 const CleaningServicePage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [service, setService] = useState<Service | null>(null);
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<{ role: string; name?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
   
@@ -78,11 +91,12 @@ const CleaningServicePage = () => {
 
   // Worker selection states
   const [selectedWorker, setSelectedWorker] = useState<string>('auto-assign');
-  const [availableWorkers, setAvailableWorkers] = useState<any[]>([]);
+  const [availableWorkers, setAvailableWorkers] = useState<Worker[]>([]);
   const [loadingWorkers, setLoadingWorkers] = useState(false);
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const fetchData = async () => {
@@ -310,7 +324,43 @@ const CleaningServicePage = () => {
       const durationMinutes = calculateDuration();
 
       // Base booking data
-      const bookingData: any = {
+      const bookingData: {
+        service: string;
+        bookingType: string;
+        serviceDetails: {
+          cleaningType: string;
+          numberOfRooms: number;
+          numberOfBedrooms: number;
+          numberOfBathrooms: number;
+          areaSize: string;
+          additionalServices: string[];
+          specialInstructions: string;
+        };
+        totalAmount: number;
+        estimatedDuration: number;
+        bookingDate?: string;
+        preferredTime?: string;
+        subscription?: {
+          isSubscription: boolean;
+          startDate: string;
+          endDate: string;
+          durationPerSession: number;
+          autoRenewal: boolean;
+          allowPause: boolean;
+        };
+        recurringSchedule?: {
+          selectedDays: string[];
+        };
+        assignedWorker?: string;
+        location?: {
+          type: string;
+          coordinates: number[];
+          address: string;
+          city: string;
+          state: string;
+          zipCode: string;
+        };
+      } = {
         service: service?._id,
         bookingType: bookingType,
         serviceDetails: {
@@ -372,11 +422,9 @@ const CleaningServicePage = () => {
       const response = await bookingsAPI.create(bookingData);
       toast.success(bookingType === 'oneTime' ? 'Booking created successfully!' : 'Subscription created successfully!');
       navigate('/customer/bookings');
-    } catch (error: unknown) {
+    } catch (error) {
       console.error('Error creating booking:', error);
-      const errorMessage = error instanceof Error && 'response' in error 
-        ? (error as any).response?.data?.message 
-        : 'Failed to create booking';
+      const errorMessage = (error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to create booking';
       toast.error(errorMessage);
     } finally {
       setBooking(false);
@@ -440,7 +488,7 @@ const CleaningServicePage = () => {
                 <button
                   key={plan.id}
                   type="button"
-                  onClick={() => setBookingType(plan.name as any)}
+                  onClick={() => setBookingType(plan.name as 'oneTime' | 'daily' | 'weekly' | 'monthly')}
                   className={`p-4 rounded-lg border-2 transition-all ${
                     bookingType === plan.name
                       ? 'border-primary bg-primary/10 shadow-md'
@@ -714,7 +762,7 @@ const CleaningServicePage = () => {
                 <button
                   key={type.value}
                   type="button"
-                  onClick={() => setCleaningDetails(prev => ({ ...prev, cleaningType: type.value as any }))}
+                  onClick={() => setCleaningDetails(prev => ({ ...prev, cleaningType: type.value as CleaningDetails['cleaningType'] }))}
                   className={`p-4 rounded-lg border-2 text-left transition-all ${
                     cleaningDetails.cleaningType === type.value
                       ? 'border-primary bg-primary/5'

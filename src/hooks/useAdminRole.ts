@@ -10,7 +10,9 @@ export const useAdminRole = () => {
         const user = JSON.parse(stored);
         if (user?.role === 'super_admin') return 'super_admin';
       }
-    } catch {}
+    } catch {
+      // Ignore parsing errors
+    }
     return 'admin';
   };
 
@@ -21,7 +23,9 @@ export const useAdminRole = () => {
         const user = JSON.parse(stored);
         if (user?.name) return user.name;
       }
-    } catch {}
+    } catch {
+      // Ignore parsing errors
+    }
     return 'Admin';
   };
 
@@ -37,10 +41,14 @@ export const useAdminRole = () => {
         try {
           const stored = JSON.parse(localStorage.getItem('user') || '{}');
           localStorage.setItem('user', JSON.stringify({ ...stored, role: user.role, name: user.name }));
-        } catch {}
+        } catch {
+          // Ignore parsing errors
+        }
       }
       if (user?.name) setName(user.name);
-    }).catch(() => {});
+    }).catch(() => {
+      // Ignore API errors
+    });
   }, []);
 
   return { role, name, isSuperAdmin: role === 'super_admin' };

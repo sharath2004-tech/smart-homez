@@ -10,7 +10,9 @@ const getUserFromStorage = () => {
   try {
     const stored = localStorage.getItem('user');
     if (stored) return JSON.parse(stored);
-  } catch {}
+  } catch {
+    // Ignore parsing errors
+  }
   return null;
 };
 

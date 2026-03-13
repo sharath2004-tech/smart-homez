@@ -97,7 +97,7 @@ export const useGeolocation = (options: GeolocationOptions = {}) => {
     };
 
     navigator.geolocation.getCurrentPosition(handleSuccess, handleError, geoOptions);
-  }, []);
+  }, [options.enableHighAccuracy, options.timeout, options.maximumAge]);
 
   const refetch = () => {
     setState(prev => ({ ...prev, loading: true }));

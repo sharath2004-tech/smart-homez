@@ -110,15 +110,15 @@ const RegisterPage = () => {
       
       setIsLoading(false);
       setStep(3);
-    } catch (err: any) {
-      setError(err.message || 'Registration failed. Please try again.');
+    } catch (err) {
+      setError((err as Error).message || 'Registration failed. Please try again.');
       setIsLoading(false);
     }
   };
 
-  if (step === 3) {
-    // Auto-redirect after 2 seconds
-    useEffect(() => {
+  // Auto-redirect after registration success
+  useEffect(() => {
+    if (step === 3) {
       const timer = setTimeout(() => {
         if (userType === 'customer') {
           window.location.href = "/customer/dashboard";
@@ -127,7 +127,10 @@ const RegisterPage = () => {
         }
       }, 2000);
       return () => clearTimeout(timer);
-    }, [userType]);
+    }
+  }, [step, userType]);
+
+  if (step === 3) {
 
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-6">
