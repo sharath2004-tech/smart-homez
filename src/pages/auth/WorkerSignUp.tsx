@@ -72,7 +72,7 @@ const WorkerSignUp = () => {
   useEffect(() => {
     if (step === "location" && availableLocations.length === 0) {
       setLocLoading(true);
-      fetch(`${API_BASE_URL}/api/locations/public`)
+      fetch(`${API_BASE_URL}/locations/public`)
         .then((r) => r.json())
         .then((data) => {
           if (data.success && data.cities) {
