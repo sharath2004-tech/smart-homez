@@ -394,6 +394,7 @@ const WorkerEarnings = () => {
               <Download className="w-3.5 h-3.5" /> {t('worker.earnings.export')}
             </button>
           </div>
+          {getRecentEarnings().filter(earning => earning.service && earning.customer).length === 0 ? (
             <div className="card-elevated p-12 text-center">
               <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
                 <IndianRupee className="w-8 h-8 text-muted-foreground" />
