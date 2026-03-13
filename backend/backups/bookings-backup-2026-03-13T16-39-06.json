@@ -1,0 +1,1049 @@
+[
+  {
+    "_id": "69b2fefea2e9a8ee7315f919",
+    "customer": {
+      "_id": "69b2fdbea2e9a8ee7315f6ef",
+      "name": "Sai Shashank",
+      "email": "singusaishashank2021@gmail.com",
+      "phone": "+916305352434"
+    },
+    "assignmentMethod": "auto",
+    "assignedAt": null,
+    "workerArrivalTime": null,
+    "service": {
+      "_id": "69b2fe18a2e9a8ee7315f75c",
+      "name": "Insta Maid"
+    },
+    "bookingDate": "2026-03-13T00:00:00.000Z",
+    "startTime": "07:00",
+    "endTime": "09:00",
+    "status": "pending",
+    "totalAmount": 350,
+    "bookingType": "adhoc",
+    "isRecurring": false,
+    "recurringSchedule": {
+      "customDays": null,
+      "selectedDays": [],
+      "completedOccurrences": 0
+    },
+    "subscription": {
+      "isSubscription": false,
+      "autoRenewal": false,
+      "allowPause": true,
+      "isPaused": false,
+      "durationPerSession": 1,
+      "discountPercent": 0,
+      "isPrepaid": false
+    },
+    "parentBooking": null,
+    "slotDetails": {
+      "slotDuration": 15,
+      "minimumBookingDuration": 60,
+      "bufferTime": 15
+    },
+    "preferences": {
+      "workerGenderPreference": "any",
+      "specialInstructions": "",
+      "preferenceP1": null,
+      "preferenceP2": null,
+      "preferenceP3": null
+    },
+    "billing": {
+      "roundingDetails": {
+        "roundedUp": false
+      },
+      "roundedDurationMinutes": null,
+      "billingSlots": 0,
+      "roundingApplied": false
+    },
+    "paymentStatus": "pending",
+    "paymentMethod": "qr-upi",
+    "qrPayment": null,
+    "location": {
+      "locationId": "69b2db82ee04a327ffaf158c",
+      "apartmentName": "MY HOME MANGALA",
+      "area": "Kondapur",
+      "city": "Hyderabad",
+      "state": "Telangana",
+      "coordinates": [
+        78.34673,
+        17.474721
+      ]
+    },
+    "serviceDetails": {
+      "hours": 2,
+      "taskList": [
+        "sweeping"
+      ],
+      "bringSupplies": true,
+      "roomsCount": null,
+      "package": null,
+      "areas": [],
+      "addOns": [],
+      "sessionDurationHours": null
+    },
+    "notes": "",
+    "cancellationReason": null,
+    "cancellationDate": null,
+    "refund": {
+      "amount": 0,
+      "percentage": 0,
+      "reason": null,
+      "processedAt": null,
+      "status": "not-applicable"
+    },
+    "rating": null,
+    "review": null,
+    "serviceStartQRCode": null,
+    "serviceEndQRCode": null,
+    "actualStartTime": null,
+    "actualEndTime": null,
+    "termsAccepted": false,
+    "termsAcceptedAt": null,
+    "jobDescriptionAcknowledged": false,
+    "jobDescriptionAcknowledgedAt": null,
+    "actualDurationMinutes": null,
+    "scheduledDurationMinutes": null,
+    "overtimeMinutes": 0,
+    "overtimeCharges": 0,
+    "completionPhoto": {
+      "url": null,
+      "timestamp": null,
+      "uploadedBy": null,
+      "verified": false
+    },
+    "paymentProof": {
+      "url": null,
+      "timestamp": null,
+      "uploadedBy": null,
+      "verified": false,
+      "transactionId": null,
+      "transactionTime": null
+    },
+    "workDocumentation": {
+      "additionalNotes": "",
+      "photos": []
+    },
+    "backupWorkers": [],
+    "backupActivations": [],
+    "extensionRequests": [],
+    "reassignmentHistory": [],
+    "delayNotifications": [],
+    "completionPhotos": [],
+    "createdAt": "2026-03-12T17:59:26.027Z",
+    "updatedAt": "2026-03-12T17:59:26.027Z",
+    "__v": 0
+  },
+  {
+    "_id": "69b3cdae3e118e091eb295f4",
+    "customer": {
+      "_id": "69b3cd873e118e091eb295a2",
+      "name": "sharath",
+      "email": "customer@gmail.com"
+    },
+    "assignmentMethod": "auto",
+    "assignedAt": null,
+    "workerArrivalTime": null,
+    "service": {
+      "_id": "69b2fe18a2e9a8ee7315f75c",
+      "name": "Insta Maid"
+    },
+    "bookingDate": "2026-03-13T00:00:00.000Z",
+    "startTime": "15:00",
+    "endTime": "16:00",
+    "status": "pending",
+    "totalAmount": 150,
+    "bookingType": "adhoc",
+    "isRecurring": false,
+    "recurringSchedule": {
+      "customDays": null,
+      "selectedDays": [],
+      "completedOccurrences": 0
+    },
+    "subscription": {
+      "isSubscription": false,
+      "autoRenewal": false,
+      "allowPause": true,
+      "isPaused": false,
+      "durationPerSession": 1,
+      "discountPercent": 0,
+      "isPrepaid": false
+    },
+    "parentBooking": null,
+    "slotDetails": {
+      "slotDuration": 15,
+      "minimumBookingDuration": 60,
+      "bufferTime": 15
+    },
+    "preferences": {
+      "workerGenderPreference": "any",
+      "specialInstructions": "",
+      "preferenceP1": null,
+      "preferenceP2": null,
+      "preferenceP3": null
+    },
+    "billing": {
+      "roundingDetails": {
+        "roundedUp": false
+      },
+      "roundedDurationMinutes": null,
+      "billingSlots": 0,
+      "roundingApplied": false
+    },
+    "paymentStatus": "pending",
+    "paymentMethod": "qr-upi",
+    "qrPayment": null,
+    "location": {
+      "locationId": "69b2db82ee04a327ffaf158c",
+      "apartmentName": "MY HOME MANGALA",
+      "area": "Kondapur",
+      "city": "Hyderabad",
+      "state": "Telangana",
+      "coordinates": [
+        78.34673,
+        17.474721
+      ]
+    },
+    "serviceDetails": {
+      "hours": 1,
+      "taskList": [
+        "sweeping"
+      ],
+      "bringSupplies": false,
+      "roomsCount": null,
+      "package": null,
+      "areas": [],
+      "addOns": [],
+      "sessionDurationHours": null
+    },
+    "notes": "",
+    "cancellationReason": null,
+    "cancellationDate": null,
+    "refund": {
+      "amount": 0,
+      "percentage": 0,
+      "reason": null,
+      "processedAt": null,
+      "status": "not-applicable"
+    },
+    "rating": null,
+    "review": null,
+    "serviceStartQRCode": null,
+    "serviceEndQRCode": null,
+    "actualStartTime": null,
+    "actualEndTime": null,
+    "termsAccepted": false,
+    "termsAcceptedAt": null,
+    "jobDescriptionAcknowledged": false,
+    "jobDescriptionAcknowledgedAt": null,
+    "actualDurationMinutes": null,
+    "scheduledDurationMinutes": null,
+    "overtimeMinutes": 0,
+    "overtimeCharges": 0,
+    "completionPhoto": {
+      "url": null,
+      "timestamp": null,
+      "uploadedBy": null,
+      "verified": false
+    },
+    "paymentProof": {
+      "url": null,
+      "timestamp": null,
+      "uploadedBy": null,
+      "verified": false,
+      "transactionId": null,
+      "transactionTime": null
+    },
+    "workDocumentation": {
+      "additionalNotes": "",
+      "photos": []
+    },
+    "backupWorkers": [],
+    "backupActivations": [],
+    "extensionRequests": [],
+    "reassignmentHistory": [],
+    "delayNotifications": [],
+    "completionPhotos": [],
+    "createdAt": "2026-03-13T08:41:18.122Z",
+    "updatedAt": "2026-03-13T08:41:18.122Z",
+    "__v": 0
+  },
+  {
+    "_id": "69b416251741b88ea832277a",
+    "customer": {
+      "_id": "69b40ead6e2565222a206c9a",
+      "name": "customer",
+      "email": "customer1@gmail.com"
+    },
+    "assignmentMethod": "auto",
+    "assignedAt": "2026-03-13T15:39:50.447Z",
+    "workerArrivalTime": null,
+    "service": {
+      "_id": "69b2fe18a2e9a8ee7315f75c",
+      "name": "Insta Maid"
+    },
+    "bookingDate": "2026-03-14T00:00:00.000Z",
+    "startTime": "11:30",
+    "endTime": "12:30",
+    "status": "confirmed",
+    "totalAmount": 150,
+    "bookingType": "adhoc",
+    "isRecurring": false,
+    "recurringSchedule": {
+      "customDays": null,
+      "selectedDays": [],
+      "completedOccurrences": 0
+    },
+    "subscription": {
+      "isSubscription": false,
+      "autoRenewal": false,
+      "allowPause": true,
+      "isPaused": false,
+      "durationPerSession": 1,
+      "discountPercent": 0,
+      "isPrepaid": false
+    },
+    "parentBooking": null,
+    "slotDetails": {
+      "slotDuration": 15,
+      "minimumBookingDuration": 60,
+      "bufferTime": 15
+    },
+    "preferences": {
+      "workerGenderPreference": "any",
+      "specialInstructions": "",
+      "preferenceP1": null,
+      "preferenceP2": null,
+      "preferenceP3": null
+    },
+    "billing": {
+      "roundingDetails": {
+        "roundedUp": false
+      },
+      "roundedDurationMinutes": null,
+      "billingSlots": 0,
+      "roundingApplied": false
+    },
+    "paymentStatus": "pending",
+    "paymentMethod": "qr-upi",
+    "qrPayment": null,
+    "location": {
+      "locationId": "69b3ce963e118e091eb2968c",
+      "apartmentName": "sharath",
+      "area": "mohali",
+      "city": "Hyderabad",
+      "state": "chandigarh",
+      "coordinates": [
+        76.573776,
+        30.76995
+      ]
+    },
+    "serviceDetails": {
+      "hours": 1,
+      "taskList": [
+        "sweeping",
+        "dusting"
+      ],
+      "bringSupplies": false,
+      "roomsCount": null,
+      "package": null,
+      "areas": [],
+      "addOns": [],
+      "sessionDurationHours": null
+    },
+    "notes": "",
+    "cancellationReason": null,
+    "cancellationDate": null,
+    "refund": {
+      "amount": 0,
+      "percentage": 0,
+      "reason": null,
+      "processedAt": null,
+      "status": "not-applicable"
+    },
+    "rating": null,
+    "review": null,
+    "serviceStartQRCode": null,
+    "serviceEndQRCode": null,
+    "actualStartTime": null,
+    "actualEndTime": null,
+    "termsAccepted": false,
+    "termsAcceptedAt": null,
+    "jobDescriptionAcknowledged": false,
+    "jobDescriptionAcknowledgedAt": null,
+    "actualDurationMinutes": null,
+    "scheduledDurationMinutes": null,
+    "overtimeMinutes": 0,
+    "overtimeCharges": 0,
+    "completionPhoto": {
+      "url": null,
+      "timestamp": null,
+      "uploadedBy": null,
+      "verified": false
+    },
+    "paymentProof": {
+      "url": null,
+      "timestamp": null,
+      "uploadedBy": null,
+      "verified": false,
+      "transactionId": null,
+      "transactionTime": null
+    },
+    "workDocumentation": {
+      "additionalNotes": "",
+      "photos": []
+    },
+    "backupWorkers": [
+      {
+        "worker": "69b40d596e2565222a206bfe",
+        "assignedAt": "2026-03-13T15:39:50.446Z",
+        "priority": 1,
+        "_id": "69b42fc65aeffdbe263d9593"
+      },
+      {
+        "worker": "69b418cc1741b88ea83228ab",
+        "assignedAt": "2026-03-13T15:39:50.446Z",
+        "priority": 2,
+        "_id": "69b42fc65aeffdbe263d9594"
+      }
+    ],
+    "backupActivations": [],
+    "extensionRequests": [],
+    "reassignmentHistory": [],
+    "delayNotifications": [],
+    "completionPhotos": [],
+    "createdAt": "2026-03-13T13:50:29.502Z",
+    "updatedAt": "2026-03-13T15:39:50.448Z",
+    "__v": 1,
+    "worker": {
+      "_id": "69b2df6ac241a1ccad1f63f6",
+      "name": "WORKER-SAI",
+      "email": "6305352434@healthyhomez.app",
+      "phone": "+916305352434"
+    },
+    "workerChecklist": []
+  },
+  {
+    "_id": "69b419b91741b88ea832299d",
+    "customer": {
+      "_id": "69b419711741b88ea832291d",
+      "name": "ww",
+      "email": "customer2@gmail.com"
+    },
+    "assignmentMethod": "auto",
+    "assignedAt": null,
+    "workerArrivalTime": null,
+    "service": {
+      "_id": "69b2fe18a2e9a8ee7315f75c",
+      "name": "Insta Maid"
+    },
+    "bookingDate": "2026-03-14T00:00:00.000Z",
+    "startTime": "07:00",
+    "endTime": "08:00",
+    "status": "cancelled",
+    "totalAmount": 150,
+    "bookingType": "adhoc",
+    "isRecurring": false,
+    "recurringSchedule": {
+      "customDays": null,
+      "selectedDays": [],
+      "completedOccurrences": 0
+    },
+    "subscription": {
+      "isSubscription": false,
+      "autoRenewal": false,
+      "allowPause": true,
+      "isPaused": false,
+      "durationPerSession": 1,
+      "discountPercent": 0,
+      "isPrepaid": false
+    },
+    "parentBooking": null,
+    "slotDetails": {
+      "slotDuration": 15,
+      "minimumBookingDuration": 60,
+      "bufferTime": 15
+    },
+    "preferences": {
+      "workerGenderPreference": "any",
+      "specialInstructions": "",
+      "preferenceP1": null,
+      "preferenceP2": null,
+      "preferenceP3": null
+    },
+    "billing": {
+      "roundingDetails": {
+        "roundedUp": false
+      },
+      "roundedDurationMinutes": null,
+      "billingSlots": 0,
+      "roundingApplied": false
+    },
+    "paymentStatus": "pending",
+    "paymentMethod": "qr-upi",
+    "qrPayment": null,
+    "location": {
+      "locationId": "69b3ce963e118e091eb2968c",
+      "apartmentName": "sharath",
+      "area": "mohali",
+      "city": "Hyderabad",
+      "state": "chandigarh",
+      "coordinates": [
+        76.573776,
+        30.76995
+      ]
+    },
+    "serviceDetails": {
+      "hours": 1,
+      "taskList": [
+        "sweeping"
+      ],
+      "bringSupplies": false,
+      "roomsCount": null,
+      "package": null,
+      "areas": [],
+      "addOns": [],
+      "sessionDurationHours": null
+    },
+    "notes": "",
+    "cancellationReason": "Cancelled by customer",
+    "cancellationDate": "2026-03-13T15:39:47.981Z",
+    "refund": {
+      "amount": 150,
+      "percentage": 100,
+      "reason": "Free cancellation (15.3 hours before booking)",
+      "processedAt": "2026-03-13T15:39:47.981Z",
+      "status": "processed"
+    },
+    "rating": null,
+    "review": null,
+    "serviceStartQRCode": null,
+    "serviceEndQRCode": null,
+    "actualStartTime": null,
+    "actualEndTime": null,
+    "termsAccepted": false,
+    "termsAcceptedAt": null,
+    "jobDescriptionAcknowledged": false,
+    "jobDescriptionAcknowledgedAt": null,
+    "actualDurationMinutes": null,
+    "scheduledDurationMinutes": null,
+    "overtimeMinutes": 0,
+    "overtimeCharges": 0,
+    "completionPhoto": {
+      "url": null,
+      "timestamp": null,
+      "uploadedBy": null,
+      "verified": false
+    },
+    "paymentProof": {
+      "url": null,
+      "timestamp": null,
+      "uploadedBy": null,
+      "verified": false,
+      "transactionId": null,
+      "transactionTime": null
+    },
+    "workDocumentation": {
+      "additionalNotes": "",
+      "photos": []
+    },
+    "backupWorkers": [],
+    "backupActivations": [],
+    "extensionRequests": [],
+    "reassignmentHistory": [],
+    "delayNotifications": [],
+    "completionPhotos": [],
+    "createdAt": "2026-03-13T14:05:45.076Z",
+    "updatedAt": "2026-03-13T15:39:47.983Z",
+    "__v": 1,
+    "workerChecklist": []
+  },
+  {
+    "_id": "69b42be45aeffdbe263d930a",
+    "customer": {
+      "_id": "69b419711741b88ea832291d",
+      "name": "ww",
+      "email": "customer2@gmail.com"
+    },
+    "assignmentMethod": "auto",
+    "assignedAt": "2026-03-13T15:23:18.613Z",
+    "workerArrivalTime": null,
+    "service": {
+      "_id": "69b2fe18a2e9a8ee7315f75c",
+      "name": "Insta Maid"
+    },
+    "bookingDate": "2026-03-14T00:00:00.000Z",
+    "startTime": "07:00",
+    "endTime": "08:00",
+    "status": "confirmed",
+    "totalAmount": 150,
+    "bookingType": "adhoc",
+    "isRecurring": false,
+    "recurringSchedule": {
+      "customDays": null,
+      "selectedDays": [],
+      "completedOccurrences": 0
+    },
+    "subscription": {
+      "isSubscription": false,
+      "autoRenewal": false,
+      "allowPause": true,
+      "isPaused": false,
+      "durationPerSession": 1,
+      "discountPercent": 0,
+      "isPrepaid": false
+    },
+    "parentBooking": null,
+    "slotDetails": {
+      "slotDuration": 15,
+      "minimumBookingDuration": 60,
+      "bufferTime": 15
+    },
+    "preferences": {
+      "workerGenderPreference": "any",
+      "specialInstructions": "",
+      "preferenceP1": null,
+      "preferenceP2": null,
+      "preferenceP3": null
+    },
+    "billing": {
+      "roundingDetails": {
+        "roundedUp": false
+      },
+      "roundedDurationMinutes": null,
+      "billingSlots": 0,
+      "roundingApplied": false
+    },
+    "paymentStatus": "pending",
+    "paymentMethod": "qr-upi",
+    "qrPayment": null,
+    "location": {
+      "locationId": "69b3ce963e118e091eb2968c",
+      "apartmentName": "sharath",
+      "area": "mohali",
+      "city": "Hyderabad",
+      "state": "chandigarh",
+      "coordinates": [
+        76.573776,
+        30.76995
+      ]
+    },
+    "serviceDetails": {
+      "hours": 1,
+      "taskList": [
+        "toilets",
+        "dusting"
+      ],
+      "bringSupplies": false,
+      "roomsCount": null,
+      "package": null,
+      "areas": [],
+      "addOns": [],
+      "sessionDurationHours": null
+    },
+    "notes": "",
+    "cancellationReason": null,
+    "cancellationDate": null,
+    "refund": {
+      "amount": 0,
+      "percentage": 0,
+      "reason": null,
+      "processedAt": null,
+      "status": "not-applicable"
+    },
+    "rating": null,
+    "review": null,
+    "serviceStartQRCode": null,
+    "serviceEndQRCode": null,
+    "actualStartTime": null,
+    "actualEndTime": null,
+    "termsAccepted": false,
+    "termsAcceptedAt": null,
+    "jobDescriptionAcknowledged": false,
+    "jobDescriptionAcknowledgedAt": null,
+    "actualDurationMinutes": null,
+    "scheduledDurationMinutes": null,
+    "overtimeMinutes": 0,
+    "overtimeCharges": 0,
+    "completionPhoto": {
+      "url": null,
+      "timestamp": null,
+      "uploadedBy": null,
+      "verified": false
+    },
+    "arrivalPhoto": {
+      "url": null,
+      "timestamp": null,
+      "uploadedBy": null
+    },
+    "paymentProof": {
+      "url": null,
+      "timestamp": null,
+      "uploadedBy": null,
+      "verified": false,
+      "transactionId": null,
+      "transactionTime": null
+    },
+    "workDocumentation": {
+      "additionalNotes": "",
+      "photos": []
+    },
+    "backupWorkers": [
+      {
+        "worker": "69b40d596e2565222a206bfe",
+        "assignedAt": "2026-03-13T15:23:18.610Z",
+        "priority": 1,
+        "_id": "69b42be65aeffdbe263d931c"
+      },
+      {
+        "worker": "69b418cc1741b88ea83228ab",
+        "assignedAt": "2026-03-13T15:23:18.610Z",
+        "priority": 2,
+        "_id": "69b42be65aeffdbe263d931d"
+      }
+    ],
+    "backupActivations": [],
+    "extensionRequests": [],
+    "reassignmentHistory": [],
+    "delayNotifications": [],
+    "workerChecklist": [],
+    "completionPhotos": [],
+    "createdAt": "2026-03-13T15:23:16.374Z",
+    "updatedAt": "2026-03-13T15:23:18.615Z",
+    "__v": 1,
+    "worker": {
+      "_id": "69b2df6ac241a1ccad1f63f6",
+      "name": "WORKER-SAI",
+      "email": "6305352434@healthyhomez.app",
+      "phone": "+916305352434"
+    }
+  },
+  {
+    "_id": "69b430095aeffdbe263d9647",
+    "customer": {
+      "_id": "69b419711741b88ea832291d",
+      "name": "ww",
+      "email": "customer2@gmail.com"
+    },
+    "assignmentMethod": "auto",
+    "assignedAt": "2026-03-13T15:40:59.494Z",
+    "workerArrivalTime": null,
+    "service": {
+      "_id": "69b2fe18a2e9a8ee7315f75c",
+      "name": "Insta Maid"
+    },
+    "bookingDate": "2026-03-14T00:00:00.000Z",
+    "startTime": "13:30",
+    "endTime": "14:30",
+    "status": "confirmed",
+    "totalAmount": 150,
+    "bookingType": "adhoc",
+    "isRecurring": false,
+    "recurringSchedule": {
+      "customDays": null,
+      "selectedDays": [],
+      "completedOccurrences": 0
+    },
+    "subscription": {
+      "isSubscription": false,
+      "autoRenewal": false,
+      "allowPause": true,
+      "isPaused": false,
+      "durationPerSession": 1,
+      "discountPercent": 0,
+      "isPrepaid": false
+    },
+    "parentBooking": null,
+    "slotDetails": {
+      "slotDuration": 15,
+      "minimumBookingDuration": 60,
+      "bufferTime": 15
+    },
+    "preferences": {
+      "workerGenderPreference": "any",
+      "specialInstructions": "",
+      "preferenceP1": null,
+      "preferenceP2": null,
+      "preferenceP3": null
+    },
+    "billing": {
+      "roundingDetails": {
+        "roundedUp": false
+      },
+      "roundedDurationMinutes": null,
+      "billingSlots": 0,
+      "roundingApplied": false
+    },
+    "paymentStatus": "pending",
+    "paymentMethod": "qr-upi",
+    "qrPayment": null,
+    "location": {
+      "locationId": "69b3ce963e118e091eb2968c",
+      "apartmentName": "sharath",
+      "area": "mohali",
+      "city": "Hyderabad",
+      "state": "chandigarh",
+      "coordinates": [
+        76.573776,
+        30.76995
+      ]
+    },
+    "serviceDetails": {
+      "hours": 1,
+      "taskList": [
+        "dusting",
+        "laundry"
+      ],
+      "bringSupplies": false,
+      "roomsCount": null,
+      "package": null,
+      "areas": [],
+      "addOns": [],
+      "sessionDurationHours": null
+    },
+    "notes": "",
+    "cancellationReason": null,
+    "cancellationDate": null,
+    "refund": {
+      "amount": 0,
+      "percentage": 0,
+      "reason": null,
+      "processedAt": null,
+      "status": "not-applicable"
+    },
+    "rating": null,
+    "review": null,
+    "serviceStartQRCode": null,
+    "serviceEndQRCode": null,
+    "actualStartTime": null,
+    "actualEndTime": null,
+    "termsAccepted": false,
+    "termsAcceptedAt": null,
+    "jobDescriptionAcknowledged": false,
+    "jobDescriptionAcknowledgedAt": null,
+    "actualDurationMinutes": null,
+    "scheduledDurationMinutes": null,
+    "overtimeMinutes": 0,
+    "overtimeCharges": 0,
+    "completionPhoto": {
+      "url": null,
+      "timestamp": null,
+      "uploadedBy": null,
+      "verified": false
+    },
+    "arrivalPhoto": {
+      "url": null,
+      "timestamp": null,
+      "uploadedBy": null
+    },
+    "paymentProof": {
+      "url": null,
+      "timestamp": null,
+      "uploadedBy": null,
+      "verified": false,
+      "transactionId": null,
+      "transactionTime": null
+    },
+    "workDocumentation": {
+      "additionalNotes": "",
+      "photos": []
+    },
+    "backupWorkers": [
+      {
+        "worker": "69b40d596e2565222a206bfe",
+        "assignedAt": "2026-03-13T15:40:59.493Z",
+        "priority": 1,
+        "_id": "69b4300b5aeffdbe263d9659"
+      },
+      {
+        "worker": "69b418cc1741b88ea83228ab",
+        "assignedAt": "2026-03-13T15:40:59.493Z",
+        "priority": 2,
+        "_id": "69b4300b5aeffdbe263d965a"
+      }
+    ],
+    "backupActivations": [],
+    "extensionRequests": [],
+    "reassignmentHistory": [],
+    "delayNotifications": [],
+    "workerChecklist": [],
+    "completionPhotos": [],
+    "createdAt": "2026-03-13T15:40:57.452Z",
+    "updatedAt": "2026-03-13T15:40:59.495Z",
+    "__v": 1,
+    "worker": {
+      "_id": "69b2df6ac241a1ccad1f63f6",
+      "name": "WORKER-SAI",
+      "email": "6305352434@healthyhomez.app",
+      "phone": "+916305352434"
+    }
+  },
+  {
+    "_id": "69b430345aeffdbe263d96d1",
+    "customer": {
+      "_id": "69b419711741b88ea832291d",
+      "name": "ww",
+      "email": "customer2@gmail.com"
+    },
+    "assignmentMethod": "auto",
+    "assignedAt": "2026-03-13T15:41:42.897Z",
+    "workerArrivalTime": null,
+    "service": {
+      "_id": "69b2fe18a2e9a8ee7315f75c",
+      "name": "Insta Maid"
+    },
+    "bookingDate": "2026-03-14T00:00:00.000Z",
+    "startTime": "13:30",
+    "endTime": "15:30",
+    "status": "completed",
+    "totalAmount": 300,
+    "bookingType": "adhoc",
+    "isRecurring": false,
+    "recurringSchedule": {
+      "customDays": null,
+      "selectedDays": [],
+      "completedOccurrences": 0
+    },
+    "subscription": {
+      "isSubscription": false,
+      "autoRenewal": false,
+      "allowPause": true,
+      "isPaused": false,
+      "durationPerSession": 1,
+      "discountPercent": 0,
+      "isPrepaid": false
+    },
+    "parentBooking": null,
+    "slotDetails": {
+      "slotDuration": 15,
+      "minimumBookingDuration": 60,
+      "bufferTime": 15
+    },
+    "preferences": {
+      "workerGenderPreference": "any",
+      "specialInstructions": "",
+      "preferenceP1": null,
+      "preferenceP2": null,
+      "preferenceP3": null
+    },
+    "billing": {
+      "roundingDetails": {
+        "roundedUp": false
+      },
+      "roundedDurationMinutes": null,
+      "billingSlots": 0,
+      "roundingApplied": false
+    },
+    "paymentStatus": "pending",
+    "paymentMethod": "qr-upi",
+    "qrPayment": null,
+    "location": {
+      "locationId": "69b3ce963e118e091eb2968c",
+      "apartmentName": "sharath",
+      "area": "mohali",
+      "city": "Hyderabad",
+      "state": "chandigarh",
+      "coordinates": [
+        76.573776,
+        30.76995
+      ]
+    },
+    "serviceDetails": {
+      "hours": 2,
+      "taskList": [
+        "dusting"
+      ],
+      "bringSupplies": false,
+      "roomsCount": null,
+      "package": null,
+      "areas": [],
+      "addOns": [],
+      "sessionDurationHours": null
+    },
+    "notes": "",
+    "cancellationReason": null,
+    "cancellationDate": null,
+    "refund": {
+      "amount": 0,
+      "percentage": 0,
+      "reason": null,
+      "processedAt": null,
+      "status": "not-applicable"
+    },
+    "rating": null,
+    "review": null,
+    "serviceStartQRCode": "START-69b430345aeffdbe263d96d1-69b40d596e2565222a206bfe-1773416649196-6u1p57rs0",
+    "serviceEndQRCode": "END-69b430345aeffdbe263d96d1-69b40d596e2565222a206bfe-1773416949238-7xyxgakr6",
+    "actualStartTime": "2026-03-13T15:44:51.238Z",
+    "actualEndTime": "2026-03-13T15:50:52.325Z",
+    "termsAccepted": true,
+    "termsAcceptedAt": "2026-03-13T15:44:51.238Z",
+    "jobDescriptionAcknowledged": true,
+    "jobDescriptionAcknowledgedAt": "2026-03-13T15:44:09.196Z",
+    "actualDurationMinutes": 6,
+    "scheduledDurationMinutes": 120,
+    "overtimeMinutes": 0,
+    "overtimeCharges": 0,
+    "completionPhoto": {
+      "url": "/uploads/completion-photos/booking-69b430345aeffdbe263d96d1-1773416940311.jpg",
+      "timestamp": "2026-03-13T15:49:01.745Z",
+      "uploadedBy": "69b40d596e2565222a206bfe",
+      "verified": true
+    },
+    "arrivalPhoto": {
+      "url": null,
+      "timestamp": null,
+      "uploadedBy": null
+    },
+    "paymentProof": {
+      "url": "/uploads/completion-photos/booking-69b430345aeffdbe263d96d1-1773417260721.jpg",
+      "timestamp": "2026-03-13T15:54:21.278Z",
+      "uploadedBy": "69b40d596e2565222a206bfe",
+      "verified": true,
+      "transactionId": null,
+      "transactionTime": "2026-03-13T15:51:23.365Z"
+    },
+    "workDocumentation": {
+      "additionalNotes": "",
+      "photos": []
+    },
+    "backupWorkers": [
+      {
+        "worker": "69b418cc1741b88ea83228ab",
+        "assignedAt": "2026-03-13T15:41:42.896Z",
+        "priority": 1,
+        "_id": "69b430365aeffdbe263d96e3"
+      }
+    ],
+    "backupActivations": [],
+    "extensionRequests": [],
+    "reassignmentHistory": [],
+    "delayNotifications": [],
+    "workerChecklist": [],
+    "completionPhotos": [
+      {
+        "url": "/uploads/completion-photos/booking-69b430345aeffdbe263d96d1-1773416871637.jpg",
+        "timestamp": "2026-03-13T15:47:52.850Z",
+        "uploadedBy": "69b40d596e2565222a206bfe",
+        "verified": true,
+        "_id": "69b431a85aeffdbe263d9b9b"
+      },
+      {
+        "url": "/uploads/completion-photos/booking-69b430345aeffdbe263d96d1-1773416940311.jpg",
+        "timestamp": "2026-03-13T15:49:01.744Z",
+        "uploadedBy": "69b40d596e2565222a206bfe",
+        "verified": true,
+        "_id": "69b431ed5aeffdbe263d9c34"
+      }
+    ],
+    "createdAt": "2026-03-13T15:41:40.858Z",
+    "updatedAt": "2026-03-13T15:58:25.071Z",
+    "__v": 3,
+    "worker": {
+      "_id": "69b40d596e2565222a206bfe",
+      "name": "shaa",
+      "email": "worker@gmail.com",
+      "phone": "+915884644112"
+    }
+  }
+]

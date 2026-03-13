@@ -2376,8 +2376,8 @@ router.post('/worker-requests/:id/reject', authenticate, authorize('admin', 'sup
 
 // @route   GET /api/admin/area-stats
 // @desc    Aggregate worker count and booking demand per area for heatmap
-// @access  Admin
-router.get('/area-stats', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+// @access  Super Admin only
+router.get('/area-stats', authenticate, authorize('super_admin'), async (req, res) => {
   try {
     // Get all active workers
     let workers = await User.find({ role: 'worker', isActive: true })

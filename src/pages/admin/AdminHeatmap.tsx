@@ -53,7 +53,7 @@ const AdminHeatmap = () => {
   const understaffed  = stats.filter(s => getDemandLevel(s) === 'critical' || getDemandLevel(s) === 'high').length;
 
   return (
-    <AppLayout userType="admin" userName="Admin">
+    <AppLayout userType="super_admin" userName="Super Admin">
       <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">

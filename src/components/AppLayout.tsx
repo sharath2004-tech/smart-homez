@@ -89,7 +89,6 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
     { to: "/admin/locations", icon: MapPin, label: t('nav.locations') },
     { to: "/admin/help-messages", icon: MessageSquare, label: "Help Messages" },
     { to: "/admin/sos", icon: AlertTriangle, label: "SOS Alerts" },
-    { to: "/admin/heatmap", icon: BarChart3, label: "Worker Heatmap" },
     { to: "/admin/settings", icon: Settings, label: t('nav.settings') },
     { to: "/change-password", icon: KeyRound, label: "Change Password" },
   ];
@@ -107,7 +106,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
     { to: "/admin/services", icon: Wrench, label: t('nav.services') },
     { to: "/admin/help-messages", icon: MessageSquare, label: "Help Messages" },
     { to: "/admin/sos", icon: AlertTriangle, label: "SOS Alerts" },
-    { to: "/admin/heatmap", icon: BarChart3, label: "Worker Heatmap" },
+    { to: "/super-admin/heatmap", icon: BarChart3, label: "Worker Heatmap" },
     { to: "/admin/settings", icon: Settings, label: t('nav.settings') },
     { to: "/change-password", icon: KeyRound, label: "Change Password" },
   ];
