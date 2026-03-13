@@ -30,6 +30,13 @@ function toE164(phone) {
   return `+91${digits}`;
 }
 
+function normalizeIndianPhone(phone) {
+  if (!phone) return null;
+  const digits = String(phone).replace(/\D/g, '').slice(-10);
+  if (digits.length < 10) return null;
+  return `+91${digits}`;
+}
+
 const router = express.Router();
 
 // Rate limiter for sensitive auth endpoints (OTP / password reset)
@@ -64,6 +71,8 @@ router.post('/register',
       }
 
       const { name, email, password, role, phone, location, gender, religion, workerProfile, isPhoneVerified } = req.body;
+      const normalizedRole = role || 'customer';
+      const normalizedPhone = normalizeIndianPhone(phone);
 
       // Check if user already exists
       const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
@@ -72,6 +81,29 @@ router.post('/register',
         return res.status(400).json({ 
           error: { message: 'User already exists with this email', status: 400 } 
         });
+      }
+
+      if (phone && !normalizedPhone) {
+        return res.status(400).json({
+          error: { message: 'Enter a valid 10-digit mobile number', status: 400 }
+        });
+      }
+
+      if (normalizedPhone) {
+        const phoneDigits = normalizedPhone.slice(-10);
+        const existingPhoneRoleUser = await User.findOne({
+          role: normalizedRole,
+          phone: { $regex: `${phoneDigits}$` }
+        });
+
+        if (existingPhoneRoleUser) {
+          return res.status(409).json({
+            error: {
+              message: `A ${normalizedRole} account with this mobile number already exists. Please log in instead.`,
+              status: 409
+            }
+          });
+        }
       }
 
       console.log(`✅ No existing user found for email: ${email}, proceeding with registration`);
@@ -84,8 +116,8 @@ router.post('/register',
         name,
         email: email.toLowerCase().trim(), // Normalize email
         password,
-        role: role || 'customer',
-        phone,
+        role: normalizedRole,
+        phone: normalizedPhone || phone,
         gender: gender || 'prefer_not_to_say',
         religion: religion || undefined,
         isPhoneVerified: isPhoneVerified === true || isPhoneVerified === 'true',
@@ -800,6 +832,25 @@ router.post('/register-worker',
         return res.status(400).json({ error: { message: 'User already exists with this email', status: 400 } });
       }
 
+      const normalizedPhone = normalizeIndianPhone(phone);
+      if (!normalizedPhone) {
+        return res.status(400).json({ error: { message: 'Enter a valid 10-digit mobile number', status: 400 } });
+      }
+
+      const phoneDigits = normalizedPhone.slice(-10);
+      const existingWorkerWithPhone = await User.findOne({
+        role: 'worker',
+        phone: { $regex: `${phoneDigits}$` }
+      });
+      if (existingWorkerWithPhone) {
+        return res.status(409).json({
+          error: {
+            message: 'A worker account with this mobile number already exists. Please log in instead.',
+            status: 409
+          }
+        });
+      }
+
       const settings = await Settings.getSettings();
 
       // Parse skills from JSON string if needed
@@ -823,8 +874,6 @@ router.post('/register-worker',
       const profilePicFile = req.files.profilePicture[0];
       const aadhaarFrontFile = req.files.aadhaarFront[0];
       const aadhaarBackFile = req.files.aadhaarBack?.[0] || null;
-
-      const normalizedPhone = phone.startsWith('+') ? phone : `+91${phone.replace(/\D/g, '').slice(-10)}`;
 
       const userData = {
         name: name.trim(),

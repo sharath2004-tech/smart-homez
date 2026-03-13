@@ -85,11 +85,28 @@ router.post('/verify-otp', async (req, res) => {
       return res.status(401).json({ message: 'Invalid or expired OTP. Please try again.' });
     }
 
-    let user = await User.findOne({ phone: e164 });
+    const requestedRole = typeof role === 'string' ? role.toLowerCase().trim() : 'customer';
+    const allowedRoles = ['customer', 'worker'];
+    const finalRole = allowedRoles.includes(requestedRole) ? requestedRole : 'customer';
+    const isSignupAttempt = Boolean(name && String(name).trim());
+
+    let user = await User.findOne({ phone: e164, role: finalRole });
 
     if (!user) {
-      const allowedRoles = ['customer', 'worker'];
-      const finalRole = allowedRoles.includes(role) ? role : 'customer';
+      // For login flow (no name), do not auto-create users
+      if (!isSignupAttempt) {
+        return res.status(404).json({
+          message: `No ${finalRole} account found for this mobile number. Please sign up first.`
+        });
+      }
+
+      const existingSameRoleUser = await User.findOne({ phone: e164, role: finalRole });
+      if (existingSameRoleUser) {
+        return res.status(409).json({
+          message: `A ${finalRole} account with this mobile number already exists. Please log in instead.`
+        });
+      }
+
       const digits = e164.replace(/\D/g, '').slice(-10);
 
       user = new User({
@@ -102,6 +119,10 @@ router.post('/verify-otp', async (req, res) => {
         password: Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12),
       });
       await user.save();
+    } else if (isSignupAttempt) {
+      return res.status(409).json({
+        message: `A ${user.role} account with this mobile number already exists. Please log in instead.`
+      });
     } else if (!user.isPhoneVerified) {
       user.isPhoneVerified = true;
       await user.save();
