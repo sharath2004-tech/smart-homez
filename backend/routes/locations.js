@@ -54,20 +54,6 @@ router.get('/public', async (req, res) => {
   }
 });
 
-// @route   GET /api/locations/public
-// @desc    Get active locations for worker self-registration (no auth)
-// @access  Public
-router.get('/public', async (req, res) => {
-  try {
-    const locations = await Location.find({ isActive: { $ne: false } })
-      .select('_id apartmentName area city')
-      .sort({ city: 1, area: 1 });
-    res.status(200).json({ success: true, data: locations });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Error fetching locations' });
-  }
-});
-
 // Get all locations (admin only)
 router.get('/', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
   try {

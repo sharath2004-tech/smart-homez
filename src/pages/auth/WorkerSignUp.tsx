@@ -75,8 +75,15 @@ const WorkerSignUp = () => {
       fetch(`${API_BASE_URL}/api/locations/public`)
         .then((r) => r.json())
         .then((data) => {
-          if (data.success) setAvailableLocations(data.data);
-          else setError("Could not load service areas. Please try again.");
+          if (data.success && data.cities) {
+            // Flatten cities → locations into a single list
+            const flat: AvailableLocation[] = data.cities.flatMap(
+              (c: { locations: AvailableLocation[] }) => c.locations
+            );
+            setAvailableLocations(flat);
+          } else {
+            setError("Could not load service areas. Please try again.");
+          }
         })
         .catch(() => setError("Could not load service areas. Please try again."))
         .finally(() => setLocLoading(false));
