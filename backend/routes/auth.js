@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import twilio from 'twilio';
 import { authenticate } from '../middleware/auth.js';
 import { uploadWorkerFiles } from '../middleware/upload.js';
+import Location from '../models/Location.js';
 import Notification from '../models/Notification.js';
 import Settings from '../models/Settings.js';
 import User from '../models/User.js';
@@ -149,9 +150,21 @@ router.post('/register',
 
         // For workers, initialize workerProfile with service area
         if (role === 'worker' && location.serviceAreaId) {
+          let locationId = null;
+          // Try to find the Location document by city and area
+          if (location.city && location.area) {
+            const foundLocation = await Location.findOne({
+              city: new RegExp(`^${location.city}$`, 'i'),
+              area: new RegExp(`^${location.area}$`, 'i')
+            }).select('_id apartmentName');
+            if (foundLocation) {
+              locationId = foundLocation._id;
+            }
+          }
           userData.workerProfile = {
             experience: workerProfile?.experience || 0,
             assignedApartments: [{
+              locationId, // Include the Location document ID if found
               apartmentName: location.area || '',
               area: location.area || '',
               city: location.city || '',
@@ -912,7 +925,21 @@ router.post('/register-worker',
           coordinates: parsedLocation.coordinates,
           lastUpdated: new Date()
         };
+
+        // Find the Location document by city and area to include locationId
+        let locationId = null;
+        if (parsedLocation.city && parsedLocation.area) {
+          const foundLocation = await Location.findOne({
+            city: new RegExp(`^${parsedLocation.city}$`, 'i'),
+            area: new RegExp(`^${parsedLocation.area}$`, 'i')
+          }).select('_id apartmentName');
+          if (foundLocation) {
+            locationId = foundLocation._id;
+          }
+        }
+
         userData.workerProfile.assignedApartments = [{
+          locationId, // Include the Location document ID if found
           apartmentName: parsedLocation.area || '',
           area: parsedLocation.area || '',
           city: parsedLocation.city || '',
