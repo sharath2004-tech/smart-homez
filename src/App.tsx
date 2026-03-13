@@ -32,6 +32,7 @@ import ServiceRouter from "./pages/customer/ServiceRouter";
 import DeepCleaningServicePage from "./pages/customer/services/DeepCleaningServicePage";
 import InstaServicePage from "./pages/customer/services/InstaServicePage";
 import SubscriptionServicePage from "./pages/customer/services/SubscriptionServicePage";
+import DeepCleaningQuotePage from "./pages/customer/DeepCleaningQuotePage";
 import ServicesPage from "./pages/customer/ServicesPage";
 import SubscriptionBookingPage from "./pages/customer/SubscriptionBookingPage";
 
@@ -81,6 +82,7 @@ const App = () => (
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/change-password" element={<ChangePasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/deep-cleaning-quote" element={<DeepCleaningQuotePage />} />
 
           {/* Customer */}
           <Route path="/customer/dashboard" element={<ProtectedRoute allowedRoles={['customer']}><CustomerDashboard /></ProtectedRoute>} />

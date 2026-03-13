@@ -32,6 +32,7 @@ const serviceSchema = new mongoose.Schema({
       'fixed_sofa_cleaning',      // Sofa cleaning
       'fixed_carpet_cleaning',    // Carpet cleaning
       'fixed_balcony_cleaning',   // Balcony cleaning
+      'deep_cleaning_commercial', // Commercial/residential deep cleaning (custom quote)
       'other'                     // Custom services
     ],
     default: 'other'
@@ -117,6 +118,10 @@ const serviceSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  isQuoteService: {
+    type: Boolean,
+    default: false   // If true, no fixed price — customer submits a quote request
   },
   tags: [String],
   requirements: [String],

@@ -34,6 +34,7 @@ import superAdminRoutes from './routes/superAdmin.js';
 import trackingRoutes from './routes/tracking.js';
 import twilioAuthRoutes from './routes/twilioAuth.js';
 import userRoutes from './routes/users.js';
+import quotesRoutes from './routes/quotes.js';
 
 // Import utilities
 import { runBookingUpdates } from './utils/bookingStatusUpdater.js';
@@ -207,6 +208,7 @@ app.use('/api/preferences', preferencesRoutes);
 app.use('/api/leaves', leavesRoutes);
 app.use('/api/salary-requests', salaryRequestsRoutes);
 app.use('/api/help', helpRoutes);
+app.use('/api/quotes', quotesRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
