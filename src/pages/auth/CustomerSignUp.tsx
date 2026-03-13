@@ -7,15 +7,13 @@ import {
     EyeOff,
     Home,
     Loader2,
-    Mail,
     MapPin,
     Navigation,
-    Phone,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-type Step = "method" | "form" | "phone-entry" | "otp" | "location" | "done";
+type Step = "form" | "location" | "done";
 
 interface GeoResult {
   address: string;
@@ -45,7 +43,7 @@ interface ServiceCity {
 }
 
 const CustomerSignUp = () => {
-  const [step, setStep] = useState<Step>("method");
+  const [step, setStep] = useState<Step>("form");
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -59,127 +57,63 @@ const CustomerSignUp = () => {
   const [loading, setLoading] = useState(false);
   const [locLoading, setLocLoading] = useState(false);
   const [error, setError] = useState("");
-  const [geoResult, setGeoResult] = useState<GeoResult | null>(null);
 
-  // OTP state
-  const [otpCode, setOtpCode] = useState("");
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [signupMethod, setSignupMethod] = useState<"email" | "phone" | null>(null);
-  const [phoneForm, setPhoneForm] = useState({ name: "", phone: "" });
-
-  // City / location picker state
   const [serviceCities, setServiceCities] = useState<ServiceCity[]>([]);
   const [citiesLoading, setCitiesLoading] = useState(false);
   const [selectedCity, setSelectedCity] = useState("");
   const [selectedLocationId, setSelectedLocationId] = useState("");
 
-  // Load available service cities when the location step is shown
   useEffect(() => {
     if (step !== "location") return;
     setCitiesLoading(true);
-    publicAPI.getServiceLocations()
+    publicAPI
+      .getServiceLocations()
       .then((data) => {
         if (data.cities) setServiceCities(data.cities);
       })
-      .catch(() => {/* non-critical */})
+      .catch(() => {})
       .finally(() => setCitiesLoading(false));
   }, [step]);
 
-  const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  const set =
+    (field: keyof typeof form) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+      setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
-  // -- Step 1 (email path): validate and send OTP to email ---------
-  const handleFormNext = async (e: React.FormEvent) => {
+  const handleFormNext = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim()) { setError("Name is required"); return; }
-    if (!form.email.trim()) { setError("Email is required"); return; }
-    if (form.password.length < 8) { setError("Password must be at least 8 characters"); return; }
-    if (!/[A-Z]/.test(form.password)) { setError("Password must contain at least one uppercase letter"); return; }
-    if (!/[0-9]/.test(form.password)) { setError("Password must contain at least one number"); return; }
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(form.password)) { setError('Password must include a special character (e.g. @, #, $, !)'); return; }
-    if (form.password !== form.confirmPassword) { setError("Passwords do not match"); return; }
-    setError("");
-    setOtpLoading(true);
-    try {
-      await authAPI.sendEmailOTP(form.email.trim().toLowerCase());
-      setOtpSent(true);
-      setStep("otp");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send OTP to your email. Please try again.");
-    } finally {
-      setOtpLoading(false);
+    if (!form.name.trim()) {
+      setError("Name is required");
+      return;
     }
+    if (!form.email.trim()) {
+      setError("Email is required");
+      return;
+    }
+    if (form.password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+    if (!/[A-Z]/.test(form.password)) {
+      setError("Password must contain at least one uppercase letter");
+      return;
+    }
+    if (!/[0-9]/.test(form.password)) {
+      setError("Password must contain at least one number");
+      return;
+    }
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(form.password)) {
+      setError("Password must include a special character (e.g. @, #, $, !)");
+      return;
+    }
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+    setError("");
+    setStep("location");
   };
 
-  // -- Phone-only path: collect name + phone then send OTP ----------------
-  const handlePhoneEntryNext = async () => {
-    if (!phoneForm.name.trim()) { setError("Name is required"); return; }
-    const digits = phoneForm.phone.replace(/\D/g, "").slice(-10);
-    if (digits.length < 10) { setError("Enter a valid 10-digit mobile number"); return; }
-    setError("");
-    setOtpLoading(true);
-    try {
-      await authAPI.sendOTP(digits);
-      setOtpSent(true);
-      setStep("otp");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send OTP. Please try again.");
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  // -- Step 2: verify OTP -------------------------------------------------
-  const handleVerifyOTP = async () => {
-    if (!otpCode || otpCode.length < 6) { setError("Enter the 6-digit OTP"); return; }
-    setOtpLoading(true);
-    setError("");
-    try {
-      if (signupMethod === "email") {
-        // Verify email OTP then proceed to location selection
-        await authAPI.verifyEmailOTP(form.email.trim().toLowerCase(), otpCode);
-        setStep("location");
-      } else {
-        // Phone path: verify SMS OTP and complete registration
-        const response = await authAPI.verifyOTP(
-          phoneForm.phone.replace(/\D/g, "").slice(-10),
-          otpCode,
-          "customer",
-          phoneForm.name.trim()
-        );
-        localStorage.setItem("token", response.token);
-        localStorage.setItem("user", JSON.stringify(response.user));
-        setStep("done");
-        setTimeout(() => { window.location.href = "/customer/dashboard"; }, 2000);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Incorrect OTP. Please check and try again.");
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  const handleResendOTP = async () => {
-    setOtpLoading(true);
-    setError("");
-    setOtpCode("");
-    try {
-      if (signupMethod === "email") {
-        await authAPI.sendEmailOTP(form.email.trim().toLowerCase());
-      } else {
-        const phone = phoneForm.phone.replace(/\D/g, "").slice(-10);
-        await authAPI.sendOTP(phone);
-      }
-      setOtpSent(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to resend OTP.");
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  // -- Register account ---------------------------------------------------
   const registerAccount = async (geo: GeoResult | null) => {
     setLoading(true);
     try {
@@ -208,7 +142,9 @@ const CustomerSignUp = () => {
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
       setStep("done");
-      setTimeout(() => { window.location.href = "/customer/dashboard"; }, 2000);
+      setTimeout(() => {
+        window.location.href = "/customer/dashboard";
+      }, 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed. Please try again.");
     } finally {
@@ -217,7 +153,10 @@ const CustomerSignUp = () => {
   };
 
   const handleGPS = () => {
-    if (!navigator.geolocation) { setError("Geolocation not supported by your browser"); return; }
+    if (!navigator.geolocation) {
+      setError("Geolocation not supported by your browser");
+      return;
+    }
     setLocLoading(true);
     setError("");
     navigator.geolocation.getCurrentPosition(
@@ -225,7 +164,6 @@ const CustomerSignUp = () => {
         const { latitude: lat, longitude: lng } = pos.coords;
         setLocLoading(false);
 
-        // Try to match GPS coordinates to the nearest service location
         let bestLoc: ServiceLocation | null = null;
         let bestDist = Infinity;
         for (const cityGroup of serviceCities) {
@@ -244,14 +182,6 @@ const CustomerSignUp = () => {
         if (bestLoc) {
           setSelectedCity(bestLoc.city);
           setSelectedLocationId(bestLoc._id);
-          setGeoResult({
-            address: `${bestLoc.apartmentName}, ${bestLoc.area}, ${bestLoc.city}`,
-            area: bestLoc.area,
-            city: bestLoc.city,
-            zipCode: bestLoc.zipCode,
-            lat: bestLoc.coordinates?.lat ?? lat,
-            lng: bestLoc.coordinates?.lng ?? lng,
-          });
         } else {
           setError("Couldn't match your location. Please select your city manually.");
         }
@@ -265,15 +195,23 @@ const CustomerSignUp = () => {
 
   const handleSkipLocation = () => registerAccount(null);
 
-  // -- Register with selected city/location from the picker -----------------
   const handleConfirmLocation = async () => {
-    if (!selectedCity) { setError("Please select your city"); return; }
-    if (!selectedLocationId) { setError("Please select your area / apartment"); return; }
+    if (!selectedCity) {
+      setError("Please select your city");
+      return;
+    }
+    if (!selectedLocationId) {
+      setError("Please select your area / apartment");
+      return;
+    }
     setError("");
 
-    const city = serviceCities.find(c => c.city === selectedCity);
-    const loc = city?.locations.find(l => l._id === selectedLocationId);
-    if (!loc) { setError("Invalid selection. Please try again."); return; }
+    const city = serviceCities.find((c) => c.city === selectedCity);
+    const loc = city?.locations.find((l) => l._id === selectedLocationId);
+    if (!loc) {
+      setError("Invalid selection. Please try again.");
+      return;
+    }
 
     const geo: GeoResult = {
       address: `${loc.apartmentName}, ${loc.area}, ${loc.city}`,
@@ -283,17 +221,11 @@ const CustomerSignUp = () => {
       lat: loc.coordinates?.lat ?? 0,
       lng: loc.coordinates?.lng ?? 0,
     };
-    setGeoResult(geo);
     await registerAccount(geo);
   };
 
-  // -- Left panel step indicator ------------------------------------------
-  const steps = signupMethod === "phone"
-    ? ["Your details", "Verify phone", "All set!"]
-    : ["Your details", "Verify email", "Your area", "All set!"];
-  const stepIdx = signupMethod === "phone"
-    ? ((step === "phone-entry") ? 0 : step === "otp" ? 1 : 2)
-    : (step === "form" ? 0 : step === "otp" ? 1 : step === "location" ? 2 : 3);
+  const steps = ["Your details", "Your area", "All set!"];
+  const stepIdx = step === "form" ? 0 : step === "location" ? 1 : 2;
 
   if (step === "done") {
     return (
@@ -303,7 +235,7 @@ const CustomerSignUp = () => {
             <CheckCircle className="w-10 h-10 text-green-600" />
           </div>
           <h2 className="text-3xl font-bold font-heading text-foreground mb-3">Welcome to Healthy Homez! 🎉</h2>
-          <p className="text-muted-foreground">Your account is ready. Redirecting to your dashboard�</p>
+          <p className="text-muted-foreground">Your account is ready. Redirecting to your dashboard…</p>
         </div>
       </div>
     );
@@ -311,7 +243,6 @@ const CustomerSignUp = () => {
 
   return (
     <div className="min-h-screen flex">
-      {/* Left panel */}
       <div className="hidden lg:flex lg:w-2/5 relative overflow-hidden" style={{ background: "var(--gradient-hero)" }}>
         <div className="relative z-10 flex flex-col justify-between p-12 text-primary-foreground h-full">
           <Link to="/" className="flex items-center gap-3">
@@ -322,7 +253,9 @@ const CustomerSignUp = () => {
           </Link>
           <div>
             <h1 className="text-3xl font-bold font-heading mb-4 leading-tight">
-              Book trusted home<br />services in minutes
+              Book trusted home
+              <br />
+              services in minutes
             </h1>
             <p className="text-primary-foreground/70 leading-relaxed mb-8">
               Create your free account to book cleaners, cooks, and more.
@@ -330,12 +263,16 @@ const CustomerSignUp = () => {
             <div className="space-y-3">
               {steps.map((label, i) => (
                 <div key={label} className="flex items-center gap-3">
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                    i < stepIdx ? "bg-primary-foreground text-primary"
-                    : i === stepIdx ? "bg-primary-foreground/80 text-primary"
-                    : "bg-primary-foreground/20 text-primary-foreground/50"
-                  }`}>
-                    {i < stepIdx ? "?" : i + 1}
+                  <div
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                      i < stepIdx
+                        ? "bg-primary-foreground text-primary"
+                        : i === stepIdx
+                        ? "bg-primary-foreground/80 text-primary"
+                        : "bg-primary-foreground/20 text-primary-foreground/50"
+                    }`}
+                  >
+                    {i < stepIdx ? "✓" : i + 1}
                   </div>
                   <span className={`text-sm ${i <= stepIdx ? "text-primary-foreground" : "text-primary-foreground/50"}`}>
                     {label}
@@ -347,9 +284,10 @@ const CustomerSignUp = () => {
         </div>
       </div>
 
-      {/* Right panel */}
       <div className="flex-1 flex items-center justify-center p-6 bg-background relative overflow-y-auto">
-        <div className="absolute top-6 right-6 z-10"><LanguageSelector /></div>
+        <div className="absolute top-6 right-6 z-10">
+          <LanguageSelector />
+        </div>
 
         <div className="w-full max-w-md animate-fade-in py-8">
           <div className="lg:hidden flex items-center gap-2 mb-6">
@@ -360,103 +298,9 @@ const CustomerSignUp = () => {
           </div>
 
           {error && (
-            <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">
-              {error}
-            </div>
+            <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">{error}</div>
           )}
 
-          {/* -- STEP: method -- */}
-          {step === "method" && (
-            <>
-              <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Create your account</h2>
-              <p className="text-muted-foreground mb-8">How would you like to sign up?</p>
-
-              <div className="space-y-3">
-                <button
-                  onClick={() => { setSignupMethod("email"); setStep("form"); setError(""); }}
-                  className="w-full flex items-center gap-4 p-5 border-2 border-border rounded-xl hover:border-primary hover:bg-primary/5 transition-all text-left group"
-                >
-                  <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary transition-all shrink-0">
-                    <Mail className="w-5 h-5 text-primary group-hover:text-white" />
-                  </div>
-                  <div>
-                    <div className="font-semibold text-foreground">Continue with Email</div>
-                    <div className="text-sm text-muted-foreground mt-0.5">Sign up with your email address &amp; password</div>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => { setSignupMethod("phone"); setStep("phone-entry"); setError(""); }}
-                  className="w-full flex items-center gap-4 p-5 border-2 border-border rounded-xl hover:border-primary hover:bg-primary/5 transition-all text-left group"
-                >
-                  <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary transition-all shrink-0">
-                    <Phone className="w-5 h-5 text-primary group-hover:text-white" />
-                  </div>
-                  <div>
-                    <div className="font-semibold text-foreground">Continue with Phone</div>
-                    <div className="text-sm text-muted-foreground mt-0.5">Sign up instantly with your mobile number &amp; OTP</div>
-                  </div>
-                </button>
-              </div>
-
-              <p className="text-center text-sm text-muted-foreground mt-6">
-                Already have an account?{" "}
-                <Link to="/login" className="text-primary font-semibold hover:underline">Log in</Link>
-              </p>
-            </>
-          )}
-
-          {/* -- STEP: phone-entry -- */}
-          {step === "phone-entry" && (
-            <>
-              <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Your details</h2>
-              <p className="text-muted-foreground mb-6">Enter your name and mobile number to get started</p>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Full Name</label>
-                  <input
-                    className="input-clean"
-                    placeholder="e.g. Priya Sharma"
-                    value={phoneForm.name}
-                    onChange={(e) => setPhoneForm(p => ({ ...p, name: e.target.value }))}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Mobile Number</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">+91</span>
-                    <input
-                      type="tel"
-                      inputMode="numeric"
-                      maxLength={10}
-                      className="input-clean pl-12"
-                      placeholder="98765 43210"
-                      value={phoneForm.phone}
-                      onChange={(e) => setPhoneForm(p => ({ ...p, phone: e.target.value.replace(/\D/g, "") }))}
-                    />
-                  </div>
-                </div>
-
-                <button
-                  onClick={handlePhoneEntryNext}
-                  disabled={otpLoading}
-                  className="btn-brand w-full flex items-center justify-center gap-2"
-                >
-                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTP…</> : <><Phone className="w-4 h-4" /> Send OTP</>}
-                </button>
-                <button
-                  onClick={() => { setStep("method"); setError(""); }}
-                  className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm"
-                >
-                  Back
-                </button>
-              </div>
-            </>
-          )}
-
-          {/* -- STEP: form -- */}
           {step === "form" && (
             <>
               <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Create your account</h2>
@@ -470,11 +314,21 @@ const CustomerSignUp = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">Email Address</label>
-                  <input type="email" className="input-clean" placeholder="you@example.com" value={form.email} onChange={set("email")} required autoComplete="email" />
+                  <input
+                    type="email"
+                    className="input-clean"
+                    placeholder="you@example.com"
+                    value={form.email}
+                    onChange={set("email")}
+                    required
+                    autoComplete="email"
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Mobile Number <span className="text-muted-foreground font-normal">(optional)</span></label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Mobile Number <span className="text-muted-foreground font-normal">(optional)</span>
+                  </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">+91</span>
                     <input
@@ -490,7 +344,9 @@ const CustomerSignUp = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Gender <span className="text-muted-foreground font-normal">(optional)</span></label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Gender <span className="text-muted-foreground font-normal">(optional)</span>
+                  </label>
                   <select className="input-clean" value={form.gender} onChange={set("gender")}>
                     <option value="">Select gender</option>
                     <option value="male">Male</option>
@@ -512,7 +368,11 @@ const CustomerSignUp = () => {
                       required
                       autoComplete="new-password"
                     />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
@@ -530,7 +390,11 @@ const CustomerSignUp = () => {
                       required
                       autoComplete="new-password"
                     />
-                    <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirm(!showConfirm)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
                       {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
@@ -541,84 +405,24 @@ const CustomerSignUp = () => {
                 </button>
               </form>
 
-              <div className="flex items-center justify-between mt-6 flex-wrap gap-2">
-                <button onClick={() => { setStep("method"); setError(""); }} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                  ← Back
-                </button>
-                <p className="text-sm text-muted-foreground">
-                  Already have an account?{" "}
-                  <Link to="/login" className="text-primary font-semibold hover:underline">Log in</Link>
-                </p>
-              </div>
-            </>
-          )}
-
-          {/* -- STEP: otp -- */}
-          {step === "otp" && (
-            <>
-              <h2 className="text-2xl font-bold font-heading text-foreground mb-1">
-                {signupMethod === "email" ? "Verify your email" : "Verify your number"}
-              </h2>
-              <p className="text-muted-foreground mb-6">
-                {otpSent
-                  ? signupMethod === "email"
-                    ? `OTP sent to ${form.email}. Enter the 6-digit code below.`
-                    : `OTP sent to +91${phoneForm.phone}. Enter the 6-digit code below.`
-                  : "Sending OTP..."}
+              <p className="text-center text-sm text-muted-foreground mt-6">
+                Already have an account?{" "}
+                <Link to="/login" className="text-primary font-semibold hover:underline">
+                  Log in
+                </Link>
               </p>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Enter OTP</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    className="input-clean tracking-widest text-center text-lg"
-                    placeholder="� � � � � �"
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
-                  />
-                </div>
-
-                <button
-                  onClick={handleVerifyOTP}
-                  disabled={otpLoading}
-                  className="btn-brand w-full flex items-center justify-center gap-2"
-                >
-                  {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying�</> : "Verify & Continue"}
-                </button>
-
-                <button
-                  onClick={handleResendOTP}
-                  disabled={otpLoading}
-                  className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Resend OTP
-                </button>
-
-                <button
-                  onClick={() => { setStep(signupMethod === "phone" ? "phone-entry" : "form"); setError(""); setOtpCode(""); }}
-                  className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm"
-                >
-                  Back
-                </button>
-              </div>
             </>
           )}
 
-          {/* -- STEP: location -- */}
           {step === "location" && (
             <>
               <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Select your area</h2>
-              <p className="text-muted-foreground mb-5">
-                Choose the city and location where you need home services.
-              </p>
+              <p className="text-muted-foreground mb-5">Choose the city and location where you need home services.</p>
 
               {citiesLoading ? (
                 <div className="flex items-center justify-center py-10">
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                  <span className="ml-2 text-muted-foreground text-sm">Loading service areas�</span>
+                  <span className="ml-2 text-muted-foreground text-sm">Loading service areas…</span>
                 </div>
               ) : serviceCities.length === 0 ? (
                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 mb-4">
@@ -626,19 +430,23 @@ const CustomerSignUp = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* City selector */}
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">City</label>
                     <div className="relative">
                       <select
                         className="input-clean appearance-none pr-10"
                         value={selectedCity}
-                        onChange={(e) => { setSelectedCity(e.target.value); setSelectedLocationId(""); setError(""); }}
+                        onChange={(e) => {
+                          setSelectedCity(e.target.value);
+                          setSelectedLocationId("");
+                          setError("");
+                        }}
                       >
-                        <option value="">� Select your city �</option>
+                        <option value="">Select your city</option>
                         {serviceCities.map((c) => (
                           <option key={c.city} value={c.city}>
-                            {c.city}{c.hasService ? "" : " (coming soon)"}
+                            {c.city}
+                            {c.hasService ? "" : " (coming soon)"}
                           </option>
                         ))}
                       </select>
@@ -646,9 +454,8 @@ const CustomerSignUp = () => {
                     </div>
                   </div>
 
-                  {/* Location / apartment selector */}
                   {selectedCity && (() => {
-                    const city = serviceCities.find(c => c.city === selectedCity);
+                    const city = serviceCities.find((c) => c.city === selectedCity);
                     const locs = city?.locations ?? [];
                     return (
                       <div>
@@ -657,13 +464,17 @@ const CustomerSignUp = () => {
                           <select
                             className="input-clean appearance-none pr-10"
                             value={selectedLocationId}
-                            onChange={(e) => { setSelectedLocationId(e.target.value); setError(""); }}
+                            onChange={(e) => {
+                              setSelectedLocationId(e.target.value);
+                              setError("");
+                            }}
                           >
-                            <option value="">� Select your area �</option>
+                            <option value="">Select your area</option>
                             {locs.map((loc) => (
                               <option key={loc._id} value={loc._id}>
-                                {loc.apartmentName}{loc.area ? `, ${loc.area}` : ""}
-                                {loc.isServiceAvailable ? " ?" : " (coming soon)"}
+                                {loc.apartmentName}
+                                {loc.area ? `, ${loc.area}` : ""}
+                                {loc.isServiceAvailable ? "" : " (coming soon)"}
                               </option>
                             ))}
                           </select>
@@ -675,7 +486,6 @@ const CustomerSignUp = () => {
                 </div>
               )}
 
-              {/* GPS auto-detect */}
               <div className="mt-4">
                 <button
                   type="button"
@@ -694,7 +504,15 @@ const CustomerSignUp = () => {
                   disabled={loading || !selectedCity || !selectedLocationId}
                   className="btn-brand w-full flex items-center justify-center gap-2"
                 >
-                  {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating account�</> : <><MapPin className="w-4 h-4" /> Confirm &amp; Create Account</>}
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Creating account…
+                    </>
+                  ) : (
+                    <>
+                      <MapPin className="w-4 h-4" /> Confirm &amp; Create Account
+                    </>
+                  )}
                 </button>
 
                 <button
@@ -702,10 +520,16 @@ const CustomerSignUp = () => {
                   disabled={loading}
                   className="w-full py-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Skip � I'll set location later
+                  Skip — I'll set location later
                 </button>
 
-                <button onClick={() => { setStep("otp"); setError(""); }} className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm">
+                <button
+                  onClick={() => {
+                    setStep("form");
+                    setError("");
+                  }}
+                  className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm"
+                >
                   Back
                 </button>
               </div>
@@ -718,4 +542,3 @@ const CustomerSignUp = () => {
 };
 
 export default CustomerSignUp;
-
