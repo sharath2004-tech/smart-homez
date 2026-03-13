@@ -910,43 +910,42 @@ router.post('/register-worker',
         }
       };
 
-      if (parsedLocation?.coordinates?.length === 2) {
-        userData.addresses = [{
-          label: 'Home',
-          street: parsedLocation.address || '',
-          area: parsedLocation.area || '',
-          city: parsedLocation.city || '',
-          zipCode: parsedLocation.zipCode || '',
-          location: { type: 'Point', coordinates: parsedLocation.coordinates },
-          isDefault: true
-        }];
-        userData.currentLocation = {
-          type: 'Point',
-          coordinates: parsedLocation.coordinates,
-          lastUpdated: new Date()
-        };
-
-        // Find the Location document by city and area to include locationId
-        let locationId = null;
-        if (parsedLocation.city && parsedLocation.area) {
-          const foundLocation = await Location.findOne({
-            city: new RegExp(`^${parsedLocation.city}$`, 'i'),
-            area: new RegExp(`^${parsedLocation.area}$`, 'i')
-          }).select('_id apartmentName');
-          if (foundLocation) {
-            locationId = foundLocation._id;
-          }
+      // locationId is now sent directly from worker signup dropdown
+      const selectedLocationId = req.body.locationId;
+      if (selectedLocationId) {
+        const foundLocation = await Location.findById(selectedLocationId).select('_id apartmentName area city location');
+        if (!foundLocation) {
+          return res.status(400).json({ error: { message: 'Selected location does not exist. Please choose a valid service area.', status: 400 } });
         }
 
         userData.workerProfile.assignedApartments = [{
-          locationId, // Include the Location document ID if found
-          apartmentName: parsedLocation.area || '',
-          area: parsedLocation.area || '',
-          city: parsedLocation.city || '',
-          location: { type: 'Point', coordinates: parsedLocation.coordinates },
+          locationId: foundLocation._id,
+          apartmentName: foundLocation.apartmentName || foundLocation.area || '',
+          area: foundLocation.area || '',
+          city: foundLocation.city || '',
+          location: foundLocation.location,
           maxWalkingDistance: settings.booking.serviceRadius
         }];
         userData.workerProfile.serviceRadius = settings.booking.serviceRadius;
+
+        if (foundLocation.location?.coordinates?.length === 2) {
+          userData.addresses = [{
+            label: 'Home',
+            street: '',
+            area: foundLocation.area || '',
+            city: foundLocation.city || '',
+            zipCode: '',
+            location: foundLocation.location,
+            isDefault: true
+          }];
+          userData.currentLocation = {
+            type: 'Point',
+            coordinates: foundLocation.location.coordinates,
+            lastUpdated: new Date()
+          };
+        }
+      } else {
+        return res.status(400).json({ error: { message: 'Please select a service area to register.', status: 400 } });
       }
 
       const user = new User(userData);

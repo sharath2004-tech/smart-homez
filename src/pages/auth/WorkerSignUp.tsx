@@ -9,10 +9,9 @@ import {
     Home,
     Loader2,
     MapPin,
-    Navigation,
     Upload,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 type Step = "form" | "skills" | "documents" | "location" | "pending";
@@ -28,13 +27,11 @@ const SKILLS = [
   "Dusting",
 ];
 
-interface GeoResult {
-  lat: number;
-  lng: number;
-  address: string;
+interface AvailableLocation {
+  _id: string;
+  apartmentName: string;
   area: string;
   city: string;
-  zipCode: string;
 }
 
 const WorkerSignUp = () => {
@@ -54,8 +51,10 @@ const WorkerSignUp = () => {
   const [loading, setLoading] = useState(false);
   const [locLoading, setLocLoading] = useState(false);
   const [error, setError] = useState("");
-  const [manualAddress, setManualAddress] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
+
+  const [availableLocations, setAvailableLocations] = useState<AvailableLocation[]>([]);
+  const [selectedLocationId, setSelectedLocationId] = useState("");
 
   const [profilePic, setProfilePic] = useState<File | null>(null);
   const [aadhaarFront, setAadhaarFront] = useState<File | null>(null);
@@ -68,6 +67,21 @@ const WorkerSignUp = () => {
     (field: keyof typeof form) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setForm((prev) => ({ ...prev, [field]: e.target.value }));
+
+  // Fetch available locations when reaching the location step
+  useEffect(() => {
+    if (step === "location" && availableLocations.length === 0) {
+      setLocLoading(true);
+      fetch(`${API_BASE_URL}/api/locations/public`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success) setAvailableLocations(data.data);
+          else setError("Could not load service areas. Please try again.");
+        })
+        .catch(() => setError("Could not load service areas. Please try again."))
+        .finally(() => setLocLoading(false));
+    }
+  }, [step, availableLocations.length]);
 
   const toggleSkill = (skill: string) =>
     setSelectedSkills((prev) => (prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill]));
@@ -153,25 +167,11 @@ const WorkerSignUp = () => {
     setStep("location");
   };
 
-  const reverseGeocode = async (lat: number, lng: number): Promise<GeoResult> => {
-    try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
-      const data = await res.json();
-      const addr = data.address || {};
-      return {
-        lat,
-        lng,
-        address: data.display_name || "",
-        area: addr.suburb || addr.neighbourhood || addr.residential || addr.village || "",
-        city: addr.city || addr.town || addr.district || "",
-        zipCode: addr.postcode || "",
-      };
-    } catch {
-      return { lat, lng, address: "", area: "", city: "", zipCode: "" };
+  const registerAccount = async () => {
+    if (!selectedLocationId) {
+      setError("Please select a service area");
+      return;
     }
-  };
-
-  const registerAccount = async (geo: GeoResult | null) => {
     setLoading(true);
     setError("");
     try {
@@ -185,19 +185,7 @@ const WorkerSignUp = () => {
       formData.append("experience", form.experience || "0");
       formData.append("skills", JSON.stringify(selectedSkills));
       formData.append("phoneVerified", "false");
-
-      if (geo) {
-        formData.append(
-          "location",
-          JSON.stringify({
-            address: geo.address,
-            area: geo.area,
-            city: geo.city,
-            zipCode: geo.zipCode,
-            coordinates: [geo.lng, geo.lat],
-          })
-        );
-      }
+      formData.append("locationId", selectedLocationId);
 
       if (profilePic) formData.append("profilePicture", profilePic);
       if (aadhaarFront) formData.append("aadhaarFront", aadhaarFront);
@@ -213,56 +201,6 @@ const WorkerSignUp = () => {
       setLoading(false);
     }
   };
-
-  const handleGPS = () => {
-    if (!navigator.geolocation) {
-      setError("Geolocation not supported");
-      return;
-    }
-    setLocLoading(true);
-    setError("");
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude: lat, longitude: lng } = pos.coords;
-        const geo = await reverseGeocode(lat, lng);
-        setLocLoading(false);
-        await registerAccount(geo);
-      },
-      () => {
-        setLocLoading(false);
-        setError("Location access denied. Please allow it or enter your area.");
-      }
-    );
-  };
-
-  const handleManualLocation = async () => {
-    if (!manualAddress.trim()) {
-      setError("Please enter your area");
-      return;
-    }
-    setLocLoading(true);
-    setError("");
-    try {
-      const enc = encodeURIComponent(manualAddress + ", India");
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${enc}`);
-      const results = await res.json();
-      if (!results.length) {
-        setError("Address not found. Try a more specific area.");
-        setLocLoading(false);
-        return;
-      }
-      const lat = parseFloat(results[0].lat);
-      const lng = parseFloat(results[0].lon);
-      const geo = await reverseGeocode(lat, lng);
-      setLocLoading(false);
-      await registerAccount(geo);
-    } catch {
-      setLocLoading(false);
-      setError("Location lookup failed. Please try again.");
-    }
-  };
-
-  const handleSkipLocation = () => registerAccount(null);
 
   const stepLabels = ["Your details", "Skills", "Documents", "Service area"];
   const stepIdx = step === "form" ? 0 : step === "skills" ? 1 : step === "documents" ? 2 : 3;
@@ -288,8 +226,6 @@ const WorkerSignUp = () => {
       </div>
     );
   }
-
-  void API_BASE_URL;
 
   return (
     <div className="min-h-screen flex">
@@ -641,51 +577,51 @@ const WorkerSignUp = () => {
           {step === "location" && (
             <>
               <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Your service area</h2>
-              <p className="text-muted-foreground mb-6">Tell us where you're based so we can match you with nearby bookings.</p>
+              <p className="text-muted-foreground mb-6">Select the area where you will provide services.</p>
               <div className="space-y-4">
-                <button
-                  onClick={handleGPS}
-                  disabled={locLoading}
-                  className="w-full flex items-center justify-center gap-3 py-4 px-4 bg-primary/10 border-2 border-primary rounded-xl text-primary font-semibold hover:bg-primary/20 transition-colors"
-                >
-                  {locLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Navigation className="w-5 h-5" />}
-                  Use my current location
-                </button>
-
-                <div className="relative flex items-center gap-3">
-                  <div className="flex-1 h-px bg-border" />
-                  <span className="text-xs text-muted-foreground">or enter area</span>
-                  <div className="flex-1 h-px bg-border" />
-                </div>
-
-                <div className="flex gap-2">
-                  <input
-                    className="input-clean flex-1"
-                    placeholder="e.g. Koramangala, Bengaluru"
-                    value={manualAddress}
-                    onChange={(e) => setManualAddress(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleManualLocation()}
-                  />
-                  <button
-                    onClick={handleManualLocation}
-                    disabled={locLoading}
-                    className="px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors"
-                  >
-                    {locLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
-                  </button>
-                </div>
+                {locLoading ? (
+                  <div className="flex items-center justify-center py-8 gap-3 text-muted-foreground">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span className="text-sm">Loading available areas...</span>
+                  </div>
+                ) : availableLocations.length === 0 ? (
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+                    No service areas are available right now. Please contact support.
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">
+                      Select Service Area <span className="text-destructive">*</span>
+                    </label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <select
+                        className="input-clean pl-9"
+                        value={selectedLocationId}
+                        onChange={(e) => setSelectedLocationId(e.target.value)}
+                      >
+                        <option value="">-- Choose your area --</option>
+                        {availableLocations.map((loc) => (
+                          <option key={loc._id} value={loc._id}>
+                            {loc.apartmentName} — {loc.area}, {loc.city}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
 
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800">
-                  You can update your service area anytime from your profile settings.
+                  Only areas where Healthy Homez operates are listed. Your admin can update your area after approval.
                 </div>
 
                 <button
-                  onClick={handleSkipLocation}
-                  disabled={loading}
-                  className="w-full py-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={registerAccount}
+                  disabled={loading || !selectedLocationId || locLoading}
+                  className="btn-brand w-full"
                 >
                   {loading ? <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> : null}
-                  Skip for now
+                  Submit Application
                 </button>
 
                 <button
