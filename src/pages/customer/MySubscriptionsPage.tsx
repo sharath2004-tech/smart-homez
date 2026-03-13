@@ -68,7 +68,7 @@ interface Worker {
 }
 
 const MySubscriptionsPage = () => {
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<{ role: string; name?: string } | null>(null);
   const [subscriptions, setSubscriptions] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [changingWorker, setChangingWorker] = useState<string | null>(null);
@@ -163,9 +163,9 @@ const MySubscriptionsPage = () => {
       setChangingWorker(null);
       setAvailableWorkers([]);
       await fetchData();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error changing worker:', error);
-      toast.error(error.message || 'Failed to change worker');
+      toast.error((error as Error).message || 'Failed to change worker');
     }
   };
 
@@ -190,9 +190,9 @@ const MySubscriptionsPage = () => {
       
       toast.success('Subscription paused successfully');
       await fetchData();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error pausing subscription:', error);
-      toast.error(error.message || 'Failed to pause subscription');
+      toast.error((error as Error).message || 'Failed to pause subscription');
     }
   };
 
@@ -217,9 +217,9 @@ const MySubscriptionsPage = () => {
       
       toast.success('Subscription resumed successfully');
       await fetchData();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error resuming subscription:', error);
-      toast.error(error.message || 'Failed to resume subscription');
+      toast.error((error as Error).message || 'Failed to resume subscription');
     }
   };
 

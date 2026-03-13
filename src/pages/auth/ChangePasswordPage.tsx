@@ -31,7 +31,7 @@ const ChangePasswordPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<{ role: string; name?: string } | null>(null);
   
   const [form, setForm] = useState({
     currentPassword: "",
@@ -41,6 +41,7 @@ const ChangePasswordPage = () => {
 
   useEffect(() => {
     fetchProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchProfile = async () => {

@@ -55,7 +55,16 @@ const LocationSelector = ({ onLocationConfirmed, onClose, defaultLocation, showC
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [isLoadingGPS, setIsLoadingGPS] = useState(false);
-  const [availabilityInfo, setAvailabilityInfo] = useState<any>(null);
+  const [availabilityInfo, setAvailabilityInfo] = useState<{
+    isAvailable: boolean;
+    serviceArea?: { id: string; name: string };
+    message: string;
+    nearestArea?: { name: string; distance: number };
+    address?: string;
+    area?: string;
+    city?: string;
+    zipCode?: string;
+  } | null>(null);
   const [serviceAreas, setServiceAreas] = useState<ServiceArea[]>([]);
 
   // Fetch service areas from backend
@@ -68,7 +77,7 @@ const LocationSelector = ({ onLocationConfirmed, onClose, defaultLocation, showC
       const response = await fetch(`${API_BASE_URL}/service-areas/map-data`);
       if (response.ok) {
         const data = await response.json();
-        setServiceAreas(data.areas.map((area: any) => ({
+        setServiceAreas(data.areas.map((area: ServiceArea) => ({
           id: area.id,
           name: area.name,
           city: area.city,
@@ -141,7 +150,8 @@ const LocationSelector = ({ onLocationConfirmed, onClose, defaultLocation, showC
         mapRef.current = null;
       }
     };
-  }, [serviceAreas]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serviceAreas, defaultLocation]);
 
   const addOrUpdateMarker = (lat: number, lng: number) => {
     if (!mapRef.current) return;
@@ -208,7 +218,7 @@ const LocationSelector = ({ onLocationConfirmed, onClose, defaultLocation, showC
 
             if (reverseData?.address) {
               const addr = reverseData.address;
-              setAvailabilityInfo((prev: any) => ({
+              setAvailabilityInfo((prev) => ({
                 ...prev,
                 address: reverseData.display_name,
                 area: addr.suburb || addr.neighbourhood || addr.city_district,

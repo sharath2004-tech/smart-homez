@@ -39,7 +39,7 @@ const MaidServicePage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [service, setService] = useState<Service | null>(null);
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<{ role: string; name?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
   
@@ -60,6 +60,7 @@ const MaidServicePage = () => {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const fetchData = async () => {
@@ -226,9 +227,9 @@ const MaidServicePage = () => {
       await bookingsAPI.create(bookingData);
       toast.success('Booking created successfully!');
       navigate('/customer/bookings');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating booking:', error);
-      toast.error(error.response?.data?.message || 'Failed to create booking');
+      toast.error((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to create booking');
     } finally {
       setBooking(false);
     }
@@ -297,7 +298,7 @@ const MaidServicePage = () => {
                 <button
                   key={type.value}
                   type="button"
-                  onClick={() => setMaidDetails(prev => ({ ...prev, bookingType: type.value as any }))}
+                  onClick={() => setMaidDetails(prev => ({ ...prev, bookingType: type.value as MaidBookingDetails['bookingType'] }))}
                   className={`p-4 rounded-lg border-2 text-left transition-all ${
                     maidDetails.bookingType === type.value
                       ? 'border-primary bg-primary/5'
@@ -433,7 +434,7 @@ const MaidServicePage = () => {
                 <select
                   id="gender"
                   value={maidDetails.workerGenderPreference}
-                  onChange={(e) => setMaidDetails(prev => ({ ...prev, workerGenderPreference: e.target.value as any }))}
+                  onChange={(e) => setMaidDetails(prev => ({ ...prev, workerGenderPreference: e.target.value as MaidBookingDetails['workerGenderPreference'] }))}
                   className="w-full p-2 rounded-lg border border-border bg-background"
                 >
                   <option value="any">No Preference</option>
