@@ -933,6 +933,11 @@ export const settingsAPI = {
     return apiCall('/settings/business-hours');
   },
 
+  // Public slot preview for selected date (YYYY-MM-DD)
+  getAvailableSlotsByDate: async (date: string) => {
+    return apiCall(`/settings/business-hours/available-slots?date=${encodeURIComponent(date)}`);
+  },
+
   updateSettings: async (settings: {
     payment?: {
       upiId?: string;

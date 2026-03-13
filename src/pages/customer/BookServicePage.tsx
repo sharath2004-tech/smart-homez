@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { authAPI, bookingsAPI, servicesAPI, settingsAPI } from "@/lib/api";
 import { Calendar, ChevronLeft, Clock, Info, MapPin, Sparkles, Star, User, Users, Zap } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -86,6 +86,7 @@ const BookServicePage = () => {
   const [selectedExactTime, setSelectedExactTime] = useState<string>('');
   const [selectedWorker, setSelectedWorker] = useState<string | null>(null);
   const [bookedRanges, setBookedRanges] = useState<{ workerId: string | null; startTime: string; endTime: string }[]>([]);
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [totalWorkersCount, setTotalWorkersCount] = useState(0);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [preferences, setPreferences] = useState<Preferences>({
@@ -108,11 +109,6 @@ const BookServicePage = () => {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
-
-  useEffect(() => {
-    if (selectedDate) fetchBookedSlots(selectedDate);
-    setSelectedExactTime('');
-  }, [selectedDate]); // fetchBookedSlots is stable
 
   const fetchData = async () => {
     try {
@@ -226,8 +222,8 @@ const BookServicePage = () => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
-  // Generate 15-min slots for a period
-  const generateSlots = (period: TimePeriod): string[] => {
+  // Fallback local slots (used only if API lookup fails)
+  const generateFallbackSlots = (period: TimePeriod): string[] => {
     const ranges: Record<TimePeriod, { start: number; end: number }> = {
       morning:   { start: 6,  end: 12 },
       afternoon: { start: 12, end: 17 },
@@ -241,6 +237,24 @@ const BookServicePage = () => {
       }
     }
     return slots;
+  };
+
+  const getSlotsForPeriod = (period: TimePeriod): string[] => {
+    const ranges: Record<TimePeriod, { start: number; end: number }> = {
+      morning: { start: 6, end: 12 },
+      afternoon: { start: 12, end: 17 },
+      evening: { start: 17, end: 24 }
+    };
+
+    const { start, end } = ranges[period];
+    const source = availableSlots.length > 0
+      ? availableSlots
+      : generateFallbackSlots(period);
+
+    return source.filter((time) => {
+      const [h] = time.split(':').map(Number);
+      return !Number.isNaN(h) && h >= start && h < end;
+    });
   };
 
   const formatSlotTime = (time: string): string => {
@@ -435,9 +449,9 @@ const BookServicePage = () => {
   };
 
   // Fetch booked slots for the selected date
-  const fetchBookedSlots = async (date: string) => {
+  const fetchBookedSlots = useCallback(async (date: string, manageLoading = true) => {
     if (!date) return;
-    setLoadingSlots(true);
+    if (manageLoading) setLoadingSlots(true);
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
@@ -452,9 +466,42 @@ const BookServicePage = () => {
     } catch (err) {
       console.error('Fetch booked slots error:', err);
     } finally {
+      if (manageLoading) setLoadingSlots(false);
+    }
+  }, []);
+
+  const fetchAvailableSlots = useCallback(async (date: string) => {
+    if (!date) return;
+    try {
+      const data = await settingsAPI.getAvailableSlotsByDate(date) as { slots?: string[] };
+      setAvailableSlots(Array.isArray(data?.slots) ? data.slots : []);
+    } catch (err) {
+      console.error('Fetch available slots error:', err);
+      setAvailableSlots([]);
+    }
+  }, []);
+
+  const fetchDateAvailability = useCallback(async (date: string) => {
+    if (!date) return;
+    setLoadingSlots(true);
+    try {
+      await Promise.all([
+        fetchBookedSlots(date, false),
+        fetchAvailableSlots(date)
+      ]);
+    } finally {
       setLoadingSlots(false);
     }
-  };
+  }, [fetchAvailableSlots, fetchBookedSlots]);
+
+  useEffect(() => {
+    if (selectedDate) fetchDateAvailability(selectedDate);
+    else {
+      setBookedRanges([]);
+      setAvailableSlots([]);
+    }
+    setSelectedExactTime('');
+  }, [selectedDate, fetchDateAvailability]);
 
   // Convert HH:MM string to minutes
   const toMinutes = (t: string): number => {
@@ -741,7 +788,7 @@ const BookServicePage = () => {
                     ) : loadingSlots ? (
                       <p className="col-span-4 text-sm text-muted-foreground py-4 text-center">Loading slots...</p>
                     ) : (
-                      generateSlots(selectedPeriod).map((time) => {
+                      getSlotsForPeriod(selectedPeriod).map((time) => {
                         const unavailable = isSlotUnavailable(time);
                         const isPast = isSlotInPast(time);
                         const available = !unavailable ? getAvailableWorkersForSlot(time) : 0;

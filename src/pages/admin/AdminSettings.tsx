@@ -601,7 +601,7 @@ const AdminSettings = () => {
                     <h2 className="text-xl font-bold text-foreground">Subscription Pricing</h2>
                     <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Super Admin Only</span>
                   </div>
-                  <p className="text-sm text-muted-foreground">Set prices for worker and customer subscription plans</p>
+                  <p className="text-sm text-muted-foreground">Set prices for worker subscription plans</p>
                 </div>
               </div>
               <div className="space-y-6">
@@ -625,34 +625,6 @@ const AdminSettings = () => {
                             <input type="number" min="0" max="1" step="0.01"
                               value={settings.subscriptions.workerPlans[plan].commissionRate}
                               onChange={(e) => setSettings(prev => ({ ...prev, subscriptions: { ...prev.subscriptions, workerPlans: { ...prev.subscriptions.workerPlans, [plan]: { ...prev.subscriptions.workerPlans[plan], commissionRate: parseFloat(e.target.value) || 0 } } } }))}
-                              className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary mt-1"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-foreground mb-3">Customer Plans</h3>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    {(['basic', 'premium'] as const).map(plan => (
-                      <div key={plan} className="border border-border rounded-xl p-4">
-                        <p className="font-medium text-foreground capitalize mb-3">{plan}</p>
-                        <div className="space-y-2">
-                          <div>
-                            <label className="text-xs text-muted-foreground">Price (₹/month)</label>
-                            <input type="number" min="0"
-                              value={settings.subscriptions.customerPlans[plan].price}
-                              onChange={(e) => setSettings(prev => ({ ...prev, subscriptions: { ...prev.subscriptions, customerPlans: { ...prev.subscriptions.customerPlans, [plan]: { ...prev.subscriptions.customerPlans[plan], price: parseFloat(e.target.value) || 0 } } } }))}
-                              className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary mt-1"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs text-muted-foreground">Discount Rate (0–1)</label>
-                            <input type="number" min="0" max="1" step="0.01"
-                              value={settings.subscriptions.customerPlans[plan].discountRate}
-                              onChange={(e) => setSettings(prev => ({ ...prev, subscriptions: { ...prev.subscriptions, customerPlans: { ...prev.subscriptions.customerPlans, [plan]: { ...prev.subscriptions.customerPlans[plan], discountRate: parseFloat(e.target.value) || 0 } } } }))}
                               className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary mt-1"
                             />
                           </div>

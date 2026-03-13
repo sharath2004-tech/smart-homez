@@ -54,7 +54,7 @@ const PORT = process.env.PORT || 5000;
 app.set('trust proxy', 1);
 
 // CORS Configuration
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
+const configuredOrigins = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
   : [
       'http://localhost:5173',
@@ -65,10 +65,21 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
       'https://*.vercel.app'
     ];
 
+const allowedOrigins = Array.from(new Set([
+  ...configuredOrigins,
+  'http://localhost:5173',
+  'http://localhost:8080',
+  'http://localhost:8081',
+  'http://localhost:8082'
+]));
+
 console.log('🔒 CORS Allowed Origins:', allowedOrigins);
 
 // Helper function to check if origin matches (supports wildcards)
 function isOriginAllowed(origin) {
+  // Always allow localhost/127.0.0.1 on any port for local development against remote API
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+
   // Check exact matches
   if (allowedOrigins.includes(origin)) return true;
   

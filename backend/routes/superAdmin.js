@@ -928,19 +928,56 @@ router.post('/service-requests/:id/reject', async (req, res) => {
 
 // ─── Business Hours ──────────────────────────────────────────────────────────
 
+const parseClockToMinutes = (timeStr) => {
+  if (!timeStr || typeof timeStr !== 'string') return null;
+  const value = timeStr.trim().toLowerCase();
+
+  const hhmm24 = value.match(/^(\d{1,2}):(\d{2})$/);
+  if (hhmm24) {
+    const h = Number(hhmm24[1]);
+    const m = Number(hhmm24[2]);
+    if (Number.isNaN(h) || Number.isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
+    return h * 60 + m;
+  }
+
+  const hhmm12 = value.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/);
+  if (hhmm12) {
+    let h = Number(hhmm12[1]);
+    const m = Number(hhmm12[2]);
+    const meridiem = hhmm12[3];
+    if (Number.isNaN(h) || Number.isNaN(m) || h < 1 || h > 12 || m < 0 || m > 59) return null;
+    if (meridiem === 'pm' && h !== 12) h += 12;
+    if (meridiem === 'am' && h === 12) h = 0;
+    return h * 60 + m;
+  }
+
+  return null;
+};
+
+const minutesToHHMM = (mins) => {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+};
+
+const normalizeClock = (timeStr) => {
+  const mins = parseClockToMinutes(timeStr);
+  return mins === null ? null : minutesToHHMM(mins);
+};
+
 // Helper: generate time slots from a day config + slot duration
 function generateSlotsFromDayConfig(dayConfig, slotDurationMinutes) {
   const slots = [];
-  const [openHour, openMin] = dayConfig.openTime.split(':').map(Number);
-  const [closeHour, closeMin] = dayConfig.closeTime.split(':').map(Number);
-  const openMinutes = openHour * 60 + openMin;
-  const closeMinutes = closeHour * 60 + closeMin;
+  const openMinutes = parseClockToMinutes(dayConfig.openTime);
+  const closeMinutes = parseClockToMinutes(dayConfig.closeTime);
+  if (openMinutes === null || closeMinutes === null || closeMinutes <= openMinutes) return slots;
 
   const breaks = (dayConfig.breaks || []).map((b) => {
-    const [sh, sm] = b.start.split(':').map(Number);
-    const [eh, em] = b.end.split(':').map(Number);
-    return { start: sh * 60 + sm, end: eh * 60 + em };
-  });
+    const start = parseClockToMinutes(b.start);
+    const end = parseClockToMinutes(b.end);
+    if (start === null || end === null) return null;
+    return { start, end };
+  }).filter(Boolean);
 
   for (let t = openMinutes; t + slotDurationMinutes <= closeMinutes; t += slotDurationMinutes) {
     const slotEnd = t + slotDurationMinutes;
@@ -999,22 +1036,73 @@ router.put(
       const config = await BusinessHours.getConfig();
 
       if (schedule !== undefined) {
+        const normalizedSchedule = [];
+
         // Validate break end > start for every day
         for (const day of schedule) {
+          const openNorm = normalizeClock(day.openTime);
+          const closeNorm = normalizeClock(day.closeTime);
+
+          if (!openNorm || !closeNorm) {
+            return res.status(400).json({
+              error: {
+                message: `Invalid opening/closing time for ${day.day}. Use HH:MM or h:mm am/pm format.`,
+                status: 400
+              }
+            });
+          }
+
+          if (openNorm >= closeNorm) {
+            return res.status(400).json({
+              error: {
+                message: `Close time must be after open time (${day.day}: ${openNorm}–${closeNorm})`,
+                status: 400
+              }
+            });
+          }
+
+          const nextDay = { ...day, openTime: openNorm, closeTime: closeNorm };
+
           if (Array.isArray(day.breaks)) {
+            const nextBreaks = [];
             for (const br of day.breaks) {
-              if (br.start && br.end && br.start >= br.end) {
+              const startNorm = normalizeClock(br.start);
+              const endNorm = normalizeClock(br.end);
+              if (!startNorm || !endNorm) {
                 return res.status(400).json({
                   error: {
-                    message: `Break end time must be after start time (${day.day}: ${br.start}–${br.end})`,
+                    message: `Invalid break time format (${day.day}: ${br.start}–${br.end})`,
                     status: 400
                   }
                 });
               }
+              if (startNorm >= endNorm) {
+                return res.status(400).json({
+                  error: {
+                    message: `Break end time must be after start time (${day.day}: ${startNorm}–${endNorm})`,
+                    status: 400
+                  }
+                });
+              }
+
+              // Break should stay within open/close window.
+              if (startNorm < openNorm || endNorm > closeNorm) {
+                return res.status(400).json({
+                  error: {
+                    message: `Break must be inside business hours (${day.day}: ${startNorm}–${endNorm})`,
+                    status: 400
+                  }
+                });
+              }
+
+              nextBreaks.push({ ...br, start: startNorm, end: endNorm });
             }
+            nextDay.breaks = nextBreaks;
           }
+
+          normalizedSchedule.push(nextDay);
         }
-        config.schedule = schedule;
+        config.schedule = normalizedSchedule;
       }
       if (timezone !== undefined) config.timezone = timezone;
       if (slotDurationMinutes !== undefined) config.slotDurationMinutes = slotDurationMinutes;

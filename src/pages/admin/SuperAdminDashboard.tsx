@@ -381,6 +381,14 @@ const SuperAdminDashboard = () => {
       year: "numeric",
     });
 
+  const formatDisplayTime = (value: string) => {
+    const [h, m] = value.split(':').map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return value;
+    const period = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+  };
+
   // ── Loading ────────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -605,7 +613,7 @@ const SuperAdminDashboard = () => {
                                 <div className="flex flex-wrap items-start gap-1.5">
                                   {day.breaks.map((br, bi) => (
                                     <span key={bi} className="inline-flex items-center gap-1 bg-orange-50 border border-orange-200 text-orange-700 text-xs rounded-full px-2.5 py-0.5">
-                                      {br.start}–{br.end}
+                                      {formatDisplayTime(br.start)}–{formatDisplayTime(br.end)}
                                       {br.label ? ` · ${br.label}` : ''}
                                       <button
                                         onClick={() => removeBreak(idx, bi)}

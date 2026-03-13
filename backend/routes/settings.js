@@ -6,6 +6,60 @@ import Settings from '../models/Settings.js';
 
 const router = express.Router();
 
+// Time helpers: accept both 24h ("21:00") and 12h ("9:00 pm") inputs.
+const parseClockToMinutes = (timeStr) => {
+  if (!timeStr || typeof timeStr !== 'string') return null;
+  const value = timeStr.trim().toLowerCase();
+
+  const hhmm24 = value.match(/^(\d{1,2}):(\d{2})$/);
+  if (hhmm24) {
+    const h = Number(hhmm24[1]);
+    const m = Number(hhmm24[2]);
+    if (Number.isNaN(h) || Number.isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
+    return h * 60 + m;
+  }
+
+  const hhmm12 = value.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/);
+  if (hhmm12) {
+    let h = Number(hhmm12[1]);
+    const m = Number(hhmm12[2]);
+    const meridiem = hhmm12[3];
+    if (Number.isNaN(h) || Number.isNaN(m) || h < 1 || h > 12 || m < 0 || m > 59) return null;
+    if (meridiem === 'pm' && h !== 12) h += 12;
+    if (meridiem === 'am' && h === 12) h = 0;
+    return h * 60 + m;
+  }
+
+  return null;
+};
+
+const minutesToHHMM = (mins) => {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+};
+
+const generateSlotsFromDayConfig = (dayConfig, slotDurationMinutes) => {
+  const openMinutes = parseClockToMinutes(dayConfig?.openTime);
+  const closeMinutes = parseClockToMinutes(dayConfig?.closeTime);
+  if (openMinutes === null || closeMinutes === null || closeMinutes <= openMinutes) return [];
+
+  const breaks = (dayConfig?.breaks || []).map((b) => {
+    const start = parseClockToMinutes(b.start);
+    const end = parseClockToMinutes(b.end);
+    if (start === null || end === null) return null;
+    return { start, end };
+  }).filter(Boolean);
+
+  const slots = [];
+  for (let t = openMinutes; t + slotDurationMinutes <= closeMinutes; t += slotDurationMinutes) {
+    const slotEnd = t + slotDurationMinutes;
+    const inBreak = breaks.some((b) => t < b.end && slotEnd > b.start);
+    if (!inBreak) slots.push(minutesToHHMM(t));
+  }
+  return slots;
+};
+
 // @route   GET /api/settings
 // @desc    Get application settings (public for certain fields)
 // @access  Public
@@ -103,6 +157,75 @@ router.get('/business-hours', async (req, res) => {
     });
   } catch (error) {
     console.error('Get business hours (public) error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   GET /api/settings/business-hours/available-slots
+// @desc    Public slot preview for a given date based on configured business hours
+// @query   date=YYYY-MM-DD
+// @access  Public
+router.get('/business-hours/available-slots', async (req, res) => {
+  try {
+    const { date } = req.query;
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ error: { message: 'Query param ?date=YYYY-MM-DD is required', status: 400 } });
+    }
+
+    const config = await BusinessHours.getConfig();
+    const tz = config.timezone || 'Asia/Kolkata';
+
+    // Keep weekday calculation in business timezone.
+    const refDate = new Date(`${date}T12:00:00Z`);
+    if (Number.isNaN(refDate.getTime())) {
+      return res.status(400).json({ error: { message: 'Invalid date format', status: 400 } });
+    }
+
+    const dayName = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      weekday: 'long'
+    }).format(refDate).toLowerCase();
+
+    const dayConfig = config.schedule.find((d) => d.day === dayName);
+    const holiday = (config.holidays || []).find((h) => h.date === date);
+
+    if (holiday) {
+      return res.json({
+        success: true,
+        slots: [],
+        date,
+        day: dayName,
+        reason: `Holiday: ${holiday.label || 'Holiday'}`
+      });
+    }
+
+    if (!dayConfig || !dayConfig.isActive) {
+      return res.json({
+        success: true,
+        slots: [],
+        date,
+        day: dayName,
+        reason: 'Business is closed on this day'
+      });
+    }
+
+    const slots = generateSlotsFromDayConfig(dayConfig, config.slotDurationMinutes);
+
+    res.json({
+      success: true,
+      slots,
+      date,
+      day: dayName,
+      config: {
+        openTime: dayConfig.openTime,
+        closeTime: dayConfig.closeTime,
+        breaks: dayConfig.breaks || [],
+        slotDurationMinutes: config.slotDurationMinutes,
+        timezone: config.timezone
+      }
+    });
+  } catch (error) {
+    console.error('Get public available slots error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
   }
 });
