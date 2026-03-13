@@ -37,6 +37,22 @@ interface Service {
     label: string;
     price: number;
   }>;
+  durationOptions?: Array<{
+    hours: number;
+    price: number;
+    isDefault?: boolean;
+  }>;
+  sizeParameters?: {
+    enabled: boolean;
+    sizeType: string;
+    options: Array<{
+      value: string;
+      label: string;
+      price: number;
+      duration?: number;
+      workersRequired?: number;
+    }>;
+  };
 }
 
 interface UserProfile {
@@ -187,7 +203,9 @@ const AdminServices = () => {
     ],
     duration: 60,
     isActive: true,
-    additionalServiceOptions: []
+    additionalServiceOptions: [],
+    durationOptions: [],
+    sizeParameters: { enabled: false, sizeType: 'quantity', options: [] }
   });
 
   const isSuperAdmin = profile?.role === 'super_admin';
@@ -286,8 +304,8 @@ const AdminServices = () => {
       return;
     }
     
-    if (formData.price <= 0) {
-      toast.error('Price must be greater than 0');
+    if (formData.price < 0) {
+      toast.error('Price cannot be negative');
       return;
     }
     
@@ -340,6 +358,8 @@ const AdminServices = () => {
       isActive: service.isActive,
       subscriptionPlans: service.subscriptionPlans,
       additionalServiceOptions: service.additionalServiceOptions,
+      durationOptions: service.durationOptions || [],
+      sizeParameters: service.sizeParameters || { enabled: false, sizeType: 'quantity', options: [] },
     });
     setSelectedServiceType(service.serviceType || null);
     setEditingId(service._id!);
@@ -373,7 +393,9 @@ const AdminServices = () => {
         monthly: Math.round(defaultPrice * 0.65 * 30)
       },
       duration: 60,
-      isActive: true
+      isActive: true,
+      durationOptions: [],
+      sizeParameters: { enabled: false, sizeType: 'quantity', options: [] }
     });
   };
 
@@ -1258,6 +1280,158 @@ const AdminServices = () => {
                     </div>
                   )}
                 </div>
+
+                {/* ── Duration Tiers (super admin only) ── */}
+                {isSuperAdmin && (
+                  <div className="space-y-3 p-4 bg-blue-50/50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="block text-sm font-medium text-foreground">Duration Tiers (Hourly Pricing)</label>
+                        <p className="text-xs text-muted-foreground mt-0.5">e.g. 1 hr → ₹200, 1.5 hr → ₹300, 2 hr → ₹400</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, durationOptions: [...(formData.durationOptions || []), { hours: 1, price: 0, isDefault: false }] })}
+                        className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1"
+                      >
+                        <Plus className="w-3 h-3" /> Add Tier
+                      </button>
+                    </div>
+
+                    {(formData.durationOptions || []).length > 0 && (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-12 gap-2 px-1">
+                          <span className="col-span-4 text-xs text-muted-foreground font-medium">Hours</span>
+                          <span className="col-span-6 text-xs text-muted-foreground font-medium">Price (₹/month or per session)</span>
+                          <span className="col-span-2" />
+                        </div>
+                        {(formData.durationOptions || []).map((tier, index) => (
+                          <div key={index} className="grid grid-cols-12 gap-2 items-center bg-white rounded-lg border border-blue-100 p-2">
+                            <div className="col-span-4">
+                              <input
+                                type="number"
+                                step="0.5"
+                                min="0.5"
+                                value={tier.hours}
+                                onChange={e => {
+                                  const updated = [...(formData.durationOptions || [])];
+                                  updated[index] = { ...updated[index], hours: Number(e.target.value) };
+                                  setFormData({ ...formData, durationOptions: updated });
+                                }}
+                                className="input-clean text-sm"
+                                placeholder="1.5"
+                              />
+                            </div>
+                            <div className="col-span-6">
+                              <input
+                                type="number"
+                                min="0"
+                                step="50"
+                                value={tier.price}
+                                onChange={e => {
+                                  const updated = [...(formData.durationOptions || [])];
+                                  updated[index] = { ...updated[index], price: Number(e.target.value) };
+                                  setFormData({ ...formData, durationOptions: updated });
+                                }}
+                                className="input-clean text-sm"
+                                placeholder="4500"
+                              />
+                            </div>
+                            <div className="col-span-2 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, durationOptions: (formData.durationOptions || []).filter((_, i) => i !== index) })}
+                                className="p-1.5 hover:bg-red-50 rounded transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Size / Quantity Tiers (super admin only) ── */}
+                {isSuperAdmin && (
+                  <div className="space-y-3 p-4 bg-green-50/50 border border-green-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="block text-sm font-medium text-foreground">Size / Quantity Tiers</label>
+                        <p className="text-xs text-muted-foreground mt-0.5">e.g. 1 Washroom → ₹1100, 2 Washrooms → ₹2000</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({
+                          ...formData,
+                          sizeParameters: {
+                            ...(formData.sizeParameters || { enabled: true, sizeType: 'quantity' }),
+                            enabled: true,
+                            options: [...(formData.sizeParameters?.options || []), { value: '', label: '', price: 0 }]
+                          }
+                        })}
+                        className="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1"
+                      >
+                        <Plus className="w-3 h-3" /> Add Tier
+                      </button>
+                    </div>
+
+                    {(formData.sizeParameters?.options || []).length > 0 && (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-12 gap-2 px-1">
+                          <span className="col-span-4 text-xs text-muted-foreground font-medium">Label</span>
+                          <span className="col-span-6 text-xs text-muted-foreground font-medium">Price (₹/month)</span>
+                          <span className="col-span-2" />
+                        </div>
+                        {(formData.sizeParameters?.options || []).map((opt, index) => (
+                          <div key={index} className="grid grid-cols-12 gap-2 items-center bg-white rounded-lg border border-green-100 p-2">
+                            <div className="col-span-4">
+                              <input
+                                type="text"
+                                value={opt.label}
+                                onChange={e => {
+                                  const opts = [...(formData.sizeParameters?.options || [])];
+                                  opts[index] = { ...opts[index], label: e.target.value, value: e.target.value.toLowerCase().replace(/\s+/g, '_') };
+                                  setFormData({ ...formData, sizeParameters: { ...(formData.sizeParameters!), options: opts } });
+                                }}
+                                className="input-clean text-sm"
+                                placeholder="1 Washroom"
+                              />
+                            </div>
+                            <div className="col-span-6">
+                              <input
+                                type="number"
+                                min="0"
+                                step="50"
+                                value={opt.price}
+                                onChange={e => {
+                                  const opts = [...(formData.sizeParameters?.options || [])];
+                                  opts[index] = { ...opts[index], price: Number(e.target.value) };
+                                  setFormData({ ...formData, sizeParameters: { ...(formData.sizeParameters!), options: opts } });
+                                }}
+                                className="input-clean text-sm"
+                                placeholder="1100"
+                              />
+                            </div>
+                            <div className="col-span-2 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const opts = (formData.sizeParameters?.options || []).filter((_, i) => i !== index);
+                                  setFormData({ ...formData, sizeParameters: { ...(formData.sizeParameters!), enabled: opts.length > 0, options: opts } });
+                                }}
+                                className="p-1.5 hover:bg-red-50 rounded transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex items-center gap-3">
                   <input
