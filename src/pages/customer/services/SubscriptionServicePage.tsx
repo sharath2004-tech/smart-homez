@@ -79,12 +79,23 @@ const SubscriptionServicePage = () => {
   const [genderPref, setGenderPref] = useState<"any" | "male" | "female">("any");
   const [specialInstructions, setSpecialInstructions] = useState("");
 
+  // Session split — available when sessionHours >= 2
+  const [splitEnabled, setSplitEnabled] = useState(false);
+  const [session1Hours, setSession1Hours] = useState(1);
+  const [session2Time, setSession2Time] = useState("17:00");
+
   useEffect(() => {
     fetchData();
     const nextWeek = new Date();
     nextWeek.setDate(nextWeek.getDate() + 1);
     setStartDate(nextWeek.toISOString().split("T")[0]);
   }, []);
+
+  // Reset split state whenever hours change
+  useEffect(() => {
+    if (sessionHours < 2) setSplitEnabled(false);
+    setSession1Hours(1);
+  }, [sessionHours]);
 
   const fetchData = async () => {
     try {
@@ -119,10 +130,24 @@ const SubscriptionServicePage = () => {
     return d.toISOString().split("T")[0];
   };
 
-  const getEndTime = () => {
-    const [h] = preferredTime.split(":").map(Number);
-    return `${String(h + sessionHours).padStart(2, "0")}:00`;
+  const addHoursToTime = (time: string, hours: number) => {
+    const [h, m] = time.split(":").map(Number);
+    const totalMin = h * 60 + m + Math.round(hours * 60);
+    return `${String(Math.floor(totalMin / 60) % 24).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
   };
+
+  const getEndTime = () => {
+    if (splitEnabled && sessionHours >= 2) {
+      return addHoursToTime(session2Time, sessionHours - session1Hours);
+    }
+    return addHoursToTime(preferredTime, sessionHours);
+  };
+
+  // Valid session1Hours choices: steps of 0.5, from 1 up to sessionHours-1 (so session2 has ≥1h)
+  const session1HoursOptions: number[] = [];
+  for (let h = 1; h <= sessionHours - 1; h += 0.5) {
+    session1HoursOptions.push(h);
+  }
 
   const handleBook = async () => {
     if (!selectedService) return toast.error("Please select a service");
@@ -149,6 +174,12 @@ const SubscriptionServicePage = () => {
           durationPerSession: sessionHours,
           autoRenewal,
           allowPause: true,
+          ...(splitEnabled && sessionHours >= 2 && {
+            splitSessions: [
+              { startTime: preferredTime, endTime: addHoursToTime(preferredTime, session1Hours) },
+              { startTime: session2Time, endTime: addHoursToTime(session2Time, sessionHours - session1Hours) },
+            ],
+          }),
         },
         serviceDetails: {
           sessionDurationHours: sessionHours,
@@ -375,7 +406,9 @@ const SubscriptionServicePage = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Preferred Time</label>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  {splitEnabled ? "Session 1 Time" : "Preferred Time"}
+                </label>
                 <select
                   value={preferredTime}
                   onChange={(e) => setPreferredTime(e.target.value)}
@@ -387,6 +420,98 @@ const SubscriptionServicePage = () => {
                 </select>
               </div>
             </div>
+
+            {/* Session Split — available when 2h or more booked */}
+            {sessionHours >= 2 && (
+              <div className="space-y-3">
+                {/* Toggle */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-indigo-50 border border-indigo-200">
+                  <div>
+                    <p className="text-sm font-semibold text-indigo-900">Split into Sessions</p>
+                    <p className="text-xs text-indigo-600">
+                      Divide {sessionHours}h across morning &amp; evening (min 1h each)
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSplitEnabled(!splitEnabled)}
+                    className={`w-12 h-6 rounded-full transition-colors relative shrink-0 ${splitEnabled ? "bg-indigo-500" : "bg-muted"}`}
+                  >
+                    <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${splitEnabled ? "left-6" : "left-0.5"}`} />
+                  </button>
+                </div>
+
+                {/* Session split details */}
+                {splitEnabled && (
+                  <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-200 space-y-4">
+                    {/* Session 1 */}
+                    <div>
+                      <p className="text-xs font-bold text-indigo-800 mb-2">🌅 Session 1 — Morning</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">Start Time</label>
+                          <select
+                            value={preferredTime}
+                            onChange={(e) => setPreferredTime(e.target.value)}
+                            className="w-full rounded-xl border border-input bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                          >
+                            {TIME_SLOTS.map((t) => (
+                              <option key={t} value={t}>{t}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">Duration</label>
+                          <select
+                            value={session1Hours}
+                            onChange={(e) => setSession1Hours(Number(e.target.value))}
+                            className="w-full rounded-xl border border-input bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                          >
+                            {session1HoursOptions.map((h) => (
+                              <option key={h} value={h}>{h}h</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <p className="text-xs text-indigo-600 mt-1">
+                        Ends at {addHoursToTime(preferredTime, session1Hours)}
+                      </p>
+                    </div>
+
+                    <div className="border-t border-indigo-200" />
+
+                    {/* Session 2 */}
+                    <div>
+                      <p className="text-xs font-bold text-indigo-800 mb-2">
+                        🌆 Session 2 — Evening ({sessionHours - session1Hours}h)
+                      </p>
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1 block">Start Time</label>
+                        <select
+                          value={session2Time}
+                          onChange={(e) => setSession2Time(e.target.value)}
+                          className="w-full rounded-xl border border-input bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                        >
+                          {TIME_SLOTS.map((t) => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <p className="text-xs text-indigo-600 mt-1">
+                        Ends at {addHoursToTime(session2Time, sessionHours - session1Hours)}
+                      </p>
+                    </div>
+
+                    {/* Split summary */}
+                    <div className="bg-white rounded-lg p-3 border border-indigo-200 text-xs text-indigo-800 space-y-1">
+                      <p className="font-semibold">📋 Daily Schedule</p>
+                      <p>Session 1: {preferredTime} → {addHoursToTime(preferredTime, session1Hours)} ({session1Hours}h)</p>
+                      <p>Session 2: {session2Time} → {addHoursToTime(session2Time, sessionHours - session1Hours)} ({sessionHours - session1Hours}h)</p>
+                      <p className="text-green-700 font-medium pt-1">✓ Total: {sessionHours}h/day</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Auto-renewal */}
             <div className="flex items-center justify-between p-4 rounded-2xl border border-border">
@@ -483,10 +608,23 @@ const SubscriptionServicePage = () => {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Calendar className="w-3.5 h-3.5" />
-                <span>Preferred time: {preferredTime}</span>
-              </div>
+              {splitEnabled ? (
+                <div className="space-y-1.5 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <span>🌅</span>
+                    <span>Session 1: {preferredTime} → {addHoursToTime(preferredTime, session1Hours)} ({session1Hours}h)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span>🌆</span>
+                    <span>Session 2: {session2Time} → {addHoursToTime(session2Time, sessionHours - session1Hours)} ({sessionHours - session1Hours}h)</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>Preferred time: {preferredTime}</span>
+                </div>
+              )}
               {selectedDays.length > 0 && (
                 <div className="flex gap-1 flex-wrap">
                   {selectedDays.map((d) => (

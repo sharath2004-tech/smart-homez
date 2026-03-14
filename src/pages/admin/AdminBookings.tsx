@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { bookingsAPI, superAdminAPI } from "@/lib/api";
 import ExcelJS from "exceljs";
-import { CheckCircle, Download, Eye, MapPin, Search, X } from "lucide-react";
+import { CheckCircle, Download, Eye, MapPin, Search, Users, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface ProofPhoto {
@@ -17,6 +17,7 @@ interface Booking {
   _id: string;
   customer: { _id: string; name: string; email: string } | null;
   worker?: { _id: string; name: string; email: string } | null;
+  supportStaff?: { worker: { _id: string; name: string }; name?: string }[];
   service: { _id: string; name: string; category: string } | null;
   bookingType?: string;
   location?: { address?: string; city?: string; state?: string; zipCode?: string } | null;
@@ -59,6 +60,12 @@ const AdminBookings = () => {
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocation, setSelectedLocation] = useState("");
   const [noRegionAssigned, setNoRegionAssigned] = useState(false);
+
+  // Manage Team state
+  const [selectedTeamBooking, setSelectedTeamBooking] = useState<Booking | null>(null);
+  const [allWorkers, setAllWorkers] = useState<{ _id: string; name: string; email: string }[]>([]);
+  const [workerSearch, setWorkerSearch] = useState('');
+  const [teamActionLoading, setTeamActionLoading] = useState(false);
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -146,6 +153,45 @@ const AdminBookings = () => {
       alert((error as Error).message || 'Failed to approve booking');
     } finally {
       setApprovingBookingId(null);
+    }
+  };
+
+  const openManageTeam = async (booking: Booking) => {
+    setSelectedTeamBooking(booking);
+    setWorkerSearch('');
+    if (allWorkers.length === 0) {
+      try {
+        const res = await superAdminAPI.getWorkers();
+        setAllWorkers(res.workers || []);
+      } catch (e) { console.error(e); }
+    }
+  };
+
+  const handleAddSupportStaff = async (workerId: string) => {
+    if (!selectedTeamBooking) return;
+    try {
+      setTeamActionLoading(true);
+      const res = await bookingsAPI.addSupportStaff(selectedTeamBooking._id, workerId);
+      setSelectedTeamBooking(prev => prev ? { ...prev, supportStaff: res.supportStaff } : prev);
+      setBookings(prev => prev.map(b => b._id === selectedTeamBooking._id ? { ...b, supportStaff: res.supportStaff } : b));
+    } catch (e) {
+      alert((e as Error).message || 'Failed to add support staff');
+    } finally {
+      setTeamActionLoading(false);
+    }
+  };
+
+  const handleRemoveSupportStaff = async (workerId: string) => {
+    if (!selectedTeamBooking) return;
+    try {
+      setTeamActionLoading(true);
+      const res = await bookingsAPI.removeSupportStaff(selectedTeamBooking._id, workerId);
+      setSelectedTeamBooking(prev => prev ? { ...prev, supportStaff: res.supportStaff } : prev);
+      setBookings(prev => prev.map(b => b._id === selectedTeamBooking._id ? { ...b, supportStaff: res.supportStaff } : b));
+    } catch (e) {
+      alert((e as Error).message || 'Failed to remove support staff');
+    } finally {
+      setTeamActionLoading(false);
     }
   };
 
@@ -290,27 +336,40 @@ const AdminBookings = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {(b.status === 'completed' || b.status === 'pending-review') ? (
-                        <button
-                          onClick={() => setSelectedProofBooking(b)}
-                          className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors ${
-                            hasProofs(b)
-                              ? b.status === 'pending-review' ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                              : 'bg-muted text-muted-foreground hover:bg-muted/70'
-                          }`}
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          {b.status === 'pending-review' ? '⏳ Review' : (
-                            hasProofs(b) ? (
-                              <span>
-                                {[b.completionPhotos && b.completionPhotos.length > 0 && `📸×${b.completionPhotos.length}`, b.paymentProof?.url && '💳'].filter(Boolean).join(' ')}
-                              </span>
-                            ) : 'No proofs'
-                          )}
-                        </button>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
+                      <div className="flex flex-col gap-1">
+                        {b.bookingType === 'deep-cleaning-cart' && (
+                          <button
+                            onClick={() => openManageTeam(b)}
+                            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors"
+                          >
+                            <Users className="w-3.5 h-3.5" />
+                            Team ({(b.supportStaff?.length ?? 0) + (b.worker ? 1 : 0)})
+                          </button>
+                        )}
+                        {(b.status === 'completed' || b.status === 'pending-review') ? (
+                          <button
+                            onClick={() => setSelectedProofBooking(b)}
+                            className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors ${
+                              hasProofs(b)
+                                ? b.status === 'pending-review' ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                            }`}
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            {b.status === 'pending-review' ? '⏳ Review' : (
+                              hasProofs(b) ? (
+                                <span>
+                                  {[b.completionPhotos && b.completionPhotos.length > 0 && `📸×${b.completionPhotos.length}`, b.paymentProof?.url && '💳'].filter(Boolean).join(' ')}
+                                </span>
+                              ) : 'No proofs'
+                            )}
+                          </button>
+                        ) : (
+                          b.bookingType !== 'deep-cleaning-cart' && (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -481,6 +540,124 @@ const AdminBookings = () => {
                 className="w-full py-3 border border-border rounded-xl text-foreground font-medium hover:bg-muted transition-colors"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Manage Team Modal */}
+      {selectedTeamBooking && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-card rounded-2xl max-w-lg w-full my-8 shadow-2xl">
+            <div className="sticky top-0 bg-card border-b border-border p-4 flex items-center justify-between rounded-t-2xl">
+              <div>
+                <h2 className="font-bold text-foreground text-lg flex items-center gap-2">
+                  <Users className="w-5 h-5 text-violet-600" /> Manage Team
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Deep Cleaning · {formatDate(selectedTeamBooking.bookingDate)} · {selectedTeamBooking.customer?.name}
+                </p>
+              </div>
+              <button onClick={() => setSelectedTeamBooking(null)} className="p-2 hover:bg-muted rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-5">
+              {/* Current Team */}
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-3">Current Team ({(selectedTeamBooking.supportStaff?.length ?? 0) + (selectedTeamBooking.worker ? 1 : 0)} members)</h3>
+                <div className="space-y-2">
+                  {selectedTeamBooking.worker && (
+                    <div className="flex items-center justify-between p-3 bg-violet-50 border border-violet-200 rounded-xl">
+                      <div className="flex items-center gap-2">
+                        <span>👑</span>
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{selectedTeamBooking.worker.name}</p>
+                          <p className="text-xs text-muted-foreground">{selectedTeamBooking.worker.email}</p>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-medium">Team Head</span>
+                    </div>
+                  )}
+                  {!selectedTeamBooking.worker && (
+                    <p className="text-sm text-muted-foreground italic">No team head assigned yet</p>
+                  )}
+                  {(selectedTeamBooking.supportStaff ?? []).map((s) => (
+                    <div key={s.worker._id} className="flex items-center justify-between p-3 bg-muted/40 border border-border rounded-xl">
+                      <div className="flex items-center gap-2">
+                        <span>👷</span>
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{s.worker.name}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveSupportStaff(s.worker._id)}
+                        disabled={teamActionLoading}
+                        className="text-xs text-red-600 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                  {(selectedTeamBooking.supportStaff?.length ?? 0) < 4 && (
+                    <p className="text-xs text-muted-foreground pl-1">
+                      {4 - (selectedTeamBooking.supportStaff?.length ?? 0)} support staff slot{4 - (selectedTeamBooking.supportStaff?.length ?? 0) !== 1 ? 's' : ''} remaining
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Add Support Staff */}
+              {(selectedTeamBooking.supportStaff?.length ?? 0) < 4 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground mb-3">Add Support Staff</h3>
+                  <div className="relative mb-3">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input
+                      className="input-clean pl-9 text-sm"
+                      placeholder="Search worker by name..."
+                      value={workerSearch}
+                      onChange={(e) => setWorkerSearch(e.target.value)}
+                    />
+                  </div>
+                  <div className="max-h-48 overflow-y-auto space-y-1 border border-border rounded-xl p-2">
+                    {allWorkers
+                      .filter(w => {
+                        const alreadyTeamHead = selectedTeamBooking.worker?._id === w._id;
+                        const alreadySupport = selectedTeamBooking.supportStaff?.some(s => s.worker._id === w._id);
+                        const matchSearch = w.name.toLowerCase().includes(workerSearch.toLowerCase());
+                        return !alreadyTeamHead && !alreadySupport && matchSearch;
+                      })
+                      .slice(0, 10)
+                      .map(w => (
+                        <button
+                          key={w._id}
+                          onClick={() => handleAddSupportStaff(w._id)}
+                          disabled={teamActionLoading}
+                          className="w-full text-left p-2.5 rounded-lg hover:bg-muted transition-colors text-sm flex items-center justify-between group disabled:opacity-50"
+                        >
+                          <span className="font-medium text-foreground">{w.name}</span>
+                          <span className="text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">+ Add</span>
+                        </button>
+                      ))}
+                    {allWorkers.filter(w => {
+                      const alreadyTeamHead = selectedTeamBooking.worker?._id === w._id;
+                      const alreadySupport = selectedTeamBooking.supportStaff?.some(s => s.worker._id === w._id);
+                      const matchSearch = w.name.toLowerCase().includes(workerSearch.toLowerCase());
+                      return !alreadyTeamHead && !alreadySupport && matchSearch;
+                    }).length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">No workers to add</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={() => setSelectedTeamBooking(null)}
+                className="w-full py-3 border border-border rounded-xl text-foreground font-medium hover:bg-muted transition-colors"
+              >
+                Done
               </button>
             </div>
           </div>

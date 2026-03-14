@@ -72,8 +72,11 @@ router.get('/', authenticate, async (req, res) => {
     if (req.user.role === 'customer') {
       query.customer = req.user._id;
     } else if (req.user.role === 'worker') {
-      // Workers only see bookings assigned to them
-      query.worker = req.user._id;
+      // Workers see bookings where they are team head OR support staff
+      query.$or = [
+        { worker: req.user._id },
+        { 'supportStaff.worker': req.user._id }
+      ];
     } else if (req.user.role === 'admin') {
       // Admins only see bookings within their assigned region
       const admin = await User.findById(req.user._id).select('adminProfile').lean();
@@ -110,6 +113,11 @@ router.get('/', authenticate, async (req, res) => {
       .populate({
         path: 'worker',
         select: 'name email phone gender religion workerProfile',
+        options: { strictPopulate: false }
+      })
+      .populate({
+        path: 'supportStaff.worker',
+        select: 'name email phone',
         options: { strictPopulate: false }
       })
       .populate({
@@ -327,19 +335,25 @@ router.get('/:id', authenticate, async (req, res) => {
     const booking = await Booking.findById(req.params.id)
       .populate('customer', 'name email phone')
       .populate('worker', 'name email phone gender religion workerProfile')
+      .populate('supportStaff.worker', 'name email phone')
       .populate('service', 'name description price duration');
-    
+
     if (!booking) {
-      return res.status(404).json({ 
-        error: { message: 'Booking not found', status: 404 } 
+      return res.status(404).json({
+        error: { message: 'Booking not found', status: 404 }
       });
     }
 
-    // Check access permissions
-    const isAuthorized = 
+    // Check access permissions (also allow support staff workers)
+    const isSupportStaff = booking.supportStaff?.some(
+      s => s.worker && s.worker._id && s.worker._id.toString() === req.user._id.toString()
+    );
+    const isAuthorized =
       req.user.role === 'admin' ||
+      req.user.role === 'super_admin' ||
       booking.customer._id.toString() === req.user._id.toString() ||
-      (booking.worker && booking.worker._id && booking.worker._id.toString() === req.user._id.toString());
+      (booking.worker && booking.worker._id && booking.worker._id.toString() === req.user._id.toString()) ||
+      isSupportStaff;
 
     if (!isAuthorized) {
       return res.status(403).json({ 
@@ -663,7 +677,11 @@ router.post('/',
           allowPause: subscriptionDetails.allowPause || false,
           fixedWorker: worker, // Store the fixed worker for this subscription
           durationPerSession: subscriptionDetails.durationPerSession || 1,
-          preferredTime: subscriptionDetails.preferredTime
+          preferredTime: subscriptionDetails.preferredTime,
+          // Split sessions: store multiple time windows when customer splits work across day
+          ...(subscriptionDetails.splitSessions?.length > 0 && {
+            splitSessions: subscriptionDetails.splitSessions
+          })
         };
         
         // Add recurring schedule for subscription
@@ -1577,6 +1595,86 @@ router.post('/:id/reassign-worker',
     }
   }
 );
+
+
+// ==================== SUPPORT STAFF MANAGEMENT ====================
+
+// @route   POST /api/bookings/:id/support-staff
+// @desc    Admin adds a support staff worker to a deep cleaning booking (max 4)
+// @access  Private/Admin
+router.post('/:id/support-staff', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { workerId } = req.body;
+    if (!workerId) {
+      return res.status(400).json({ error: { message: 'workerId is required', status: 400 } });
+    }
+
+    const booking = await Booking.findById(req.params.id).populate('supportStaff.worker', 'name email');
+    if (!booking) {
+      return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
+    }
+
+    if (booking.bookingType !== 'deep-cleaning-cart') {
+      return res.status(400).json({ error: { message: 'Support staff only applies to deep cleaning bookings', status: 400 } });
+    }
+
+    if ((booking.supportStaff?.length ?? 0) >= 4) {
+      return res.status(400).json({ error: { message: 'Maximum 4 support staff allowed', status: 400 } });
+    }
+
+    const alreadyAdded = booking.supportStaff?.some(s => s.worker._id.toString() === workerId);
+    if (alreadyAdded) {
+      return res.status(400).json({ error: { message: 'Worker already in support staff', status: 400 } });
+    }
+
+    if (booking.worker && booking.worker.toString() === workerId) {
+      return res.status(400).json({ error: { message: 'Team head cannot be added as support staff', status: 400 } });
+    }
+
+    const worker = await User.findById(workerId).select('name email');
+    if (!worker) {
+      return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
+    }
+
+    booking.supportStaff.push({ worker: workerId, name: worker.name });
+    await booking.save();
+    await booking.populate('supportStaff.worker', 'name email phone');
+
+    res.json({ message: 'Support staff added', supportStaff: booking.supportStaff });
+  } catch (error) {
+    console.error('Add support staff error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   DELETE /api/bookings/:id/support-staff/:workerId
+// @desc    Admin removes a support staff worker from a booking
+// @access  Private/Admin
+router.delete('/:id/support-staff/:workerId', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
+    }
+
+    const beforeLen = booking.supportStaff?.length ?? 0;
+    booking.supportStaff = (booking.supportStaff || []).filter(
+      s => s.worker.toString() !== req.params.workerId
+    );
+
+    if (booking.supportStaff.length === beforeLen) {
+      return res.status(404).json({ error: { message: 'Worker not in support staff', status: 404 } });
+    }
+
+    await booking.save();
+    await booking.populate('supportStaff.worker', 'name email phone');
+
+    res.json({ message: 'Support staff removed', supportStaff: booking.supportStaff });
+  } catch (error) {
+    console.error('Remove support staff error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
 
 // ==================== SERVICE QR CODE WORKFLOW ====================
 

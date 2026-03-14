@@ -50,6 +50,15 @@ const bookingSchema = new mongoose.Schema({
     reason: String,
     backupPriority: Number
   }],
+  // Support staff for deep cleaning (team head = booking.worker, support staff = this array)
+  supportStaff: [{
+    worker: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    name: { type: String }
+  }],
   // Worker arrival tracking
   workerArrivalTime: {
     type: Date,
@@ -146,6 +155,11 @@ const bookingSchema = new mongoose.Schema({
       type: Number, // Duration in hours for each session
       default: 1
     },
+    // Split sessions: if total hours > 2, customer can split work into multiple time windows
+    splitSessions: [{
+      startTime: { type: String, required: true }, // e.g. "09:00"
+      endTime:   { type: String, required: true }  // e.g. "11:00"
+    }],
     preferredTime: String, // Preferred time for all bookings
     discountPercent: {
       type: Number,

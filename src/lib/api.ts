@@ -462,7 +462,16 @@ export const bookingsAPI = {
     // Remove /api/ from API_BASE_URL if present and remove /uploads prefix from photoPath if it starts with it
     const baseUrl = API_BASE_URL.replace('/api', '');
     return `${baseUrl}${photoPath}`;
-  }
+  },
+
+  addSupportStaff: (bookingId: string, workerId: string) =>
+    apiCall(`/bookings/${bookingId}/support-staff`, {
+      method: 'POST',
+      body: JSON.stringify({ workerId })
+    }),
+
+  removeSupportStaff: (bookingId: string, workerId: string) =>
+    apiCall(`/bookings/${bookingId}/support-staff/${workerId}`, { method: 'DELETE' }),
 };
 
 // ====== Locations APIs ======

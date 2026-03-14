@@ -18,6 +18,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 interface Task {
   _id: string;
+  worker?: { _id: string; name: string };
+  supportStaff?: { worker: { _id: string; name: string }; name?: string }[];
   service?: {
     _id: string;
     name: string;
@@ -417,6 +419,11 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
 
   if (!task) return null;
 
+  // Team head is the primary assigned worker; support staff see timer but can't generate QR
+  const currentUserId = getCurrentUserId();
+  const isTeamHead = !task.worker || task.worker._id === currentUserId;
+  const isDeepCleaning = task.bookingType === 'deep-cleaning-cart';
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-card rounded-2xl max-w-2xl w-full my-8 max-h-[90vh] overflow-y-auto">
@@ -589,6 +596,39 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
             </div>
           </div>
 
+          {/* Team Members (Deep Cleaning) */}
+          {isDeepCleaning && task.worker && (
+            <div className="card-elevated p-5">
+              <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
+                <User className="w-5 h-5 text-primary" />
+                Team Members
+              </h3>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">👑</span>
+                    <span className="text-sm font-medium text-foreground">{task.worker.name}</span>
+                  </div>
+                  <span className="text-xs bg-primary-light text-primary px-2 py-0.5 rounded-full font-medium">Team Head</span>
+                </div>
+                {task.supportStaff && task.supportStaff.length > 0 && (
+                  task.supportStaff.map((s, i) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">👷</span>
+                        <span className="text-sm text-foreground">{s.worker.name}</span>
+                      </div>
+                      <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">Support Staff</span>
+                    </div>
+                  ))
+                )}
+                {(!task.supportStaff || task.supportStaff.length === 0) && (
+                  <p className="text-xs text-muted-foreground">No support staff assigned yet</p>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Payment Information */}
           <div className="card-elevated p-5">
             <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
@@ -616,14 +656,15 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
             </div>
           </div>
 
-          {/* QR Code Section - Show for confirmed/scheduled tasks */}
+          {/* QR Code Section - Only team head generates start QR */}
           {task.status !== 'completed' && !task.actualStartTime && (
+            isTeamHead ? (
             <div className="card-elevated p-5 text-center">
               <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
                 <QrCode className="w-5 h-5 text-primary" />
                 {t('worker.taskDetail.serviceStartQR')}
               </h3>
-              
+
               {qrCodeImage ? (
                 <div>
                   <div className="bg-white p-4 rounded-xl inline-block mb-3">
@@ -651,10 +692,19 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                 </div>
               )}
             </div>
+            ) : (
+            <div className="card-elevated p-5 text-center bg-blue-50 border-2 border-blue-200">
+              <p className="text-2xl mb-2">⏳</p>
+              <p className="font-semibold text-blue-800">Waiting for Team Head to start service</p>
+              <p className="text-sm text-blue-600 mt-1">
+                The timer will begin once <strong>{task.worker?.name || 'the team head'}</strong> generates and the customer scans the start QR.
+              </p>
+            </div>
+            )
           )}
 
-          {/* End QR Code Section - Show for in-progress tasks */}
-          {task.status === 'in-progress' && task.actualStartTime && (
+          {/* End QR Code Section - Only team head can end service */}
+          {task.status === 'in-progress' && task.actualStartTime && isTeamHead && (
             <div className="space-y-4">
               {/* Step 1: Upload Completion Photos (min 2 required) */}
               <div className="card-elevated p-5 bg-gradient-to-br from-teal-50 to-cyan-50 border-2 border-teal-200">
