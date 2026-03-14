@@ -918,7 +918,7 @@ router.get('/workers', authenticate, authorize('admin', 'super_admin'), async (r
 
       if (adminLocationIds.length === 0) {
         console.log(`⚠️ Admin ${req.user.name} has NO assigned locations - returning empty worker list`);
-        workers = [];
+        return res.json({ workers: [], noRegionAssigned: true });
       } else {
         // Filter workers who are assigned to ANY of the admin's locations
         workers = workers.filter(worker => {
@@ -1095,39 +1095,55 @@ router.get('/dashboard-stats', authenticate, authorize('admin', 'super_admin'), 
 
     const workersInLocations = workers;
 
+    // Build booking location filter for admin (blank = super_admin sees all)
+    let bookingLocationFilter = {};
+    if (req.user.role === 'admin') {
+      const adminLocIds = (req.user.adminProfile?.assignedLocations || [])
+        .map(loc => loc.locationId).filter(Boolean);
+      if (adminLocIds.length > 0) {
+        bookingLocationFilter = { 'location.locationId': { $in: adminLocIds } };
+      }
+    } else if (req.query.locationId) {
+      bookingLocationFilter = { 'location.locationId': req.query.locationId };
+    }
+
     // Date boundaries
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
     // Today's stats
     const todayBookings = await Booking.countDocuments({
+      ...bookingLocationFilter,
       createdAt: { $gte: today },
       status: { $in: ['pending', 'confirmed', 'in-progress'] }
     });
 
     const completedToday = await Booking.countDocuments({
+      ...bookingLocationFilter,
       completedAt: { $gte: today },
       status: 'completed'
     });
 
     const todayRevenue = await Booking.aggregate([
-      { $match: { completedAt: { $gte: today }, status: 'completed' } },
+      { $match: { ...bookingLocationFilter, completedAt: { $gte: today }, status: 'completed' } },
       { $group: { _id: null, total: { $sum: '$totalAmount' } } }
     ]);
 
     // Yesterday's stats for change calculation
     const yesterdayBookings = await Booking.countDocuments({
+      ...bookingLocationFilter,
       createdAt: { $gte: yesterday, $lt: today },
       status: { $in: ['pending', 'confirmed', 'in-progress'] }
     });
 
     const completedYesterday = await Booking.countDocuments({
+      ...bookingLocationFilter,
       completedAt: { $gte: yesterday, $lt: today },
       status: 'completed'
     });
 
     const yesterdayRevenue = await Booking.aggregate([
-      { $match: { completedAt: { $gte: yesterday, $lt: today }, status: 'completed' } },
+      { $match: { ...bookingLocationFilter, completedAt: { $gte: yesterday, $lt: today }, status: 'completed' } },
       { $group: { _id: null, total: { $sum: '$totalAmount' } } }
     ]);
 
@@ -1179,41 +1195,27 @@ router.get('/recent-bookings', authenticate, authorize('admin', 'super_admin'), 
   try {
     const limitNum = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 100);
 
-    let bookings = await Booking.find()
+    // Build location query upfront
+    let locationQuery = {};
+    if (req.user.role === 'admin') {
+      const adminLocationIds = (req.user.adminProfile?.assignedLocations || [])
+        .map(loc => loc.locationId).filter(Boolean);
+      if (adminLocationIds.length > 0) {
+        locationQuery = { 'location.locationId': { $in: adminLocationIds } };
+      } else {
+        // Admin has no locations assigned — return empty
+        return res.json({ success: true, bookings: [] });
+      }
+    } else if (req.user.role === 'super_admin' && req.query.locationId) {
+      locationQuery = { 'location.locationId': req.query.locationId };
+    }
+
+    const bookings = await Booking.find(locationQuery)
       .populate('customer', 'name')
       .populate('worker', 'name')
       .populate('service', 'name')
       .sort({ createdAt: -1 })
-      .limit(limitNum * 5); // Fetch more to filter
-
-    // Filter bookings by location scope
-    if (req.user.role === 'admin') {
-      const adminLocationIds = req.user.adminProfile?.assignedLocations?.map(loc => loc.locationId.toString()) || [];
-
-      bookings = await Promise.all(
-        bookings.map(async (booking) => {
-          if (!booking.worker) return booking;
-          const worker = await User.findById(booking.worker._id);
-          if (!worker) return null;
-          const workerLocationIds = worker.workerProfile?.assignedApartments?.map(apt => apt.locationId?.toString()).filter(Boolean) || [];
-          return workerLocationIds.some(locId => adminLocationIds.includes(locId)) ? booking : null;
-        })
-      );
-      bookings = bookings.filter(b => b !== null).slice(0, limitNum);
-    } else if (req.user.role === 'super_admin' && req.query.locationId) {
-      // Super Admin: filter bookings by specific locationId via worker assignment
-      const { locationId } = req.query;
-      const workersInLocation = await User.find({
-        role: 'worker',
-        'workerProfile.assignedApartments.locationId': locationId
-      }).select('_id').lean();
-      const workerIds = new Set(workersInLocation.map((w) => w._id.toString()));
-      bookings = bookings
-        .filter((b) => b.worker && workerIds.has(b.worker._id?.toString() || b.worker.toString()))
-        .slice(0, limitNum);
-    } else {
-      bookings = bookings.slice(0, limitNum);
-    }
+      .limit(limitNum);
 
     res.json({
       success: true,
@@ -1245,13 +1247,21 @@ router.get('/alerts', authenticate, authorize('admin', 'super_admin'), async (re
       });
     }
 
-    const workerIds = workers.map(w => w._id);
+    // Build location filter for unassigned bookings (admin sees only their region)
+    let unassignedLocationFilter = {};
+    if (req.user.role === 'admin') {
+      const adminLocIds = (req.user.adminProfile?.assignedLocations || [])
+        .map(loc => loc.locationId).filter(Boolean);
+      if (adminLocIds.length > 0) {
+        unassignedLocationFilter = { 'location.locationId': { $in: adminLocIds } };
+      }
+    }
 
     // Check for unassigned bookings (only for this admin's area)
     const unassignedBookings = await Booking.countDocuments({
+      ...unassignedLocationFilter,
       worker: null,
       status: 'pending'
-      // Note: Ideally filter by location/address, but for now showing all unassigned
     });
 
     if (unassignedBookings > 0) {
@@ -1528,12 +1538,28 @@ router.get('/workforce-status', authenticate, authorize('admin', 'super_admin'),
     todayEnd.setHours(23, 59, 59, 999);
 
     // Get all workers
-    const workers = await User.find({ 
-      role: 'worker', 
-      isActive: true 
+    let workers = await User.find({
+      role: 'worker',
+      isActive: true
     })
       .select('name email phone workerProfile.specialization workerProfile.assignedApartments workerProfile.rating workerProfile.availability workerProfile.leaves workerProfile.completedJobs currentLocation')
       .sort({ name: 1 });
+
+    // Filter workers by admin's assigned locations
+    if (req.user.role === 'admin') {
+      const adminLocIds = (req.user.adminProfile?.assignedLocations || [])
+        .map(loc => loc.locationId?.toString()).filter(Boolean);
+      if (adminLocIds.length > 0) {
+        workers = workers.filter(worker => {
+          const workerLocIds = (worker.workerProfile?.assignedApartments || [])
+            .map(apt => apt.locationId?.toString()).filter(Boolean);
+          return workerLocIds.some(id => adminLocIds.includes(id));
+        });
+      } else {
+        // No region assigned — return empty with flag
+        return res.json({ workers: [], summary: { total: 0, free: 0, working: 0, onLeave: 0, offline: 0 }, noRegionAssigned: true });
+      }
+    }
 
     // Get all bookings for today
     const bookings = await Booking.find({

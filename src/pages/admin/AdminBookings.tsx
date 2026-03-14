@@ -58,6 +58,7 @@ const AdminBookings = () => {
   const [approvingBookingId, setApprovingBookingId] = useState<string | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocation, setSelectedLocation] = useState("");
+  const [noRegionAssigned, setNoRegionAssigned] = useState(false);
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -84,7 +85,13 @@ const AdminBookings = () => {
       } else {
         // admin role — backend scopes to their assigned locations automatically
         const response = await bookingsAPI.getAll({ limit: 1000 });
-        setBookings(response.bookings || []);
+        if (response.noRegionAssigned) {
+          setNoRegionAssigned(true);
+          setBookings([]);
+        } else {
+          setNoRegionAssigned(false);
+          setBookings(response.bookings || []);
+        }
       }
     } catch (error) {
       console.error('Error fetching bookings:', error);
@@ -310,7 +317,14 @@ const AdminBookings = () => {
               </tbody>
             </table>
           </div>
-          {filtered.length === 0 && (
+          {noRegionAssigned && (
+            <div className="text-center py-12 text-muted-foreground">
+              <div className="text-4xl mb-3">🗺️</div>
+              <p className="font-semibold text-foreground">No region assigned</p>
+              <p className="text-sm mt-1">Contact your super admin to assign you to a location region.</p>
+            </div>
+          )}
+          {!noRegionAssigned && filtered.length === 0 && (
             <div className="text-center py-12 text-muted-foreground">
               <div className="text-4xl mb-3">📭</div>
               <p>No bookings found</p>

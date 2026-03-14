@@ -75,6 +75,7 @@ const AdminWorkforce = () => {
   const [unassignedBookings, setUnassignedBookings] = useState<Booking[]>([]);
   const [selectedBooking, setSelectedBooking] = useState<string | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [noRegionAssigned, setNoRegionAssigned] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -90,6 +91,7 @@ const AdminWorkforce = () => {
       
       setWorkers(workforceRes.workers || []);
       setSummary(workforceRes.summary || { total: 0, free: 0, working: 0, onLeave: 0, offline: 0 });
+      setNoRegionAssigned(!!workforceRes.noRegionAssigned);
       setUnassignedBookings((bookingsRes.bookings || []).filter((b: Booking) => !b.worker));
     } catch (error) {
       console.error('Error fetching workforce data:', error);
@@ -281,7 +283,13 @@ const AdminWorkforce = () => {
 
         {/* Workers List - Enhanced */}
         <div className="space-y-4">
-          {filteredWorkers.length === 0 ? (
+          {noRegionAssigned ? (
+            <div className="bg-gradient-to-br from-slate-50 to-slate-100 border-2 border-dashed border-slate-200 rounded-2xl text-center py-16">
+              <Users className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-slate-700 mb-2">No Region Assigned</h3>
+              <p className="text-muted-foreground">Contact your super admin to assign you to a location region.</p>
+            </div>
+          ) : filteredWorkers.length === 0 ? (
             <div className="bg-gradient-to-br from-slate-50 to-slate-100 border-2 border-dashed border-slate-200 rounded-2xl text-center py-16">
               <Users className="w-16 h-16 text-slate-400 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-slate-700 mb-2">No Workers Found</h3>

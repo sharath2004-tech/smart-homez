@@ -65,6 +65,7 @@ const AdminWorkers = () => {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
+  const [noRegionAssigned, setNoRegionAssigned] = useState(false);
   const [showWorkerForm, setShowWorkerForm] = useState(false);
   const [creatingWorker, setCreatingWorker] = useState(false);
   const [credentialDelivery, setCredentialDelivery] = useState<"email" | "phone" | "both">("email");
@@ -112,6 +113,7 @@ const AdminWorkers = () => {
         console.log('Sample worker:', workersRes.workers[0]);
       }
       setWorkers(workersRes.workers || []);
+      setNoRegionAssigned(!!workersRes.noRegionAssigned);
       setLocations(locationsRes.locations || []);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -293,7 +295,13 @@ const AdminWorkers = () => {
         </div>
 
         {/* Worker cards */}
-        {filtered.length === 0 ? (
+        {noRegionAssigned ? (
+          <div className="text-center py-12 text-muted-foreground card-elevated">
+            <div className="text-4xl mb-3">🗺️</div>
+            <p className="font-semibold text-foreground">No region assigned</p>
+            <p className="text-sm mt-1">Contact your super admin to assign you to a location region.</p>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground card-elevated">
             <div className="text-4xl mb-3">👷</div>
             <p>No workers found</p>

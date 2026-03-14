@@ -75,15 +75,17 @@ router.get('/', authenticate, async (req, res) => {
       // Workers only see bookings assigned to them
       query.worker = req.user._id;
     } else if (req.user.role === 'admin') {
-      // Admins see bookings within their assigned locations; if none assigned, see all
+      // Admins only see bookings within their assigned region
       const admin = await User.findById(req.user._id).select('adminProfile').lean();
       const assignedLocationIds = (admin?.adminProfile?.assignedLocations || [])
         .map(l => l.locationId)
         .filter(Boolean);
       if (assignedLocationIds.length > 0) {
         query['location.locationId'] = { $in: assignedLocationIds };
+      } else {
+        // No region assigned — return empty with flag so frontend can show helpful message
+        return res.json({ bookings: [], totalPages: 0, currentPage: 1, totalBookings: 0, noRegionAssigned: true });
       }
-      // else: no region restriction — admin sees all bookings
     }
     // super_admin sees all bookings (no filter applied)
 
