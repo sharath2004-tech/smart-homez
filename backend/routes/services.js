@@ -245,6 +245,76 @@ router.post('/',
   }
 );
 
+// Validates pricing field values — shared by service update and price-change-request
+function validatePricingFields(body) {
+  const errors = [];
+
+  if ('price' in body) {
+    if (typeof body.price !== 'number' || body.price < 0) {
+      errors.push('price must be a non-negative number');
+    }
+  }
+
+  if ('pricingPlans' in body && body.pricingPlans) {
+    for (const key of ['oneTime', 'daily', 'weekly', 'monthly']) {
+      const val = body.pricingPlans[key];
+      if (val !== undefined && (typeof val !== 'number' || val < 0)) {
+        errors.push(`pricingPlans.${key} must be a non-negative number`);
+      }
+    }
+  }
+
+  if ('subscriptionPlans' in body && Array.isArray(body.subscriptionPlans)) {
+    body.subscriptionPlans.forEach((plan, i) => {
+      const lbl = `subscriptionPlans[${i}]`;
+      if (!plan.id || typeof plan.id !== 'string') {
+        errors.push(`${lbl}.id is required and must be a string`);
+      }
+      if (plan.price !== undefined && (typeof plan.price !== 'number' || plan.price < 0)) {
+        errors.push(`${lbl}.price must be a non-negative number`);
+      }
+      if (plan.totalMonthlyPrice !== undefined && (typeof plan.totalMonthlyPrice !== 'number' || plan.totalMonthlyPrice < 0)) {
+        errors.push(`${lbl}.totalMonthlyPrice must be a non-negative number`);
+      }
+      if (plan.discountPercentage !== undefined && (typeof plan.discountPercentage !== 'number' || plan.discountPercentage < 0 || plan.discountPercentage > 100)) {
+        errors.push(`${lbl}.discountPercentage must be 0–100`);
+      }
+      if (plan.sessionsPerMonth !== undefined && (!Number.isInteger(plan.sessionsPerMonth) || plan.sessionsPerMonth < 1)) {
+        errors.push(`${lbl}.sessionsPerMonth must be an integer >= 1`);
+      }
+    });
+  }
+
+  if ('durationOptions' in body && Array.isArray(body.durationOptions)) {
+    body.durationOptions.forEach((opt, i) => {
+      const lbl = `durationOptions[${i}]`;
+      if (opt.hours !== undefined && (typeof opt.hours !== 'number' || opt.hours <= 0)) {
+        errors.push(`${lbl}.hours must be a positive number`);
+      }
+      if (opt.price !== undefined && (typeof opt.price !== 'number' || opt.price < 0)) {
+        errors.push(`${lbl}.price must be a non-negative number`);
+      }
+    });
+  }
+
+  if ('pricingTiers' in body && Array.isArray(body.pricingTiers)) {
+    body.pricingTiers.forEach((tier, i) => {
+      const lbl = `pricingTiers[${i}]`;
+      if (tier.pricePerUnit !== undefined && (typeof tier.pricePerUnit !== 'number' || tier.pricePerUnit < 0)) {
+        errors.push(`${lbl}.pricePerUnit must be a non-negative number`);
+      }
+      if (tier.totalPrice !== undefined && (typeof tier.totalPrice !== 'number' || tier.totalPrice < 0)) {
+        errors.push(`${lbl}.totalPrice must be a non-negative number`);
+      }
+      if (tier.quantityFrom !== undefined && tier.quantityTo !== undefined && tier.quantityTo < tier.quantityFrom) {
+        errors.push(`${lbl}.quantityTo must be >= quantityFrom`);
+      }
+    });
+  }
+
+  return errors;
+}
+
 // @route   PUT/PATCH /api/services/:id
 // @desc    Update service (including all dynamic parameters)
 // Shared update handler with proper validation and field clearing
@@ -272,6 +342,12 @@ const handleServiceUpdate = async (req, res) => {
           }
         });
       }
+    }
+
+    // Validate pricing field values (super_admin path — admin is already blocked above)
+    const pricingErrors = validatePricingFields(req.body);
+    if (pricingErrors.length > 0) {
+      return res.status(400).json({ error: { message: pricingErrors.join('; '), status: 400 } });
     }
 
     // Validation for subscription plans
@@ -374,6 +450,12 @@ router.post('/:id/price-change-request', authenticate, authorize('admin'), async
           status: 400
         }
       });
+    }
+
+    // Validate the proposed values before saving the request
+    const pricingErrors = validatePricingFields(req.body);
+    if (pricingErrors.length > 0) {
+      return res.status(400).json({ error: { message: pricingErrors.join('; '), status: 400 } });
     }
 
     const proposedPricing = {};
