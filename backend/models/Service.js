@@ -32,6 +32,7 @@ const serviceSchema = new mongoose.Schema({
       'fixed_sofa_cleaning',      // Sofa cleaning
       'fixed_carpet_cleaning',    // Carpet cleaning
       'fixed_balcony_cleaning',   // Balcony cleaning
+      'fixed_fridge_cleaning',    // Fridge deep cleaning
       'deep_cleaning_commercial', // Commercial/residential deep cleaning (custom quote)
       'other'                     // Custom services
     ],

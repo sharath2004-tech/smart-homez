@@ -34,11 +34,11 @@ interface UserProfile {
 }
 
 const PACKAGES = [
-  { id: "1BHK", label: "1 BHK", rooms: 1, baths: 1, basePrice: 1499, duration: "3-4 hrs", icon: "🏠" },
-  { id: "2BHK", label: "2 BHK", rooms: 2, baths: 1, basePrice: 2299, duration: "5-6 hrs", icon: "🏡" },
-  { id: "3BHK", label: "3 BHK", rooms: 3, baths: 2, basePrice: 3199, duration: "6-8 hrs", icon: "🏘️" },
-  { id: "4BHK", label: "4 BHK", rooms: 4, baths: 3, basePrice: 4299, duration: "8-10 hrs", icon: "🏰" },
-  { id: "villa", label: "Villa / Duplex", rooms: 5, baths: 4, basePrice: 5999, duration: "10-12 hrs", icon: "🏯" },
+  { id: "1BHK", label: "1 BHK", rooms: 1, baths: 1, basePrice: 1499, duration: "3-4 hrs", icon: "🏠", badge: "Most Booked", badgeColor: "bg-orange-100 text-orange-700" },
+  { id: "2BHK", label: "2 BHK", rooms: 2, baths: 1, basePrice: 2299, duration: "5-6 hrs", icon: "🏡", badge: "Popular", badgeColor: "bg-blue-100 text-blue-700" },
+  { id: "3BHK", label: "3 BHK", rooms: 3, baths: 2, basePrice: 3199, duration: "6-8 hrs", icon: "🏘️", badge: "Best for Families", badgeColor: "bg-purple-100 text-purple-700" },
+  { id: "4BHK", label: "4 BHK", rooms: 4, baths: 3, basePrice: 4299, duration: "8-10 hrs", icon: "🏰", badge: null, badgeColor: "" },
+  { id: "villa", label: "Villa / Duplex", rooms: 5, baths: 4, basePrice: 5999, duration: "10-12 hrs", icon: "🏯", badge: "Premium", badgeColor: "bg-yellow-100 text-yellow-700" },
 ];
 
 const ADD_ON_AREAS = [
@@ -261,37 +261,36 @@ const DeepCleaningServicePage = () => {
               <p className="text-xs text-muted-foreground mb-3">
                 Includes all rooms, kitchen & bathrooms in the package
               </p>
-              <div className="grid gap-3">
+            <div className="grid grid-cols-2 gap-3">
                 {PACKAGES.map((pkg) => (
                   <button
                     key={pkg.id}
                     onClick={() => setSelectedPackage(pkg)}
-                    className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
+                    className={`relative text-left p-4 rounded-2xl border-2 transition-all ${
                       selectedPackage?.id === pkg.id
                         ? "border-green-400 bg-green-50"
-                        : "border-border hover:border-green-300"
+                        : "border-border hover:border-green-300 bg-card"
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-2xl">
-                        {pkg.icon}
+                    {pkg.badge && (
+                      <span className={`absolute top-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${pkg.badgeColor}`}>
+                        {pkg.badge}
+                      </span>
+                    )}
+                    {selectedPackage?.id === pkg.id && (
+                      <div className="absolute top-2 left-2 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold text-foreground">{pkg.label}</p>
-                          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                            {pkg.duration}
-                          </span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {pkg.rooms} room{pkg.rooms > 1 ? "s" : ""} · {pkg.baths} bathroom{pkg.baths > 1 ? "s" : ""}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-foreground">₹{pkg.basePrice.toLocaleString()}</p>
-                        <p className="text-xs text-muted-foreground">flat rate</p>
-                      </div>
-                    </div>
+                    )}
+                    <div className="text-3xl mb-2 mt-1">{pkg.icon}</div>
+                    <p className="font-bold text-foreground text-base">{pkg.label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {pkg.rooms} rm · {pkg.baths} bath
+                    </p>
+                    <p className="text-xs text-muted-foreground">{pkg.duration}</p>
+                    <p className="text-base font-bold text-green-600 mt-2">₹{pkg.basePrice.toLocaleString()}</p>
                   </button>
                 ))}
               </div>
@@ -322,36 +321,28 @@ const DeepCleaningServicePage = () => {
               <p className="text-xs text-muted-foreground mb-3">
                 Add specific areas or appliances for extra-deep cleaning
               </p>
-              <div className="grid gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {ADD_ON_AREAS.map((ao) => (
                   <button
                     key={ao.id}
                     onClick={() => toggleAddOn(ao.id)}
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${
+                    className={`relative text-left p-3 rounded-xl border-2 transition-all ${
                       selectedAddOns.includes(ao.id)
                         ? "border-green-400 bg-green-50"
-                        : "border-border hover:border-green-300"
+                        : "border-border hover:border-green-300 bg-card"
                     }`}
                   >
-                    <span className="text-xl">{ao.icon}</span>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground">{ao.label}</p>
-                      <p className="text-xs text-muted-foreground">{ao.desc}</p>
-                    </div>
-                    <span className="text-sm font-semibold text-foreground">+₹{ao.price}</span>
-                    <div
-                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                        selectedAddOns.includes(ao.id)
-                          ? "border-green-500 bg-green-500"
-                          : "border-border"
-                      }`}
-                    >
-                      {selectedAddOns.includes(ao.id) && (
-                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    {selectedAddOns.includes(ao.id) && (
+                      <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+                        <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                         </svg>
-                      )}
-                    </div>
+                      </div>
+                    )}
+                    <div className="text-2xl mb-1">{ao.icon}</div>
+                    <p className="text-sm font-semibold text-foreground leading-tight">{ao.label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-tight">{ao.desc}</p>
+                    <p className="text-sm font-bold text-green-600 mt-1.5">+₹{ao.price}</p>
                   </button>
                 ))}
               </div>

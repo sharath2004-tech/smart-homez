@@ -5,6 +5,7 @@ import BookServicePage from "./BookServicePage"; // Fallback for other services
 import ACServicingPage from "./services/ACServicingPage";
 import CleaningServicePage from "./services/CleaningServicePage";
 import MaidServicePage from "./services/MaidServicePage";
+import MiniCleanServicePage from "./services/MiniCleanServicePage";
 import PlumbingServicePage from "./services/PlumbingServicePage";
 
 const ServiceRouter = () => {
@@ -42,7 +43,11 @@ const ServiceRouter = () => {
             serviceName.includes('ad hoc')) {
           setServiceType('maid');
         }
-        // Priority 2: Check for other cleaning services
+        // Priority 2: Mini / spot-clean services (individual add-on services)
+        else if (serviceTags.includes('mini-service') || serviceTags.includes('spot-clean')) {
+          setServiceType('mini');
+        }
+        // Priority 3: Check for other cleaning services
         else if (serviceName.includes('clean')) {
           setServiceType('cleaning');
         } else if (serviceName.includes('ac') || serviceName.includes('air condition')) {
@@ -87,6 +92,8 @@ const ServiceRouter = () => {
   switch (serviceType) {
     case 'maid':
       return <MaidServicePage />;
+    case 'mini':
+      return <MiniCleanServicePage />;
     case 'cleaning':
       return <CleaningServicePage />;
     case 'ac':

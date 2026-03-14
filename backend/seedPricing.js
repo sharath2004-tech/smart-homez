@@ -201,6 +201,139 @@ async function seedPricing() {
         tags: ['deep cleaning', 'commercial', 'villa', 'bungalow', 'restaurant', 'corporate', 'custom quote', 'residential'],
         requirements: ['Site inspection may be required', 'Team of workers deployed', 'All equipment provided'],
         createdBy
+      },
+
+      // ─────────────────────────────────────────
+      // 5–12. SPOT CLEAN MINI SERVICES
+      //       Individual bookable add-on services
+      // ─────────────────────────────────────────
+
+      {
+        name: 'Kitchen Deep Clean',
+        description: 'Thorough cleaning of oven, fridge exterior, countertops, sink, stove, and cabinets. Grease-free finish guaranteed.',
+        category: 'cleaning',
+        serviceType: 'deep_cleaning_kitchen',
+        price: 399,
+        duration: 90,
+        isActive: true,
+        isQuoteService: false,
+        subscriptionOptions: { enabled: false },
+        subscriptionPlans: [],
+        tags: ['mini-service', 'kitchen', 'spot-clean'],
+        requirements: ['Kitchen must be accessible', 'Remove loose items from counters'],
+        createdBy
+      },
+
+      {
+        name: 'Bathroom Deep Clean',
+        description: 'Deep scrub of tiles, toilet, basin, shower/tub, mirrors, and floor. Mould and stain removal included.',
+        category: 'cleaning',
+        serviceType: 'deep_cleaning_bathroom',
+        price: 249,
+        duration: 45,
+        isActive: true,
+        isQuoteService: false,
+        subscriptionOptions: { enabled: false },
+        subscriptionPlans: [],
+        tags: ['mini-service', 'bathroom', 'spot-clean'],
+        requirements: ['Per bathroom pricing', 'Water supply must be available'],
+        createdBy
+      },
+
+      {
+        name: 'Sofa Cleaning',
+        description: 'Steam clean and sanitise fabric or leather sofas. Removes dust, allergens, stains, and odour.',
+        category: 'cleaning',
+        serviceType: 'fixed_sofa_cleaning',
+        price: 499,
+        duration: 60,
+        isActive: true,
+        isQuoteService: false,
+        subscriptionOptions: { enabled: false },
+        subscriptionPlans: [],
+        tags: ['mini-service', 'sofa', 'spot-clean'],
+        requirements: ['Per sofa pricing (2-seater/3-seater)', 'Drying time ~2 hours after service'],
+        createdBy
+      },
+
+      {
+        name: 'Carpet Cleaning',
+        description: 'Vacuum and steam extraction for all carpet types. Removes deep-seated dirt, stains, and pet hair.',
+        category: 'cleaning',
+        serviceType: 'fixed_carpet_cleaning',
+        price: 349,
+        duration: 60,
+        isActive: true,
+        isQuoteService: false,
+        subscriptionOptions: { enabled: false },
+        subscriptionPlans: [],
+        tags: ['mini-service', 'carpet', 'spot-clean'],
+        requirements: ['Minimum 100 sq ft', 'Drying time ~3 hours after service'],
+        createdBy
+      },
+
+      {
+        name: 'Window Cleaning',
+        description: 'Inside and outside glass cleaning. Removes dust, water marks, and smudges for a streak-free shine.',
+        category: 'cleaning',
+        serviceType: 'fixed_window_cleaning',
+        price: 299,
+        duration: 45,
+        isActive: true,
+        isQuoteService: false,
+        subscriptionOptions: { enabled: false },
+        subscriptionPlans: [],
+        tags: ['mini-service', 'window', 'spot-clean'],
+        requirements: ['Per set of windows', 'Outside access may require extra time'],
+        createdBy
+      },
+
+      {
+        name: 'Fan Cleaning',
+        description: 'Dust removal and wipe-down of all ceiling fans. Includes blade, motor cover, and surrounding area.',
+        category: 'cleaning',
+        serviceType: 'fixed_fan_cleaning',
+        price: 149,
+        duration: 30,
+        isActive: true,
+        isQuoteService: false,
+        subscriptionOptions: { enabled: false },
+        subscriptionPlans: [],
+        tags: ['mini-service', 'fan', 'spot-clean'],
+        requirements: ['Per fan pricing', 'Step ladder provided by team'],
+        createdBy
+      },
+
+      {
+        name: 'Balcony Cleaning',
+        description: 'Full sweep and scrub of balcony floor, grill/railing, ceiling corners, and drain clearing.',
+        category: 'cleaning',
+        serviceType: 'fixed_balcony_cleaning',
+        price: 199,
+        duration: 30,
+        isActive: true,
+        isQuoteService: false,
+        subscriptionOptions: { enabled: false },
+        subscriptionPlans: [],
+        tags: ['mini-service', 'balcony', 'spot-clean'],
+        requirements: ['Per balcony pricing', 'Move planters/furniture before service'],
+        createdBy
+      },
+
+      {
+        name: 'Fridge Deep Clean',
+        description: 'Interior deep clean including shelves, drawers, door seals, and coil dust removal for energy efficiency.',
+        category: 'cleaning',
+        serviceType: 'fixed_fridge_cleaning',
+        price: 249,
+        duration: 45,
+        isActive: true,
+        isQuoteService: false,
+        subscriptionOptions: { enabled: false },
+        subscriptionPlans: [],
+        tags: ['mini-service', 'fridge', 'spot-clean'],
+        requirements: ['Empty fridge before service', 'Fridge turned off 1 hr prior'],
+        createdBy
       }
 
     ];

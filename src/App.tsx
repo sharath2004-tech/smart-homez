@@ -20,7 +20,10 @@ import WorkerSignUp from "./pages/auth/WorkerSignUp";
 // Customer pages
 import BookingsPage from "./pages/customer/BookingsPage";
 import CustomerDashboard from "./pages/customer/CustomerDashboard";
+import DeepCleaningPage from "./pages/customer/DeepCleaningPage";
+import DeepCleaningQuotePage from "./pages/customer/DeepCleaningQuotePage";
 import HelpPage from "./pages/customer/HelpPage";
+import MyQuotesPage from "./pages/customer/MyQuotesPage";
 import MySubscriptionsPage from "./pages/customer/MySubscriptionsPage";
 import NotificationSettingsPage from "./pages/customer/NotificationSettingsPage";
 import NotificationsPage from "./pages/customer/NotificationsPage";
@@ -31,10 +34,8 @@ import ServiceAreaDemo from "./pages/customer/ServiceAreaDemo";
 import ServiceRouter from "./pages/customer/ServiceRouter";
 import DeepCleaningServicePage from "./pages/customer/services/DeepCleaningServicePage";
 import InstaServicePage from "./pages/customer/services/InstaServicePage";
+import SpotCleanPage from "./pages/customer/services/SpotCleanPage";
 import SubscriptionServicePage from "./pages/customer/services/SubscriptionServicePage";
-import DeepCleaningQuotePage from "./pages/customer/DeepCleaningQuotePage";
-import DeepCleaningPage from "./pages/customer/DeepCleaningPage";
-import MyQuotesPage from "./pages/customer/MyQuotesPage";
 import ServicesPage from "./pages/customer/ServicesPage";
 import SubscriptionBookingPage from "./pages/customer/SubscriptionBookingPage";
 
@@ -49,10 +50,12 @@ import WorkerTasks from "./pages/worker/WorkerTasks";
 // Admin pages
 import AdminBookings from "./pages/admin/AdminBookings";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminDeepCleaningConfig from "./pages/admin/AdminDeepCleaningConfig";
 import AdminHeatmap from "./pages/admin/AdminHeatmap";
 import AdminHelpMessages from "./pages/admin/AdminHelpMessages";
 import AdminLeaves from "./pages/admin/AdminLeaves";
 import AdminLocations from "./pages/admin/AdminLocations";
+import AdminQuotes from "./pages/admin/AdminQuotes";
 import AdminSalarySettlements from "./pages/admin/AdminSalarySettlements";
 import AdminServiceAreas from "./pages/admin/AdminServiceAreas";
 import AdminServices from "./pages/admin/AdminServices";
@@ -62,8 +65,6 @@ import AdminWorkerRequests from "./pages/admin/AdminWorkerRequests";
 import AdminWorkers from "./pages/admin/AdminWorkers";
 import AdminWorkerSchedule from "./pages/admin/AdminWorkerSchedule";
 import AdminWorkforce from "./pages/admin/AdminWorkforce";
-import AdminQuotes from "./pages/admin/AdminQuotes";
-import AdminDeepCleaningConfig from "./pages/admin/AdminDeepCleaningConfig";
 import SuperAdminDashboard from "./pages/admin/SuperAdminDashboard";
 
 const queryClient = new QueryClient();
@@ -94,6 +95,7 @@ const App = () => (
           <Route path="/customer/services/insta" element={<ProtectedRoute allowedRoles={['customer']}><InstaServicePage /></ProtectedRoute>} />
           <Route path="/customer/services/subscription" element={<ProtectedRoute allowedRoles={['customer']}><SubscriptionServicePage /></ProtectedRoute>} />
           <Route path="/customer/services/deep-cleaning" element={<ProtectedRoute allowedRoles={['customer']}><DeepCleaningServicePage /></ProtectedRoute>} />
+          <Route path="/customer/services/spot-clean" element={<ProtectedRoute allowedRoles={['customer']}><SpotCleanPage /></ProtectedRoute>} />
           <Route path="/customer/deep-cleaning" element={<ProtectedRoute allowedRoles={['customer']}><DeepCleaningPage /></ProtectedRoute>} />
           <Route path="/customer/book/:id" element={<ProtectedRoute allowedRoles={['customer']}><ServiceRouter /></ProtectedRoute>} />
           <Route path="/customer/subscribe/:id" element={<ProtectedRoute allowedRoles={['customer']}><SubscriptionBookingPage /></ProtectedRoute>} />

@@ -146,6 +146,9 @@ const ServicesPage = () => {
     if (name.toLowerCase().includes('sofa')) return '🛋️';
     if (name.toLowerCase().includes('carpet')) return '🪣';
     if (name.toLowerCase().includes('window')) return '🪟';
+    if (name.toLowerCase().includes('fan')) return '🌀';
+    if (name.toLowerCase().includes('balcony')) return '🌿';
+    if (name.toLowerCase().includes('fridge')) return '❄️';
     if (category === 'cleaning') return '🧹';
     if (category === 'health') return '🏥';
     if (category === 'maintenance') return '🔧';
@@ -232,6 +235,27 @@ const ServicesPage = () => {
                 </button>
               ))}
             </div>
+
+            {/* Spot Clean Mini Services Banner */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.40 }}
+            >
+              <Link
+                to="/customer/services/spot-clean"
+                className="flex items-center gap-4 p-4 rounded-2xl border-2 border-cyan-300 bg-cyan-50 hover:bg-cyan-100 hover:border-cyan-400 transition-all group"
+              >
+                <div className="w-12 h-12 bg-cyan-200 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform text-2xl">
+                  🧹
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-cyan-900 text-sm leading-tight">Spot Cleaning — Mini Services</p>
+                  <p className="text-xs text-cyan-700 mt-0.5">Kitchen · Bathroom · Sofa · Fan · Fridge · Balcony &amp; more</p>
+                </div>
+                <span className="shrink-0 text-xs font-semibold bg-cyan-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">From ₹149 →</span>
+              </Link>
+            </motion.div>
 
             {/* Deep Cleaning Commercial Quote Banner */}
             <motion.div
