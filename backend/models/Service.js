@@ -43,6 +43,12 @@ const serviceSchema = new mongoose.Schema({
     required: [true, 'Price is required'],
     min: 0
   },
+  // MRP / rack rate shown as strikethrough to customers (e.g. insta hourly MRP)
+  originalPrice: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   // Pricing plans for recurring bookings (legacy - kept for backward compatibility)
   pricingPlans: {
     oneTime: {

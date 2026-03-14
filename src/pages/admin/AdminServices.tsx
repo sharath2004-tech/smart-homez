@@ -411,6 +411,7 @@ const AdminServices = () => {
       durationOptions: service.durationOptions || [],
       subscriptionOptions: service.subscriptionOptions || { allowedFrequencies: ['daily', 'alt-days', '3-days', 'weekly'], requiresSameWorker: true, autoRenewal: true },
       sizeParameters: service.sizeParameters || { enabled: false, sizeType: 'quantity', options: [] },
+      originalPrice: (service as any).originalPrice || 0,
     });
     setSelectedServiceType(service.serviceType || null);
     setEditingId(service._id!);
@@ -448,7 +449,8 @@ const AdminServices = () => {
       isQuoteService: false,
       durationOptions: [],
       subscriptionOptions: { allowedFrequencies: ['daily', 'alt-days', '3-days', 'weekly'], requiresSameWorker: true, autoRenewal: true },
-      sizeParameters: { enabled: false, sizeType: 'quantity', options: [] }
+      sizeParameters: { enabled: false, sizeType: 'quantity', options: [] },
+      originalPrice: 0,
     });
   };
 
@@ -965,6 +967,31 @@ const AdminServices = () => {
                     This is the base price used for calculations. Changing it will auto-recalculate all plan prices below.
                   </p>
                 </div>
+
+                {/* MRP / Original Price — for Insta service only */}
+                {selectedServiceType === 'instant_hourly' && (
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      MRP / Original Price (₹)
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">shown as strikethrough</span>
+                    </label>
+                    <input
+                      type="number"
+                      value={(formData as any).originalPrice || ''}
+                      onChange={(e) => setFormData({ ...formData, originalPrice: Number(e.target.value) } as any)}
+                      className="input-clean"
+                      min="0"
+                      step="10"
+                      placeholder="e.g. 190"
+                    />
+                    {(formData as any).originalPrice > formData.price && (
+                      <p className="text-xs text-green-600 mt-1 font-medium">
+                        {Math.round((1 - formData.price / (formData as any).originalPrice) * 100)}% discount shown to customers
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-1">Leave 0 to hide the strikethrough price.</p>
+                  </div>
+                )}
 
                 {/* Subscription Plans Section — hidden for monthly_subscription (uses Duration Tiers instead) */}
                 {selectedServiceType === 'monthly_subscription' ? (

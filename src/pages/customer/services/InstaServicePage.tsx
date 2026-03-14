@@ -47,6 +47,7 @@ const TIME_SLOTS = [
 ];
 
 const DEFAULT_PRICE = 150;
+const DEFAULT_SUPPLIES_PRICE = 50;
 
 const getNearestSlot = () => {
   const now = new Date();
@@ -74,6 +75,8 @@ const InstaServicePage = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [pricePerHour, setPricePerHour] = useState(DEFAULT_PRICE);
+  const [mrpPerHour, setMrpPerHour] = useState(0);          // from service.originalPrice
+  const [suppliesAddonPrice, setSuppliesAddonPrice] = useState(DEFAULT_SUPPLIES_PRICE);
   const [serviceId, setServiceId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
@@ -93,9 +96,11 @@ const InstaServicePage = () => {
   const [busyWorkersBySlot, setBusyWorkersBySlot] = useState<Record<string, number>>({});
   const [totalWorkers, setTotalWorkers] = useState(0);
 
-  const totalAmount = hours * pricePerHour + (bringSupplies ? 50 : 0);
-  const mrpPerHour = Math.round(pricePerHour / 0.8);
-  const mrpTotal = hours * mrpPerHour + (bringSupplies ? 50 : 0);
+  const totalAmount = hours * pricePerHour + (bringSupplies ? suppliesAddonPrice : 0);
+  const mrpTotal = hours * mrpPerHour + (bringSupplies ? suppliesAddonPrice : 0);
+  const discountPct = mrpPerHour > pricePerHour
+    ? Math.round((1 - pricePerHour / mrpPerHour) * 100)
+    : 0;
 
   const availableSlots = (() => {
     const today = new Date().toISOString().split("T")[0];
@@ -121,8 +126,14 @@ const InstaServicePage = () => {
         setProfile(profileData.user || profileData);
         const list = servicesData?.services || [];
         if (list.length > 0) {
-          setPricePerHour(list[0].price || DEFAULT_PRICE);
-          setServiceId(list[0]._id);
+          const svc = list[0];
+          setPricePerHour(svc.price || DEFAULT_PRICE);
+          setServiceId(svc._id);
+          // MRP from DB — falls back to computing 25% above if not set
+          setMrpPerHour(svc.originalPrice > 0 ? svc.originalPrice : Math.round((svc.price || DEFAULT_PRICE) / 0.8));
+          // Supplies add-on from first active addon, fallback to default
+          const suppliesAddon = svc.addons?.find((a: any) => a.isActive !== false);
+          if (suppliesAddon?.price > 0) setSuppliesAddonPrice(suppliesAddon.price);
         } else {
           setNoServiceWarning(true);
         }
@@ -240,7 +251,10 @@ const InstaServicePage = () => {
             <span>⚡</span> Insta Maid Service
           </h1>
           <p className="text-xs text-muted-foreground">
-            On-demand hourly cleaning · <span className="line-through text-muted-foreground/60">₹{mrpPerHour}/hr</span> <span className="text-green-600 font-semibold">₹{pricePerHour}/hr</span> <span className="text-xs font-semibold bg-green-100 text-green-700 px-1 py-0.5 rounded-full ml-0.5">20% off</span>
+            On-demand hourly cleaning ·{" "}
+            {mrpPerHour > pricePerHour && <span className="line-through text-muted-foreground/60">₹{mrpPerHour}/hr </span>}
+            <span className="text-green-600 font-semibold">₹{pricePerHour}/hr</span>
+            {discountPct > 0 && <span className="text-xs font-semibold bg-green-100 text-green-700 px-1 py-0.5 rounded-full ml-1">{discountPct}% off</span>}
           </p>
         </div>
 
@@ -515,7 +529,7 @@ const InstaServicePage = () => {
                 <ShoppingBag className="w-5 h-5 text-primary" />
                 <div>
                   <p className="font-medium text-foreground text-sm">Bring Supplies</p>
-                  <p className="text-xs text-muted-foreground">Cleaning supplies included (+₹50)</p>
+                  <p className="text-xs text-muted-foreground">Cleaning supplies included (+₹{suppliesAddonPrice})</p>
                 </div>
               </div>
               <button
@@ -648,7 +662,7 @@ const InstaServicePage = () => {
               {bringSupplies && (
                 <div className="flex justify-between text-sm text-muted-foreground">
                   <span>Cleaning supplies</span>
-                  <span>₹50</span>
+                  <span>₹{suppliesAddonPrice}</span>
                 </div>
               )}
               <div className="flex justify-between font-bold text-foreground border-t pt-2 text-base">

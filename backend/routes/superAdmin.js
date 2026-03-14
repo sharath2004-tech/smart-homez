@@ -963,6 +963,7 @@ router.post('/price-change-requests/:id/approve', async (req, res) => {
     const proposed = request.proposedPricing;
     const updateData = {};
     if (proposed.price !== undefined) updateData.price = proposed.price;
+    if (proposed.originalPrice !== undefined) updateData.originalPrice = proposed.originalPrice;
     if (proposed.pricingPlans !== undefined) updateData.pricingPlans = proposed.pricingPlans;
     if (proposed.subscriptionPlans !== undefined) updateData.subscriptionPlans = proposed.subscriptionPlans;
     if (proposed.durationOptions !== undefined) updateData.durationOptions = proposed.durationOptions;

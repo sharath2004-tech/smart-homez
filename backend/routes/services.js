@@ -255,6 +255,12 @@ function validatePricingFields(body) {
     }
   }
 
+  if ('originalPrice' in body) {
+    if (typeof body.originalPrice !== 'number' || body.originalPrice < 0) {
+      errors.push('originalPrice must be a non-negative number');
+    }
+  }
+
   if ('pricingPlans' in body && body.pricingPlans) {
     for (const key of ['oneTime', 'daily', 'weekly', 'monthly']) {
       const val = body.pricingPlans[key];
@@ -337,7 +343,7 @@ const handleServiceUpdate = async (req, res) => {
     } = req.body;
 
     // Admins cannot directly edit pricing — they must submit a price change request
-    const PRICING_FIELDS = ['price', 'pricingPlans', 'subscriptionPlans', 'durationOptions', 'pricingTiers'];
+    const PRICING_FIELDS = ['price', 'originalPrice', 'pricingPlans', 'subscriptionPlans', 'durationOptions', 'pricingTiers'];
     if (req.user.role === 'admin') {
       const attempted = PRICING_FIELDS.filter(f => f in req.body);
       if (attempted.length > 0) {
@@ -374,6 +380,7 @@ const handleServiceUpdate = async (req, res) => {
     if ('category' in req.body) updateData.category = category;
     if ('serviceType' in req.body) updateData.serviceType = serviceType;
     if ('price' in req.body) updateData.price = price;
+    if ('originalPrice' in req.body) updateData.originalPrice = req.body.originalPrice;
     if ('pricingPlans' in req.body) updateData.pricingPlans = pricingPlans;
     if ('subscriptionPlans' in req.body) updateData.subscriptionPlans = subscriptionPlans;
     if ('duration' in req.body) updateData.duration = duration;
@@ -439,20 +446,20 @@ router.post('/:id/price-change-request', authenticate, authorize('admin'), async
     const PriceChangeRequest = (await import('../models/PriceChangeRequest.js')).default;
 
     const service = await Service.findById(req.params.id)
-      .select('price pricingPlans subscriptionPlans durationOptions pricingTiers')
+      .select('price originalPrice pricingPlans subscriptionPlans durationOptions pricingTiers')
       .lean();
     if (!service) {
       return res.status(404).json({ error: { message: 'Service not found', status: 404 } });
     }
 
-    const { price, pricingPlans, subscriptionPlans, durationOptions, pricingTiers, reason } = req.body;
+    const { price, originalPrice, pricingPlans, subscriptionPlans, durationOptions, pricingTiers, reason } = req.body;
 
-    const hasPricingField = [price, pricingPlans, subscriptionPlans, durationOptions, pricingTiers]
+    const hasPricingField = [price, originalPrice, pricingPlans, subscriptionPlans, durationOptions, pricingTiers]
       .some(v => v !== undefined);
     if (!hasPricingField) {
       return res.status(400).json({
         error: {
-          message: 'At least one pricing field must be provided: price, pricingPlans, subscriptionPlans, durationOptions, pricingTiers',
+          message: 'At least one pricing field must be provided: price, originalPrice, pricingPlans, subscriptionPlans, durationOptions, pricingTiers',
           status: 400
         }
       });
@@ -466,6 +473,7 @@ router.post('/:id/price-change-request', authenticate, authorize('admin'), async
 
     const proposedPricing = {};
     if (price !== undefined) proposedPricing.price = price;
+    if (originalPrice !== undefined) proposedPricing.originalPrice = originalPrice;
     if (pricingPlans !== undefined) proposedPricing.pricingPlans = pricingPlans;
     if (subscriptionPlans !== undefined) proposedPricing.subscriptionPlans = subscriptionPlans;
     if (durationOptions !== undefined) proposedPricing.durationOptions = durationOptions;
@@ -477,6 +485,7 @@ router.post('/:id/price-change-request', authenticate, authorize('admin'), async
       reason: reason || '',
       currentPricing: {
         price: service.price,
+        originalPrice: service.originalPrice,
         pricingPlans: service.pricingPlans,
         subscriptionPlans: service.subscriptionPlans,
         durationOptions: service.durationOptions,
