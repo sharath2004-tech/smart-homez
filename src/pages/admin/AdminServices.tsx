@@ -32,6 +32,7 @@ interface Service {
   }>;
   duration: number;
   isActive: boolean;
+  isQuoteService?: boolean;
   additionalServiceOptions?: Array<{
     value: string;
     label: string;
@@ -103,6 +104,7 @@ const SERVICE_TYPE_CARDS = [
       category: 'cleaning',
       price: 2999,
       duration: 240,
+      isQuoteService: true,
     }
   },
   {
@@ -203,6 +205,7 @@ const AdminServices = () => {
     ],
     duration: 60,
     isActive: true,
+    isQuoteService: false,
     additionalServiceOptions: [],
     durationOptions: [],
     sizeParameters: { enabled: false, sizeType: 'quantity', options: [] }
@@ -289,7 +292,8 @@ const AdminServices = () => {
         monthly: Math.round(basePrice * 0.65 * 30)
       },
       // For subscription type, keep existing default plans; otherwise clear
-      subscriptionPlans: typeCard.id === 'monthly_subscription' ? prev.subscriptionPlans : []
+      subscriptionPlans: typeCard.id === 'monthly_subscription' ? prev.subscriptionPlans : [],
+      isQuoteService: (p as typeof p & { isQuoteService?: boolean }).isQuoteService ?? false,
     }));
     setShowTypeSelector(false);
     setShowForm(true);
@@ -356,6 +360,7 @@ const AdminServices = () => {
       },
       duration: service.duration,
       isActive: service.isActive,
+      isQuoteService: service.isQuoteService ?? false,
       subscriptionPlans: service.subscriptionPlans,
       additionalServiceOptions: service.additionalServiceOptions,
       durationOptions: service.durationOptions || [],
@@ -394,6 +399,7 @@ const AdminServices = () => {
       },
       duration: 60,
       isActive: true,
+      isQuoteService: false,
       durationOptions: [],
       sizeParameters: { enabled: false, sizeType: 'quantity', options: [] }
     });
@@ -600,6 +606,11 @@ const AdminServices = () => {
                       <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100 capitalize">
                         {service.category}
                       </span>
+                      {service.isQuoteService && (
+                        <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800 font-semibold">
+                          ✨ Deep Cleaning Cart
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-muted-foreground mb-4">{service.description}</p>
                     
@@ -1382,6 +1393,22 @@ const AdminServices = () => {
                   <label htmlFor="isActive" className="text-sm font-medium text-foreground">
                     Service is active
                   </label>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="isQuoteService"
+                    checked={!!formData.isQuoteService}
+                    onChange={(e) => setFormData({ ...formData, isQuoteService: e.target.checked })}
+                    className="w-4 h-4 accent-primary"
+                  />
+                  <div>
+                    <label htmlFor="isQuoteService" className="text-sm font-medium text-foreground cursor-pointer">
+                      Deep Cleaning Cart Service ✨
+                    </label>
+                    <p className="text-xs text-muted-foreground">Customers will be taken to the cart-based deep cleaning booking instead of a fixed price.</p>
+                  </div>
                 </div>
 
                 <div className="flex gap-3 pt-4">

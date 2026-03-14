@@ -70,6 +70,10 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
   }
 
   if (!allowedRoles.includes(user.role)) {
+    // Super admin can preview any section of the app
+    if (user.role === 'super_admin') {
+      return <>{children}</>;
+    }
     const dashboardMap: Record<string, string> = {
       customer: '/customer/dashboard',
       worker: '/worker/dashboard',

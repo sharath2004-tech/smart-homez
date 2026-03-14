@@ -11,12 +11,18 @@ interface AppLayoutProps {
   userName?: string;
 }
 
-const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLayoutProps) => {
+const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // Resolve display name: prop > localStorage cached user > "User"
+  const resolvedName = userName ?? (() => {
+    try { return (JSON.parse(localStorage.getItem('user') || '{}') as { name?: string })?.name; }
+    catch { return undefined; }
+  })() ?? "User";
 
   useEffect(() => {
     api.get('/notifications')
@@ -116,7 +122,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
   ];
 
   const navItems = userType === "admin" ? adminNav : userType === "super_admin" ? superAdminNav : userType === "worker" ? workerNav : customerNav;
-  const initials = userName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+  const initials = resolvedName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
   const dashboardPath = userType === "admin" ? "/admin/dashboard" : userType === "super_admin" ? "/super-admin/dashboard" : userType === "worker" ? "/worker/dashboard" : "/customer/dashboard";
 
   return (
@@ -140,7 +146,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
               {initials}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-foreground truncate">{userName}</p>
+              <p className="text-sm font-semibold text-foreground truncate">{resolvedName}</p>
               <p className="text-xs text-muted-foreground capitalize">{userType === 'super_admin' ? 'Super Admin' : t(`nav.${userType}`)}</p>
             </div>
           </div>
@@ -180,6 +186,18 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
             );
           })}
         </nav>
+
+        {/* Super admin role preview */}
+        {userType === 'super_admin' && (
+          <div className="px-4 py-3 border-t border-sidebar-border">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">View As</p>
+            <div className="flex gap-1.5">
+              <Link to="/customer/dashboard" className="flex-1 text-center text-xs py-1.5 rounded-lg bg-sidebar-accent hover:bg-primary/10 hover:text-primary transition-colors font-medium text-sidebar-foreground">Customer</Link>
+              <Link to="/admin/dashboard" className="flex-1 text-center text-xs py-1.5 rounded-lg bg-sidebar-accent hover:bg-primary/10 hover:text-primary transition-colors font-medium text-sidebar-foreground">Admin</Link>
+              <Link to="/worker/dashboard" className="flex-1 text-center text-xs py-1.5 rounded-lg bg-sidebar-accent hover:bg-primary/10 hover:text-primary transition-colors font-medium text-sidebar-foreground">Worker</Link>
+            </div>
+          </div>
+        )}
 
         {/* Bottom actions */}
         <div className="p-4 border-t border-sidebar-border space-y-1 shrink-0">
@@ -285,7 +303,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
                   {initials}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-foreground truncate">{userName}</p>
+                  <p className="text-sm font-semibold text-foreground truncate">{resolvedName}</p>
                   <p className="text-xs text-muted-foreground capitalize">{userType === 'super_admin' ? 'Super Admin' : t(`nav.${userType}`)}</p>
                 </div>
               </div>
@@ -325,6 +343,17 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
                 );
               })}
             </nav>
+            {/* Super admin role preview - mobile */}
+            {userType === 'super_admin' && (
+              <div className="px-4 py-3 border-t border-sidebar-border">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">View As</p>
+                <div className="flex gap-1.5">
+                  <Link to="/customer/dashboard" onClick={() => setMobileOpen(false)} className="flex-1 text-center text-xs py-1.5 rounded-lg bg-sidebar-accent hover:bg-primary/10 hover:text-primary transition-colors font-medium text-sidebar-foreground">Customer</Link>
+                  <Link to="/admin/dashboard" onClick={() => setMobileOpen(false)} className="flex-1 text-center text-xs py-1.5 rounded-lg bg-sidebar-accent hover:bg-primary/10 hover:text-primary transition-colors font-medium text-sidebar-foreground">Admin</Link>
+                  <Link to="/worker/dashboard" onClick={() => setMobileOpen(false)} className="flex-1 text-center text-xs py-1.5 rounded-lg bg-sidebar-accent hover:bg-primary/10 hover:text-primary transition-colors font-medium text-sidebar-foreground">Worker</Link>
+                </div>
+              </div>
+            )}
             {/* Drawer bottom */}
             <div className="p-4 border-t border-sidebar-border space-y-1 shrink-0">
               <LanguageSelector variant="full" />
@@ -342,6 +371,16 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
 
       {/* Main content */}
       <main className="flex-1 md:ml-64 pt-16 md:pt-0">
+        {/* Super admin preview mode banner */}
+        {userType !== 'super_admin' && (() => {
+          try { return (JSON.parse(localStorage.getItem('user') || '{}') as { role?: string })?.role === 'super_admin'; }
+          catch { return false; }
+        })() && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center justify-between gap-3">
+            <p className="text-xs font-semibold text-amber-800">👁️ Previewing as {userType} — you are still logged in as Super Admin</p>
+            <Link to="/super-admin/dashboard" className="text-xs font-bold text-amber-900 underline hover:no-underline shrink-0">← Return to Super Admin</Link>
+          </div>
+        )}
         {/* Desktop back button — shown on all non-dashboard pages */}
         {location.pathname !== dashboardPath && (
           <div className="hidden md:flex items-center px-6 md:px-8 pt-5 pb-0">
