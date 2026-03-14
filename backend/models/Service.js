@@ -219,7 +219,7 @@ const serviceSchema = new mongoose.Schema({
     },
     allowedFrequencies: [{
       type: String,
-      enum: ['daily', 'weekly', 'biweekly', 'custom']
+      enum: ['daily', 'alt-days', '3-days', 'weekly', 'biweekly', 'monthly', 'custom']
     }],
     discountPercentage: {
       type: Number,
