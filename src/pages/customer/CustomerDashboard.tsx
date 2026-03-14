@@ -131,36 +131,25 @@ const CustomerDashboard = () => {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
+      transition: { staggerChildren: 0.08 }
     }
   };
 
   const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
+    hidden: { opacity: 0, y: 14 },
     visible: {
-      y: 0,
       opacity: 1,
-      transition: {
-        type: "spring",
-        stiffness: 100
-      }
+      y: 0,
+      transition: { duration: 0.35, ease: "easeOut" }
     }
   };
 
   const cardHoverVariants = {
     hover: {
-      scale: 1.02,
-      transition: {
-        type: "spring",
-        stiffness: 400,
-        damping: 10
-      }
+      scale: 1.015,
+      transition: { duration: 0.2, ease: "easeOut" }
     },
-    tap: {
-      scale: 0.98
-    }
+    tap: { scale: 0.97 }
   };
 
   return (
@@ -174,37 +163,37 @@ const CustomerDashboard = () => {
         {/* Header */}
         <motion.div variants={itemVariants} className="flex items-start justify-between">
           <div>
-            <motion.p 
+            <motion.p
               className="text-muted-foreground text-sm mb-1"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
             >
               {t('customer.dashboard.goodMorning')}
             </motion.p>
             <Link to="/customer/profile">
-              <motion.h1 
+              <motion.h1
                 className="text-2xl font-bold font-heading text-foreground hover:text-primary transition-colors cursor-pointer"
-                initial={{ x: -20, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ delay: 0.3, type: "spring" }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, ease: "easeOut", delay: 0.1 }}
               >
                 {profile?.name || "Loading..."}
               </motion.h1>
             </Link>
           </div>
-          <motion.button 
+          <motion.button
             className="relative p-2.5 bg-card rounded-xl border border-border"
-            whileHover={{ scale: 1.05, rotate: 15 }}
+            whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => navigate('/customer/notifications')}
           >
             <Bell className="w-5 h-5 text-muted-foreground" />
             {upcomingBookings.length > 0 && (
-              <motion.span 
+              <motion.span
                 className="absolute top-1.5 right-1.5 w-2 h-2 bg-destructive rounded-full"
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ repeat: Infinity, duration: 2 }}
+                animate={{ opacity: [1, 0.4, 1] }}
+                transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
               />
             )}
           </motion.button>
@@ -291,10 +280,10 @@ const CustomerDashboard = () => {
                   to={s.path}
                   className="card-elevated-hover p-4 text-center group block flex flex-col items-center justify-center min-h-[130px]"
                 >
-                  <motion.div 
+                  <motion.div
                     className="text-3xl mb-2"
-                    whileHover={{ scale: 1.2, rotate: 10 }}
-                    transition={{ type: "spring", stiffness: 300 }}
+                    whileHover={{ scale: 1.15 }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
                   >
                     {s.icon}
                   </motion.div>
@@ -329,26 +318,20 @@ const CustomerDashboard = () => {
               <p className="text-sm">{t('dashboard.loadingBookings')}</p>
             </motion.div>
           ) : upcomingBookings.length === 0 ? (
-            <motion.div 
+            <motion.div
               className="card-elevated p-8 text-center"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: "spring", stiffness: 200 }}
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
             >
-              <motion.div 
-                className="text-4xl mb-2"
-                animate={{ y: [0, -10, 0] }}
-                transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-              >
-                📭
-              </motion.div>
+              <div className="text-4xl mb-2">📭</div>
               <p className="text-sm font-medium text-foreground">{t('dashboard.noUpcomingBookings')}</p>
               <p className="text-xs text-muted-foreground mt-1">{t('dashboard.bookService')}</p>
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <div>
                 <Link to="/customer/services" className="btn-brand mt-4 text-sm inline-flex items-center gap-2">
                   {t('dashboard.browseServices')} <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
-              </motion.div>
+              </div>
             </motion.div>
           ) : (
             <motion.div 
@@ -357,20 +340,16 @@ const CustomerDashboard = () => {
             >
               {upcomingBookings.map((b, index) => (
                 <Link key={b._id} to={`/customer/bookings`} state={{ openBookingId: b._id }}>
-                <motion.div 
+                <motion.div
                   className="card-elevated p-4 flex items-center gap-4 cursor-pointer"
                   variants={itemVariants}
                   custom={index}
-                  whileHover={{ scale: 1.02, x: 5 }}
-                  transition={{ type: "spring", stiffness: 300 }}
+                  whileHover={{ scale: 1.015, y: -2 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
                 >
-                  <motion.div 
-                    className="w-12 h-12 bg-accent rounded-xl flex items-center justify-center text-xl shrink-0"
-                    whileHover={{ rotate: 360 }}
-                    transition={{ duration: 0.6 }}
-                  >
+                  <div className="w-12 h-12 bg-accent rounded-xl flex items-center justify-center text-xl shrink-0">
                     {(b.service?.name ?? '').toLowerCase().includes("deep") || b.bookingType === 'deep-cleaning-cart' ? "✨" : "🧹"}
-                  </motion.div>
+                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-foreground text-sm">{b.service?.name ?? (b.bookingType === 'deep-cleaning-cart' ? '✨ Deep Cleaning' : 'Booking')}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
@@ -387,11 +366,11 @@ const CustomerDashboard = () => {
                       )}
                     </div>
                   </div>
-                  <motion.span 
+                  <motion.span
                     className="shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold badge-primary"
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.2 + index * 0.1 }}
+                    initial={{ opacity: 0, scale: 0.85 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.25, ease: "easeOut", delay: 0.15 + index * 0.05 }}
                   >
                     {b.status === "confirmed" ? t('customer.dashboard.confirmed') : t('customer.dashboard.pending')}
                   </motion.span>
@@ -409,13 +388,9 @@ const CustomerDashboard = () => {
               to="/customer/profile"
               className="card-elevated-hover p-4 flex items-center gap-4 group block"
             >
-              <motion.div
-                className="w-12 h-12 bg-secondary rounded-xl flex items-center justify-center shrink-0"
-                whileHover={{ rotate: 180 }}
-                transition={{ duration: 0.3 }}
-              >
+              <div className="w-12 h-12 bg-secondary rounded-xl flex items-center justify-center shrink-0">
                 <Settings className="w-6 h-6 text-foreground" />
-              </motion.div>
+              </div>
               <div className="flex-1">
                 <p className="text-sm font-semibold text-foreground">{t('customer.dashboard.accountSettings')}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{t('customer.dashboard.manageProfile')}</p>

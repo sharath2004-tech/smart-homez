@@ -21,6 +21,10 @@ const bookingSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  confirmedAt: {
+    type: Date,
+    default: null
+  },
   backupWorkers: [{
     worker: {
       type: mongoose.Schema.Types.ObjectId,

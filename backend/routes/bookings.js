@@ -10,9 +10,9 @@ import Settings from '../models/Settings.js';
 import User from '../models/User.js';
 import WorkerEarnings from '../models/WorkerEarnings.js';
 import {
-    activateBackupWorker,
-    assignWorkersWithBackup,
-    checkBackupActivationNeeded
+  activateBackupWorker,
+  assignWorkersWithBackup,
+  checkBackupActivationNeeded
 } from '../utils/advancedWorkerAssignment.js';
 import { processQueuedBookings, updateBookingStatuses } from '../utils/bookingStatusUpdater.js';
 import notificationService from '../utils/notificationService.js';
@@ -20,9 +20,9 @@ import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
 import { checkIfOnTime, updateWorkerStats } from '../utils/updateWorkerStats.js';
 import { assignWorkerToBooking, reassignWorker } from '../utils/workerAssignment.js';
 import {
-    getWorkerAvailabilityForecast,
-    getWorkerCapacityStatus,
-    monitorWorkerPool
+  getWorkerAvailabilityForecast,
+  getWorkerCapacityStatus,
+  monitorWorkerPool
 } from '../utils/workerPoolManager.js';
 
 const router = express.Router();
@@ -1094,7 +1094,7 @@ router.delete('/:id', authenticate, async (req, res) => {
       'BOOKING_CANCELLED',
       {
         bookingId: booking._id,
-        serviceName: booking.service.name,
+        serviceName: booking.service?.name ?? 'Deep Cleaning',
         refundAmount: refundAmount > 0 ? refundAmount : null,
         reason: booking.cancellationReason
       }
@@ -1119,7 +1119,7 @@ router.delete('/:id', authenticate, async (req, res) => {
         userId: booking.worker,
         type: 'cancellation',
         title: '❌ Booking Cancelled',
-        message: `Customer cancelled booking for ${booking.service.name}. ${refundReason}`,
+        message: `Customer cancelled booking for ${booking.service?.name ?? 'Deep Cleaning'}. ${refundReason}`,
         priority: 'medium',
         data: {
           bookingId: booking._id
@@ -1357,7 +1357,7 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
         'SCHEDULE_CHANGE',
         {
           bookingId: booking._id,
-          serviceName: booking.service.name,
+          serviceName: booking.service?.name ?? 'Deep Cleaning',
           newDate: formatDate(newScheduledDate),
           newTime: formatTime(newScheduledDate)
         }
@@ -1382,7 +1382,7 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
             userId: oldWorker._id,
             type: 'schedule-change',
             title: '📅 Booking Rescheduled',
-            message: `Customer rescheduled booking for ${booking.service.name}. Booking reassigned to another worker.`,
+            message: `Customer rescheduled booking for ${booking.service?.name ?? 'Deep Cleaning'}. Booking reassigned to another worker.`,
             priority: 'medium',
             data: { bookingId: booking._id }
           });
@@ -1395,7 +1395,7 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
           {
             bookingId: booking._id,
             workerName: newWorkerInfo.name,
-            serviceName: booking.service.name,
+            serviceName: booking.service?.name ?? 'Deep Cleaning',
             date: formatDate(newScheduledDate),
             time: formatTime(newScheduledDate)
           }
@@ -1406,7 +1406,7 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
           userId: oldWorker._id,
           type: 'schedule-change',
           title: '📅 Booking Rescheduled',
-          message: `Customer rescheduled booking for ${booking.service.name} to ${formatDate(newScheduledDate)} at ${formatTime(newScheduledDate)}.`,
+          message: `Customer rescheduled booking for ${booking.service?.name ?? 'Deep Cleaning'} to ${formatDate(newScheduledDate)} at ${formatTime(newScheduledDate)}.`,
           priority: 'medium',
           data: { 
             bookingId: booking._id,
@@ -1855,7 +1855,7 @@ router.post('/:id/upload-arrival-photo',
       // Notify customer that worker has arrived
       try {
         await notificationService.sendNotification({
-          recipient: booking.customer,
+          userId: booking.customer._id || booking.customer,
           type: 'worker-enroute',
           title: 'Worker Has Arrived',
           message: 'Your worker has arrived and is ready to start. Service will begin shortly.',
@@ -2350,7 +2350,7 @@ router.post('/:id/admin-approve',
         if (workerId) {
           await notificationService.sendNotification({
             userId: workerId,
-            type: 'booking_approved',
+            type: 'booking-confirmed',
             title: 'Service Approved',
             message: 'Your completed service has been reviewed and approved by the admin.',
             data: { bookingId: booking._id },

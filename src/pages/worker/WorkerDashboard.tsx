@@ -18,10 +18,11 @@ interface Stats {
 
 interface Task {
   _id: string;
-  service: {
+  service?: {
     name: string;
     price: number;
-  };
+  } | null;
+  bookingType?: string;
   customer: {
     name: string;
   };
@@ -173,11 +174,12 @@ const WorkerDashboard = () => {
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
-  const getServiceEmoji = (serviceName: string) => {
-    if (serviceName.toLowerCase().includes('kitchen')) return '🍳';
-    if (serviceName.toLowerCase().includes('bathroom')) return '🚿';
-    if (serviceName.toLowerCase().includes('deep clean')) return '✨';
-    if (serviceName.toLowerCase().includes('sofa')) return '🛋️';
+  const getServiceEmoji = (serviceName?: string | null) => {
+    const name = (serviceName ?? '').toLowerCase();
+    if (name.includes('kitchen')) return '🍳';
+    if (name.includes('bathroom')) return '🚿';
+    if (name.includes('deep clean') || !serviceName) return '✨';
+    if (name.includes('sofa')) return '🛋️';
     return '🧹';
   };
 
@@ -252,10 +254,10 @@ const WorkerDashboard = () => {
             <div className="bg-card p-5">
               <div className="flex items-start gap-4 mb-4">
                 <div className="w-12 h-12 bg-accent rounded-xl flex items-center justify-center text-2xl shrink-0">
-                  {getServiceEmoji(currentTask.service.name)}
+                  {getServiceEmoji(currentTask.service?.name)}
                 </div>
                 <div className="flex-1">
-                  <p className="font-bold text-foreground">{currentTask.service.name}</p>
+                  <p className="font-bold text-foreground">{currentTask.service?.name ?? '✨ Deep Cleaning'}</p>
                   <p className="text-sm text-muted-foreground">{t('worker.dashboard.customer')}: {currentTask.customer.name}</p>
                   <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
                     <MapPin className="w-3 h-3" />
@@ -346,10 +348,10 @@ const WorkerDashboard = () => {
                   onClick={() => setSelectedTaskId(task._id)}
                 >
                   <div className="w-11 h-11 bg-accent rounded-xl flex items-center justify-center text-xl shrink-0">
-                    {getServiceEmoji(task.service.name)}
+                    {getServiceEmoji(task.service?.name)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-foreground text-sm">{task.service.name}</p>
+                    <p className="font-semibold text-foreground text-sm">{task.service?.name ?? '✨ Deep Cleaning'}</p>
                     <p className="text-xs text-muted-foreground">{task.customer.name}</p>
                     <div className="flex items-center gap-3 mt-1">
                       <span className="text-xs text-muted-foreground flex items-center gap-1">

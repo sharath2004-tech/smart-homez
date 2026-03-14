@@ -226,9 +226,9 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
     try {
       const superAdmins = await User.find({ role: 'super_admin', isActive: true }).select('_id').lean();
       for (const sa of superAdmins) {
-        await notificationService.createNotification({
+        await notificationService.sendNotification({
           userId:  sa._id,
-          type:    'booking_created',
+          type:    'booking',
           title:   'New Deep Cleaning Booking',
           message: `New cart booking of ₹${calculatedTotal} from ${customer.name || 'customer'}`,
           data:    { bookingId: booking._id }
@@ -257,6 +257,14 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
         booking.status           = 'confirmed';
         booking.confirmedAt      = new Date();
         await booking.save();
+        // Notify assigned worker
+        notificationService.sendTemplatedNotification(assignmentResult.primaryWorker, 'WORKER_ASSIGNED', {
+          bookingId: booking._id,
+          workerName: 'Worker',
+          serviceName: '✨ Deep Cleaning',
+          date: bookingDate,
+          time: startTime
+        }).catch(() => {});
       } else {
         // Fallback to preference-based assignment
         const fallbackResult = await findWorkerWithPreferences({
@@ -274,6 +282,14 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
           booking.status           = 'confirmed';
           booking.confirmedAt      = new Date();
           await booking.save();
+          // Notify assigned worker
+          notificationService.sendTemplatedNotification(fallbackResult.worker._id, 'WORKER_ASSIGNED', {
+            bookingId: booking._id,
+            workerName: fallbackResult.worker.name || 'Worker',
+            serviceName: '✨ Deep Cleaning',
+            date: bookingDate,
+            time: startTime
+          }).catch(() => {});
         }
       }
     } catch (assignErr) {

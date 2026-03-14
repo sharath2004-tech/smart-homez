@@ -94,10 +94,11 @@ const AdminBookings = () => {
   };
 
   const filtered = bookings.filter((b) => {
+    const serviceName = b.service?.name || (b.bookingType === 'deep-cleaning-cart' ? 'deep cleaning' : '');
     const matchSearch =
       (b.customer?.name || '').toLowerCase().includes(search.toLowerCase()) ||
       b._id.toLowerCase().includes(search.toLowerCase()) ||
-      (b.service?.name || '').toLowerCase().includes(search.toLowerCase());
+      serviceName.toLowerCase().includes(search.toLowerCase());
     const matchFilter = filter === "all" || b.status === filter;
     return matchSearch && matchFilter;
   });

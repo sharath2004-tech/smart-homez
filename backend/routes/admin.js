@@ -2137,8 +2137,8 @@ router.get('/worker-schedule-comprehensive',
             subscriptionEndDate: b.subscription?.subscriptionEndDate || null,
             autoRenewal: b.subscription?.autoRenewal || false,
             service: {
-              name: b.service?.name,
-              category: b.service?.category
+              name: b.service?.name ?? (b.bookingType === 'deep-cleaning-cart' ? '✨ Deep Cleaning' : 'Unknown'),
+              category: b.service?.category ?? (b.bookingType === 'deep-cleaning-cart' ? 'deep-cleaning' : '')
             },
             customer: {
               name: b.customer?.name,
