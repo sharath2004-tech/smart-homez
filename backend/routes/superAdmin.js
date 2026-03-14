@@ -926,6 +926,93 @@ router.post('/service-requests/:id/reject', async (req, res) => {
   }
 });
 
+// ─── Price Change Requests ────────────────────────────────────────────────────
+
+// @route   GET /api/super-admin/price-change-requests
+// @desc    List admin-submitted pricing update requests
+router.get('/price-change-requests', async (req, res) => {
+  try {
+    const PriceChangeRequest = (await import('../models/PriceChangeRequest.js')).default;
+    const { status = 'pending' } = req.query;
+    const query = status === 'all' ? {} : { status };
+    const requests = await PriceChangeRequest.find(query)
+      .populate('service', 'name price')
+      .populate('requestedBy', 'name email')
+      .populate('reviewedBy', 'name email')
+      .sort({ createdAt: -1 });
+    res.json({ requests, total: requests.length });
+  } catch (error) {
+    console.error('Get price change requests error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   POST /api/super-admin/price-change-requests/:id/approve
+// @desc    Approve a price change request — applies proposed pricing to the service
+router.post('/price-change-requests/:id/approve', async (req, res) => {
+  try {
+    const PriceChangeRequest = (await import('../models/PriceChangeRequest.js')).default;
+    const Service = (await import('../models/Service.js')).default;
+
+    const request = await PriceChangeRequest.findById(req.params.id);
+    if (!request) return res.status(404).json({ error: { message: 'Request not found', status: 404 } });
+    if (request.status !== 'pending') {
+      return res.status(400).json({ error: { message: `Request already ${request.status}`, status: 400 } });
+    }
+
+    const proposed = request.proposedPricing;
+    const updateData = {};
+    if (proposed.price !== undefined) updateData.price = proposed.price;
+    if (proposed.pricingPlans !== undefined) updateData.pricingPlans = proposed.pricingPlans;
+    if (proposed.subscriptionPlans !== undefined) updateData.subscriptionPlans = proposed.subscriptionPlans;
+    if (proposed.durationOptions !== undefined) updateData.durationOptions = proposed.durationOptions;
+    if (proposed.pricingTiers !== undefined) updateData.pricingTiers = proposed.pricingTiers;
+
+    const service = await Service.findByIdAndUpdate(
+      request.service,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
+    if (!service) return res.status(404).json({ error: { message: 'Service not found', status: 404 } });
+
+    request.status = 'approved';
+    request.reviewedBy = req.user._id;
+    request.reviewedAt = new Date();
+    request.superAdminNote = req.body.note || '';
+    await request.save();
+
+    res.json({ message: 'Price change approved and applied to service', service, request });
+  } catch (error) {
+    console.error('Approve price change request error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   POST /api/super-admin/price-change-requests/:id/reject
+// @desc    Reject a price change request
+router.post('/price-change-requests/:id/reject', async (req, res) => {
+  try {
+    const PriceChangeRequest = (await import('../models/PriceChangeRequest.js')).default;
+
+    const request = await PriceChangeRequest.findById(req.params.id);
+    if (!request) return res.status(404).json({ error: { message: 'Request not found', status: 404 } });
+    if (request.status !== 'pending') {
+      return res.status(400).json({ error: { message: `Request already ${request.status}`, status: 400 } });
+    }
+
+    request.status = 'rejected';
+    request.reviewedBy = req.user._id;
+    request.reviewedAt = new Date();
+    request.superAdminNote = req.body.reason || '';
+    await request.save();
+
+    res.json({ message: 'Price change request rejected', request });
+  } catch (error) {
+    console.error('Reject price change request error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
 // ─── Business Hours ──────────────────────────────────────────────────────────
 
 const parseClockToMinutes = (timeStr) => {

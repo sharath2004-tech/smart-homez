@@ -103,6 +103,16 @@ const serviceSchema = new mongoose.Schema({
       type: Boolean,
       default: false // For weekly plans
     },
+    sessionsPerMonth: {
+      type: Number,
+      default: 1,
+      min: 1
+    },
+    totalMonthlyPrice: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
     sortOrder: {
       type: Number,
       default: 0
@@ -393,24 +403,32 @@ serviceSchema.pre('validate', function(next) {
   next();
 });
 
+// Session counts and discount rates per plan (Urban Company model)
+// Higher frequency = higher commitment = better per-session discount
+const PLAN_CONFIG = {
+  daily:     { sessionsPerMonth: 26, discountPercentage: 30 }, // 6 days/week × ~4.3 weeks
+  'bi-weekly': { sessionsPerMonth: 8,  discountPercentage: 20 }, // 2 days/week × 4 weeks
+  weekly:    { sessionsPerMonth: 4,  discountPercentage: 15 }, // 1 day/week × 4 weeks
+  monthly:   { sessionsPerMonth: 1,  discountPercentage: 5  }  // single session
+};
+
 // Pre-save middleware to set defaults only for new documents
 serviceSchema.pre('save', function(next) {
-  // Only set defaults for new documents
-  if (!this.isNew) {
-    return next();
-  }
-  
-  // Legacy pricing plans
+  if (!this.isNew) return next();
+
+  const p = this.price;
+
+  // Legacy pricingPlans — total monthly bundle cost per plan
   if (!this.pricingPlans || !this.pricingPlans.oneTime) {
     this.pricingPlans = {
-      oneTime: this.price,
-      daily: Math.round(this.price * 0.85),
-      weekly: Math.round(this.price * 0.75 * 7),
-      monthly: Math.round(this.price * 0.65 * 30)
+      oneTime: p,
+      daily:   Math.round(p * (1 - 0.30) * 26), // 30% off × 26 sessions
+      weekly:  Math.round(p * (1 - 0.15) * 4),  // 15% off × 4 sessions
+      monthly: Math.round(p * (1 - 0.05) * 1)   // 5% off × 1 session
     };
   }
-  
-  // New subscription plans - initialize defaults if empty (only for new docs)
+
+  // New subscriptionPlans — per-session price + total monthly bundle
   if (!this.subscriptionPlans || this.subscriptionPlans.length === 0) {
     this.subscriptionPlans = [
       {
@@ -418,9 +436,11 @@ serviceSchema.pre('save', function(next) {
         name: 'oneTime',
         displayName: 'One-Time',
         icon: '📅',
-        description: 'Single service',
-        price: this.price,
+        description: 'Single service, no commitment',
+        price: p,
         discountPercentage: 0,
+        sessionsPerMonth: 1,
+        totalMonthlyPrice: p,
         isActive: true,
         requiresFixedWorker: false,
         allowDaySelection: false,
@@ -431,43 +451,64 @@ serviceSchema.pre('save', function(next) {
         name: 'daily',
         displayName: 'Daily',
         icon: '🌅',
-        description: 'Every day',
-        price: Math.round(this.price * 0.85),
-        discountPercentage: 15,
+        description: '6 days/week (~26 sessions/month)',
+        price: Math.round(p * 0.70),
+        discountPercentage: 30,
+        sessionsPerMonth: 26,
+        totalMonthlyPrice: Math.round(p * 0.70 * 26),
         isActive: true,
         requiresFixedWorker: true,
         allowDaySelection: false,
         sortOrder: 2
       },
       {
-        id: 'weekly',
-        name: 'weekly',
-        displayName: 'Weekly',
+        id: 'bi-weekly',
+        name: 'bi-weekly',
+        displayName: 'Bi-Weekly',
         icon: '📆',
-        description: 'Select days',
-        price: Math.round(this.price * 0.75),
-        discountPercentage: 25,
+        description: '2 days/week (~8 sessions/month)',
+        price: Math.round(p * 0.80),
+        discountPercentage: 20,
+        sessionsPerMonth: 8,
+        totalMonthlyPrice: Math.round(p * 0.80 * 8),
         isActive: true,
         requiresFixedWorker: true,
         allowDaySelection: true,
         sortOrder: 3
       },
       {
+        id: 'weekly',
+        name: 'weekly',
+        displayName: 'Weekly',
+        icon: '🗓️',
+        description: '1 day/week (~4 sessions/month)',
+        price: Math.round(p * 0.85),
+        discountPercentage: 15,
+        sessionsPerMonth: 4,
+        totalMonthlyPrice: Math.round(p * 0.85 * 4),
+        isActive: true,
+        requiresFixedWorker: true,
+        allowDaySelection: true,
+        sortOrder: 4
+      },
+      {
         id: 'monthly',
         name: 'monthly',
         displayName: 'Monthly',
         icon: '🗓️',
-        description: 'Once a month',
-        price: Math.round(this.price * 0.65),
-        discountPercentage: 35,
+        description: 'Once a month (1 session)',
+        price: Math.round(p * 0.95),
+        discountPercentage: 5,
+        sessionsPerMonth: 1,
+        totalMonthlyPrice: Math.round(p * 0.95),
         isActive: true,
-        requiresFixedWorker: true,
+        requiresFixedWorker: false,
         allowDaySelection: false,
-        sortOrder: 4
+        sortOrder: 5
       }
     ];
   }
-  
+
   next();
 });
 

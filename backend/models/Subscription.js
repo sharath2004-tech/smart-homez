@@ -10,6 +10,7 @@ const subscriptionSchema = new mongoose.Schema({
   autoRenewal: { type: Boolean, default: true },
   preferredTimeSlots: [{ day: String, time: String }],
   pauseHistory: [{ pausedAt: Date, resumedAt: Date, reason: String }],
+  sessionsPerMonth: { type: Number, default: 1 },
   totalAmount: { type: Number, required: true },
   discountApplied: { type: Number, default: 0 },
   nextBillingDate: Date,

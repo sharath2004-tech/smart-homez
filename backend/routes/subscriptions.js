@@ -1,8 +1,8 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
+import Service from '../models/Service.js';
 import Subscription from '../models/Subscription.js';
-import Booking from '../models/Booking.js';
 
 const router = express.Router();
 
@@ -16,9 +16,25 @@ router.post('/', authenticate, authorize('customer'), [
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
+    // Look up service to get server-authoritative plan pricing
+    const serviceDoc = await Service.findById(req.body.service)
+      .select('subscriptionPlans')
+      .lean();
+    if (!serviceDoc) {
+      return res.status(404).json({ error: { message: 'Service not found', status: 404 } });
+    }
+
+    const planEntry = serviceDoc.subscriptionPlans?.find(p => p.id === req.body.plan);
+    if (!planEntry) {
+      return res.status(400).json({ error: { message: `Plan '${req.body.plan}' is not available for this service`, status: 400 } });
+    }
+
     const subscription = new Subscription({
       ...req.body,
-      customer: req.user._id
+      customer: req.user._id,
+      totalAmount: planEntry.totalMonthlyPrice,
+      discountApplied: planEntry.discountPercentage,
+      sessionsPerMonth: planEntry.sessionsPerMonth
     });
     await subscription.save();
     res.status(201).json({ subscription });

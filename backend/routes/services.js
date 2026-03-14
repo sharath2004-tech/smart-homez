@@ -260,6 +260,20 @@ const handleServiceUpdate = async (req, res) => {
       timeSlotRestrictions, cancellationPolicy, specialInstructionsTemplate
     } = req.body;
 
+    // Admins cannot directly edit pricing — they must submit a price change request
+    const PRICING_FIELDS = ['price', 'pricingPlans', 'subscriptionPlans', 'durationOptions', 'pricingTiers'];
+    if (req.user.role === 'admin') {
+      const attempted = PRICING_FIELDS.filter(f => f in req.body);
+      if (attempted.length > 0) {
+        return res.status(403).json({
+          error: {
+            message: `Admins cannot directly update pricing fields (${attempted.join(', ')}). Use POST /api/services/${req.params.id}/price-change-request to submit a request for super admin review.`,
+            status: 403
+          }
+        });
+      }
+    }
+
     // Validation for subscription plans
     if (subscriptionPlans && Array.isArray(subscriptionPlans)) {
       const ids = subscriptionPlans.map(plan => plan.id);
@@ -334,6 +348,62 @@ router.patch('/:id', authenticate, authorize('admin', 'super_admin'), handleServ
 
 // Support PUT as well for compatibility
 router.put('/:id', authenticate, authorize('admin', 'super_admin'), handleServiceUpdate);
+
+// @route   POST /api/services/:id/price-change-request
+// @desc    Admin submits a pricing update request for super admin review
+// @access  Private/Admin
+router.post('/:id/price-change-request', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const PriceChangeRequest = (await import('../models/PriceChangeRequest.js')).default;
+
+    const service = await Service.findById(req.params.id)
+      .select('price pricingPlans subscriptionPlans durationOptions pricingTiers')
+      .lean();
+    if (!service) {
+      return res.status(404).json({ error: { message: 'Service not found', status: 404 } });
+    }
+
+    const { price, pricingPlans, subscriptionPlans, durationOptions, pricingTiers, reason } = req.body;
+
+    const hasPricingField = [price, pricingPlans, subscriptionPlans, durationOptions, pricingTiers]
+      .some(v => v !== undefined);
+    if (!hasPricingField) {
+      return res.status(400).json({
+        error: {
+          message: 'At least one pricing field must be provided: price, pricingPlans, subscriptionPlans, durationOptions, pricingTiers',
+          status: 400
+        }
+      });
+    }
+
+    const proposedPricing = {};
+    if (price !== undefined) proposedPricing.price = price;
+    if (pricingPlans !== undefined) proposedPricing.pricingPlans = pricingPlans;
+    if (subscriptionPlans !== undefined) proposedPricing.subscriptionPlans = subscriptionPlans;
+    if (durationOptions !== undefined) proposedPricing.durationOptions = durationOptions;
+    if (pricingTiers !== undefined) proposedPricing.pricingTiers = pricingTiers;
+
+    const request = new PriceChangeRequest({
+      service: service._id,
+      requestedBy: req.user._id,
+      reason: reason || '',
+      currentPricing: {
+        price: service.price,
+        pricingPlans: service.pricingPlans,
+        subscriptionPlans: service.subscriptionPlans,
+        durationOptions: service.durationOptions,
+        pricingTiers: service.pricingTiers
+      },
+      proposedPricing
+    });
+    await request.save();
+
+    res.status(201).json({ message: 'Price change request submitted for super admin review', request });
+  } catch (error) {
+    console.error('Price change request error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
 
 // @route   DELETE /api/services/:id
 // @desc    Delete service
