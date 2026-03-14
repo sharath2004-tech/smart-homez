@@ -33,6 +33,7 @@ import DeepCleaningServicePage from "./pages/customer/services/DeepCleaningServi
 import InstaServicePage from "./pages/customer/services/InstaServicePage";
 import SubscriptionServicePage from "./pages/customer/services/SubscriptionServicePage";
 import DeepCleaningQuotePage from "./pages/customer/DeepCleaningQuotePage";
+import DeepCleaningPage from "./pages/customer/DeepCleaningPage";
 import ServicesPage from "./pages/customer/ServicesPage";
 import SubscriptionBookingPage from "./pages/customer/SubscriptionBookingPage";
 
@@ -61,6 +62,7 @@ import AdminWorkers from "./pages/admin/AdminWorkers";
 import AdminWorkerSchedule from "./pages/admin/AdminWorkerSchedule";
 import AdminWorkforce from "./pages/admin/AdminWorkforce";
 import AdminQuotes from "./pages/admin/AdminQuotes";
+import AdminDeepCleaningConfig from "./pages/admin/AdminDeepCleaningConfig";
 import SuperAdminDashboard from "./pages/admin/SuperAdminDashboard";
 
 const queryClient = new QueryClient();
@@ -91,6 +93,7 @@ const App = () => (
           <Route path="/customer/services/insta" element={<ProtectedRoute allowedRoles={['customer']}><InstaServicePage /></ProtectedRoute>} />
           <Route path="/customer/services/subscription" element={<ProtectedRoute allowedRoles={['customer']}><SubscriptionServicePage /></ProtectedRoute>} />
           <Route path="/customer/services/deep-cleaning" element={<ProtectedRoute allowedRoles={['customer']}><DeepCleaningServicePage /></ProtectedRoute>} />
+          <Route path="/customer/deep-cleaning" element={<ProtectedRoute allowedRoles={['customer']}><DeepCleaningPage /></ProtectedRoute>} />
           <Route path="/customer/book/:id" element={<ProtectedRoute allowedRoles={['customer']}><ServiceRouter /></ProtectedRoute>} />
           <Route path="/customer/subscribe/:id" element={<ProtectedRoute allowedRoles={['customer']}><SubscriptionBookingPage /></ProtectedRoute>} />
           <Route path="/customer/bookings" element={<ProtectedRoute allowedRoles={['customer']}><BookingsPage /></ProtectedRoute>} />
@@ -133,6 +136,7 @@ const App = () => (
 
           {/* Super Admin */}
           <Route path="/super-admin/dashboard" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminDashboard /></ProtectedRoute>} />
+          <Route path="/super-admin/deep-cleaning-config" element={<ProtectedRoute allowedRoles={['super_admin']}><AdminDeepCleaningConfig /></ProtectedRoute>} />
           <Route path="/super-admin/heatmap" element={<ProtectedRoute allowedRoles={['super_admin']}><AdminHeatmap /></ProtectedRoute>} />
 
           {/* Catch-all */}

@@ -1,0 +1,180 @@
+import express from 'express';
+import { authenticate, authorize } from '../middleware/auth.js';
+import Booking from '../models/Booking.js';
+import DeepCleaningConfig from '../models/DeepCleaningConfig.js';
+import User from '../models/User.js';
+import notificationService from '../utils/notificationService.js';
+
+const router = express.Router();
+
+// ─── seed / ensure config exists ───────────────────────────────────────────
+async function ensureConfig() {
+  const existing = await DeepCleaningConfig.findOne();
+  if (existing) return existing;
+  return DeepCleaningConfig.create({
+    minimumCartValue: 500,
+    items: DEFAULT_ITEMS
+  });
+}
+
+const DEFAULT_ITEMS = [
+  // ── BATHROOM ───────────────────────────────────────────────────────────────
+  { id: 'washroom_basic', category: 'bathroom', name: 'Basic Washroom Clean',
+    description: 'Floor, toilet seat, mirror & washbasin', pricingType: 'per_unit',
+    price: 200, unit: 'bathroom', icon: '🚿', sortOrder: 1 },
+  { id: 'washroom_deep', category: 'bathroom', name: 'Intense Washroom Deep Clean',
+    description: 'Machine scrub walls & floors, taps & fixtures, shower, tiles, exhaust', pricingType: 'per_unit',
+    price: 500, unit: 'bathroom', icon: '🧹', sortOrder: 2 },
+
+  // ── KITCHEN ────────────────────────────────────────────────────────────────
+  { id: 'kitchen_deep', category: 'kitchen', name: 'Kitchen Deep Cleaning',
+    description: 'Full kitchen deep clean — price by home size', pricingType: 'tiered',
+    tiers: [
+      { label: '2 BHK', price: 2600 },
+      { label: '3 BHK', price: 3200 },
+      { label: '4 BHK', price: 4000 },
+      { label: '5 BHK', price: 4500 }
+    ], icon: '🍳', sortOrder: 3 },
+  { id: 'kitchen_chimney', category: 'kitchen', name: 'Kitchen Chimney Cleaning',
+    description: 'Deep clean chimney filters and hood', pricingType: 'per_unit',
+    price: 500, unit: 'chimney', icon: '🏭', sortOrder: 4 },
+
+  // ── FURNITURE ──────────────────────────────────────────────────────────────
+  { id: 'sofa_34', category: 'furniture', name: 'Sofa Wet Shampoo 3/4 Seater',
+    description: 'Fabric or leather — 3 to 4 seater', pricingType: 'per_unit',
+    price: 449, unit: 'sofa', icon: '🛋️', sortOrder: 5 },
+  { id: 'sofa_56', category: 'furniture', name: 'Sofa Wet Shampoo 5/6 Seater',
+    description: 'Fabric or leather — 5 to 6 seater', pricingType: 'per_unit',
+    price: 649, unit: 'sofa', icon: '🛋️', sortOrder: 6 },
+  { id: 'sofa_7plus', category: 'furniture', name: 'Sofa Wet Shampoo 7+ Seater',
+    description: 'Fabric or leather — 7 seater and above', pricingType: 'per_unit',
+    price: 849, unit: 'sofa', icon: '🛋️', sortOrder: 7 },
+  { id: 'dining_table', category: 'furniture', name: 'Dining Table Clean',
+    description: 'Deep clean dining table and chairs', pricingType: 'fixed',
+    price: 499, icon: '🍽️', sortOrder: 8 },
+
+  // ── APPLIANCES ─────────────────────────────────────────────────────────────
+  { id: 'fan_clean', category: 'appliances', name: 'Fan Cleaning',
+    description: 'Per ceiling or wall fan', pricingType: 'per_unit',
+    price: 100, unit: 'fan', maxQty: 20, icon: '💨', sortOrder: 9 },
+
+  // ── FULL HOUSE ─────────────────────────────────────────────────────────────
+  { id: 'fullhouse_bare', category: 'fullhouse', name: 'Full House Deep Clean — Bare Flat',
+    description: 'Unfurnished / empty flat, charged per sq ft', pricingType: 'per_sqft',
+    price: 7, unit: 'sqft', icon: '🏠', sortOrder: 10 },
+  { id: 'fullhouse_furnished', category: 'fullhouse', name: 'Full House Deep Clean — Furnished',
+    description: 'Fully furnished flat with all belongings, per sq ft', pricingType: 'per_sqft',
+    price: 10, unit: 'sqft', icon: '🏡', sortOrder: 11 }
+];
+
+// ─── GET /api/deep-cleaning/config  (public — customers & admins) ───────────
+router.get('/config', async (req, res) => {
+  try {
+    const config = await ensureConfig();
+    res.json({ success: true, config });
+  } catch (err) {
+    res.status(500).json({ error: { message: err.message, status: 500 } });
+  }
+});
+
+// ─── PUT /api/deep-cleaning/config  (super admin only) ───────────────────────
+router.put('/config', authenticate, authorize('super_admin'), async (req, res) => {
+  try {
+    const { items, minimumCartValue } = req.body;
+    let config = await DeepCleaningConfig.findOne();
+    if (!config) config = new DeepCleaningConfig();
+
+    if (items !== undefined) config.items = items;
+    if (minimumCartValue !== undefined) config.minimumCartValue = Number(minimumCartValue);
+    config.updatedBy = req.user._id;
+
+    await config.save();
+    res.json({ success: true, config });
+  } catch (err) {
+    res.status(500).json({ error: { message: err.message, status: 500 } });
+  }
+});
+
+// ─── POST /api/deep-cleaning/booking  (customers only) ───────────────────────
+router.post('/booking', authenticate, authorize('customer'), async (req, res) => {
+  try {
+    const { cartItems, totalAmount, bookingDate, startTime, address } = req.body;
+
+    if (!cartItems?.length) {
+      return res.status(400).json({ error: { message: 'Cart is empty', status: 400 } });
+    }
+
+    const config = await ensureConfig();
+    if (totalAmount < config.minimumCartValue) {
+      return res.status(400).json({
+        error: { message: `Minimum cart value is ₹${config.minimumCartValue}`, status: 400 }
+      });
+    }
+
+    if (!bookingDate || !startTime) {
+      return res.status(400).json({ error: { message: 'Booking date and time are required', status: 400 } });
+    }
+
+    // Build endTime: deep cleaning sessions default to 3 hours
+    const [h, m] = startTime.split(':').map(Number);
+    const endH = (h + 3) % 24;
+    const endTime = `${String(endH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+
+    // Get customer location
+    const customer = await User.findById(req.user._id)
+      .select('customerProfile name')
+      .lean();
+
+    const defaultAddress = customer?.customerProfile?.addresses?.find(a => a.isDefault)
+      || customer?.customerProfile?.addresses?.[0];
+
+    const locationData = address || {
+      locationId:    defaultAddress?.locationId || null,
+      apartmentName: defaultAddress?.apartment  || '',
+      area:          defaultAddress?.area        || '',
+      city:          defaultAddress?.city        || '',
+      address:       defaultAddress?.fullAddress || ''
+    };
+
+    // Build a notes summary
+    const notesSummary = cartItems
+      .map(i => `${i.name} x${i.qty} = ₹${i.totalPrice}`)
+      .join(', ');
+
+    const booking = await Booking.create({
+      customer:     req.user._id,
+      bookingType:  'deep-cleaning-cart',
+      bookingDate:  new Date(bookingDate),
+      startTime,
+      endTime,
+      totalAmount,
+      cartItems,
+      location:     locationData,
+      notes:        `Deep Cleaning Cart: ${notesSummary}`,
+      status:       'pending'
+    });
+
+    // Notify admins
+    try {
+      const superAdmins = await User.find({ role: 'super_admin', isActive: true }).select('_id').lean();
+      for (const sa of superAdmins) {
+        await notificationService.createNotification({
+          userId:  sa._id,
+          type:    'booking_created',
+          title:   'New Deep Cleaning Booking',
+          message: `New cart booking of ₹${totalAmount} from ${customer.name || 'customer'}`,
+          data:    { bookingId: booking._id }
+        });
+      }
+    } catch (notifErr) {
+      console.error('Notification error (non-fatal):', notifErr.message);
+    }
+
+    res.status(201).json({ success: true, booking });
+  } catch (err) {
+    console.error('Deep cleaning booking error:', err);
+    res.status(500).json({ error: { message: err.message, status: 500 } });
+  }
+});
+
+export default router;

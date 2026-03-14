@@ -24,7 +24,7 @@ interface Service {
 const SERVICE_CATEGORIES = [
   { key: 'insta',        labelKey: 'customer.services.catInstaLabel', icon: '⚡', descKey: 'customer.services.catInstaDesc', color: 'bg-amber-50 border-amber-300',  badgeKey: 'customer.services.catInstaBadge', badgeColor: 'bg-teal-100 text-teal-700', path: '/customer/services/insta' },
   { key: 'subscription', labelKey: 'customer.services.catSubLabel',   icon: '📅', descKey: 'customer.services.catSubDesc',   color: 'bg-blue-50 border-blue-300',    badgeKey: 'customer.services.catSubBadge',   badgeColor: 'bg-teal-100 text-teal-700', path: '/customer/services/subscription' },
-  { key: 'deep',         labelKey: 'customer.services.catDeepLabel',  icon: '✨', descKey: 'customer.services.catDeepDesc',  color: 'bg-green-50 border-green-300',  badgeKey: 'customer.services.catDeepBadge',  badgeColor: 'bg-teal-100 text-teal-700', path: '/customer/services/deep-cleaning' },
+  { key: 'deep',         labelKey: 'customer.services.catDeepLabel',  icon: '✨', descKey: 'customer.services.catDeepDesc',  color: 'bg-green-50 border-green-300',  badgeKey: 'customer.services.catDeepBadge',  badgeColor: 'bg-teal-100 text-teal-700', path: '/customer/deep-cleaning' },
 ];
 
 const ServicesPage = () => {

@@ -54,7 +54,7 @@ const bookingSchema = new mongoose.Schema({
   service: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Service',
-    required: true
+    required: false  // optional for cart-type bookings (deep cleaning)
   },
   bookingDate: {
     type: Date,
@@ -81,7 +81,7 @@ const bookingSchema = new mongoose.Schema({
   // Recurring booking details
   bookingType: {
     type: String,
-    enum: ['adhoc', 'recurring-short', 'monthly-subscription', 'oneTime', 'daily', 'weekly', 'monthly'],
+    enum: ['adhoc', 'recurring-short', 'monthly-subscription', 'oneTime', 'daily', 'weekly', 'monthly', 'deep-cleaning-cart'],
     default: 'adhoc'
   },
   isRecurring: {
@@ -327,6 +327,16 @@ const bookingSchema = new mongoose.Schema({
     // Subscription specific (mirrors recurringSchedule for UI)
     sessionDurationHours: { type: Number, default: null }
   },
+  // Deep Cleaning cart items (used when bookingType === 'deep-cleaning-cart')
+  cartItems: [{
+    itemId:       { type: String },
+    name:         { type: String },
+    category:     { type: String },
+    qty:          { type: Number, default: 1 },
+    unitPrice:    { type: Number, default: 0 },
+    totalPrice:   { type: Number, default: 0 },
+    selectedTier: { type: String, default: null }
+  }],
   notes: {
     type: String,
     default: ''
