@@ -39,7 +39,9 @@ interface Location {
 
 interface Booking {
   _id: string;
-  service: Service;
+  service?: Service | null;
+  bookingType?: string;
+  cartItems?: { name: string; totalPrice: number }[];
   worker?: Worker;
   bookingDate: string;
   startTime: string;
@@ -292,7 +294,7 @@ const BookingsPage = () => {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
                       <h3 className="text-lg font-bold font-heading text-foreground mb-1">
-                        {booking.service.name}
+                        {booking.service?.name ?? (booking.bookingType === 'deep-cleaning-cart' ? '✨ Deep Cleaning' : 'Booking')}
                       </h3>
                       <p className="text-xs text-muted-foreground">
                         {t('customer.bookings.bookingId')} {booking._id.slice(-8)}

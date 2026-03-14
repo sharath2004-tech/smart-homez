@@ -86,7 +86,7 @@ const MyQuotesPage = () => {
               Request a free deep cleaning quote for your space.
             </p>
             <Link
-              to="/customer/deep-cleaning"
+              to="/deep-cleaning-quote"
               className="btn-brand px-6 inline-block text-sm"
             >
               Get a Free Quote
@@ -151,7 +151,7 @@ const MyQuotesPage = () => {
 
             {/* New quote CTA */}
             <Link
-              to="/customer/deep-cleaning"
+              to="/deep-cleaning-quote"
               className="flex items-center gap-3 p-4 rounded-2xl border-2 border-dashed border-green-300 hover:bg-green-50 transition-colors group"
             >
               <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">

@@ -41,7 +41,9 @@ interface Location {
 
 interface Booking {
   _id: string;
-  service: Service;
+  service?: Service | null;
+  bookingType?: string;
+  cartItems?: { name: string; qty?: number; totalPrice: number }[];
   worker?: Worker;
   customer: {
     _id: string;
@@ -381,8 +383,22 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
           <div className="p-6 space-y-6">
             {/* Service Info */}
             <div className="bg-primary-light p-4 rounded-xl">
-              <h3 className="text-lg font-bold text-foreground mb-1">{booking.service.name}</h3>
-              <p className="text-sm text-muted-foreground capitalize">{booking.service.category}</p>
+              <h3 className="text-lg font-bold text-foreground mb-1">
+                {booking.service?.name ?? (booking.bookingType === 'deep-cleaning-cart' ? '✨ Deep Cleaning' : 'Booking')}
+              </h3>
+              {booking.service?.category && (
+                <p className="text-sm text-muted-foreground capitalize">{booking.service.category}</p>
+              )}
+              {booking.bookingType === 'deep-cleaning-cart' && booking.cartItems && booking.cartItems.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {booking.cartItems.map((item, i) => (
+                    <div key={i} className="flex justify-between text-xs text-muted-foreground">
+                      <span>{item.name}{item.qty && item.qty > 1 ? ` ×${item.qty}` : ''}</span>
+                      <span>₹{item.totalPrice}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Booking Status Stepper */}
