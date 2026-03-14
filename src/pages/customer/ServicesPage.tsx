@@ -14,6 +14,8 @@ interface Service {
   category: string;
   price: number;
   duration: number;
+  isQuoteService?: boolean;
+  subscriptionOptions?: { enabled?: boolean };
   availability?: {
     available: boolean;
     workersCount: number;
@@ -343,25 +345,47 @@ const ServicesPage = () => {
                 <div className="mt-4">
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <span className="text-sm font-bold text-foreground">₹{service.price}</span>
+                      {service.isQuoteService ? (
+                        <span className="text-sm font-bold text-green-700">Custom Quote</span>
+                      ) : service.subscriptionOptions?.enabled ? (
+                        <span className="text-sm font-bold text-foreground">From ₹{service.price}<span className="text-xs font-normal text-muted-foreground">/mo</span></span>
+                      ) : (
+                        <span className="text-sm font-bold text-foreground">₹{service.price}</span>
+                      )}
                       <div className="flex items-center gap-1 mt-0.5">
                         <Clock className="w-3 h-3 text-muted-foreground" />
                         <span className="text-xs text-muted-foreground">{service.duration} min</span>
                       </div>
                     </div>
                   </div>
-                  
+
                   <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Link
-                      to={`/customer/book/${service._id}`}
-                      className={`w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors ${
-                      service.availability?.available === false
-                        ? 'bg-muted text-muted-foreground hover:bg-border'
-                        : 'btn-brand'
-                    }`}
-                  >
-                    {service.availability?.available === false ? t('customer.services.view') : t('customer.services.bookNow')}
-                    </Link>
+                    {service.isQuoteService ? (
+                      <Link
+                        to="/customer/deep-cleaning"
+                        className="w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors btn-brand"
+                      >
+                        Book Now ✨
+                      </Link>
+                    ) : service.subscriptionOptions?.enabled ? (
+                      <Link
+                        to={`/customer/subscribe/${service._id}`}
+                        className="w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors btn-brand"
+                      >
+                        Subscribe 📅
+                      </Link>
+                    ) : (
+                      <Link
+                        to={`/customer/book/${service._id}`}
+                        className={`w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors ${
+                          service.availability?.available === false
+                            ? 'bg-muted text-muted-foreground hover:bg-border'
+                            : 'btn-brand'
+                        }`}
+                      >
+                        {service.availability?.available === false ? t('customer.services.view') : t('customer.services.bookNow')}
+                      </Link>
+                    )}
                   </motion.div>
                 </div>
               </div>

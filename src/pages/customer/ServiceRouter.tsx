@@ -17,17 +17,31 @@ const ServiceRouter = () => {
     const fetchServiceType = async () => {
       try {
         const response = await servicesAPI.getById(id!);
-        const serviceName = response.service.name.toLowerCase();
-        const serviceTags = response.service.tags || [];
-        
-        // Map service names to their specialized pages
+        const service = response.service;
+        const serviceName = service.name.toLowerCase();
+        const serviceTags = service.tags || [];
+
+        // Quote services → deep cleaning cart page
+        if (service.isQuoteService) {
+          navigate('/customer/deep-cleaning', { replace: true });
+          return;
+        }
+
+        // Subscription services → subscription booking page
+        if (service.subscriptionOptions?.enabled) {
+          navigate(`/customer/subscribe/${id}`, { replace: true });
+          return;
+        }
+
         // Priority 1: Check for maid services (time-based)
-        if (serviceName.includes('maid') || 
-            serviceName.includes('insta maid') || 
-            serviceTags.includes('maid') || 
-            serviceTags.includes('hourly')) {
+        if (serviceName.includes('maid') ||
+            serviceName.includes('insta maid') ||
+            serviceTags.includes('maid') ||
+            serviceTags.includes('hourly') ||
+            serviceName.includes('instant') ||
+            serviceName.includes('ad hoc')) {
           setServiceType('maid');
-        } 
+        }
         // Priority 2: Check for other cleaning services
         else if (serviceName.includes('clean')) {
           setServiceType('cleaning');
