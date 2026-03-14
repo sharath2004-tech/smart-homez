@@ -438,16 +438,21 @@ const AdminServices = () => {
   };
 
   const handlePriceChange = (price: number) => {
-    setFormData({
-      ...formData,
+    setFormData(prev => ({
+      ...prev,
       price,
       pricingPlans: {
         oneTime: price,
         daily: Math.round(price * 0.85),
         weekly: Math.round(price * 0.75 * 7),
         monthly: Math.round(price * 0.65 * 30)
-      }
-    });
+      },
+      // Auto-recalculate each existing plan price from its stored discount %
+      subscriptionPlans: (prev.subscriptionPlans || []).map(plan => ({
+        ...plan,
+        price: Math.round(price * (1 - (plan.discountPercentage ?? 0) / 100))
+      }))
+    }));
   };
 
   const filteredServices = services.filter(service => 
@@ -906,7 +911,7 @@ const AdminServices = () => {
                     required
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    This is the base price used for calculations
+                    This is the base price used for calculations. Changing it will auto-recalculate all plan prices below.
                   </p>
                 </div>
 
@@ -1083,8 +1088,13 @@ const AdminServices = () => {
                                   type="number"
                                   value={plan.discountPercentage}
                                   onChange={(e) => {
+                                    const discount = Number(e.target.value);
                                     const newPlans = [...(formData.subscriptionPlans || [])];
-                                    newPlans[index] = { ...newPlans[index], discountPercentage: Number(e.target.value) };
+                                    newPlans[index] = {
+                                      ...newPlans[index],
+                                      discountPercentage: discount,
+                                      price: Math.round(formData.price * (1 - discount / 100))
+                                    };
                                     setFormData({ ...formData, subscriptionPlans: newPlans });
                                   }}
                                   className="input-clean text-sm"

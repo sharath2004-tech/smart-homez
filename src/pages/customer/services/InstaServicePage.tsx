@@ -399,6 +399,10 @@ const InstaServicePage = () => {
                   </button>
                 ))}
               </div>
+              <div className="flex items-start gap-2 mt-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                <span className="shrink-0 mt-0.5">⚠️</span>
+                <span>If the maid stays beyond your booked hours, <strong>overtime charges of ₹2.50/min</strong> will apply to the final bill.</span>
+              </div>
             </div>
 
             {/* Date */}
@@ -653,6 +657,10 @@ const InstaServicePage = () => {
                   <div className="text-xs text-muted-foreground line-through">₹{mrpTotal.toLocaleString('en-IN')}</div>
                   <span className="text-green-700">₹{totalAmount.toLocaleString('en-IN')}</span>
                 </div>
+              </div>
+              <div className="flex items-start gap-2 pt-2 border-t border-amber-200 text-xs text-amber-800 bg-amber-50 -mx-4 -mb-4 px-4 pb-4 rounded-b-2xl mt-2">
+                <span className="shrink-0 mt-0.5">⚠️</span>
+                <span><strong>Price may vary</strong> if the service runs beyond {hours} hr{hours > 1 ? 's' : ''}. Overtime is billed at ₹2.50/min on the final bill.</span>
               </div>
             </div>
 
