@@ -7,7 +7,6 @@ import {
     CheckCircle,
     DollarSign,
     Home,
-    ListChecks,
     MapPin,
     MessageCircle,
     Navigation,
@@ -100,8 +99,6 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   const [paymentTransactionTime, setPaymentTransactionTime] = useState('');
   const [showCompletionCapture, setShowCompletionCapture] = useState(false);
   const [uploadingCompletionPhoto, setUploadingCompletionPhoto] = useState(false);
-  const [showArrivalCapture, setShowArrivalCapture] = useState(false);
-  const [uploadingArrivalPhoto, setUploadingArrivalPhoto] = useState(false);
   const [showChat, setShowChat] = useState(false);
 
   const OVERTIME_RATE = 2.5; // ₹2.5 per minute
@@ -264,21 +261,6 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       alert((error as Error).message || 'Failed to upload completion photo');
     } finally {
       setUploadingCompletionPhoto(false);
-    }
-  };
-
-  const handleArrivalPhotoCapture = async (file: File) => {
-    try {
-      setShowArrivalCapture(false);
-      setUploadingArrivalPhoto(true);
-      const result = await bookingsAPI.uploadArrivalPhoto(taskId, file);
-      setTask(prev => prev ? { ...prev, arrivalPhoto: result.arrivalPhoto } : prev);
-      await fetchTaskDetail(true);
-    } catch (error) {
-      console.error('Error uploading arrival photo:', error);
-      alert((error as Error).message || 'Failed to upload arrival photo');
-    } finally {
-      setUploadingArrivalPhoto(false);
     }
   };
 
@@ -492,110 +474,6 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
             </>
           )}
 
-          {/* Service Checklist */}
-          {(task.status === 'confirmed' || task.status === 'in-progress') && (() => {
-            const checklist = task.workerChecklist ?? [];
-            const done = checklist.filter(i => i.completed).length;
-            const total = checklist.length;
-            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-
-            const DEFAULT_ITEMS: Record<string, string[]> = {
-              cleaning: ['Dust all surfaces','Mop/vacuum floors','Wipe mirrors & glass','Clean bathroom(s)','Tidy kitchen','Empty trash bins'],
-              maid:     ['Wash/fold laundry','Wash dishes','Sweep & mop floors','Tidy living areas','Clean kitchen','Clean bathroom(s)'],
-              plumbing: ['Inspect issue','Shut off water supply','Complete repair','Test for leaks','Restore water supply','Clean work area'],
-              ac:       ['Inspect unit','Clean air filters','Check coolant level','Clean condenser coils','Run test cycle','Log service report'],
-              default:  ['Prepare tools/equipment','Start main task','Complete task steps','Quality check','Clean up work area','Document work done'],
-            };
-            const category = (task.service?.name ?? task.bookingType ?? '').toLowerCase();
-            const defaults = DEFAULT_ITEMS[
-              Object.keys(DEFAULT_ITEMS).find(k => category.includes(k)) ?? 'default'
-            ];
-
-            const handleInit = async () => {
-              try {
-                const res = await bookingsAPI.initChecklist(taskId, defaults);
-                setTask(prev => prev ? { ...prev, workerChecklist: res.checklist } : prev);
-              } catch { alert('Failed to start checklist'); }
-            };
-
-            const handleToggle = async (itemId: string) => {
-              try {
-                const res = await bookingsAPI.toggleChecklistItem(taskId, itemId);
-                setTask(prev => {
-                  if (!prev) return prev;
-                  return {
-                    ...prev,
-                    workerChecklist: (prev.workerChecklist ?? []).map(i =>
-                      i._id === itemId ? { ...i, completed: res.item.completed, completedAt: res.item.completedAt } : i
-                    )
-                  };
-                });
-              } catch { alert('Failed to update item'); }
-            };
-
-            return (
-              <div className="card-elevated p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-bold text-foreground flex items-center gap-2">
-                    <ListChecks className="w-5 h-5 text-primary" />
-                    Service Checklist
-                  </h3>
-                  {total > 0 && (
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                      pct === 100 ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'
-                    }`}>
-                      {done}/{total} done
-                    </span>
-                  )}
-                </div>
-
-                {total === 0 ? (
-                  <div className="text-center space-y-2">
-                    <p className="text-sm text-muted-foreground">No checklist yet. Start with the default tasks for this service.</p>
-                    <button
-                      onClick={handleInit}
-                      className="btn-brand py-2 px-4 text-sm"
-                    >
-                      <ListChecks className="w-4 h-4 inline mr-1" />
-                      Start Checklist
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {total > 0 && (
-                      <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mb-3">
-                        <div
-                          className="h-full bg-primary transition-all duration-300"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    )}
-                    {checklist.map(item => (
-                      <button
-                        key={item._id}
-                        onClick={() => handleToggle(item._id)}
-                        className={`w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-all ${
-                          item.completed
-                            ? 'bg-green-50 border-green-200 text-green-800'
-                            : 'bg-white border-border text-foreground hover:bg-muted/30'
-                        }`}
-                      >
-                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
-                          item.completed ? 'bg-green-500 border-green-500' : 'border-border'
-                        }`}>
-                          {item.completed && <CheckCircle className="w-3 h-3 text-white" />}
-                        </div>
-                        <span className={`text-sm flex-1 ${item.completed ? 'line-through opacity-70' : ''}`}>
-                          {item.text}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-
           {/* Customer Information */}
           <div className="card-elevated p-5">
             <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
@@ -737,59 +615,6 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
               </div>
             </div>
           </div>
-
-          {/* Arrival Photo Section - Show for confirmed tasks that aren't started yet */}
-          {task.status === 'confirmed' && !task.actualStartTime && (
-            <div className="card-elevated p-5 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200">
-              <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
-                <Camera className="w-5 h-5 text-blue-600" />
-                Arrival Photo
-              </h3>
-              {task.arrivalPhoto ? (
-                <div className="space-y-3">
-                  <div className="relative rounded-lg overflow-hidden border-2 border-blue-400">
-                    <img
-                      src={bookingsAPI.getCompletionPhotoUrl(task.arrivalPhoto.url)}
-                      alt="Arrival photo"
-                      className="w-full h-auto max-h-48 object-cover"
-                    />
-                  </div>
-                  <div className="flex items-center justify-center gap-2 text-blue-700 text-sm font-medium">
-                    <CheckCircle className="w-4 h-4" />
-                    Arrival photo submitted
-                    {task.arrivalPhoto.timestamp && (
-                      <span className="text-xs text-muted-foreground">
-                        · {new Date(task.arrivalPhoto.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ) : uploadingArrivalPhoto ? (
-                <div className="text-center py-4">
-                  <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-2" />
-                  <p className="text-blue-700 text-sm font-medium">Uploading photo…</p>
-                </div>
-              ) : showArrivalCapture ? (
-                <PhotoCapture
-                  onPhotoCapture={handleArrivalPhotoCapture}
-                  onCancel={() => setShowArrivalCapture(false)}
-                  showPreview={false}
-                  autoUpload={true}
-                />
-              ) : (
-                <div className="space-y-2 text-center">
-                  <p className="text-sm text-blue-700">Take a selfie when you arrive to notify the customer</p>
-                  <button
-                    onClick={() => setShowArrivalCapture(true)}
-                    className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg flex items-center justify-center gap-2 transition-colors"
-                  >
-                    <Camera className="w-4 h-4" />
-                    Take Arrival Photo
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* QR Code Section - Show for confirmed/scheduled tasks */}
           {task.status !== 'completed' && !task.actualStartTime && (

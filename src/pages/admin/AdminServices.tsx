@@ -54,6 +54,7 @@ interface Service {
       workersRequired?: number;
     }>;
   };
+  tags?: string[];
 }
 
 interface UserProfile {
@@ -72,6 +73,18 @@ interface ServiceRequest {
   superAdminNote: string;
   createdAt: string;
 }
+
+const MINI_SERVICE_TYPES = [
+  { id: 'deep_cleaning_kitchen',  label: 'Kitchen Deep Clean',  price: 399, duration: 45 },
+  { id: 'deep_cleaning_bathroom', label: 'Bathroom Deep Clean', price: 249, duration: 30 },
+  { id: 'fixed_sofa_cleaning',    label: 'Sofa Cleaning',       price: 499, duration: 60 },
+  { id: 'fixed_carpet_cleaning',  label: 'Carpet Cleaning',     price: 349, duration: 45 },
+  { id: 'fixed_window_cleaning',  label: 'Window Cleaning',     price: 299, duration: 30 },
+  { id: 'fixed_fan_cleaning',     label: 'Fan Cleaning',        price: 149, duration: 20 },
+  { id: 'fixed_balcony_cleaning', label: 'Balcony Cleaning',    price: 199, duration: 25 },
+  { id: 'fixed_fridge_cleaning',  label: 'Fridge Deep Clean',   price: 249, duration: 40 },
+];
+const MINI_SERVICE_IDS = new Set(MINI_SERVICE_TYPES.map(t => t.id));
 
 const SERVICE_TYPE_CARDS = [
   {
@@ -121,6 +134,22 @@ const SERVICE_TYPE_CARDS = [
       category: 'cleaning',
       price: 499,
       duration: 60,
+    }
+  },
+  {
+    id: 'deep_cleaning_kitchen',
+    label: 'Spot Clean / Mini Service',
+    emoji: '🧽',
+    tagline: 'Individual spot-clean tasks (kitchen, bathroom, sofa…)',
+    description: 'Bookable single-task cleaning services. Customer picks exactly what they need — kitchen, bathroom, sofa, fan, window or more.',
+    color: 'from-cyan-500/10 to-teal-500/10 border-cyan-200',
+    badge: 'bg-cyan-100 text-cyan-700',
+    defaults: {
+      name: 'Kitchen Deep Clean',
+      description: 'Professional deep cleaning of your kitchen including stove, sink, tiles, and surfaces.',
+      category: 'cleaning',
+      price: 399,
+      duration: 45,
     }
   }
 ];
@@ -326,7 +355,10 @@ const AdminServices = () => {
         const res = await servicesAPI.create({
           ...formData,
           serviceType: selectedServiceType || 'other',
-          serviceTypeName: SERVICE_TYPE_CARDS.find(c => c.id === selectedServiceType)?.label || formData.name
+          serviceTypeName: SERVICE_TYPE_CARDS.find(c => c.id === selectedServiceType)?.label || formData.name,
+          ...(MINI_SERVICE_IDS.has(selectedServiceType ?? '') && {
+            tags: ['mini-service', 'spot-clean']
+          })
         });
         if (res.requestSubmitted) {
           toast.success('Request sent to Super Admin for approval!', { duration: 5000 });
@@ -774,6 +806,39 @@ const AdminServices = () => {
                     required
                   />
                 </div>
+
+                {/* Mini-service subtype selector */}
+                {MINI_SERVICE_IDS.has(selectedServiceType ?? '') && (
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Service Sub-type *
+                    </label>
+                    <select
+                      value={selectedServiceType ?? ''}
+                      onChange={(e) => {
+                        const chosen = MINI_SERVICE_TYPES.find(t => t.id === e.target.value);
+                        if (!chosen) return;
+                        setSelectedServiceType(chosen.id);
+                        setFormData(prev => ({
+                          ...prev,
+                          price: chosen.price,
+                          duration: chosen.duration,
+                          pricingPlans: {
+                            oneTime: chosen.price,
+                            daily: Math.round(chosen.price * 0.85),
+                            weekly: Math.round(chosen.price * 0.75 * 7),
+                            monthly: Math.round(chosen.price * 0.65 * 30)
+                          }
+                        }));
+                      }}
+                      className="input-clean"
+                    >
+                      {MINI_SERVICE_TYPES.map(t => (
+                        <option key={t.id} value={t.id}>{t.label} — ₹{t.price}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
