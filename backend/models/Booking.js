@@ -85,7 +85,7 @@ const bookingSchema = new mongoose.Schema({
   // Recurring booking details
   bookingType: {
     type: String,
-    enum: ['adhoc', 'recurring-short', 'monthly-subscription', 'oneTime', 'daily', 'weekly', 'monthly', 'deep-cleaning-cart'],
+    enum: ['adhoc', 'recurring-short', 'monthly-subscription', 'oneTime', 'daily', 'weekly', 'biweekly', 'monthly', 'deep-cleaning-cart'],
     default: 'adhoc'
   },
   isRecurring: {
