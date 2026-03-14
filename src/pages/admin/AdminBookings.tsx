@@ -18,6 +18,7 @@ interface Booking {
   customer: { _id: string; name: string; email: string } | null;
   worker?: { _id: string; name: string; email: string } | null;
   service: { _id: string; name: string; category: string } | null;
+  bookingType?: string;
   location?: { address?: string; city?: string; state?: string; zipCode?: string } | null;
   bookingDate: string;
   startTime: string;
@@ -162,7 +163,7 @@ const AdminBookings = () => {
         id: b._id.slice(-8).toUpperCase(),
         customer: b.customer?.name || 'Unknown',
         worker: b.worker?.name || '—',
-        service: b.service?.name || 'Unknown',
+        service: b.service?.name || (b.bookingType === 'deep-cleaning-cart' ? 'Deep Cleaning' : 'Unknown'),
         date: b.bookingDate ? new Date(b.bookingDate).toLocaleDateString('en-IN') : '—',
         startTime: b.startTime,
         endTime: b.endTime,
@@ -267,7 +268,7 @@ const AdminBookings = () => {
                     <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{b._id.slice(-6).toUpperCase()}</td>
                     <td className="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">{b.customer?.name || 'Unknown'}</td>
                     <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{b.worker?.name || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{b.service?.name || 'Unknown'}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{b.service?.name || (b.bookingType === 'deep-cleaning-cart' ? '✨ Deep Cleaning' : 'Unknown')}</td>
                     <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
                       {formatDate(b.bookingDate)} · {formatTime(b.startTime)}
                     </td>

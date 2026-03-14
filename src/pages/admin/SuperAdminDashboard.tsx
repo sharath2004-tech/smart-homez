@@ -69,6 +69,7 @@ interface Booking {
   customer: { name: string } | null;
   worker: { name: string } | null;
   service: { name: string } | null;
+  bookingType?: string;
   startTime: string;
   endTime: string;
   status: string;
@@ -343,7 +344,7 @@ const SuperAdminDashboard = () => {
         id: b._id.slice(-8).toUpperCase(),
         customer: b.customer?.name || 'Unknown',
         worker: b.worker?.name || '—',
-        service: b.service?.name || 'Unknown',
+        service: b.service?.name || (b.bookingType === 'deep-cleaning-cart' ? 'Deep Cleaning' : 'Unknown'),
         date: b.bookingDate ? new Date(b.bookingDate).toLocaleDateString('en-IN') : '—',
         startTime: b.startTime,
         endTime: b.endTime,
@@ -1074,7 +1075,7 @@ const SuperAdminDashboard = () => {
                                   <td className="px-4 py-3 text-xs font-mono text-muted-foreground whitespace-nowrap">{b._id.slice(-8)}</td>
                                   <td className="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">{b.customer?.name ?? "Unknown"}</td>
                                   <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{b.worker?.name ?? "—"}</td>
-                                  <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{b.service?.name ?? "Unknown"}</td>
+                                  <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{b.service?.name ?? (b.bookingType === 'deep-cleaning-cart' ? '✨ Deep Cleaning' : 'Unknown')}</td>
                                   <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                                     {b.bookingDate ? new Date(b.bookingDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—"}
                                   </td>

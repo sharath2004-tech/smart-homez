@@ -2,8 +2,11 @@ import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import Booking from '../models/Booking.js';
 import DeepCleaningConfig from '../models/DeepCleaningConfig.js';
+import Location from '../models/Location.js';
 import User from '../models/User.js';
+import { assignWorkersWithBackup } from '../utils/advancedWorkerAssignment.js';
 import notificationService from '../utils/notificationService.js';
+import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
 
 const router = express.Router();
 
@@ -170,18 +173,36 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
 
     // Get customer location
     const customer = await User.findById(req.user._id)
-      .select('customerProfile name')
+      .select('addresses currentLocation name')
       .lean();
 
-    const defaultAddress = customer?.customerProfile?.addresses?.find(a => a.isDefault)
-      || customer?.customerProfile?.addresses?.[0];
+    const defaultAddress = customer?.addresses?.find(a => a.isDefault)
+      || customer?.addresses?.[0];
+
+    // Resolve coordinates from saved address or current location
+    const coords = defaultAddress?.location?.coordinates || customer?.currentLocation?.coordinates;
+    const [customerLng, customerLat] = coords || [null, null];
+
+    // $near lookup to resolve the Location doc (needed for admin region filter + worker assignment)
+    let nearbyLocation = null;
+    if (customerLng != null && customerLat != null) {
+      nearbyLocation = await Location.findOne({
+        location: {
+          $near: {
+            $geometry: { type: 'Point', coordinates: [customerLng, customerLat] },
+            $maxDistance: 5000
+          }
+        },
+        isActive: true
+      });
+    }
 
     const locationData = address || {
-      locationId:    defaultAddress?.locationId || null,
-      apartmentName: defaultAddress?.apartment  || '',
-      area:          defaultAddress?.area        || '',
-      city:          defaultAddress?.city        || '',
-      address:       defaultAddress?.fullAddress || ''
+      locationId:    nearbyLocation?._id || null,
+      apartmentName: defaultAddress?.apartment  || nearbyLocation?.apartmentName || '',
+      area:          defaultAddress?.area        || nearbyLocation?.area || '',
+      city:          defaultAddress?.city        || nearbyLocation?.city || '',
+      address:       defaultAddress?.street      || ''
     };
 
     const notesSummary = verifiedCartItems
@@ -217,7 +238,50 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
       console.error('Notification error (non-fatal):', notifErr.message);
     }
 
-    res.status(201).json({ success: true, booking, totalAmount: calculatedTotal });
+    // Auto-assign a worker (same pattern as standard bookings)
+    try {
+      const assignmentResult = await assignWorkersWithBackup({
+        customerId:  req.user._id,
+        bookingDate: booking.bookingDate,
+        startTime:   booking.startTime,
+        endTime:     booking.endTime,
+        location:    locationData,
+        bookingType: 'deep-cleaning-cart'
+      });
+
+      if (assignmentResult.success) {
+        booking.worker           = assignmentResult.primaryWorker;
+        booking.backupWorkers    = assignmentResult.backupWorkers || [];
+        booking.assignmentMethod = assignmentResult.assignmentMethod;
+        booking.assignedAt       = new Date();
+        booking.status           = 'confirmed';
+        booking.confirmedAt      = new Date();
+        await booking.save();
+      } else {
+        // Fallback to preference-based assignment
+        const fallbackResult = await findWorkerWithPreferences({
+          customerId: req.user._id,
+          bookingDate: booking.bookingDate,
+          startTime:   booking.startTime,
+          endTime:     booking.endTime,
+          location:    locationData,
+          radius:      5000
+        }, Booking);
+        if (fallbackResult.success) {
+          booking.worker           = fallbackResult.worker._id;
+          booking.assignmentMethod = fallbackResult.assignmentMethod;
+          booking.assignedAt       = new Date();
+          booking.status           = 'confirmed';
+          booking.confirmedAt      = new Date();
+          await booking.save();
+        }
+      }
+    } catch (assignErr) {
+      console.error('Worker assignment error (non-fatal):', assignErr.message);
+    }
+
+    const finalBooking = await Booking.findById(booking._id).populate('worker', 'name phone workerProfile').lean();
+    res.status(201).json({ success: true, booking: finalBooking, totalAmount: calculatedTotal });
   } catch (err) {
     console.error('Deep cleaning booking error:', err);
     res.status(500).json({ error: { message: err.message, status: 500 } });
