@@ -415,17 +415,6 @@ router.post('/',
         console.log(`✅ Service auto-resolved: ${fallbackService.name} (${fallbackService.serviceType})`);
       }
 
-      // Validate subscription bookings require a worker
-      if (isSubscription && !worker) {
-        return res.status(400).json({ 
-          error: { 
-            message: 'Subscription bookings require a worker to be selected for consistency.', 
-            status: 400,
-            code: 'WORKER_REQUIRED_FOR_SUBSCRIPTION'
-          } 
-        });
-      }
-      
       // Validate subscription details
       if (isSubscription && subscriptionDetails) {
         if (!subscriptionDetails.startDate) {
@@ -687,10 +676,12 @@ router.post('/',
           preferredTime: subscriptionDetails.preferredTime
         };
         
-        // Auto-confirm subscription bookings since worker is pre-assigned
-        bookingData.status = 'confirmed';
-        bookingData.confirmedAt = new Date();
-        bookingData.assignedAt = new Date();
+        // Status: confirmed if worker already known (manual), pending if auto-assignment will run
+        bookingData.status = worker ? 'confirmed' : 'pending';
+        if (worker) {
+          bookingData.confirmedAt = new Date();
+          bookingData.assignedAt = new Date();
+        }
       }
 
       // Add recurring schedule if it's a recurring booking (non-subscription)
@@ -734,7 +725,12 @@ router.post('/',
             booking.backupWorkers = assignmentResult.backupWorkers || [];
             booking.assignmentMethod = assignmentResult.assignmentMethod;
             booking.assignedAt = new Date();
-            
+
+            // For subscription bookings, pin the auto-assigned worker as the fixed daily worker
+            if (booking.subscription?.isSubscription) {
+              booking.subscription.fixedWorker = assignmentResult.primaryWorker;
+            }
+
             // Auto-confirm booking when worker is assigned
             if (booking.status === 'pending') {
               booking.status = 'confirmed';
@@ -793,7 +789,12 @@ router.post('/',
               booking.worker = fallbackResult.worker._id;
               booking.assignmentMethod = fallbackResult.assignmentMethod;
               booking.assignedAt = new Date();
-              
+
+              // Pin fallback-assigned worker as fixed worker for subscriptions
+              if (booking.subscription?.isSubscription) {
+                booking.subscription.fixedWorker = fallbackResult.worker._id;
+              }
+
               if (booking.status === 'pending') {
                 booking.status = 'confirmed';
                 booking.confirmedAt = new Date();

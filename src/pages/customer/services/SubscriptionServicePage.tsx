@@ -7,7 +7,6 @@ import {
     ChevronLeft,
     Clock,
     RefreshCw,
-    Repeat,
     Star,
     User,
     Zap,
@@ -23,6 +22,7 @@ interface Service {
   price: number;
   duration: number;
   serviceType: string;
+  durationOptions?: { hours: number; price: number; isDefault?: boolean }[];
   subscriptionPlans?: {
     id: string;
     name: string;
@@ -47,16 +47,6 @@ interface UserProfile {
   }[];
 }
 
-const DAYS_OF_WEEK = [
-  { id: "monday", label: "Mon" },
-  { id: "tuesday", label: "Tue" },
-  { id: "wednesday", label: "Wed" },
-  { id: "thursday", label: "Thu" },
-  { id: "friday", label: "Fri" },
-  { id: "saturday", label: "Sat" },
-  { id: "sunday", label: "Sun" },
-];
-
 const FREQUENCY_OPTIONS = [
   { id: "daily", label: "Daily", icon: "📆", desc: "Every day", days: 30 },
   { id: "custom-days", label: "5 Days/Week", icon: "📅", desc: "Weekdays only", days: 20 },
@@ -64,7 +54,7 @@ const FREQUENCY_OPTIONS = [
   { id: "weekly", label: "Weekly", icon: "📋", desc: "Once a week", days: 4 },
 ];
 
-const SESSION_HOURS = [1, 2, 3, 4];
+const SESSION_HOURS = [1, 1.5, 2, 2.5, 3, 3.5];
 const TIME_SLOTS = [
   "06:00", "07:00", "08:00", "09:00", "10:00", "11:00",
   "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00",
@@ -79,10 +69,10 @@ const SubscriptionServicePage = () => {
   const [booking, setBooking] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
-  // Booking params
-  const [frequency, setFrequency] = useState("daily");
-  const [selectedDays, setSelectedDays] = useState<string[]>(["monday", "tuesday", "wednesday", "thursday", "friday"]);
-  const [sessionHours, setSessionHours] = useState(2);
+  // Booking params — frequency is fixed to "daily" for this Monthly Pack
+  const frequency = "daily";
+  const selectedDays: string[] = []; // daily plan has no specific day selection
+  const [sessionHours, setSessionHours] = useState(1);
   const [startDate, setStartDate] = useState("");
   const [preferredTime, setPreferredTime] = useState("09:00");
   const [autoRenewal, setAutoRenewal] = useState(true);
@@ -115,20 +105,13 @@ const SubscriptionServicePage = () => {
     }
   };
 
-  const toggleDay = (id: string) => {
-    setSelectedDays((prev) =>
-      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
-    );
-  };
-
   const currentFreq = FREQUENCY_OPTIONS.find((f) => f.id === frequency);
-  const basePrice = selectedService?.price ?? 120;
-  // Monthly cost projection: sessions × price per session (hours set duration, not price multiplier)
-  const sessionsPerMonth = currentFreq?.days ?? 20;
-  const pricePerSession = basePrice;
-  const monthlyPrice = sessionsPerMonth * pricePerSession;
-  const discount = 20; // 20% subscription discount
-  const discountedPrice = Math.round(monthlyPrice * (1 - discount / 100));
+  // Pricing: look up the monthly price from durationOptions for chosen hours
+  const durationOption = selectedService?.durationOptions?.find(
+    (d) => d.hours === sessionHours
+  );
+  const monthlyPrice = durationOption?.price ?? selectedService?.price ?? 0;
+  const discountedPrice = monthlyPrice; // durationOptions prices are already the subscription prices
 
   const getEndDate = () => {
     const d = new Date(startDate);
@@ -144,8 +127,6 @@ const SubscriptionServicePage = () => {
   const handleBook = async () => {
     if (!selectedService) return toast.error("Please select a service");
     if (!startDate) return toast.error("Please select a start date");
-    if (frequency === "weekly" && selectedDays.length === 0)
-      return toast.error("Select at least one day for weekly plan");
 
     const defaultAddr = profile?.addresses?.find((a) => a.isDefault) || profile?.addresses?.[0];
 
@@ -163,7 +144,7 @@ const SubscriptionServicePage = () => {
           startDate,
           endDate: getEndDate(),
           frequency,
-          selectedDays: frequency === "weekly" || frequency === "custom-days" ? selectedDays : [],
+          selectedDays: [],
           preferredTime,
           durationPerSession: sessionHours,
           autoRenewal,
@@ -318,9 +299,9 @@ const SubscriptionServicePage = () => {
                           </p>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className="text-xs text-muted-foreground line-through">₹{svc.price.toLocaleString('en-IN')}/session</p>
-                          <p className="font-bold text-green-700">₹{Math.round(svc.price * 0.8).toLocaleString('en-IN')}</p>
-                          <p className="text-xs text-muted-foreground">/session · 20% off</p>
+                          <p className="text-xs text-muted-foreground">from</p>
+                          <p className="font-bold text-blue-700">₹{svc.price.toLocaleString('en-IN')}/mo</p>
+                          <p className="text-xs text-muted-foreground">1h daily</p>
                         </div>
                       </div>
                     </button>
@@ -351,63 +332,15 @@ const SubscriptionServicePage = () => {
               </div>
             </div>
 
-            {/* Frequency */}
-            <div>
-              <h2 className="font-semibold text-foreground mb-2 flex items-center gap-2">
-                <Repeat className="w-4 h-4 text-blue-500" /> Frequency
-              </h2>
-              <div className="grid grid-cols-2 gap-2">
-                {FREQUENCY_OPTIONS.map((f) => (
-                  <button
-                    key={f.id}
-                    onClick={() => setFrequency(f.id)}
-                    className={`p-3 rounded-xl border-2 text-left transition-all ${
-                      frequency === f.id
-                        ? "border-blue-400 bg-blue-50"
-                        : "border-border hover:border-blue-300"
-                    }`}
-                  >
-                    <div className="text-xl mb-1">{f.icon}</div>
-                    <p className="text-sm font-semibold text-foreground">{f.label}</p>
-                    <p className="text-xs text-muted-foreground">{f.desc}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Day selection for weekly-type */}
-            {(frequency === "weekly" || frequency === "custom-days" || frequency === "3-days") && (
-              <div>
-                <h2 className="font-semibold text-foreground mb-2">Select Days</h2>
-                <div className="flex gap-2 flex-wrap">
-                  {DAYS_OF_WEEK.map((day) => (
-                    <button
-                      key={day.id}
-                      onClick={() => toggleDay(day.id)}
-                      className={`px-3 py-1.5 rounded-xl border-2 text-sm font-medium transition-all ${
-                        selectedDays.includes(day.id)
-                          ? "border-blue-400 bg-blue-50 text-blue-700"
-                          : "border-border hover:border-blue-300"
-                      }`}
-                    >
-                      {day.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Monthly estimate */}
             <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200">
-              <p className="text-sm font-semibold text-blue-900 mb-1">Monthly Estimate</p>
+              <p className="text-sm font-semibold text-blue-900 mb-1">Monthly Total</p>
               <div className="flex items-end gap-2">
-                <span className="text-2xl font-bold text-blue-700">₹{discountedPrice.toLocaleString('en-IN')}</span>
-                <span className="text-sm text-blue-400 line-through mb-0.5">₹{monthlyPrice.toLocaleString('en-IN')}</span>
-                <span className="text-xs font-semibold text-green-600 mb-0.5">20% OFF</span>
+                <span className="text-2xl font-bold text-blue-700">₹{monthlyPrice.toLocaleString('en-IN')}</span>
+                <span className="text-xs text-blue-600 mb-0.5">/ month</span>
               </div>
               <p className="text-xs text-blue-700 mt-1">
-                <span className="line-through text-blue-400">₹{pricePerSession.toLocaleString('en-IN')}/session</span>
-                {' → '}₹{Math.round(discountedPrice / sessionsPerMonth).toLocaleString('en-IN')}/session × {sessionsPerMonth} sessions/month · {sessionHours}h each
+                {sessionHours}h daily · 30 sessions · same worker every day
               </p>
             </div>
 
@@ -567,18 +500,14 @@ const SubscriptionServicePage = () => {
 
             {/* Price breakdown */}
             <div className="p-4 rounded-2xl border border-border space-y-2">
-              <p className="text-sm font-semibold text-foreground">Monthly Cost</p>
+              <p className="text-sm font-semibold text-foreground">Cost Summary</p>
               <div className="flex justify-between text-sm text-muted-foreground">
-                <span>Without subscription</span>
-                <span className="line-through">₹{monthlyPrice}</span>
-              </div>
-              <div className="flex justify-between text-sm text-green-600 font-medium">
-                <span>20% Subscription Discount</span>
-                <span>-₹{monthlyPrice - discountedPrice}</span>
+                <span>{sessionHours}h/day · 30 days</span>
+                <span>Daily pack rate</span>
               </div>
               <div className="border-t pt-2 flex justify-between font-bold text-foreground">
                 <span>Monthly Total</span>
-                <span>₹{discountedPrice}</span>
+                <span>₹{discountedPrice.toLocaleString('en-IN')}</span>
               </div>
             </div>
 
