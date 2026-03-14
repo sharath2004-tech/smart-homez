@@ -354,7 +354,15 @@ const AdminServices = () => {
     
     try {
       if (editingId) {
-        await servicesAPI.update(editingId, formData as unknown as Record<string, unknown>);
+        // Strip UI-only _priceMode field before sending to backend
+        const payload = {
+          ...formData,
+          durationOptions: (formData.durationOptions || []).map((tier: any) => {
+            const { _priceMode, ...cleanTier } = tier;
+            return cleanTier;
+          }),
+        };
+        await servicesAPI.update(editingId, payload as unknown as Record<string, unknown>);
         toast.success('Service updated!');
       } else {
         const res = await servicesAPI.create({
