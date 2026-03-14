@@ -548,7 +548,7 @@ function ItemCard({ item, idx, cart, sqftValues, tierSelects, pulsedItem,
           {/* ── per_sqft ──────────────────────────────────────────────────── */}
           {item.pricingType === "per_sqft" && (
             <div className="mt-3">
-              <p className="text-xs text-muted-foreground mb-2">₹{item.price} per sq ft</p>
+              <p className="text-xs text-muted-foreground mb-2">Enter your flat's area in sq ft</p>
               {!inCart ? (
                 <div className="flex gap-2">
                   <input type="number" placeholder="Enter sq ft" min="1"
@@ -564,7 +564,7 @@ function ItemCard({ item, idx, cart, sqftValues, tierSelects, pulsedItem,
               ) : (
                 <div className="flex items-center justify-between bg-green-100 rounded-xl px-3 py-2">
                   <span className="text-sm font-semibold text-green-800">
-                    {entry.selectedTier} × ₹{item.price} = ₹{entry.totalPrice.toLocaleString("en-IN")}
+                    {entry.selectedTier} sq ft → ₹{entry.totalPrice.toLocaleString("en-IN")}
                   </span>
                   <motion.button whileTap={{ scale: 0.9 }} onClick={() => onRemoveSqft(item)}
                     className="text-xs text-red-500 hover:text-red-700 font-semibold ml-2">

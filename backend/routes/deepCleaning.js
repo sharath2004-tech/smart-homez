@@ -10,11 +10,22 @@ const router = express.Router();
 // ─── seed / ensure config exists ───────────────────────────────────────────
 async function ensureConfig() {
   const existing = await DeepCleaningConfig.findOne();
-  if (existing) return existing;
-  return DeepCleaningConfig.create({
-    minimumCartValue: 500,
-    items: DEFAULT_ITEMS
+  if (!existing) {
+    return DeepCleaningConfig.create({ minimumCartValue: 500, items: DEFAULT_ITEMS });
+  }
+
+  // Auto-migrate stale prices for per_sqft items
+  let dirty = false;
+  const priceUpdates = { fullhouse_bare: 8, fullhouse_furnished: 12 };
+  existing.items = existing.items.map(item => {
+    if (priceUpdates[item.id] !== undefined && item.pricingType === 'per_sqft' && item.price !== priceUpdates[item.id]) {
+      dirty = true;
+      return { ...item.toObject?.() ?? item, price: priceUpdates[item.id] };
+    }
+    return item;
   });
+  if (dirty) await existing.save();
+  return existing;
 }
 
 const DEFAULT_ITEMS = [
@@ -61,10 +72,10 @@ const DEFAULT_ITEMS = [
   // ── FULL HOUSE ─────────────────────────────────────────────────────────────
   { id: 'fullhouse_bare', category: 'fullhouse', name: 'Full House Deep Clean — Bare Flat',
     description: 'Unfurnished / empty flat, charged per sq ft', pricingType: 'per_sqft',
-    price: 7, unit: 'sqft', icon: '🏠', sortOrder: 10 },
+    price: 8, unit: 'sqft', icon: '🏠', sortOrder: 10 },
   { id: 'fullhouse_furnished', category: 'fullhouse', name: 'Full House Deep Clean — Furnished',
     description: 'Fully furnished flat with all belongings, per sq ft', pricingType: 'per_sqft',
-    price: 10, unit: 'sqft', icon: '🏡', sortOrder: 11 }
+    price: 12, unit: 'sqft', icon: '🏡', sortOrder: 11 }
 ];
 
 // ─── GET /api/deep-cleaning/config  (public — customers & admins) ───────────
@@ -98,21 +109,58 @@ router.put('/config', authenticate, authorize('super_admin'), async (req, res) =
 // ─── POST /api/deep-cleaning/booking  (customers only) ───────────────────────
 router.post('/booking', authenticate, authorize('customer'), async (req, res) => {
   try {
-    const { cartItems, totalAmount, bookingDate, startTime, address } = req.body;
+    const { cartItems, bookingDate, startTime, address } = req.body;
 
     if (!cartItems?.length) {
       return res.status(400).json({ error: { message: 'Cart is empty', status: 400 } });
     }
 
+    if (!bookingDate || !startTime) {
+      return res.status(400).json({ error: { message: 'Booking date and time are required', status: 400 } });
+    }
+
     const config = await ensureConfig();
-    if (totalAmount < config.minimumCartValue) {
+
+    // ── Server-side price recalculation (never trust client amounts) ──────────
+    let calculatedTotal = 0;
+    const verifiedCartItems = cartItems.map(item => {
+      const configItem = config.items.find(i => i.id === item.itemId);
+      if (!configItem) return null; // skip unknown items
+
+      let totalPrice = 0;
+      const qty = Math.max(1, Number(item.qty) || 1);
+
+      if (configItem.pricingType === 'per_sqft') {
+        const sqft = Math.max(0, Number(item.selectedTier) || 0);
+        totalPrice = configItem.price * sqft;
+      } else if (configItem.pricingType === 'tiered') {
+        const tier = configItem.tiers?.find(t => t.label === item.selectedTier);
+        totalPrice = tier ? tier.price * qty : 0;
+      } else {
+        // per_unit or fixed
+        totalPrice = configItem.price * qty;
+      }
+
+      calculatedTotal += totalPrice;
+      return {
+        itemId:       item.itemId,
+        name:         configItem.name,
+        category:     configItem.category,
+        qty,
+        unitPrice:    configItem.price,
+        totalPrice,
+        selectedTier: item.selectedTier || null
+      };
+    }).filter(Boolean);
+
+    if (verifiedCartItems.length === 0) {
+      return res.status(400).json({ error: { message: 'No valid items in cart', status: 400 } });
+    }
+
+    if (calculatedTotal < config.minimumCartValue) {
       return res.status(400).json({
         error: { message: `Minimum cart value is ₹${config.minimumCartValue}`, status: 400 }
       });
-    }
-
-    if (!bookingDate || !startTime) {
-      return res.status(400).json({ error: { message: 'Booking date and time are required', status: 400 } });
     }
 
     // Build endTime: deep cleaning sessions default to 3 hours
@@ -136,8 +184,7 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
       address:       defaultAddress?.fullAddress || ''
     };
 
-    // Build a notes summary
-    const notesSummary = cartItems
+    const notesSummary = verifiedCartItems
       .map(i => `${i.name} x${i.qty} = ₹${i.totalPrice}`)
       .join(', ');
 
@@ -147,8 +194,8 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
       bookingDate:  new Date(bookingDate),
       startTime,
       endTime,
-      totalAmount,
-      cartItems,
+      totalAmount:  calculatedTotal,
+      cartItems:    verifiedCartItems,
       location:     locationData,
       notes:        `Deep Cleaning Cart: ${notesSummary}`,
       status:       'pending'
@@ -162,7 +209,7 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
           userId:  sa._id,
           type:    'booking_created',
           title:   'New Deep Cleaning Booking',
-          message: `New cart booking of ₹${totalAmount} from ${customer.name || 'customer'}`,
+          message: `New cart booking of ₹${calculatedTotal} from ${customer.name || 'customer'}`,
           data:    { bookingId: booking._id }
         });
       }
@@ -170,7 +217,7 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
       console.error('Notification error (non-fatal):', notifErr.message);
     }
 
-    res.status(201).json({ success: true, booking });
+    res.status(201).json({ success: true, booking, totalAmount: calculatedTotal });
   } catch (err) {
     console.error('Deep cleaning booking error:', err);
     res.status(500).json({ error: { message: err.message, status: 500 } });

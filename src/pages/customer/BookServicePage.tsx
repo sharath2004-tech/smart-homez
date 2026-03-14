@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { authAPI, bookingsAPI, servicesAPI, settingsAPI } from "@/lib/api";
-import { Calendar, ChevronLeft, Clock, Info, MapPin, Sparkles, Star, User, Users, Zap } from "lucide-react";
+import { Calendar, Clock, Info, MapPin, Sparkles, Star, User, Users, Zap } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -280,13 +280,21 @@ const BookServicePage = () => {
 
   const calculatePrice = () => {
     if (!service) return 0;
-    
-    if (service.pricingPlans) {
-      return service.pricingPlans[bookingType];
+    // Scale price proportionally to selected session duration
+    const defaultHours = (service.duration || 60) / 60;
+    const durationRatio = durationPerSession / defaultHours;
+
+    if (bookingType !== 'oneTime') {
+      // Use the selected subscription plan's price as the base for the default duration
+      const plan = subscriptionPlans.find(p => p.name === bookingType);
+      if (plan) return Math.round(plan.price * durationRatio);
     }
-    
-    // Fallback to default price
-    return service.price;
+
+    // One-time: use pricingPlans.oneTime or service.price as base
+    const base = (service.pricingPlans as Record<string, number> | undefined)?.[bookingType]
+      ?? service.pricingPlans?.oneTime
+      ?? service.price;
+    return Math.round(base * durationRatio);
   };
 
   const handleBooking = async (e: React.FormEvent) => {
@@ -642,14 +650,9 @@ const BookServicePage = () => {
     <AppLayout userType="customer" userName={profile?.name || "Guest"}>
       <div className="max-w-2xl mx-auto space-y-6 pb-20 md:pb-0">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <Link to="/customer/services" className="p-2 hover:bg-muted rounded-lg transition-colors">
-            <ChevronLeft className="w-5 h-5" />
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold font-heading text-foreground">Book Service</h1>
-            <p className="text-sm text-muted-foreground">Complete your booking details</p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold font-heading text-foreground">Book Service</h1>
+          <p className="text-sm text-muted-foreground">Complete your booking details</p>
         </div>
 
         {/* Service Details Card */}
@@ -841,7 +844,38 @@ const BookServicePage = () => {
               </div>
             </div>
           )}
-          {/* Booking Type Selection with Subscriptions - Dynamic */}
+          {/* Duration Per Session — select first so plan prices update live */}
+          <div className="card-elevated p-6">
+            <h3 className="font-bold text-foreground mb-3 flex items-center gap-2">
+              <Clock className="w-5 h-5 text-primary" />
+              Session Duration
+            </h3>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: 0.5, label: '30 min' },
+                { value: 1,   label: '1 hr' },
+                { value: 1.5, label: '1.5 hr' },
+                { value: 2,   label: '2 hr' },
+                { value: 3,   label: '3 hr' },
+                { value: 4,   label: '4 hr' },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setDurationPerSession(opt.value)}
+                  className={`py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+                    durationPerSession === opt.value
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : 'border-border text-muted-foreground hover:border-primary/50'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">Plan prices below update based on your selection.</p>
+          </div>
+
           <div className="card-elevated p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-foreground flex items-center gap-2">
@@ -874,8 +908,12 @@ const BookServicePage = () => {
                   <div className="font-semibold text-foreground">{plan.displayName}</div>
                   <div className="text-xs text-muted-foreground mt-1">{plan.description}</div>
                   <div className="text-lg font-bold text-primary mt-2">
-                    ₹{plan.price}{plan.name !== 'oneTime' ? `/${plan.name.replace('ly', '')}` : ''}
+                    ₹{Math.round(plan.price * (durationPerSession / ((service?.duration || 60) / 60)))}
+                    {plan.name !== 'oneTime' ? `/${plan.name.replace('ly', '')}` : ''}
                   </div>
+                  {plan.name === 'oneTime' && (
+                    <div className="text-xs text-muted-foreground mt-0.5">per session</div>
+                  )}
                   {plan.requiresFixedWorker && (
                     <div className="text-xs text-muted-foreground mt-2">✓ Fixed worker</div>
                   )}
@@ -964,27 +1002,6 @@ const BookServicePage = () => {
                     required
                   />
                   <p className="text-xs text-muted-foreground mt-1">What time should the worker arrive?</p>
-                </div>
-
-                {/* Duration Per Session */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Duration Per Session <span className="text-destructive">*</span>
-                  </label>
-                  <select
-                    value={durationPerSession}
-                    onChange={(e) => setDurationPerSession(Number(e.target.value))}
-                    className="input-clean"
-                    required
-                  >
-                    <option value={0.5}>30 minutes</option>
-                    <option value={1}>1 hour</option>
-                    <option value={1.5}>1.5 hours</option>
-                    <option value={2}>2 hours</option>
-                    <option value={3}>3 hours</option>
-                    <option value={4}>4 hours</option>
-                  </select>
-                  <p className="text-xs text-muted-foreground mt-1">How long should each service last?</p>
                 </div>
 
                 {/* Day Selection for Weekly */}
@@ -1331,7 +1348,11 @@ const BookServicePage = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Duration</span>
-                <span className="font-medium text-foreground">{service.duration} minutes</span>
+                <span className="font-medium text-foreground">
+                  {bookingType === 'oneTime'
+                    ? `${service.duration} min`
+                    : `${durationPerSession >= 1 ? `${durationPerSession}hr` : `${durationPerSession * 60}min`} / session`}
+                </span>
               </div>
               <div className="h-px bg-border my-3"></div>
               <div className="flex justify-between text-lg">

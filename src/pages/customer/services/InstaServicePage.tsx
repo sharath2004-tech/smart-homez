@@ -4,7 +4,6 @@ import { motion } from "framer-motion";
 import {
     Briefcase,
     Calendar,
-    ChevronLeft,
     Clock,
     MapPin,
     ShoppingBag,
@@ -13,7 +12,7 @@ import {
     Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 interface UserProfile {
@@ -234,21 +233,13 @@ const InstaServicePage = () => {
       <div className="max-w-lg mx-auto pb-24 space-y-6">
 
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <Link
-            to="/customer/services"
-            className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center hover:bg-border transition-colors"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </Link>
-          <div>
-            <h1 className="text-xl font-bold font-heading text-foreground flex items-center gap-2">
-              <span>⚡</span> Insta Maid Service
-            </h1>
-            <p className="text-xs text-muted-foreground">
-              On-demand hourly cleaning · ₹{pricePerHour}/hr
-            </p>
-          </div>
+        <div>
+          <h1 className="text-xl font-bold font-heading text-foreground flex items-center gap-2">
+            <span>⚡</span> Insta Maid Service
+          </h1>
+          <p className="text-xs text-muted-foreground">
+            On-demand hourly cleaning · ₹{pricePerHour}/hr
+          </p>
         </div>
 
         {/* No-service notice */}
