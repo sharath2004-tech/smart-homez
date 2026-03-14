@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 
 const quoteRequestSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
   name: {
     type: String,
     required: [true, 'Name is required'],
@@ -29,8 +34,8 @@ const quoteRequestSchema = new mongoose.Schema({
   },
   placeSize: {
     type: String,   // e.g. "2000 sq ft", "3 floors", "1500 sq ft per floor"
-    trim: true,
-    default: ''
+    required: [true, 'Place size is required'],
+    trim: true
   },
   city: {
     type: String,   // Used to route to regional admin

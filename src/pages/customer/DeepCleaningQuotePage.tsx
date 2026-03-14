@@ -51,12 +51,17 @@ const DeepCleaningQuotePage = () => {
       setError("Please describe your property type"); return;
     }
     if (!form.city.trim()) { setError("Please select your city"); return; }
+    if (!form.placeSize.trim()) { setError("Please enter the place size"); return; }
 
     setLoading(true);
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch(`${API_BASE_URL}/quotes`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
         body: JSON.stringify({ ...form, phone: "+91" + digits }),
       });
       const data = await res.json();
@@ -70,6 +75,7 @@ const DeepCleaningQuotePage = () => {
   };
 
   if (done) {
+    const isLoggedIn = !!localStorage.getItem('token');
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-6">
         <div className="text-center max-w-md animate-scale-in">
@@ -83,7 +89,14 @@ const DeepCleaningQuotePage = () => {
           <p className="text-sm text-muted-foreground bg-muted rounded-xl p-4 mb-6">
             Make sure your phone is reachable. Our team may also send details via WhatsApp.
           </p>
-          <Link to="/" className="btn-brand px-8 inline-block">Back to Home</Link>
+          <div className="flex flex-col gap-3">
+            {isLoggedIn && (
+              <Link to="/customer/my-quotes" className="btn-brand px-8 inline-block">View My Quotes</Link>
+            )}
+            <Link to={isLoggedIn ? "/customer/services" : "/"} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              {isLoggedIn ? "← Back to Services" : "← Back to Home"}
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -212,12 +225,13 @@ const DeepCleaningQuotePage = () => {
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Place Size <span className="text-muted-foreground font-normal">(optional)</span></label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Place Size <span className="text-destructive">*</span></label>
                 <input
                   className="input-clean"
                   placeholder="e.g. 2000 sq ft, 3 floors, 10 rooms"
                   value={form.placeSize}
                   onChange={set("placeSize")}
+                  required
                 />
               </div>
             </div>
@@ -252,7 +266,12 @@ const DeepCleaningQuotePage = () => {
         </div>
 
         <div className="text-center mt-6">
-          <Link to="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">← Back to Home</Link>
+          <Link
+            to={localStorage.getItem('token') ? "/customer/services" : "/"}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            ← Back to {localStorage.getItem('token') ? "Services" : "Home"}
+          </Link>
         </div>
       </div>
     </div>

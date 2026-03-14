@@ -58,6 +58,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
     { to: "/customer/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },
     { to: "/customer/services", icon: Wrench, label: t('nav.services') },
     { to: "/customer/bookings", icon: Calendar, label: t('nav.myBookings') },
+    { to: "/customer/my-quotes", icon: FileText, label: "My Quotes" },
     { to: "/customer/subscriptions", icon: RefreshCw, label: t('nav.mySubscriptions') },
     { to: "/customer/payments", icon: CreditCard, label: t('nav.payments') },
     { to: "/customer/profile", icon: User, label: t('nav.profile') },

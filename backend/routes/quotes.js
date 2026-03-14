@@ -1,4 +1,5 @@
 import express from 'express';
+import jwt from 'jsonwebtoken';
 import { authenticate, authorize } from '../middleware/auth.js';
 import Location from '../models/Location.js';
 import Notification from '../models/Notification.js';
@@ -27,7 +28,18 @@ router.post('/', async (req, res) => {
     if (!phone?.trim()) return res.status(400).json({ error: { message: 'Phone number is required', status: 400 } });
     if (!propertyType) return res.status(400).json({ error: { message: 'Property type is required', status: 400 } });
 
+    // Optionally attach userId if a valid token is present
+    let userId = null;
+    const authHeader = req.header('Authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      try {
+        const decoded = jwt.verify(authHeader.replace('Bearer ', ''), process.env.JWT_SECRET);
+        userId = decoded.id || decoded._id || null;
+      } catch { /* ignore invalid/expired token */ }
+    }
+
     const quote = new QuoteRequest({
+      userId,
       name: name.trim(),
       phone: phone.trim(),
       email: email?.trim() || null,
@@ -91,6 +103,18 @@ router.post('/', async (req, res) => {
     res.status(201).json({ success: true, message: 'Quote request submitted. Our team will contact you shortly.' });
   } catch (error) {
     console.error('Quote request error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   GET /api/quotes/mine
+// @desc    Get quote requests submitted by the logged-in customer
+// @access  Private (customer)
+router.get('/mine', authenticate, async (req, res) => {
+  try {
+    const quotes = await QuoteRequest.find({ userId: req.user._id }).sort({ createdAt: -1 });
+    res.json({ success: true, data: quotes });
+  } catch (error) {
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
   }
 });
