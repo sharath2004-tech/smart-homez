@@ -363,11 +363,10 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
   if (!booking) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto">
-      <div className="min-h-screen p-4 flex items-start justify-center py-8">
-        <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[90vh]">
           {/* Header */}
-          <div className="sticky top-0 bg-primary text-primary-foreground p-6 rounded-t-2xl flex items-center gap-4">
+          <div className="bg-primary text-primary-foreground px-6 py-4 rounded-t-2xl flex items-center gap-4 shrink-0">
             <button
               onClick={onClose}
               className="p-2 hover:bg-white/10 rounded-lg transition-colors"
@@ -380,7 +379,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
             </div>
           </div>
 
-          <div className="p-6 space-y-6">
+          <div className="overflow-y-auto flex-1 p-6 space-y-6">
             {/* Service Info */}
             <div className="bg-primary-light p-4 rounded-xl">
               <h3 className="text-lg font-bold text-foreground mb-1">
@@ -696,7 +695,6 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
             </button>
           </div>
         </div>
-      </div>
 
       {/* Review Modal */}
       {showReviewModal && booking.worker && (
