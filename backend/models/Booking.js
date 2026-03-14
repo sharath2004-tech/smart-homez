@@ -95,7 +95,7 @@ const bookingSchema = new mongoose.Schema({
   recurringSchedule: {
     frequency: {
       type: String,
-      enum: ['daily', 'custom-days', '3-days', '4-days', '7-days', 'weekly', 'monthly']
+      enum: ['daily', 'custom-days', '3-days', '4-days', '7-days', 'weekly', 'biweekly', 'monthly']
     },
     customDays: {
       type: Number, // For custom day intervals

@@ -339,17 +339,19 @@ const CleaningServicePage = () => {
         totalAmount: number;
         estimatedDuration: number;
         bookingDate?: string;
+        startTime?: string;
+        endTime?: string;
         preferredTime?: string;
-        subscription?: {
-          isSubscription: boolean;
+        subscriptionDetails?: {
           startDate: string;
           endDate: string;
+          frequency: string;
+          selectedDays: string[];
+          preferredTime: string;
           durationPerSession: number;
+          fixedWorker?: string;
           autoRenewal: boolean;
           allowPause: boolean;
-        };
-        recurringSchedule?: {
-          selectedDays: string[];
         };
         assignedWorker?: string;
         location?: {
@@ -400,18 +402,14 @@ const CleaningServicePage = () => {
         bookingData.subscriptionDetails = {
           startDate: subscriptionStartDate,
           endDate: subscriptionEndDate,
+          frequency: bookingType,
+          selectedDays: selectedDays,
           preferredTime: preferredTime,
           durationPerSession: durationPerSession,
           fixedWorker: selectedWorker !== 'auto-assign' ? selectedWorker : undefined,
           autoRenewal: autoRenewal,
           allowPause: allowPause
         };
-
-        if (bookingType === 'weekly') {
-          bookingData.recurringSchedule = {
-            selectedDays: selectedDays
-          };
-        }
 
         // Only set assigned worker if not auto-assign
         if (selectedWorker !== 'auto-assign') {
@@ -609,18 +607,26 @@ const CleaningServicePage = () => {
                   <div>
                     <Label>Select Days</Label>
                     <div className="grid grid-cols-7 gap-2 mt-2">
-                      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+                      {[
+                        { id: 'monday', label: 'Mon' },
+                        { id: 'tuesday', label: 'Tue' },
+                        { id: 'wednesday', label: 'Wed' },
+                        { id: 'thursday', label: 'Thu' },
+                        { id: 'friday', label: 'Fri' },
+                        { id: 'saturday', label: 'Sat' },
+                        { id: 'sunday', label: 'Sun' },
+                      ].map((day) => (
                         <button
-                          key={day}
+                          key={day.id}
                           type="button"
-                          onClick={() => toggleDay(day)}
+                          onClick={() => toggleDay(day.id)}
                           className={`p-2 rounded-lg border-2 text-xs font-medium transition-all ${
-                            selectedDays.includes(day)
+                            selectedDays.includes(day.id)
                               ? 'border-primary bg-primary text-primary-foreground'
                               : 'border-border hover:border-primary/50'
                           }`}
                         >
-                          {day}
+                          {day.label}
                         </button>
                       ))}
                     </div>
