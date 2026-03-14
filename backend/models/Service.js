@@ -91,6 +91,11 @@ const serviceSchema = new mongoose.Schema({
       min: 0,
       max: 100
     },
+    originalPrice: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
     isActive: {
       type: Boolean,
       default: true
@@ -192,7 +197,8 @@ const serviceSchema = new mongoose.Schema({
   // Duration options (for hourly services)
   durationOptions: [{
     hours: Number,            // e.g., 1, 2, 3, 4
-    price: Number,            // Total price for this duration
+    price: Number,            // Our discounted price (monthly total for subscriptions)
+    originalPrice: Number,    // MRP / rack rate before discount
     isDefault: Boolean,
     minimumHours: Number      // Minimum booking hours
   }],

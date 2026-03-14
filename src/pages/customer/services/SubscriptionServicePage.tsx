@@ -23,7 +23,7 @@ interface Service {
   price: number;
   duration: number;
   serviceType: string;
-  durationOptions?: { hours: number; price: number; isDefault?: boolean }[];
+  durationOptions?: { hours: number; price: number; originalPrice?: number; isDefault?: boolean }[];
 }
 
 interface UserProfile {
@@ -128,6 +128,13 @@ const SubscriptionServicePage = () => {
 
   // Per-visit breakdown (Urban Company style)
   const perVisitPrice = currentFreq.visits > 0 ? Math.round(monthlyPrice / currentFreq.visits) : 0;
+
+  // MRP / savings from originalPrice
+  const originalMonthlyPrice = durationOption?.originalPrice ?? 0;
+  const monthlySavings = originalMonthlyPrice > monthlyPrice ? originalMonthlyPrice - monthlyPrice : 0;
+  const savingsPct = originalMonthlyPrice > 0 && monthlySavings > 0
+    ? Math.round((monthlySavings / originalMonthlyPrice) * 100)
+    : 0;
 
   const getEndDate = () => {
     const d = new Date(startDate);
@@ -282,10 +289,12 @@ const SubscriptionServicePage = () => {
               ) : (
                 <div className="grid gap-3">
                   {services.map((svc) => {
-                    const fromPrice =
-                      svc.durationOptions?.find(d => d.hours === 1)?.price ||
-                      (svc.durationOptions?.length ? [...svc.durationOptions].sort((a, b) => a.hours - b.hours)[0].price : null) ||
-                      svc.price;
+                    const lowestTier = svc.durationOptions?.find(d => d.hours === 1) ||
+                      (svc.durationOptions?.length ? [...svc.durationOptions].sort((a, b) => a.hours - b.hours)[0] : null);
+                    const fromPrice = lowestTier?.price ?? svc.price;
+                    const fromOriginalPrice = lowestTier?.originalPrice ?? 0;
+                    const fromSavingsPct = fromOriginalPrice > fromPrice && fromOriginalPrice > 0
+                      ? Math.round((1 - fromPrice / fromOriginalPrice) * 100) : 0;
                     return (
                       <button
                         key={svc._id}
@@ -304,8 +313,14 @@ const SubscriptionServicePage = () => {
                           </div>
                           <div className="text-right shrink-0">
                             <p className="text-xs text-muted-foreground">from</p>
+                            {fromOriginalPrice > fromPrice && (
+                              <p className="text-xs text-muted-foreground line-through">₹{fromOriginalPrice.toLocaleString("en-IN")}</p>
+                            )}
                             <p className="font-bold text-blue-700 text-lg">₹{fromPrice.toLocaleString("en-IN")}</p>
                             <p className="text-xs text-muted-foreground">/month</p>
+                            {fromSavingsPct > 0 && (
+                              <span className="inline-block text-[10px] bg-green-500 text-white px-1.5 py-0.5 rounded-full mt-0.5">{fromSavingsPct}% off</span>
+                            )}
                           </div>
                         </div>
                       </button>
@@ -331,7 +346,9 @@ const SubscriptionServicePage = () => {
                   ) : (
                     <div className="grid grid-cols-4 gap-2">
                       {availableHours.map((h) => {
-                        const tierPrice = selectedService.durationOptions?.find(d => d.hours === h)?.price;
+                        const tierOpt = selectedService.durationOptions?.find(d => d.hours === h);
+                        const tierPrice = tierOpt?.price;
+                        const tierOriginal = tierOpt?.originalPrice;
                         return (
                           <button
                             key={h}
@@ -343,6 +360,11 @@ const SubscriptionServicePage = () => {
                             }`}
                           >
                             <p className={`text-lg font-bold ${sessionHours === h ? "text-blue-700" : "text-foreground"}`}>{h}h</p>
+                            {tierOriginal && tierOriginal > (tierPrice || 0) && (
+                              <p className={`text-[10px] line-through ${sessionHours === h ? "text-blue-400" : "text-muted-foreground/60"}`}>
+                                ₹{tierOriginal.toLocaleString("en-IN")}
+                              </p>
+                            )}
                             {tierPrice && (
                               <p className={`text-xs mt-0.5 ${sessionHours === h ? "text-blue-600" : "text-muted-foreground"}`}>
                                 ₹{tierPrice.toLocaleString("en-IN")}
@@ -394,9 +416,17 @@ const SubscriptionServicePage = () => {
                     <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full">{currentFreq.label}</span>
                   </div>
                   <div className="flex items-end gap-2">
+                    {originalMonthlyPrice > monthlyPrice && (
+                      <span className="text-sm text-muted-foreground line-through mb-1">₹{originalMonthlyPrice.toLocaleString("en-IN")}</span>
+                    )}
                     <span className="text-3xl font-bold text-blue-700">₹{monthlyPrice.toLocaleString("en-IN")}</span>
                     <span className="text-sm text-blue-600 mb-1">/month</span>
                   </div>
+                  {monthlySavings > 0 && (
+                    <p className="text-xs font-medium text-green-600">
+                      You save ₹{monthlySavings.toLocaleString("en-IN")}/mo ({savingsPct}% off vs. one-time)
+                    </p>
+                  )}
                   <div className="grid grid-cols-3 gap-2 pt-1 border-t border-blue-200">
                     <div className="text-center">
                       <p className="text-xs text-blue-600">Per Visit</p>
@@ -631,6 +661,12 @@ const SubscriptionServicePage = () => {
                 <span>{sessionHours}h × ~{currentFreq.visits} visits ({currentFreq.label})</span>
                 <span>₹{perVisitPrice}/visit</span>
               </div>
+              {monthlySavings > 0 && (
+                <div className="flex justify-between text-sm text-green-600">
+                  <span>Subscription saving ({savingsPct}% off)</span>
+                  <span>-₹{monthlySavings.toLocaleString("en-IN")}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm text-muted-foreground">
                 <span>Auto-renewal</span>
                 <span>{autoRenewal ? "On" : "Off"}</span>

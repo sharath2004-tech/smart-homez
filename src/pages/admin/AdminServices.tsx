@@ -1382,7 +1382,7 @@ const AdminServices = () => {
                       </div>
                       <button
                         type="button"
-                        onClick={() => setFormData({ ...formData, durationOptions: [...(formData.durationOptions || []), { hours: 1, price: 0, isDefault: false }] })}
+                        onClick={() => setFormData({ ...formData, durationOptions: [...(formData.durationOptions || []), { hours: 1, price: 0, originalPrice: 0, isDefault: false, _priceMode: 'month' } as any] })}
                         className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1"
                       >
                         <Plus className="w-3 h-3" /> Add Tier
@@ -1392,53 +1392,98 @@ const AdminServices = () => {
                     {(formData.durationOptions || []).length > 0 && (
                       <div className="space-y-2">
                         <div className="grid grid-cols-12 gap-2 px-1">
-                          <span className="col-span-4 text-xs text-muted-foreground font-medium">Hours</span>
-                          <span className="col-span-6 text-xs text-muted-foreground font-medium">Price (₹/month or per session)</span>
+                          <span className="col-span-3 text-xs text-muted-foreground font-medium">Hours</span>
+                          <span className="col-span-4 text-xs text-muted-foreground font-medium">Our Price</span>
+                          <span className="col-span-3 text-xs text-muted-foreground font-medium">MRP (Original)</span>
                           <span className="col-span-2" />
                         </div>
-                        {(formData.durationOptions || []).map((tier, index) => (
-                          <div key={index} className="grid grid-cols-12 gap-2 items-center bg-white rounded-lg border border-blue-100 p-2">
-                            <div className="col-span-4">
-                              <input
-                                type="number"
-                                step="0.5"
-                                min="0.5"
-                                value={tier.hours}
-                                onChange={e => {
-                                  const updated = [...(formData.durationOptions || [])];
-                                  updated[index] = { ...updated[index], hours: Number(e.target.value) };
-                                  setFormData({ ...formData, durationOptions: updated });
-                                }}
-                                className="input-clean text-sm"
-                                placeholder="1.5"
-                              />
+                        {(formData.durationOptions || []).map((tier, index) => {
+                          const mode = (tier as any)._priceMode || 'month';
+                          const DAILY_SESSIONS = 26;
+                          const originalPrice = (tier as any).originalPrice || 0;
+                          const savingsPct = originalPrice > tier.price && originalPrice > 0
+                            ? Math.round((1 - tier.price / originalPrice) * 100)
+                            : 0;
+                          const displayOurPrice = mode === 'session' ? Math.round(tier.price / DAILY_SESSIONS) : tier.price;
+                          const displayMrp = mode === 'session' ? Math.round(originalPrice / DAILY_SESSIONS) : originalPrice;
+                          return (
+                            <div key={index} className="space-y-1 bg-white rounded-lg border border-blue-100 p-2">
+                              <div className="grid grid-cols-12 gap-2 items-start">
+                                <div className="col-span-3">
+                                  <input
+                                    type="number" step="0.5" min="0.5" value={tier.hours}
+                                    onChange={e => {
+                                      const updated = [...(formData.durationOptions || [])];
+                                      updated[index] = { ...updated[index], hours: Number(e.target.value) };
+                                      setFormData({ ...formData, durationOptions: updated });
+                                    }}
+                                    className="input-clean text-sm" placeholder="1.5"
+                                  />
+                                </div>
+                                <div className="col-span-4 space-y-1">
+                                  <div className="flex rounded overflow-hidden border border-blue-200 text-[10px]">
+                                    <button type="button"
+                                      className={`flex-1 py-0.5 text-center transition-colors ${mode === 'month' ? 'bg-blue-600 text-white' : 'bg-white text-muted-foreground'}`}
+                                      onClick={() => {
+                                        const updated = [...(formData.durationOptions || [])];
+                                        updated[index] = { ...updated[index], _priceMode: 'month' } as any;
+                                        setFormData({ ...formData, durationOptions: updated });
+                                      }}
+                                    >/mo</button>
+                                    <button type="button"
+                                      className={`flex-1 py-0.5 text-center transition-colors ${mode === 'session' ? 'bg-blue-600 text-white' : 'bg-white text-muted-foreground'}`}
+                                      onClick={() => {
+                                        const updated = [...(formData.durationOptions || [])];
+                                        updated[index] = { ...updated[index], _priceMode: 'session' } as any;
+                                        setFormData({ ...formData, durationOptions: updated });
+                                      }}
+                                    >/session</button>
+                                  </div>
+                                  <input
+                                    type="number" min="0" step={mode === 'session' ? '10' : '50'} value={displayOurPrice}
+                                    onChange={e => {
+                                      const entered = Number(e.target.value);
+                                      const monthly = mode === 'session' ? Math.round(entered * DAILY_SESSIONS) : entered;
+                                      const updated = [...(formData.durationOptions || [])];
+                                      updated[index] = { ...updated[index], price: monthly };
+                                      setFormData({ ...formData, durationOptions: updated });
+                                    }}
+                                    className="input-clean text-sm" placeholder={mode === 'session' ? '500' : '13000'}
+                                  />
+                                  <p className="text-[10px] text-muted-foreground">
+                                    {mode === 'session'
+                                      ? `≈ ₹${tier.price.toLocaleString('en-IN')}/mo`
+                                      : `≈ ₹${Math.round(tier.price / DAILY_SESSIONS).toLocaleString('en-IN')}/visit`}
+                                  </p>
+                                </div>
+                                <div className="col-span-3 space-y-1">
+                                  <input
+                                    type="number" min="0" step={mode === 'session' ? '10' : '50'} value={displayMrp}
+                                    onChange={e => {
+                                      const entered = Number(e.target.value);
+                                      const monthly = mode === 'session' ? Math.round(entered * DAILY_SESSIONS) : entered;
+                                      const updated = [...(formData.durationOptions || [])];
+                                      updated[index] = { ...updated[index], originalPrice: monthly } as any;
+                                      setFormData({ ...formData, durationOptions: updated });
+                                    }}
+                                    className="input-clean text-sm" placeholder={mode === 'session' ? '700' : '18200'}
+                                  />
+                                  {savingsPct > 0 && (
+                                    <p className="text-[10px] font-medium text-green-600">{savingsPct}% off</p>
+                                  )}
+                                </div>
+                                <div className="col-span-2 flex justify-end">
+                                  <button type="button"
+                                    onClick={() => setFormData({ ...formData, durationOptions: (formData.durationOptions || []).filter((_, i) => i !== index) })}
+                                    className="p-1.5 hover:bg-red-50 rounded transition-colors"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                                  </button>
+                                </div>
+                              </div>
                             </div>
-                            <div className="col-span-6">
-                              <input
-                                type="number"
-                                min="0"
-                                step="50"
-                                value={tier.price}
-                                onChange={e => {
-                                  const updated = [...(formData.durationOptions || [])];
-                                  updated[index] = { ...updated[index], price: Number(e.target.value) };
-                                  setFormData({ ...formData, durationOptions: updated });
-                                }}
-                                className="input-clean text-sm"
-                                placeholder="4500"
-                              />
-                            </div>
-                            <div className="col-span-2 flex justify-end">
-                              <button
-                                type="button"
-                                onClick={() => setFormData({ ...formData, durationOptions: (formData.durationOptions || []).filter((_, i) => i !== index) })}
-                                className="p-1.5 hover:bg-red-50 rounded transition-colors"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>

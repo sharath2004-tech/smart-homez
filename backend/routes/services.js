@@ -282,6 +282,9 @@ function validatePricingFields(body) {
       if (plan.sessionsPerMonth !== undefined && (!Number.isInteger(plan.sessionsPerMonth) || plan.sessionsPerMonth < 1)) {
         errors.push(`${lbl}.sessionsPerMonth must be an integer >= 1`);
       }
+      if (plan.originalPrice !== undefined && (typeof plan.originalPrice !== 'number' || plan.originalPrice < 0)) {
+        errors.push(`${lbl}.originalPrice must be a non-negative number`);
+      }
     });
   }
 
@@ -293,6 +296,9 @@ function validatePricingFields(body) {
       }
       if (opt.price !== undefined && (typeof opt.price !== 'number' || opt.price < 0)) {
         errors.push(`${lbl}.price must be a non-negative number`);
+      }
+      if (opt.originalPrice !== undefined && (typeof opt.originalPrice !== 'number' || opt.originalPrice < 0)) {
+        errors.push(`${lbl}.originalPrice must be a non-negative number`);
       }
     });
   }
