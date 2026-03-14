@@ -20,7 +20,23 @@ interface ConfigItem {
   isActive: boolean;
   sortOrder: number;
 }
-interface DeepCleaningConfig { items: ConfigItem[]; minimumCartValue: number; }
+interface DeepCleaningCategory { id: string; label: string; emoji: string; isActive: boolean; sortOrder: number; }
+interface DeepCleaningConfig { items: ConfigItem[]; minimumCartValue: number; categories?: DeepCleaningCategory[]; }
+
+// Fallback if backend doesn't return categories (old DB records)
+const FALLBACK_CATEGORIES: DeepCleaningCategory[] = [
+  { id: "fullhouse",        label: "Full Home Deep Cleaning",    emoji: "🏡", isActive: true, sortOrder: 1 },
+  { id: "bathroom",         label: "Bathroom Cleaning",          emoji: "🚿", isActive: true, sortOrder: 2 },
+  { id: "kitchen",          label: "Kitchen Cleaning",           emoji: "🍳", isActive: true, sortOrder: 3 },
+  { id: "sofa_upholstery",  label: "Sofa & Upholstery",         emoji: "🛋️", isActive: true, sortOrder: 4 },
+  { id: "mattress",         label: "Mattress Cleaning",          emoji: "🛏️", isActive: true, sortOrder: 5 },
+  { id: "balcony_window",   label: "Balcony & Window",           emoji: "🪟", isActive: true, sortOrder: 6 },
+  { id: "move_in_out",      label: "Move-in / Move-out",         emoji: "📦", isActive: true, sortOrder: 7 },
+  { id: "office",           label: "Office Deep Cleaning",       emoji: "🏢", isActive: true, sortOrder: 8 },
+  { id: "post_construction",label: "Post-Construction Cleaning", emoji: "🏗️", isActive: true, sortOrder: 9 },
+  { id: "appliances",       label: "Appliances",                 emoji: "💨", isActive: true, sortOrder: 10 },
+  { id: "furniture",        label: "Furniture",                  emoji: "🪑", isActive: true, sortOrder: 11 },
+];
 interface CartEntry {
   itemId: string; name: string; category: string;
   qty: number; unitPrice: number; totalPrice: number; selectedTier?: string;
@@ -31,13 +47,6 @@ type UserProfile = {
 };
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-const CATEGORIES = [
-  { id: "bathroom",   label: "Bathroom",   emoji: "🚿" },
-  { id: "kitchen",    label: "Kitchen",    emoji: "🍳" },
-  { id: "furniture",  label: "Furniture",  emoji: "🛋️" },
-  { id: "appliances", label: "Appliances", emoji: "💨" },
-  { id: "fullhouse",  label: "Full House", emoji: "🏡" },
-];
 const TIME_SLOTS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00"];
 
 // ─── Decorative floating sparkles ────────────────────────────────────────────
@@ -99,6 +108,14 @@ export default function DeepCleaningPage() {
     ]).then(([cfg, prof]) => {
       setConfig(cfg.config);
       setProfile(prof?.user || prof);
+      // Set active category to first active category from config
+      const cats = (cfg.config?.categories ?? FALLBACK_CATEGORIES)
+        .filter((c: DeepCleaningCategory) => c.isActive)
+        .sort((a: DeepCleaningCategory, b: DeepCleaningCategory) => a.sortOrder - b.sortOrder);
+      if (cats.length > 0) {
+        setActiveCategory(cats[0].id);
+        prevCat.current = cats[0].id;
+      }
     }).finally(() => setLoading(false));
   }, []);
 
@@ -106,6 +123,9 @@ export default function DeepCleaningPage() {
   const cartCount  = useMemo(() => Object.values(cart).reduce((s, e) => s + e.qty, 0), [cart]);
   const minValue   = config?.minimumCartValue ?? 500;
   const belowMin   = cartTotal > 0 && cartTotal < minValue;
+  const categories = (config?.categories ?? FALLBACK_CATEGORIES)
+    .filter(c => c.isActive)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
   const today      = new Date().toISOString().split("T")[0];
   const defaultAddr = profile?.customerProfile?.addresses?.find(a => a.isDefault)
     ?? profile?.customerProfile?.addresses?.[0];
@@ -165,7 +185,7 @@ export default function DeepCleaningPage() {
   };
 
   const handleCategoryChange = (id: string) => { prevCat.current = activeCategory; setActiveCategory(id); };
-  const direction = CATEGORIES.findIndex(c => c.id === activeCategory) > CATEGORIES.findIndex(c => c.id === prevCat.current) ? 1 : -1;
+  const direction = categories.findIndex(c => c.id === activeCategory) > categories.findIndex(c => c.id === prevCat.current) ? 1 : -1;
   const items = (config?.items ?? []).filter(i => i.isActive && i.category === activeCategory).sort((a, b) => a.sortOrder - b.sortOrder);
 
   if (loading) return (
@@ -213,7 +233,7 @@ export default function DeepCleaningPage() {
 
         {/* ── Category Tabs ─────────────────────────────────────────────────── */}
         <div className="flex gap-2 overflow-x-auto pb-1 mb-1 scrollbar-hide">
-          {CATEGORIES.map((cat, i) => {
+          {categories.map((cat, i) => {
             const isActive = cat.id === activeCategory;
             const hasItems = Object.values(cart).some(e => e.category === cat.id);
             return (

@@ -329,6 +329,28 @@ const SubscriptionServicePage = () => {
               )}
             </div>
 
+            {/* Session duration — pick FIRST so plan summaries show correct hours */}
+            <div>
+              <h2 className="font-semibold text-foreground mb-2 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-blue-500" /> Hours per Session
+              </h2>
+              <div className="flex gap-2">
+                {SESSION_HOURS.map((h) => (
+                  <button
+                    key={h}
+                    onClick={() => setSessionHours(h)}
+                    className={`flex-1 py-2 rounded-xl border-2 font-semibold text-sm transition-all ${
+                      sessionHours === h
+                        ? "border-blue-400 bg-blue-50 text-blue-700"
+                        : "border-border hover:border-blue-300"
+                    }`}
+                  >
+                    {h}h
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Frequency */}
             <div>
               <h2 className="font-semibold text-foreground mb-2 flex items-center gap-2">
@@ -374,28 +396,6 @@ const SubscriptionServicePage = () => {
                 </div>
               </div>
             )}
-
-            {/* Session duration */}
-            <div>
-              <h2 className="font-semibold text-foreground mb-2 flex items-center gap-2">
-                <Clock className="w-4 h-4 text-blue-500" /> Hours per Session
-              </h2>
-              <div className="flex gap-2">
-                {SESSION_HOURS.map((h) => (
-                  <button
-                    key={h}
-                    onClick={() => setSessionHours(h)}
-                    className={`flex-1 py-2 rounded-xl border-2 font-semibold text-sm transition-all ${
-                      sessionHours === h
-                        ? "border-blue-400 bg-blue-50 text-blue-700"
-                        : "border-border hover:border-blue-300"
-                    }`}
-                  >
-                    {h}h
-                  </button>
-                ))}
-              </div>
-            </div>
 
             {/* Monthly estimate */}
             <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200">

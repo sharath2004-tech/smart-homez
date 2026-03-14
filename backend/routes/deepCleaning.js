@@ -11,14 +11,35 @@ import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
 const router = express.Router();
 
 // ─── seed / ensure config exists ───────────────────────────────────────────
+const DEFAULT_CATEGORIES = [
+  { id: 'fullhouse',        label: 'Full Home Deep Cleaning',    emoji: '🏡', isActive: true, sortOrder: 1 },
+  { id: 'bathroom',         label: 'Bathroom Cleaning',          emoji: '🚿', isActive: true, sortOrder: 2 },
+  { id: 'kitchen',          label: 'Kitchen Cleaning',           emoji: '🍳', isActive: true, sortOrder: 3 },
+  { id: 'sofa_upholstery',  label: 'Sofa & Upholstery',         emoji: '🛋️', isActive: true, sortOrder: 4 },
+  { id: 'mattress',         label: 'Mattress Cleaning',          emoji: '🛏️', isActive: true, sortOrder: 5 },
+  { id: 'balcony_window',   label: 'Balcony & Window',           emoji: '🪟', isActive: true, sortOrder: 6 },
+  { id: 'move_in_out',      label: 'Move-in / Move-out',         emoji: '📦', isActive: true, sortOrder: 7 },
+  { id: 'office',           label: 'Office Deep Cleaning',       emoji: '🏢', isActive: true, sortOrder: 8 },
+  { id: 'post_construction',label: 'Post-Construction Cleaning', emoji: '🏗️', isActive: true, sortOrder: 9 },
+  { id: 'appliances',       label: 'Appliances',                 emoji: '💨', isActive: true, sortOrder: 10 },
+  { id: 'furniture',        label: 'Furniture',                  emoji: '🪑', isActive: true, sortOrder: 11 },
+];
+
 async function ensureConfig() {
   const existing = await DeepCleaningConfig.findOne();
   if (!existing) {
-    return DeepCleaningConfig.create({ minimumCartValue: 500, items: DEFAULT_ITEMS });
+    return DeepCleaningConfig.create({ minimumCartValue: 500, categories: DEFAULT_CATEGORIES, items: DEFAULT_ITEMS });
+  }
+
+  let dirty = false;
+
+  // Migrate: add default categories if missing
+  if (!existing.categories || existing.categories.length === 0) {
+    existing.categories = DEFAULT_CATEGORIES;
+    dirty = true;
   }
 
   // Auto-migrate stale prices for per_sqft items
-  let dirty = false;
   const priceUpdates = { fullhouse_bare: 8, fullhouse_furnished: 12 };
   existing.items = existing.items.map(item => {
     if (priceUpdates[item.id] !== undefined && item.pricingType === 'per_sqft' && item.price !== priceUpdates[item.id]) {
@@ -94,12 +115,13 @@ router.get('/config', async (req, res) => {
 // ─── PUT /api/deep-cleaning/config  (super admin only) ───────────────────────
 router.put('/config', authenticate, authorize('super_admin'), async (req, res) => {
   try {
-    const { items, minimumCartValue } = req.body;
+    const { items, minimumCartValue, categories } = req.body;
     let config = await DeepCleaningConfig.findOne();
     if (!config) config = new DeepCleaningConfig();
 
     if (items !== undefined) config.items = items;
     if (minimumCartValue !== undefined) config.minimumCartValue = Number(minimumCartValue);
+    if (categories !== undefined) config.categories = categories;
     config.updatedBy = req.user._id;
 
     await config.save();

@@ -697,6 +697,59 @@ const BookServicePage = () => {
 
         {/* Booking Form */}
         <form onSubmit={handleBooking} className="space-y-6">
+          {/* ── Step 1: Hours per Session (must pick first — price drives everything) */}
+          <div className="card-elevated p-6">
+            <h3 className="font-bold text-foreground mb-1 flex items-center gap-2">
+              <Clock className="w-5 h-5 text-primary" />
+              How many hours?
+            </h3>
+            {(() => {
+              const pricePerHour = Math.round(service.price / ((service.duration || 60) / 60));
+              return (
+                <p className="text-xs text-muted-foreground mb-4">
+                  ₹{pricePerHour.toLocaleString('en-IN')}/hr &nbsp;·&nbsp; Pick duration — plan prices update below
+                </p>
+              );
+            })()}
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: 1,   label: '1 hr' },
+                { value: 1.5, label: '1.5 hr' },
+                { value: 2,   label: '2 hr' },
+                { value: 3,   label: '3 hr' },
+                { value: 4,   label: '4 hr' },
+                { value: 5,   label: '5 hr' },
+              ].map(opt => {
+                const pricePerHour  = Math.round(service.price / ((service.duration || 60) / 60));
+                const sessionPrice  = Math.round(pricePerHour * opt.value);
+                const mrpSession    = Math.round(sessionPrice / 0.8);
+                const isSelected    = durationPerSession === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setDurationPerSession(opt.value)}
+                    className={`flex flex-col items-center py-3 px-2 rounded-xl border-2 transition-all ${
+                      isSelected
+                        ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                        : 'border-border hover:border-primary/50'
+                    }`}
+                  >
+                    <span className={`text-sm font-bold ${isSelected ? 'text-primary' : 'text-foreground'}`}>
+                      {opt.label}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground line-through mt-0.5">
+                      ₹{mrpSession.toLocaleString('en-IN')}
+                    </span>
+                    <span className={`text-sm font-bold ${isSelected ? 'text-primary' : 'text-green-700'}`}>
+                      ₹{sessionPrice.toLocaleString('en-IN')}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Booking Mode: Book Now vs Schedule */}
           <div className="card-elevated p-6">
             <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
@@ -857,37 +910,6 @@ const BookServicePage = () => {
               </div>
             </div>
           )}
-          {/* Duration Per Session — select first so plan prices update live */}
-          <div className="card-elevated p-6">
-            <h3 className="font-bold text-foreground mb-3 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-primary" />
-              Session Duration
-            </h3>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { value: 0.5, label: '30 min' },
-                { value: 1,   label: '1 hr' },
-                { value: 1.5, label: '1.5 hr' },
-                { value: 2,   label: '2 hr' },
-                { value: 3,   label: '3 hr' },
-                { value: 4,   label: '4 hr' },
-              ].map(opt => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setDurationPerSession(opt.value)}
-                  className={`py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
-                    durationPerSession === opt.value
-                      ? 'border-primary bg-primary/5 text-primary'
-                      : 'border-border text-muted-foreground hover:border-primary/50'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">Plan prices below update based on your selection.</p>
-          </div>
 
           <div className="card-elevated p-6">
             <div className="flex items-center justify-between mb-4">
@@ -926,13 +948,19 @@ const BookServicePage = () => {
                     const mrpPrice = plan.discountPercentage > 0
                       ? Math.round((service?.price ?? plan.price) * sessionFactor)
                       : Math.round(ourPrice / 0.8);
+                    const suffix: Record<string, string> = {
+                      oneTime: '/session',
+                      daily: '/day',
+                      weekly: '/week',
+                      monthly: '/month',
+                    };
                     return (
                       <div className="mt-2">
                         <div className="text-xs text-muted-foreground line-through">
-                          ₹{mrpPrice.toLocaleString('en-IN')}{plan.name !== 'oneTime' ? `/${plan.name.replace('ly', '')}` : ''}
+                          ₹{mrpPrice.toLocaleString('en-IN')}{suffix[plan.name] ?? '/session'}
                         </div>
                         <div className="text-lg font-bold text-green-700">
-                          ₹{ourPrice.toLocaleString('en-IN')}{plan.name !== 'oneTime' ? `/${plan.name.replace('ly', '')}` : ''}
+                          ₹{ourPrice.toLocaleString('en-IN')}{suffix[plan.name] ?? '/session'}
                         </div>
                       </div>
                     );
