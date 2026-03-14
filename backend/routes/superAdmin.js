@@ -411,7 +411,7 @@ router.patch('/workers/:workerId/unarchive', async (req, res) => {
 
 // @route   GET /api/super-admin/bookings
 // @desc    All bookings. Optional ?locationId= and ?status= filters.
-router.get('/bookings', async (req, res) => {
+router.get('/bookings', authenticate, authorize('super_admin', 'admin'), async (req, res) => {
   try {
     const { locationId, status, limit = 50 } = req.query;
 
