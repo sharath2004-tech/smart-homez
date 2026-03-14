@@ -50,8 +50,6 @@ import WorkerTasks from "./pages/worker/WorkerTasks";
 // Admin pages
 import AdminBookings from "./pages/admin/AdminBookings";
 import AdminDashboard from "./pages/admin/AdminDashboard";
-import AdminDeepCleaningConfig from "./pages/admin/AdminDeepCleaningConfig";
-import AdminHeatmap from "./pages/admin/AdminHeatmap";
 import AdminHelpMessages from "./pages/admin/AdminHelpMessages";
 import AdminLeaves from "./pages/admin/AdminLeaves";
 import AdminLocations from "./pages/admin/AdminLocations";
@@ -65,7 +63,25 @@ import AdminWorkerRequests from "./pages/admin/AdminWorkerRequests";
 import AdminWorkers from "./pages/admin/AdminWorkers";
 import AdminWorkerSchedule from "./pages/admin/AdminWorkerSchedule";
 import AdminWorkforce from "./pages/admin/AdminWorkforce";
-import SuperAdminDashboard from "./pages/admin/SuperAdminDashboard";
+
+// Super Admin pages
+import SuperAdminBookings from "./pages/superadmin/SuperAdminBookings";
+import SuperAdminDashboard from "./pages/superadmin/SuperAdminDashboard";
+import SuperAdminDeepCleaningConfig from "./pages/superadmin/SuperAdminDeepCleaningConfig";
+import SuperAdminHeatmap from "./pages/superadmin/SuperAdminHeatmap";
+import SuperAdminHelpMessages from "./pages/superadmin/SuperAdminHelpMessages";
+import SuperAdminLeaves from "./pages/superadmin/SuperAdminLeaves";
+import SuperAdminLocations from "./pages/superadmin/SuperAdminLocations";
+import SuperAdminQuotes from "./pages/superadmin/SuperAdminQuotes";
+import SuperAdminSalarySettlements from "./pages/superadmin/SuperAdminSalarySettlements";
+import SuperAdminServiceAreas from "./pages/superadmin/SuperAdminServiceAreas";
+import SuperAdminServices from "./pages/superadmin/SuperAdminServices";
+import SuperAdminSettings from "./pages/superadmin/SuperAdminSettings";
+import SuperAdminSOS from "./pages/superadmin/SuperAdminSOS";
+import SuperAdminWorkerRequests from "./pages/superadmin/SuperAdminWorkerRequests";
+import SuperAdminWorkers from "./pages/superadmin/SuperAdminWorkers";
+import SuperAdminWorkerSchedule from "./pages/superadmin/SuperAdminWorkerSchedule";
+import SuperAdminWorkforce from "./pages/superadmin/SuperAdminWorkforce";
 
 const queryClient = new QueryClient();
 
@@ -140,8 +156,23 @@ const App = () => (
 
           {/* Super Admin */}
           <Route path="/super-admin/dashboard" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminDashboard /></ProtectedRoute>} />
-          <Route path="/super-admin/deep-cleaning-config" element={<ProtectedRoute allowedRoles={['super_admin']}><AdminDeepCleaningConfig /></ProtectedRoute>} />
-          <Route path="/super-admin/heatmap" element={<ProtectedRoute allowedRoles={['super_admin']}><AdminHeatmap /></ProtectedRoute>} />
+          <Route path="/super-admin/bookings" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminBookings /></ProtectedRoute>} />
+          <Route path="/super-admin/workers" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminWorkers /></ProtectedRoute>} />
+          <Route path="/super-admin/worker-requests" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminWorkerRequests /></ProtectedRoute>} />
+          <Route path="/super-admin/sos" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminSOS /></ProtectedRoute>} />
+          <Route path="/super-admin/leaves" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminLeaves /></ProtectedRoute>} />
+          <Route path="/super-admin/worker-schedule" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminWorkerSchedule /></ProtectedRoute>} />
+          <Route path="/super-admin/workforce" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminWorkforce /></ProtectedRoute>} />
+          <Route path="/super-admin/salary-settlements" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminSalarySettlements /></ProtectedRoute>} />
+          <Route path="/super-admin/quotes" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminQuotes /></ProtectedRoute>} />
+          <Route path="/super-admin/help-messages" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminHelpMessages /></ProtectedRoute>} />
+          <Route path="/super-admin/locations" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminLocations /></ProtectedRoute>} />
+          <Route path="/super-admin/service-areas" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminServiceAreas /></ProtectedRoute>} />
+          <Route path="/super-admin/services" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminServices /></ProtectedRoute>} />
+          <Route path="/super-admin/settings" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminSettings /></ProtectedRoute>} />
+          <Route path="/super-admin/notifications" element={<ProtectedRoute allowedRoles={['super_admin']}><NotificationsPage /></ProtectedRoute>} />
+          <Route path="/super-admin/deep-cleaning-config" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminDeepCleaningConfig /></ProtectedRoute>} />
+          <Route path="/super-admin/heatmap" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminHeatmap /></ProtectedRoute>} />
 
           {/* Catch-all */}
           <Route path="*" element={<NotFound />} />

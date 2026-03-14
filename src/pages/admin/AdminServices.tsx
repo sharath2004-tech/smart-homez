@@ -951,7 +951,18 @@ const AdminServices = () => {
                   </p>
                 </div>
 
-                {/* Subscription Plans Section */}
+                {/* Subscription Plans Section — hidden for monthly_subscription (uses Duration Tiers instead) */}
+                {selectedServiceType === 'monthly_subscription' ? (
+                  <div className="p-4 bg-purple-50 border border-purple-300 rounded-lg space-y-1">
+                    <p className="text-sm font-semibold text-purple-900">📅 Pricing for Subscription Plans</p>
+                    <p className="text-xs text-purple-700">
+                      For subscription services, customer-facing pricing is set via <strong>Session Hours Pricing (Duration Tiers)</strong> below — e.g. 1h/day → ₹3500/mo, 2h/day → ₹5500/mo.
+                    </p>
+                    <p className="text-xs text-purple-600 mt-1">
+                      The "Subscription Plans" frequency tiers (Daily/Weekly/Monthly) are not used on the subscription booking page.
+                    </p>
+                  </div>
+                ) : (
                 <div className="space-y-3 p-4 bg-gradient-to-br from-primary/5 to-accent/5 rounded-lg border-2 border-primary/20">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1069,7 +1080,7 @@ const AdminServices = () => {
                     </div>
                   </div>
                   
-                  {formData.subscriptionPlans && formData.subscriptionPlans.length > 0 && (
+                  {selectedServiceType !== 'monthly_subscription' && formData.subscriptionPlans && formData.subscriptionPlans.length > 0 && (
                     <div className="space-y-3 mt-3">
                       {formData.subscriptionPlans.sort((a, b) => a.sortOrder - b.sortOrder).map((plan, index) => (
                         <div key={plan.id} className="p-4 bg-background rounded-lg border-2 border-border hover:border-primary/50 transition-colors">
@@ -1251,6 +1262,7 @@ const AdminServices = () => {
                     </div>
                   )}
                 </div>
+                )}
 
                 {/* Additional Services Section */}
                 <div className="space-y-3 p-4 bg-muted/50 rounded-lg">

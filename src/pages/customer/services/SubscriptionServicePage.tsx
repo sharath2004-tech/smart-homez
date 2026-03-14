@@ -331,7 +331,13 @@ const SubscriptionServicePage = () => {
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-xs text-muted-foreground">from</p>
-                          <p className="font-bold text-blue-700">₹{svc.price.toLocaleString('en-IN')}/mo</p>
+                          <p className="font-bold text-blue-700">
+                            ₹{(
+                              svc.durationOptions?.find(d => d.hours === 1)?.price ||
+                              svc.durationOptions?.slice().sort((a, b) => a.hours - b.hours)[0]?.price ||
+                              svc.price
+                            ).toLocaleString('en-IN')}/mo
+                          </p>
                           <p className="text-xs text-muted-foreground">1h daily</p>
                         </div>
                       </div>
