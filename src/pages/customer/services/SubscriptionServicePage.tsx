@@ -123,9 +123,10 @@ const SubscriptionServicePage = () => {
 
   const currentFreq = FREQUENCY_OPTIONS.find((f) => f.id === frequency);
   const basePrice = selectedService?.price ?? 120;
-  // Monthly cost projection
+  // Monthly cost projection: sessions × price per session (hours set duration, not price multiplier)
   const sessionsPerMonth = currentFreq?.days ?? 20;
-  const monthlyPrice = sessionsPerMonth * sessionHours * basePrice;
+  const pricePerSession = basePrice;
+  const monthlyPrice = sessionsPerMonth * pricePerSession;
   const discount = 20; // 20% subscription discount
   const discountedPrice = Math.round(monthlyPrice * (1 - discount / 100));
 
@@ -317,7 +318,7 @@ const SubscriptionServicePage = () => {
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-foreground">₹{svc.price}</p>
+                          <p className="font-bold text-foreground">₹{svc.price.toLocaleString('en-IN')}</p>
                           <p className="text-xs text-muted-foreground">/session</p>
                         </div>
                       </div>
@@ -399,12 +400,12 @@ const SubscriptionServicePage = () => {
             <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200">
               <p className="text-sm font-semibold text-blue-900 mb-1">Monthly Estimate</p>
               <div className="flex items-end gap-2">
-                <span className="text-2xl font-bold text-blue-700">₹{discountedPrice}</span>
-                <span className="text-sm text-blue-400 line-through mb-0.5">₹{monthlyPrice}</span>
+                <span className="text-2xl font-bold text-blue-700">₹{discountedPrice.toLocaleString('en-IN')}</span>
+                <span className="text-sm text-blue-400 line-through mb-0.5">₹{monthlyPrice.toLocaleString('en-IN')}</span>
                 <span className="text-xs font-semibold text-green-600 mb-0.5">20% OFF</span>
               </div>
               <p className="text-xs text-blue-700 mt-1">
-                ~{sessionsPerMonth} sessions/month × {sessionHours}h each
+                ₹{pricePerSession.toLocaleString('en-IN')}/session × {sessionsPerMonth} sessions/month · {sessionHours}h each
               </p>
             </div>
 
