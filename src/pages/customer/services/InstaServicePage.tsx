@@ -94,6 +94,8 @@ const InstaServicePage = () => {
   const [totalWorkers, setTotalWorkers] = useState(0);
 
   const totalAmount = hours * pricePerHour + (bringSupplies ? 50 : 0);
+  const mrpPerHour = Math.round(pricePerHour / 0.8);
+  const mrpTotal = hours * mrpPerHour + (bringSupplies ? 50 : 0);
 
   const availableSlots = (() => {
     const today = new Date().toISOString().split("T")[0];
@@ -238,7 +240,7 @@ const InstaServicePage = () => {
             <span>⚡</span> Insta Maid Service
           </h1>
           <p className="text-xs text-muted-foreground">
-            On-demand hourly cleaning · ₹{pricePerHour}/hr
+            On-demand hourly cleaning · <span className="line-through text-muted-foreground/60">₹{mrpPerHour}/hr</span> <span className="text-green-600 font-semibold">₹{pricePerHour}/hr</span> <span className="text-xs font-semibold bg-green-100 text-green-700 px-1 py-0.5 rounded-full ml-0.5">20% off</span>
           </p>
         </div>
 
@@ -391,7 +393,9 @@ const InstaServicePage = () => {
                         : "border-border hover:border-primary/40"
                     }`}
                   >
-                    {h}h · ₹{h * pricePerHour}
+                    <span className="block">{h}h</span>
+                    <span className="text-xs line-through text-muted-foreground font-normal">₹{(h * mrpPerHour).toLocaleString('en-IN')}</span>
+                    <span className="text-sm text-green-700 font-bold">₹{(h * pricePerHour).toLocaleString('en-IN')}</span>
                   </button>
                 ))}
               </div>
@@ -631,10 +635,11 @@ const InstaServicePage = () => {
             <div className="card-elevated p-4 rounded-2xl space-y-2">
               <p className="text-sm font-semibold text-foreground">Price Breakdown</p>
               <div className="flex justify-between text-sm text-muted-foreground">
-                <span>
-                  {hours} hr × ₹{pricePerHour}/hr
-                </span>
-                <span>₹{hours * pricePerHour}</span>
+                <span>{hours} hr × <span className="line-through">₹{mrpPerHour}/hr</span> <span className="text-green-600 font-medium">₹{pricePerHour}/hr</span></span>
+                <div className="text-right">
+                  <div className="text-xs line-through">₹{(hours * mrpPerHour).toLocaleString('en-IN')}</div>
+                  <div className="text-green-700 font-medium">₹{(hours * pricePerHour).toLocaleString('en-IN')}</div>
+                </div>
               </div>
               {bringSupplies && (
                 <div className="flex justify-between text-sm text-muted-foreground">
@@ -644,7 +649,10 @@ const InstaServicePage = () => {
               )}
               <div className="flex justify-between font-bold text-foreground border-t pt-2 text-base">
                 <span>Total</span>
-                <span className="text-primary">₹{totalAmount}</span>
+                <div className="text-right">
+                  <div className="text-xs text-muted-foreground line-through">₹{mrpTotal.toLocaleString('en-IN')}</div>
+                  <span className="text-green-700">₹{totalAmount.toLocaleString('en-IN')}</span>
+                </div>
               </div>
             </div>
 
@@ -678,7 +686,7 @@ const InstaServicePage = () => {
                 ) : (
                   <>
                     <Zap className="w-4 h-4" />
-                    {bookingMode === "now" ? `Book Now – ₹${totalAmount}` : `Schedule – ₹${totalAmount}`}
+                    {bookingMode === "now" ? `Book Now – ₹${totalAmount.toLocaleString('en-IN')}` : `Schedule – ₹${totalAmount.toLocaleString('en-IN')}`}
                   </>
                 )}
               </button>

@@ -317,9 +317,10 @@ const SubscriptionServicePage = () => {
                             {svc.description}
                           </p>
                         </div>
-                        <div className="text-right">
-                          <p className="font-bold text-foreground">₹{svc.price.toLocaleString('en-IN')}</p>
-                          <p className="text-xs text-muted-foreground">/session</p>
+                        <div className="text-right shrink-0">
+                          <p className="text-xs text-muted-foreground line-through">₹{svc.price.toLocaleString('en-IN')}/session</p>
+                          <p className="font-bold text-green-700">₹{Math.round(svc.price * 0.8).toLocaleString('en-IN')}</p>
+                          <p className="text-xs text-muted-foreground">/session · 20% off</p>
                         </div>
                       </div>
                     </button>
@@ -405,7 +406,8 @@ const SubscriptionServicePage = () => {
                 <span className="text-xs font-semibold text-green-600 mb-0.5">20% OFF</span>
               </div>
               <p className="text-xs text-blue-700 mt-1">
-                ₹{pricePerSession.toLocaleString('en-IN')}/session × {sessionsPerMonth} sessions/month · {sessionHours}h each
+                <span className="line-through text-blue-400">₹{pricePerSession.toLocaleString('en-IN')}/session</span>
+                {' → '}₹{Math.round(discountedPrice / sessionsPerMonth).toLocaleString('en-IN')}/session × {sessionsPerMonth} sessions/month · {sessionHours}h each
               </p>
             </div>
 

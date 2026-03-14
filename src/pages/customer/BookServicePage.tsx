@@ -297,6 +297,19 @@ const BookServicePage = () => {
     return Math.round(base * durationRatio);
   };
 
+  // MRP = market rate before platform discount
+  const calculateMrp = () => {
+    if (!service) return 0;
+    const defaultHours = (service.duration || 60) / 60;
+    const durationRatio = durationPerSession / defaultHours;
+    // For subscription plans, MRP = service base price scaled by duration
+    // For one-time, MRP = 20% above our price
+    if (bookingType !== 'oneTime') {
+      return Math.round(service.price * durationRatio);
+    }
+    return Math.round(calculatePrice() / 0.8);
+  };
+
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -907,10 +920,23 @@ const BookServicePage = () => {
                   <div className="text-2xl mb-2">{plan.icon}</div>
                   <div className="font-semibold text-foreground">{plan.displayName}</div>
                   <div className="text-xs text-muted-foreground mt-1">{plan.description}</div>
-                  <div className="text-lg font-bold text-primary mt-2">
-                    ₹{Math.round(plan.price * (durationPerSession / ((service?.duration || 60) / 60)))}
-                    {plan.name !== 'oneTime' ? `/${plan.name.replace('ly', '')}` : ''}
-                  </div>
+                  {(() => {
+                    const sessionFactor = durationPerSession / ((service?.duration || 60) / 60);
+                    const ourPrice = Math.round(plan.price * sessionFactor);
+                    const mrpPrice = plan.discountPercentage > 0
+                      ? Math.round((service?.price ?? plan.price) * sessionFactor)
+                      : Math.round(ourPrice / 0.8);
+                    return (
+                      <div className="mt-2">
+                        <div className="text-xs text-muted-foreground line-through">
+                          ₹{mrpPrice.toLocaleString('en-IN')}{plan.name !== 'oneTime' ? `/${plan.name.replace('ly', '')}` : ''}
+                        </div>
+                        <div className="text-lg font-bold text-green-700">
+                          ₹{ourPrice.toLocaleString('en-IN')}{plan.name !== 'oneTime' ? `/${plan.name.replace('ly', '')}` : ''}
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {plan.name === 'oneTime' && (
                     <div className="text-xs text-muted-foreground mt-0.5">per session</div>
                   )}
@@ -1355,9 +1381,12 @@ const BookServicePage = () => {
                 </span>
               </div>
               <div className="h-px bg-border my-3"></div>
-              <div className="flex justify-between text-lg">
+              <div className="flex justify-between items-end text-lg">
                 <span className="font-bold text-foreground">Total</span>
-                <span className="font-bold text-primary">₹{calculatePrice()}</span>
+                <div className="text-right">
+                  <div className="text-xs text-muted-foreground line-through">₹{calculateMrp().toLocaleString('en-IN')}</div>
+                  <span className="font-bold text-green-700">₹{calculatePrice().toLocaleString('en-IN')}</span>
+                </div>
               </div>
             </div>
           </div>

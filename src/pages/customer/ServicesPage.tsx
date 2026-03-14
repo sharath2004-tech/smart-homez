@@ -348,9 +348,25 @@ const ServicesPage = () => {
                       {service.isQuoteService ? (
                         <span className="text-sm font-bold text-green-700">Custom Quote</span>
                       ) : service.subscriptionOptions?.enabled ? (
-                        <span className="text-sm font-bold text-foreground">From ₹{service.price}<span className="text-xs font-normal text-muted-foreground">/mo</span></span>
+                        <div>
+                          <div className="text-xs text-muted-foreground line-through">
+                            ₹{Math.round(service.price / 0.8).toLocaleString('en-IN')}<span className="font-normal">/mo</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-bold text-green-700">From ₹{service.price.toLocaleString('en-IN')}<span className="text-xs font-normal text-muted-foreground">/mo</span></span>
+                            <span className="text-xs font-semibold bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">20% off</span>
+                          </div>
+                        </div>
                       ) : (
-                        <span className="text-sm font-bold text-foreground">₹{service.price}</span>
+                        <div>
+                          <div className="text-xs text-muted-foreground line-through">
+                            ₹{Math.round(service.price / 0.8).toLocaleString('en-IN')}
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-bold text-green-700">₹{service.price.toLocaleString('en-IN')}</span>
+                            <span className="text-xs font-semibold bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">20% off</span>
+                          </div>
+                        </div>
                       )}
                       <div className="flex items-center gap-1 mt-0.5">
                         <Clock className="w-3 h-3 text-muted-foreground" />

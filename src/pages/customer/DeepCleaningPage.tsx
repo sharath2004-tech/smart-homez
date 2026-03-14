@@ -478,12 +478,21 @@ function ItemCard({ item, idx, cart, sqftValues, tierSelects, pulsedItem,
           {/* ── per_unit ──────────────────────────────────────────────────── */}
           {(item.pricingType === "per_unit" || item.pricingType === "fixed") && (
             <div className="mt-3 flex items-center justify-between">
-              <span className="text-sm font-bold text-foreground">
-                ₹{item.price.toLocaleString("en-IN")}
-                {item.pricingType === "per_unit" && (
-                  <span className="text-xs font-normal text-muted-foreground"> / {item.unit}</span>
-                )}
-              </span>
+              <div>
+                <div className="text-xs text-muted-foreground line-through">
+                  ₹{Math.round(item.price / 0.8).toLocaleString("en-IN")}
+                  {item.pricingType === "per_unit" && <span> / {item.unit}</span>}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold text-green-700">
+                    ₹{item.price.toLocaleString("en-IN")}
+                    {item.pricingType === "per_unit" && (
+                      <span className="text-xs font-normal text-muted-foreground"> / {item.unit}</span>
+                    )}
+                  </span>
+                  <span className="text-[10px] font-semibold bg-green-100 text-green-700 px-1 py-0.5 rounded-full">20% off</span>
+                </div>
+              </div>
               {!inCart ? (
                 <motion.button whileTap={{ scale: 0.88 }} onClick={() => onAddUnit(item)}
                   className="text-xs font-semibold bg-primary text-primary-foreground px-4 py-1.5 rounded-xl">
@@ -526,7 +535,7 @@ function ItemCard({ item, idx, cart, sqftValues, tierSelects, pulsedItem,
                       className={`text-xs px-3 py-1.5 rounded-xl font-medium transition-colors ${
                         isSelected || isActive ? "bg-primary text-primary-foreground" : "bg-muted text-foreground hover:bg-border"
                       }`}>
-                      {tier.label} — ₹{tier.price.toLocaleString("en-IN")}
+                      {tier.label} — <span className="line-through opacity-60">₹{Math.round(tier.price / 0.8).toLocaleString("en-IN")}</span> <span className="font-bold">₹{tier.price.toLocaleString("en-IN")}</span>
                     </motion.button>
                   );
                 })}
