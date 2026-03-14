@@ -20,7 +20,22 @@ const quoteRequestSchema = new mongoose.Schema({
   propertyType: {
     type: String,
     required: [true, 'Property type is required'],
-    enum: ['villa', 'bungalow', 'restaurant', 'corporate_office', 'other']
+    enum: ['villa', 'bungalow', 'restaurant', 'corporate_office', 'business', 'other']
+  },
+  propertyTypeCustom: {
+    type: String,   // Filled when propertyType === 'other'
+    trim: true,
+    default: ''
+  },
+  placeSize: {
+    type: String,   // e.g. "2000 sq ft", "3 floors", "1500 sq ft per floor"
+    trim: true,
+    default: ''
+  },
+  city: {
+    type: String,   // Used to route to regional admin
+    trim: true,
+    default: ''
   },
   message: {
     type: String,

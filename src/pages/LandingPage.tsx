@@ -175,6 +175,24 @@ const LandingPage = () => {
             </Link>
           ))}
         </div>
+
+        {/* Deep Cleaning Commercial Quote Banner */}
+        <Link
+          to="/deep-cleaning-quote"
+          className="mt-6 flex items-center gap-4 p-5 rounded-2xl border-2 border-green-300 bg-green-50 hover:bg-green-100 hover:border-green-400 transition-all group"
+        >
+          <div className="w-14 h-14 bg-green-200 rounded-2xl flex items-center justify-center text-3xl shrink-0 group-hover:scale-110 transition-transform">
+            ✨
+          </div>
+          <div className="flex-1">
+            <h3 className="font-bold font-heading text-green-900 text-base">Deep Cleaning — Commercial &amp; Residential</h3>
+            <p className="text-sm text-green-700 mt-0.5">Villas · Restaurants · Offices · Bungalows · Corporate Spaces</p>
+            <p className="text-xs text-green-600 mt-1">Custom pricing based on your property — our team will call you with a quote.</p>
+          </div>
+          <div className="shrink-0 hidden sm:flex items-center gap-2 bg-green-700 text-white text-sm font-semibold px-4 py-2 rounded-xl group-hover:bg-green-800 transition-colors">
+            Get Free Quote <ChevronRight className="w-4 h-4" />
+          </div>
+        </Link>
       </section>
 
       {/* How it works */}

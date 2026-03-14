@@ -1,5 +1,5 @@
 import { api, settingsAPI } from "@/lib/api";
-import { AlertTriangle, ArrowLeft, BarChart3, Bell, Calendar, ClipboardCheck, Clock, CreditCard, HelpCircle, Home, IndianRupee, KeyRound, LayoutDashboard, LogOut, MapPin, Menu, MessageSquare, RefreshCw, Settings, User, Users, Wrench, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BarChart3, Bell, Calendar, ClipboardCheck, Clock, CreditCard, FileText, HelpCircle, Home, IndianRupee, KeyRound, LayoutDashboard, LogOut, MapPin, Menu, MessageSquare, RefreshCw, Settings, User, Users, Wrench, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -89,6 +89,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
     { to: "/admin/locations", icon: MapPin, label: t('nav.locations') },
     { to: "/admin/help-messages", icon: MessageSquare, label: "Help Messages" },
     { to: "/admin/sos", icon: AlertTriangle, label: "SOS Alerts" },
+    { to: "/admin/quotes", icon: FileText, label: "Quote Requests" },
     { to: "/admin/settings", icon: Settings, label: t('nav.settings') },
     { to: "/change-password", icon: KeyRound, label: "Change Password" },
   ];
@@ -106,6 +107,7 @@ const AppLayout = ({ children, userType = "customer", userName = "User" }: AppLa
     { to: "/admin/services", icon: Wrench, label: t('nav.services') },
     { to: "/admin/help-messages", icon: MessageSquare, label: "Help Messages" },
     { to: "/admin/sos", icon: AlertTriangle, label: "SOS Alerts" },
+    { to: "/admin/quotes", icon: FileText, label: "Quote Requests" },
     { to: "/super-admin/heatmap", icon: BarChart3, label: "Worker Heatmap" },
     { to: "/admin/settings", icon: Settings, label: t('nav.settings') },
     { to: "/change-password", icon: KeyRound, label: "Change Password" },

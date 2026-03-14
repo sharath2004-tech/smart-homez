@@ -60,6 +60,7 @@ import AdminWorkerRequests from "./pages/admin/AdminWorkerRequests";
 import AdminWorkers from "./pages/admin/AdminWorkers";
 import AdminWorkerSchedule from "./pages/admin/AdminWorkerSchedule";
 import AdminWorkforce from "./pages/admin/AdminWorkforce";
+import AdminQuotes from "./pages/admin/AdminQuotes";
 import SuperAdminDashboard from "./pages/admin/SuperAdminDashboard";
 
 const queryClient = new QueryClient();
@@ -128,6 +129,7 @@ const App = () => (
           <Route path="/admin/notifications" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><NotificationsPage /></ProtectedRoute>} />
           <Route path="/admin/help-messages" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminHelpMessages /></ProtectedRoute>} />
           <Route path="/admin/sos" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminSOS /></ProtectedRoute>} />
+          <Route path="/admin/quotes" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminQuotes /></ProtectedRoute>} />
 
           {/* Super Admin */}
           <Route path="/super-admin/dashboard" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminDashboard /></ProtectedRoute>} />

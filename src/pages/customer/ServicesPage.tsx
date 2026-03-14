@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import LocationSelector, { LocationData } from "@/components/LocationSelector";
 import { authAPI, servicesAPI } from "@/lib/api";
 import { motion } from "framer-motion";
-import { Clock, MapPin, Search, Users } from "lucide-react";
+import { Clock, MapPin, Search, Sparkles, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -231,8 +231,29 @@ const ServicesPage = () => {
               ))}
             </div>
 
+            {/* Deep Cleaning Commercial Quote Banner */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 }}
+            >
+              <Link
+                to="/deep-cleaning-quote"
+                className="flex items-center gap-4 p-4 rounded-2xl border-2 border-green-300 bg-green-50 hover:bg-green-100 hover:border-green-400 transition-all group"
+              >
+                <div className="w-12 h-12 bg-green-200 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                  <Sparkles className="w-6 h-6 text-green-700" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-green-900 text-sm leading-tight">Deep Cleaning — Commercial &amp; Residential</p>
+                  <p className="text-xs text-green-700 mt-0.5">Villas · Restaurants · Offices · Bungalows</p>
+                </div>
+                <span className="shrink-0 text-xs font-semibold bg-green-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">Get Free Quote →</span>
+              </Link>
+            </motion.div>
+
             {/* Search */}
-            <motion.div 
+            <motion.div
               className="flex gap-3"
               initial={{ y: -20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}

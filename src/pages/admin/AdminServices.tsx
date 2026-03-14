@@ -830,70 +830,8 @@ const AdminServices = () => {
                     required
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Pricing plans will be calculated automatically
+                    This is the base price used for calculations
                   </p>
-                </div>
-
-                {/* Pricing Plans */}
-                <div className="space-y-3">
-                  <label className="block text-sm font-medium text-foreground">
-                    Pricing Plans
-                  </label>
-                  
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 bg-muted rounded-lg">
-                      <label className="block text-xs text-muted-foreground mb-1">One Time</label>
-                      <input
-                        type="number"
-                        value={formData.pricingPlans.oneTime}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          pricingPlans: { ...formData.pricingPlans, oneTime: Number(e.target.value) }
-                        })}
-                        className="input-clean"
-                        min="0"
-                      />
-                    </div>
-                    <div className="p-3 bg-muted rounded-lg">
-                      <label className="block text-xs text-muted-foreground mb-1">Daily</label>
-                      <input
-                        type="number"
-                        value={formData.pricingPlans.daily}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          pricingPlans: { ...formData.pricingPlans, daily: Number(e.target.value) }
-                        })}
-                        className="input-clean"
-                        min="0"
-                      />
-                    </div>
-                    <div className="p-3 bg-muted rounded-lg">
-                      <label className="block text-xs text-muted-foreground mb-1">Weekly</label>
-                      <input
-                        type="number"
-                        value={formData.pricingPlans.weekly}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          pricingPlans: { ...formData.pricingPlans, weekly: Number(e.target.value) }
-                        })}
-                        className="input-clean"
-                        min="0"
-                      />
-                    </div>
-                    <div className="p-3 bg-muted rounded-lg">
-                      <label className="block text-xs text-muted-foreground mb-1">Monthly</label>
-                      <input
-                        type="number"
-                        value={formData.pricingPlans.monthly}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          pricingPlans: { ...formData.pricingPlans, monthly: Number(e.target.value) }
-                        })}
-                        className="input-clean"
-                        min="0"
-                      />
-                    </div>
-                  </div>
                 </div>
 
                 {/* Subscription Plans Section */}
