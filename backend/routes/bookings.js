@@ -1611,10 +1611,10 @@ router.post('/:id/generate-start-qr',
         });
       }
 
-      // Check booking status
-      if (booking.status !== 'confirmed') {
-        return res.status(400).json({ 
-          error: { message: 'Booking must be confirmed to generate start QR', status: 400 } 
+      // Check booking status — allow confirmed or in-progress (auto-status can advance before worker scans QR)
+      if (booking.status !== 'confirmed' && booking.status !== 'in-progress') {
+        return res.status(400).json({
+          error: { message: 'Booking must be confirmed or in-progress to generate start QR', status: 400 }
         });
       }
 
