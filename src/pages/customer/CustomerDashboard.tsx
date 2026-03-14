@@ -9,7 +9,8 @@ import { Link, useNavigate } from "react-router-dom";
 
 interface Booking {
   _id: string;
-  service: { name: string };
+  service?: { name: string } | null;
+  bookingType?: string;
   worker?: { name: string; workerProfile: { rating: number } };
   bookingDate: string;
   startTime: string;
@@ -237,7 +238,7 @@ const CustomerDashboard = () => {
                 🧹
               </div>
               <div className="flex-1">
-                <p className="font-semibold text-foreground text-sm">{ongoingBooking.service.name}</p>
+                <p className="font-semibold text-foreground text-sm">{ongoingBooking.service?.name ?? '✨ Deep Cleaning'}</p>
                 <p className="text-xs text-muted-foreground">{ongoingBooking.worker?.name || t('customer.dashboard.workerAssigned')}</p>
               </div>
               <Link to="/customer/bookings" className="btn-brand text-xs py-2 px-3 shrink-0">
@@ -368,10 +369,10 @@ const CustomerDashboard = () => {
                     whileHover={{ rotate: 360 }}
                     transition={{ duration: 0.6 }}
                   >
-                    {b.service.name.toLowerCase().includes("deep") ? "✨" : "🧹"}
+                    {(b.service?.name ?? '').toLowerCase().includes("deep") || b.bookingType === 'deep-cleaning-cart' ? "✨" : "🧹"}
                   </motion.div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-foreground text-sm">{b.service.name}</p>
+                    <p className="font-semibold text-foreground text-sm">{b.service?.name ?? (b.bookingType === 'deep-cleaning-cart' ? '✨ Deep Cleaning' : 'Booking')}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {b.worker?.name || t('customer.dashboard.workerWillBeAssigned')}
                     </p>
