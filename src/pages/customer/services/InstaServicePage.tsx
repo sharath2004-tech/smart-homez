@@ -78,6 +78,7 @@ const InstaServicePage = () => {
   const [mrpPerHour, setMrpPerHour] = useState(0);          // from service.originalPrice
   const [suppliesAddonPrice, setSuppliesAddonPrice] = useState(DEFAULT_SUPPLIES_PRICE);
   const [serviceId, setServiceId] = useState<string | null>(null);
+  const [taskOptions, setTaskOptions] = useState(TASK_OPTIONS);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -134,6 +135,11 @@ const InstaServicePage = () => {
           // Supplies add-on from first active addon, fallback to default
           const suppliesAddon = svc.addons?.find((a: any) => a.isActive !== false);
           if (suppliesAddon?.price > 0) setSuppliesAddonPrice(suppliesAddon.price);
+          // Task options from DB, filter active only, fallback to hardcoded list
+          if (svc.taskOptions && svc.taskOptions.length > 0) {
+            const active = svc.taskOptions.filter((t: any) => t.isActive !== false);
+            if (active.length > 0) setTaskOptions(active);
+          }
         } else {
           setNoServiceWarning(true);
         }
@@ -351,7 +357,7 @@ const InstaServicePage = () => {
               </h2>
               <p className="text-xs text-muted-foreground mb-3">Select all that apply</p>
               <div className="grid grid-cols-2 gap-2">
-                {TASK_OPTIONS.map((task) => (
+                {taskOptions.map((task) => (
                   <button
                     key={task.id}
                     onClick={() => toggleTask(task.id)}
@@ -640,7 +646,7 @@ const InstaServicePage = () => {
               </p>
               <div className="flex flex-wrap gap-2">
                 {selectedTasks.map((t) => {
-                  const task = TASK_OPTIONS.find((o) => o.id === t);
+                  const task = taskOptions.find((o) => o.id === t);
                   return (
                     <span key={t} className="badge-primary text-xs">
                       {task?.icon} {task?.label}

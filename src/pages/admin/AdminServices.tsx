@@ -61,6 +61,7 @@ interface Service {
     }>;
   };
   tags?: string[];
+  taskOptions?: Array<{ id: string; label: string; icon: string; isActive: boolean }>;
 }
 
 interface UserProfile {
@@ -412,6 +413,7 @@ const AdminServices = () => {
       subscriptionOptions: service.subscriptionOptions || { allowedFrequencies: ['daily', 'alt-days', '3-days', 'weekly'], requiresSameWorker: true, autoRenewal: true },
       sizeParameters: service.sizeParameters || { enabled: false, sizeType: 'quantity', options: [] },
       originalPrice: (service as any).originalPrice || 0,
+      taskOptions: (service as any).taskOptions || [],
     });
     setSelectedServiceType(service.serviceType || null);
     setEditingId(service._id!);
@@ -451,6 +453,7 @@ const AdminServices = () => {
       subscriptionOptions: { allowedFrequencies: ['daily', 'alt-days', '3-days', 'weekly'], requiresSameWorker: true, autoRenewal: true },
       sizeParameters: { enabled: false, sizeType: 'quantity', options: [] },
       originalPrice: 0,
+      taskOptions: [],
     });
   };
 
@@ -1304,6 +1307,99 @@ const AdminServices = () => {
                     </div>
                   )}
                 </div>
+                )}
+
+                {/* Task Options — editable checklist shown on Insta Maid booking page */}
+                {selectedServiceType === 'instant_hourly' && (
+                  <div className="space-y-3 p-4 bg-amber-50/60 border border-amber-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="block text-sm font-medium text-foreground">Task Options</label>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Tasks customers can select on the Insta Maid booking page
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newTask = { id: `task-${Date.now()}`, label: '', icon: '🧹', isActive: true };
+                          setFormData({ ...formData, taskOptions: [...((formData as any).taskOptions || []), newTask] } as any);
+                        }}
+                        className="text-xs px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors flex items-center gap-1"
+                      >
+                        <Plus className="w-3 h-3" /> Add Task
+                      </button>
+                    </div>
+
+                    {((formData as any).taskOptions || []).length === 0 && (
+                      <p className="text-xs text-muted-foreground italic">No tasks configured — customers will see the default built-in list.</p>
+                    )}
+
+                    {((formData as any).taskOptions || []).length > 0 && (
+                      <div className="space-y-2">
+                        {((formData as any).taskOptions as Array<{ id: string; label: string; icon: string; isActive: boolean }>).map((task, index) => (
+                          <div key={task.id} className="grid grid-cols-12 gap-2 p-2 bg-white rounded-lg border border-amber-100 items-center">
+                            {/* Icon */}
+                            <div className="col-span-2">
+                              <input
+                                type="text"
+                                value={task.icon}
+                                onChange={(e) => {
+                                  const updated = [...(formData as any).taskOptions];
+                                  updated[index] = { ...updated[index], icon: e.target.value };
+                                  setFormData({ ...formData, taskOptions: updated } as any);
+                                }}
+                                className="input-clean text-center text-lg"
+                                placeholder="🧹"
+                                maxLength={2}
+                              />
+                            </div>
+                            {/* Label */}
+                            <div className="col-span-7">
+                              <input
+                                type="text"
+                                value={task.label}
+                                onChange={(e) => {
+                                  const updated = [...(formData as any).taskOptions];
+                                  updated[index] = { ...updated[index], label: e.target.value };
+                                  setFormData({ ...formData, taskOptions: updated } as any);
+                                }}
+                                className="input-clean"
+                                placeholder="e.g. Sweeping & Mopping"
+                              />
+                            </div>
+                            {/* Active toggle */}
+                            <div className="col-span-2 flex justify-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = [...(formData as any).taskOptions];
+                                  updated[index] = { ...updated[index], isActive: !updated[index].isActive };
+                                  setFormData({ ...formData, taskOptions: updated } as any);
+                                }}
+                                className={`text-xs px-2 py-1 rounded-full font-medium transition-colors ${task.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
+                              >
+                                {task.isActive ? 'ON' : 'OFF'}
+                              </button>
+                            </div>
+                            {/* Delete */}
+                            <div className="col-span-1 flex justify-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = (formData as any).taskOptions.filter((_: unknown, i: number) => i !== index);
+                                  setFormData({ ...formData, taskOptions: updated } as any);
+                                }}
+                                className="p-1.5 hover:bg-destructive/10 rounded-lg transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {/* Additional Services Section */}

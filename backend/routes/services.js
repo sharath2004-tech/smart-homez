@@ -339,7 +339,8 @@ const handleServiceUpdate = async (req, res) => {
       // New parameter fields
       sizeParameters, durationOptions, subscriptionOptions, addons,
       equipmentRequired, pricingTiers, workerPreferences, serviceFields,
-      timeSlotRestrictions, cancellationPolicy, specialInstructionsTemplate
+      timeSlotRestrictions, cancellationPolicy, specialInstructionsTemplate,
+      taskOptions
     } = req.body;
 
     // Admins cannot directly edit pricing — they must submit a price change request
@@ -404,6 +405,7 @@ const handleServiceUpdate = async (req, res) => {
     if ('timeSlotRestrictions' in req.body) updateData.timeSlotRestrictions = timeSlotRestrictions;
     if ('cancellationPolicy' in req.body) updateData.cancellationPolicy = cancellationPolicy;
     if ('specialInstructionsTemplate' in req.body) updateData.specialInstructionsTemplate = specialInstructionsTemplate;
+    if ('taskOptions' in req.body) updateData.taskOptions = taskOptions;
 
     const service = await Service.findByIdAndUpdate(
       req.params.id,

@@ -147,6 +147,13 @@ const serviceSchema = new mongoose.Schema({
   },
   tags: [String],
   requirements: [String],
+  // Editable task checklist for instant_hourly services (multi-select shown to customers)
+  taskOptions: [{
+    id: { type: String, required: true },
+    label: { type: String, required: true },
+    icon: { type: String, default: '🧹' },
+    isActive: { type: Boolean, default: true }
+  }],
   // Additional service options (e.g., for cleaning: carpet cleaning, window cleaning, etc.)
   additionalServiceOptions: [{
     value: {
