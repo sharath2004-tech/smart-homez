@@ -19,13 +19,15 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 interface Task {
   _id: string;
-  service: {
+  service?: {
     _id: string;
     name: string;
     description?: string;
     price: number;
     duration: number;
   };
+  bookingType?: string;
+  cartItems?: { name: string; qty?: number; totalPrice: number }[];
   customer: {
     _id: string;
     name: string;
@@ -445,7 +447,9 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex-1">
-            <h2 className="font-bold text-foreground text-lg">{task.service.name}</h2>
+            <h2 className="font-bold text-foreground text-lg">
+              {task.service?.name ?? (task.bookingType === 'deep-cleaning-cart' ? '✨ Deep Cleaning' : 'Task')}
+            </h2>
             <p className="text-sm text-muted-foreground">{t('worker.taskDetail.title')}</p>
           </div>
           <span className={`text-xs font-semibold px-3 py-1.5 rounded-full ${getStatusColor(task.status)}`}>
@@ -502,7 +506,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
               ac:       ['Inspect unit','Clean air filters','Check coolant level','Clean condenser coils','Run test cycle','Log service report'],
               default:  ['Prepare tools/equipment','Start main task','Complete task steps','Quality check','Clean up work area','Document work done'],
             };
-            const category = (task.service.name || '').toLowerCase();
+            const category = (task.service?.name ?? task.bookingType ?? '').toLowerCase();
             const defaults = DEFAULT_ITEMS[
               Object.keys(DEFAULT_ITEMS).find(k => category.includes(k)) ?? 'default'
             ];
@@ -702,7 +706,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">{t('worker.taskDetail.duration')}</span>
-                <span className="text-sm font-medium text-foreground">{task.service.duration} {t('worker.taskDetail.mins')}</span>
+                <span className="text-sm font-medium text-foreground">{task.service?.duration ?? '—'} {task.service ? t('worker.taskDetail.mins') : ''}</span>
               </div>
             </div>
           </div>
