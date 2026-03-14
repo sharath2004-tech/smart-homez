@@ -465,7 +465,9 @@ const AdminServices = () => {
   const coverageItems = SERVICE_TYPE_CARDS.map(card => ({
     ...card,
     isConfigured: configuredTypes.has(card.id),
-    activeService: services.find(s => s.serviceType === card.id && s.isActive),
+    // Find active service first; fall back to any service of this type (so Edit shows even if inactive)
+    service: services.find(s => s.serviceType === card.id && s.isActive)
+           || services.find(s => s.serviceType === card.id),
   }));
   const missingCount = coverageItems.filter(c => !c.isConfigured).length;
 
@@ -509,7 +511,7 @@ const AdminServices = () => {
               </span>
             )}
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             {coverageItems.map((item) => (
               <div
                 key={item.id}
@@ -524,21 +526,23 @@ const AdminServices = () => {
                   <p className="text-xs font-semibold text-foreground truncate">{item.label}</p>
                   {item.isConfigured ? (
                     <p className="text-xs text-green-700 dark:text-green-400">
-                      ✓ {item.activeService ? `₹${item.activeService.price}/hr · Active` : 'Configured (inactive)'}
+                      ✓ {item.service ? (
+                        item.id === 'monthly_subscription'
+                          ? `₹${item.service.price}/mo · ${item.service.isActive ? 'Active' : 'Inactive'}`
+                          : `₹${item.service.price} · ${item.service.isActive ? 'Active' : 'Inactive'}`
+                      ) : 'Configured'}
                     </p>
                   ) : (
                     <p className="text-xs text-amber-700 dark:text-amber-400">Not configured</p>
                   )}
                 </div>
-                {item.isConfigured ? (
-                  item.activeService && (
-                    <button
-                      onClick={() => handleEdit(item.activeService!)}
-                      className="text-xs px-2 py-1 rounded-md bg-muted hover:bg-muted/80 text-muted-foreground shrink-0"
-                    >
-                      Edit
-                    </button>
-                  )
+                {item.service ? (
+                  <button
+                    onClick={() => handleEdit(item.service!)}
+                    className="text-xs px-2 py-1 rounded-md bg-muted hover:bg-muted/80 text-muted-foreground shrink-0"
+                  >
+                    Edit
+                  </button>
                 ) : (
                   <button
                     onClick={() => handleTypeSelect(item)}
@@ -643,6 +647,16 @@ const AdminServices = () => {
                       <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100 capitalize">
                         {service.category}
                       </span>
+                      {service.serviceType && (
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                          service.serviceType === 'monthly_subscription' ? 'bg-purple-100 text-purple-800' :
+                          service.serviceType === 'instant_hourly' ? 'bg-blue-100 text-blue-800' :
+                          service.serviceType?.startsWith('deep_cleaning') ? 'bg-green-100 text-green-800' :
+                          'bg-gray-100 text-gray-600'
+                        }`}>
+                          {SERVICE_TYPE_CARDS.find(c => c.id === service.serviceType)?.label || service.serviceType.replace(/_/g, ' ')}
+                        </span>
+                      )}
                       {service.isQuoteService && (
                         <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800 font-semibold">
                           ✨ Deep Cleaning Cart
@@ -651,7 +665,28 @@ const AdminServices = () => {
                     </div>
                     <p className="text-sm text-muted-foreground mb-4">{service.description}</p>
                     
-                    {/* Pricing */}
+                    {/* Pricing — subscription shows hourly tiers, others show plans */}
+                    {service.serviceType === 'monthly_subscription' ? (
+                      service.durationOptions && service.durationOptions.length > 0 ? (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-2">Monthly price per daily session hours:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {service.durationOptions.map((d, i) => (
+                              <div key={i} className="p-2 bg-purple-50 border border-purple-200 rounded-lg text-center min-w-[60px]">
+                                <div className="text-xs text-purple-600 font-medium">{d.hours}h/day</div>
+                                <div className="text-sm font-bold text-purple-800">₹{d.price}</div>
+                                <div className="text-xs text-purple-500">/mo</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                          <p className="text-xs text-purple-700 font-medium">⚠️ No hourly pricing tiers set</p>
+                          <p className="text-xs text-purple-600 mt-0.5">Edit this service and add Duration Tiers so customers can see prices per session hours.</p>
+                        </div>
+                      )
+                    ) : (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div className="p-3 bg-muted rounded-lg">
                         <div className="text-xs text-muted-foreground mb-1">One Time</div>
@@ -678,6 +713,7 @@ const AdminServices = () => {
                         </div>
                       </div>
                     </div>
+                    )}
 
                     <div className="mt-3 text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
                       <span>Duration: {service.duration} minutes</span>
@@ -1305,13 +1341,25 @@ const AdminServices = () => {
                   )}
                 </div>
 
-                {/* ── Duration Tiers (super admin only) ── */}
-                {isSuperAdmin && (
-                  <div className="space-y-3 p-4 bg-blue-50/50 border border-blue-200 rounded-lg">
+                {/* ── Duration Tiers: required for subscription, optional for others ── */}
+                {(isSuperAdmin || selectedServiceType === 'monthly_subscription') && (
+                  <div className={`space-y-3 p-4 rounded-lg border ${
+                    selectedServiceType === 'monthly_subscription'
+                      ? 'bg-purple-50/60 border-purple-300'
+                      : 'bg-blue-50/50 border-blue-200'
+                  }`}>
                     <div className="flex items-center justify-between">
                       <div>
-                        <label className="block text-sm font-medium text-foreground">Duration Tiers (Hourly Pricing)</label>
-                        <p className="text-xs text-muted-foreground mt-0.5">e.g. 1 hr → ₹200, 1.5 hr → ₹300, 2 hr → ₹400</p>
+                        <label className="block text-sm font-medium text-foreground">
+                          {selectedServiceType === 'monthly_subscription'
+                            ? '📅 Session Hours Pricing (required for subscription)'
+                            : 'Duration Tiers (Hourly Pricing)'}
+                        </label>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {selectedServiceType === 'monthly_subscription'
+                            ? 'Set monthly price for each daily session length — e.g. 1h → ₹3500/mo, 1.5h → ₹4500/mo'
+                            : 'e.g. 1 hr → ₹200, 1.5 hr → ₹300, 2 hr → ₹400'}
+                        </p>
                       </div>
                       <button
                         type="button"
