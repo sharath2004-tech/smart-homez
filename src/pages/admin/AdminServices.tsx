@@ -43,6 +43,12 @@ interface Service {
     price: number;
     isDefault?: boolean;
   }>;
+  subscriptionOptions?: {
+    allowedFrequencies?: string[];
+    requiresSameWorker?: boolean;
+    minContractMonths?: number;
+    autoRenewal?: boolean;
+  };
   sizeParameters?: {
     enabled: boolean;
     sizeType: string;
@@ -237,10 +243,9 @@ const AdminServices = () => {
     isQuoteService: false,
     additionalServiceOptions: [],
     durationOptions: [],
+    subscriptionOptions: { allowedFrequencies: ['daily', 'alt-days', '3-days', 'weekly'], requiresSameWorker: true, autoRenewal: true },
     sizeParameters: { enabled: false, sizeType: 'quantity', options: [] }
-  });
-
-  const isSuperAdmin = profile?.role === 'super_admin';
+  });  const isSuperAdmin = profile?.role === 'super_admin';
 
   useEffect(() => {
     fetchData();
@@ -396,6 +401,7 @@ const AdminServices = () => {
       subscriptionPlans: service.subscriptionPlans,
       additionalServiceOptions: service.additionalServiceOptions,
       durationOptions: service.durationOptions || [],
+      subscriptionOptions: service.subscriptionOptions || { allowedFrequencies: ['daily', 'alt-days', '3-days', 'weekly'], requiresSameWorker: true, autoRenewal: true },
       sizeParameters: service.sizeParameters || { enabled: false, sizeType: 'quantity', options: [] },
     });
     setSelectedServiceType(service.serviceType || null);
@@ -433,6 +439,7 @@ const AdminServices = () => {
       isActive: true,
       isQuoteService: false,
       durationOptions: [],
+      subscriptionOptions: { allowedFrequencies: ['daily', 'alt-days', '3-days', 'weekly'], requiresSameWorker: true, autoRenewal: true },
       sizeParameters: { enabled: false, sizeType: 'quantity', options: [] }
     });
   };
@@ -1437,7 +1444,80 @@ const AdminServices = () => {
                   </div>
                 )}
 
-                {/* ── Size / Quantity Tiers (super admin only) ── */}
+                {/* ── Subscription Booking Options (super admin + monthly_subscription) ── */}
+                {selectedServiceType === 'monthly_subscription' && (
+                  <div className="space-y-3 p-4 bg-purple-50/60 border border-purple-300 rounded-lg">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground">🔄 Subscription Booking Options</label>
+                      <p className="text-xs text-muted-foreground mt-0.5">Controls which frequencies & settings customers can choose on the booking page</p>
+                    </div>
+
+                    {/* Allowed Frequencies */}
+                    <div>
+                      <p className="text-xs font-semibold text-foreground mb-2">Allowed Frequencies</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { id: 'daily',    label: '📆 Daily',      desc: 'Mon–Sat · 26 visits/mo' },
+                          { id: 'alt-days', label: '📅 Alt Days',   desc: 'Mon/Wed/Fri · 13 visits/mo' },
+                          { id: '3-days',   label: '🗓️ 3× Week',   desc: 'Any 3 days · ~12 visits/mo' },
+                          { id: 'weekly',   label: '📋 Weekly',     desc: 'Once a week · 4 visits/mo' },
+                        ].map(freq => {
+                          const allowed = formData.subscriptionOptions?.allowedFrequencies || [];
+                          const isChecked = allowed.includes(freq.id);
+                          return (
+                            <label key={freq.id} className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${isChecked ? 'border-purple-400 bg-purple-50' : 'border-border bg-white'}`}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  const freqs = e.target.checked
+                                    ? [...allowed, freq.id]
+                                    : allowed.filter(f => f !== freq.id);
+                                  setFormData({ ...formData, subscriptionOptions: { ...formData.subscriptionOptions, allowedFrequencies: freqs } });
+                                }}
+                                className="mt-0.5 w-3.5 h-3.5 accent-purple-600"
+                              />
+                              <div>
+                                <p className="text-xs font-semibold text-foreground">{freq.label}</p>
+                                <p className="text-xs text-muted-foreground">{freq.desc}</p>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Toggles */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="flex items-center justify-between p-3 rounded-lg bg-white border border-border cursor-pointer">
+                        <div>
+                          <p className="text-xs font-semibold text-foreground">Same Worker Required</p>
+                          <p className="text-xs text-muted-foreground">Fix one maid per household</p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={formData.subscriptionOptions?.requiresSameWorker ?? true}
+                          onChange={(e) => setFormData({ ...formData, subscriptionOptions: { ...formData.subscriptionOptions, requiresSameWorker: e.target.checked } })}
+                          className="w-4 h-4 accent-purple-600 ml-2"
+                        />
+                      </label>
+                      <label className="flex items-center justify-between p-3 rounded-lg bg-white border border-border cursor-pointer">
+                        <div>
+                          <p className="text-xs font-semibold text-foreground">Auto-Renewal Default</p>
+                          <p className="text-xs text-muted-foreground">Pre-check auto-renew for customers</p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={formData.subscriptionOptions?.autoRenewal ?? true}
+                          onChange={(e) => setFormData({ ...formData, subscriptionOptions: { ...formData.subscriptionOptions, autoRenewal: e.target.checked } })}
+                          className="w-4 h-4 accent-purple-600 ml-2"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+
                 {isSuperAdmin && (
                   <div className="space-y-3 p-4 bg-green-50/50 border border-green-200 rounded-lg">
                     <div className="flex items-center justify-between">

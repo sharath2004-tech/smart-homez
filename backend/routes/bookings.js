@@ -449,6 +449,17 @@ router.post('/',
         }
       }
 
+      // ── Subscription price validation: override totalAmount from service.durationOptions ──
+      if (isSubscription && subscriptionDetails?.durationPerSession != null) {
+        const serviceDoc = await Service.findById(service).select('durationOptions price').lean();
+        if (serviceDoc?.durationOptions?.length) {
+          const tier = serviceDoc.durationOptions.find(d => d.hours === subscriptionDetails.durationPerSession);
+          if (tier?.price) {
+            totalAmount = tier.price; // Use server-authoritative price, not client-sent value
+          }
+        }
+      }
+
       // ── Holiday guard ──────────────────────────────────────────────────
       // Reject bookings on days declared as holidays by the super admin.
       const effectiveBookingDate = isSubscription
