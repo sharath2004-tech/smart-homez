@@ -48,6 +48,7 @@ const LocationSelector = ({ onLocationConfirmed, onClose, defaultLocation, showC
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const circleLayersRef = useRef<L.Circle[]>([]);
   
   const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(
     defaultLocation || null
@@ -92,11 +93,11 @@ const LocationSelector = ({ onLocationConfirmed, onClose, defaultLocation, showC
     }
   };
 
-  // Initialize map
+  // Initialize map ONCE on mount
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    const defaultCenter: [number, number] = defaultLocation 
+    const defaultCenter: [number, number] = defaultLocation
       ? [defaultLocation.lat, defaultLocation.lng]
       : [19.0760, 72.8777]; // Mumbai default
 
@@ -111,10 +112,49 @@ const LocationSelector = ({ onLocationConfirmed, onClose, defaultLocation, showC
       maxZoom: 19,
     }).addTo(map);
 
-    // Add service area circles
+    // Add click handler for map
+    map.on("click", (e: L.LeafletMouseEvent) => {
+      handleMapClick(e.latlng.lat, e.latlng.lng);
+    });
+
+    mapRef.current = map;
+
+    // Force Leaflet to recalculate the container size after CSS layout
+    const mapInstance = map;
+    setTimeout(() => {
+      if (mapRef.current === mapInstance) {
+        mapInstance.invalidateSize();
+      }
+    }, 150);
+
+    // Set initial marker if default location provided
+    if (defaultLocation) {
+      addOrUpdateMarker(defaultLocation.lat, defaultLocation.lng);
+      checkAvailability(defaultLocation.lat, defaultLocation.lng);
+    }
+
+    return () => {
+      circleLayersRef.current = [];
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Add/update service area circles whenever serviceAreas loads
+  useEffect(() => {
+    if (!mapRef.current || serviceAreas.length === 0) return;
+
+    // Remove old circles
+    circleLayersRef.current.forEach((c) => c.remove());
+    circleLayersRef.current = [];
+
+    // Add new circles
     serviceAreas.forEach((area) => {
-      L.circle([area.coordinates.lat, area.coordinates.lng], {
-        radius: area.radiusKm * 1000, // Convert km to meters
+      const circle = L.circle([area.coordinates.lat, area.coordinates.lng], {
+        radius: area.radiusKm * 1000,
         color: area.color,
         fillColor: area.color,
         fillOpacity: 0.15,
@@ -128,30 +168,10 @@ const LocationSelector = ({ onLocationConfirmed, onClose, defaultLocation, showC
             <span style="color: #999; font-size: 11px;">Radius: ${area.radiusKm} km</span>
           </div>
         `)
-        .addTo(map);
+        .addTo(mapRef.current!);
+      circleLayersRef.current.push(circle);
     });
-
-    // Add click handler for map
-    map.on("click", (e: L.LeafletMouseEvent) => {
-      handleMapClick(e.latlng.lat, e.latlng.lng);
-    });
-
-    mapRef.current = map;
-
-    // Set initial marker if default location provided
-    if (defaultLocation) {
-      addOrUpdateMarker(defaultLocation.lat, defaultLocation.lng);
-      checkAvailability(defaultLocation.lat, defaultLocation.lng);
-    }
-
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serviceAreas, defaultLocation]);
+  }, [serviceAreas]);
 
   const addOrUpdateMarker = (lat: number, lng: number) => {
     if (!mapRef.current) return;

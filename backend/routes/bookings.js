@@ -275,7 +275,7 @@ router.post('/:id/accept-order', authenticate, authorize('worker'), async (req, 
 
     const updatedBooking = await Booking.findById(booking._id)
       .populate('customer', 'name email phone')
-      .populate('worker', 'name email phone gender religion workerProfile')
+      .populate('worker', 'name email phone gender religion workerProfile profileImage')
       .populate('service', 'name description price duration')
       .populate('location.locationId', 'apartmentName area city');
 
@@ -334,7 +334,7 @@ router.get('/:id', authenticate, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id)
       .populate('customer', 'name email phone')
-      .populate('worker', 'name email phone gender religion workerProfile')
+      .populate('worker', 'name email phone gender religion workerProfile profileImage')
       .populate('supportStaff.worker', 'name email phone')
       .populate('service', 'name description price duration');
 
@@ -838,8 +838,8 @@ router.post('/',
           
           populatedBooking = await Booking.findById(booking._id)
             .populate('customer', 'name email phone')
-            .populate('worker', 'name email phone gender religion workerProfile')
-            .populate('backupWorkers.worker', 'name email phone workerProfile')
+            .populate('worker', 'name email phone gender religion workerProfile profileImage')
+            .populate('backupWorkers.worker', 'name email phone workerProfile profileImage')
             .populate('service', 'name description price duration');
         } catch (assignError) {
           console.error('Worker assignment error:', assignError);
@@ -859,8 +859,8 @@ router.post('/',
         
         populatedBooking = await Booking.findById(booking._id)
           .populate('customer', 'name email phone')
-          .populate('worker', 'name email phone gender religion workerProfile')
-          .populate('backupWorkers.worker', 'name email phone workerProfile')
+          .populate('worker', 'name email phone gender religion workerProfile profileImage')
+          .populate('backupWorkers.worker', 'name email phone workerProfile profileImage')
           .populate('service', 'name description price duration');
       }
 
@@ -1012,7 +1012,7 @@ router.put('/:id', authenticate, async (req, res) => {
 
     const updatedBooking = await Booking.findById(booking._id)
       .populate('customer', 'name email phone')
-      .populate('worker', 'name email phone gender religion workerProfile')
+      .populate('worker', 'name email phone gender religion workerProfile profileImage')
       .populate('service', 'name description price duration');
 
     res.json({ message: 'Booking updated successfully', booking: updatedBooking });
@@ -1782,7 +1782,7 @@ router.post('/:id/scan-start-qr',
 
       const booking = await Booking.findById(req.params.id)
         .populate('service', 'name description price duration')
-        .populate('worker', 'name email phone gender religion workerProfile');
+        .populate('worker', 'name email phone gender religion workerProfile profileImage');
       
       if (!booking) {
         return res.status(404).json({ 
@@ -2251,7 +2251,7 @@ router.post('/:id/scan-end-qr',
 
       const booking = await Booking.findById(req.params.id)
         .populate('service', 'name description price duration')
-        .populate('worker', 'name email phone gender religion workerProfile');
+        .populate('worker', 'name email phone gender religion workerProfile profileImage');
       
       if (!booking) {
         return res.status(404).json({ 
@@ -2730,7 +2730,7 @@ router.post('/:id/activate-backup',
 
       const booking = await Booking.findById(req.params.id)
         .populate('worker', 'name email phone')
-        .populate('backupWorkers.worker', 'name email phone workerProfile');
+        .populate('backupWorkers.worker', 'name email phone workerProfile profileImage');
 
       if (!booking) {
         return res.status(404).json({ 
@@ -2758,8 +2758,8 @@ router.post('/:id/activate-backup',
       // Get updated booking
       const updatedBooking = await Booking.findById(req.params.id)
         .populate('customer', 'name email phone')
-        .populate('worker', 'name email phone workerProfile')
-        .populate('backupWorkers.worker', 'name email phone workerProfile')
+        .populate('worker', 'name email phone workerProfile profileImage')
+        .populate('backupWorkers.worker', 'name email phone workerProfile profileImage')
         .populate('service', 'name description price duration');
 
       res.json({ 
@@ -2783,7 +2783,7 @@ router.get('/:id/check-backup',
   async (req, res) => {
     try {
       const booking = await Booking.findById(req.params.id)
-        .populate('worker', 'name email phone workerProfile');
+        .populate('worker', 'name email phone workerProfile profileImage');
 
       if (!booking) {
         return res.status(404).json({ 
@@ -2947,7 +2947,7 @@ router.post('/:id/change-subscription-worker',
       // This would require implementing a parent-child booking relationship
       // For now, just update the main subscription booking
 
-      await booking.populate('worker', 'name email phone workerProfile');
+      await booking.populate('worker', 'name email phone workerProfile profileImage');
 
       res.json({ 
         message: 'Worker changed successfully',
