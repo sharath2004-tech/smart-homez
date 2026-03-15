@@ -10,9 +10,9 @@ import Settings from '../models/Settings.js';
 import User from '../models/User.js';
 import WorkerEarnings from '../models/WorkerEarnings.js';
 import {
-  activateBackupWorker,
-  assignWorkersWithBackup,
-  checkBackupActivationNeeded
+    activateBackupWorker,
+    assignWorkersWithBackup,
+    checkBackupActivationNeeded
 } from '../utils/advancedWorkerAssignment.js';
 import { processQueuedBookings, updateBookingStatuses } from '../utils/bookingStatusUpdater.js';
 import notificationService from '../utils/notificationService.js';
@@ -20,9 +20,9 @@ import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
 import { checkIfOnTime, updateWorkerStats } from '../utils/updateWorkerStats.js';
 import { assignWorkerToBooking, reassignWorker } from '../utils/workerAssignment.js';
 import {
-  getWorkerAvailabilityForecast,
-  getWorkerCapacityStatus,
-  monitorWorkerPool
+    getWorkerAvailabilityForecast,
+    getWorkerCapacityStatus,
+    monitorWorkerPool
 } from '../utils/workerPoolManager.js';
 
 const router = express.Router();
