@@ -1,6 +1,6 @@
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { publicAPI } from "@/lib/api";
-import { ArrowRight, CheckCircle, ChevronRight, Clock, Home, MapPin, Shield, Sparkles, Star } from "lucide-react";
+import { ArrowRight, CheckCircle, ChevronRight, Clock, Home, MapPin, Shield, Sparkles, Star, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -16,14 +16,69 @@ const LandingPage = () => {
   const [loading, setLoading] = useState(true);
   // Track whether we got real data from the API
   const [statsLoaded, setStatsLoaded] = useState(false);
+  const [selectedService, setSelectedService] = useState<typeof services[0] | null>(null);
 
   const services = [
-    { icon: "🧹", nameKey: "landing.services.instaMaid", descKey: "landing.services.instaMaidDesc", tagKey: "landing.services.popular", color: "bg-accent" },
-    { icon: "✨", nameKey: "landing.services.deepCleaning", descKey: "landing.services.deepCleaningDesc", tagKey: "landing.services.bestValue", color: "bg-secondary" },
-    { icon: "🍳", nameKey: "landing.services.kitchenCleaning", descKey: "landing.services.kitchenCleaningDesc", tagKey: "", color: "bg-accent" },
-    { icon: "🚿", nameKey: "landing.services.bathroomCleaning", descKey: "landing.services.bathroomCleaningDesc", tagKey: "", color: "bg-secondary" },
-    { icon: "🪟", nameKey: "landing.services.windowCleaning", descKey: "landing.services.windowCleaningDesc", tagKey: "", color: "bg-accent" },
-    { icon: "🛋️", nameKey: "landing.services.sofaCleaning", descKey: "landing.services.sofaCleaningDesc", tagKey: "", color: "bg-secondary" },
+    {
+      icon: "🧹", nameKey: "landing.services.instaMaid", descKey: "landing.services.instaMaidDesc",
+      tagKey: "landing.services.popular", color: "bg-accent", gradient: "from-amber-400 to-orange-500",
+      image: "/images/home_cleaning.png",
+      steps: [
+        { icon: "📍", title: "Set Your Location", desc: "Tell us your area so we match you with a nearby verified maid." },
+        { icon: "🗓️", title: "Pick Date & Time", desc: "Choose any slot — same day or scheduled, from 7am to 9pm." },
+        { icon: "✅", title: "Maid Arrives & Cleans", desc: "Your assigned maid arrives on time. Pay only after the job is done." },
+      ],
+    },
+    {
+      icon: "✨", nameKey: "landing.services.deepCleaning", descKey: "landing.services.deepCleaningDesc",
+      tagKey: "landing.services.bestValue", color: "bg-secondary", gradient: "from-green-400 to-emerald-600",
+      image: "/images/deep_cleaning.png",
+      steps: [
+        { icon: "🏠", title: "Select Property Type", desc: "Villa, apartment, or office — we customise the package for your space." },
+        { icon: "📋", title: "Get a Quote", desc: "Our team reviews your requirements and sends a transparent fixed price." },
+        { icon: "🧽", title: "Deep Clean Done", desc: "A full team arrives with professional equipment for a thorough clean." },
+      ],
+    },
+    {
+      icon: "🍳", nameKey: "landing.services.kitchenCleaning", descKey: "landing.services.kitchenCleaningDesc",
+      tagKey: "", color: "bg-accent", gradient: "from-yellow-400 to-amber-500",
+      image: "/images/kitchen_cleaning.png",
+      steps: [
+        { icon: "📍", title: "Set Your Location", desc: "We verify service availability in your area instantly." },
+        { icon: "🕐", title: "Book a Slot", desc: "Pick a convenient time — kitchen cleaning takes 60–90 minutes." },
+        { icon: "🍳", title: "Sparkling Kitchen", desc: "Chimney, stove, counters and tiles — all degreased and sanitised." },
+      ],
+    },
+    {
+      icon: "🚿", nameKey: "landing.services.bathroomCleaning", descKey: "landing.services.bathroomCleaningDesc",
+      tagKey: "", color: "bg-secondary", gradient: "from-blue-400 to-cyan-500",
+      image: "/images/bathroom_cleaning.png",
+      steps: [
+        { icon: "📍", title: "Set Your Location", desc: "Enter your address to check same-day availability." },
+        { icon: "🕐", title: "Choose Slot", desc: "45–60 min service, available morning to night." },
+        { icon: "🚿", title: "Hygienic Bathroom", desc: "Tiles, fixtures, toilet and floor scrubbed and disinfected." },
+      ],
+    },
+    {
+      icon: "🪟", nameKey: "landing.services.windowCleaning", descKey: "landing.services.windowCleaningDesc",
+      tagKey: "", color: "bg-accent", gradient: "from-sky-400 to-blue-500",
+      image: "/images/window_cleaning.png",
+      steps: [
+        { icon: "📍", title: "Set Your Location", desc: "We confirm coverage and send a nearest available worker." },
+        { icon: "🔢", title: "Mention Window Count", desc: "Tell us how many windows — pricing is clear, no surprises." },
+        { icon: "🪟", title: "Crystal Clear Windows", desc: "Streak-free clean using professional squeegees and solutions." },
+      ],
+    },
+    {
+      icon: "🛋️", nameKey: "landing.services.sofaCleaning", descKey: "landing.services.sofaCleaningDesc",
+      tagKey: "", color: "bg-secondary", gradient: "from-purple-400 to-violet-600",
+      image: "/images/sofa_cleaning.png",
+      steps: [
+        { icon: "📍", title: "Set Your Location", desc: "Our upholstery team operates across all service zones." },
+        { icon: "🛋️", title: "Share Sofa Details", desc: "2-seater, 3-seater, L-shape — price is shown before booking." },
+        { icon: "✨", title: "Fresh & Sanitised Sofa", desc: "Foam extraction + dry clean removes dust, stains and allergens." },
+      ],
+    },
   ];
 
   const testimonials = [
@@ -171,10 +226,11 @@ const LandingPage = () => {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {services.map((service) => (
-            <Link
-              to="/register"
+            <button
+              type="button"
+              onClick={() => setSelectedService(service)}
               key={service.nameKey}
-              className="card-elevated-hover p-5 group cursor-pointer"
+              className="card-elevated-hover p-5 group cursor-pointer text-left"
             >
               <div className={`w-12 h-12 ${service.color} rounded-xl flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform`}>
                 {service.icon}
@@ -189,7 +245,7 @@ const LandingPage = () => {
               <div className="flex items-center gap-1 mt-3 text-primary text-xs font-medium">
                 {t('landing.services.bookNow')} <ChevronRight className="w-3 h-3" />
               </div>
-            </Link>
+            </button>
           ))}
         </div>
 
@@ -295,6 +351,83 @@ const LandingPage = () => {
           </div>
         </div>
       </footer>
+
+      {/* Service Detail Modal */}
+      {selectedService && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
+          onClick={() => setSelectedService(null)}
+        >
+          <div
+            className="bg-card w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Service image header */}
+            <div className="relative h-48 overflow-hidden">
+              <img
+                src={selectedService.image}
+                alt={t(selectedService.nameKey)}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+              <button
+                onClick={() => setSelectedService(null)}
+                className="absolute top-3 right-3 w-8 h-8 bg-black/40 rounded-full flex items-center justify-center hover:bg-black/60 transition-colors"
+              >
+                <X className="w-4 h-4 text-white" />
+              </button>
+              <div className="absolute bottom-4 left-4 right-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">{selectedService.icon}</span>
+                  <h2 className="text-lg font-bold text-white">{t(selectedService.nameKey)}</h2>
+                  {selectedService.tagKey && (
+                    <span className="bg-white/20 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+                      {t(selectedService.tagKey)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-white/80 text-xs mt-1">{t(selectedService.descKey)}</p>
+              </div>
+            </div>
+
+            {/* Booking steps */}
+            <div className="p-6 space-y-4">
+              <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">How Booking Works</h3>
+              <div className="space-y-3">
+                {selectedService.steps.map((step, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <div className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center text-xl shrink-0">
+                      {step.icon}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{step.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{step.desc}</p>
+                    </div>
+                    {i < selectedService.steps.length - 1 && (
+                      <div className="absolute ml-[17px] mt-9 w-px h-3 bg-border" />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <Link
+                to="/register"
+                className="mt-2 w-full btn-brand py-3 text-sm font-semibold flex items-center justify-center gap-2"
+                onClick={() => setSelectedService(null)}
+              >
+                Book Now — Get Started <ArrowRight className="w-4 h-4" />
+              </Link>
+              <p className="text-center text-xs text-muted-foreground">
+                Already have an account?{" "}
+                <Link to="/login" className="text-primary font-medium hover:underline" onClick={() => setSelectedService(null)}>
+                  Log in
+                </Link>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
