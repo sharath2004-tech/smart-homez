@@ -39,15 +39,6 @@ async function ensureConfig() {
     dirty = true;
   }
 
-  // Auto-migrate stale prices for per_sqft items
-  const priceUpdates = { fullhouse_bare: 8, fullhouse_furnished: 12 };
-  existing.items = existing.items.map(item => {
-    if (priceUpdates[item.id] !== undefined && item.pricingType === 'per_sqft' && item.price !== priceUpdates[item.id]) {
-      dirty = true;
-      return { ...item.toObject?.() ?? item, price: priceUpdates[item.id] };
-    }
-    return item;
-  });
   if (dirty) await existing.save();
   return existing;
 }

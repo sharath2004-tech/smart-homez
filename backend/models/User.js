@@ -111,7 +111,9 @@ const userSchema = new mongoose.Schema({
       default: 'Home'
     },
     street: String,
-    apartment: String, // Apartment name/number
+    blockNo: String,
+    flatNo: String,
+    apartment: String,
     building: String,
     area: String,
     city: String,

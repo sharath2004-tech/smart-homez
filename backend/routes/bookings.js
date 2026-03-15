@@ -935,12 +935,13 @@ router.put('/:id', authenticate, async (req, res) => {
       if (overtimeMs > 0) {
         const overtimeMinutes = Math.ceil(overtimeMs / 60000);
         booking.overtimeMinutes = overtimeMinutes;
-        
-        // ₹2.5 per minute overtime charge
-        const OVERTIME_RATE = 2.5;
+
+        // Read overtime rate from DB settings (super_admin configurable)
+        const overtimeSettings = await Settings.getSettings();
+        const OVERTIME_RATE = overtimeSettings.booking?.overtimeRate ?? 2.5;
         const overtimeCharges = overtimeMinutes * OVERTIME_RATE;
         booking.overtimeCharges = overtimeCharges;
-        
+
         // Update total amount
         booking.totalAmount = (booking.totalAmount || 0) + overtimeCharges;
       }
@@ -2333,10 +2334,12 @@ router.post('/:id/scan-end-qr',
       // Calculate overtime if applicable
       if (actualDurationMinutes > scheduledDurationMinutes) {
         booking.overtimeMinutes = actualDurationMinutes - scheduledDurationMinutes;
-        
-        // Calculate overtime charges at ₹2.5 per minute
-        booking.overtimeCharges = booking.overtimeMinutes * 2.5;
-        
+
+        // Read overtime rate from DB settings (super_admin configurable)
+        const overtimeSettings = await Settings.getSettings();
+        const overtimeRate = overtimeSettings.booking?.overtimeRate ?? 2.5;
+        booking.overtimeCharges = booking.overtimeMinutes * overtimeRate;
+
         // Update total amount to include overtime
         booking.totalAmount += booking.overtimeCharges;
       } else {

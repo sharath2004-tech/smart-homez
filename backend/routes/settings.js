@@ -312,6 +312,11 @@ router.put('/',
         return res.status(403).json({ error: { message: 'Only super admins can update earnings, subscription pricing, and cancellation policy', status: 403 } });
       }
 
+      // Only super_admin can update overtime rate
+      if (req.user.role !== 'super_admin' && updates.booking?.overtimeRate !== undefined) {
+        return res.status(403).json({ error: { message: 'Only super admins can update the overtime rate', status: 403 } });
+      }
+
       console.log('Updating settings with:', {
         hasPayment: !!updates.payment,
         hasQrCodeImage: !!updates.payment?.qrCodeImage,

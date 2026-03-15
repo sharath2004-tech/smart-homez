@@ -7,7 +7,8 @@ import { useTranslation } from "react-i18next";
 interface Address {
   _id: string;
   label: string;
-  street?: string;
+  blockNo?: string;
+  flatNo?: string;
   apartment?: string;
   area: string;
   city: string;
@@ -45,7 +46,8 @@ const ProfilePage = () => {
   const [addressError, setAddressError] = useState("");
   const [newAddress, setNewAddress] = useState({
     label: 'Home',
-    apartment: '',
+    blockNo: '',
+    flatNo: '',
     area: '',
     city: '',
     zipCode: ''
@@ -105,7 +107,7 @@ const ProfilePage = () => {
     const areaVal = newAddress.area.trim();
     const cityVal = newAddress.city.trim();
     const zipVal = newAddress.zipCode.trim();
-    const aptVal = newAddress.apartment.trim();
+    const flatVal = newAddress.flatNo.trim();
     if (!areaVal || !cityVal) {
       setAddressError(t('customer.profile.areaAndCityRequired'));
       return;
@@ -126,8 +128,8 @@ const ProfilePage = () => {
       setAddressError(t('customer.profile.invalidCity'));
       return;
     }
-    if (aptVal && !isValidName(aptVal)) {
-      setAddressError(t('customer.profile.invalidApartment'));
+    if (flatVal && !/^[a-zA-Z0-9\s/,.-]{1,20}$/.test(flatVal)) {
+      setAddressError('Invalid flat number.');
       return;
     }
     if (zipVal && !/^\d{6}$/.test(zipVal)) {
@@ -152,7 +154,6 @@ const ProfilePage = () => {
       
       // Geocode the address using OpenStreetMap
       const coordinates = await locationsAPI.geocode({
-        apartment: newAddress.apartment,
         area: newAddress.area,
         city: newAddress.city,
         zipCode: newAddress.zipCode
@@ -160,7 +161,8 @@ const ProfilePage = () => {
 
       await usersAPI.addAddress({
         label: newAddress.label,
-        apartment: newAddress.apartment,
+        blockNo: newAddress.blockNo,
+        flatNo: newAddress.flatNo,
         area: newAddress.area,
         city: newAddress.city,
         zipCode: newAddress.zipCode,
@@ -172,7 +174,7 @@ const ProfilePage = () => {
       });
 
       // Reset form
-      setNewAddress({ label: 'Home', apartment: '', area: '', city: '', zipCode: '' });
+      setNewAddress({ label: 'Home', blockNo: '', flatNo: '', area: '', city: '', zipCode: '' });
       setShowAddressForm(false);
       
       // Refresh profile
@@ -340,7 +342,7 @@ const ProfilePage = () => {
                       {addr.isDefault && <span className="badge-primary text-xs">Default</span>}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {[addr.apartment, addr.area, addr.city, addr.zipCode].filter(Boolean).join(', ')}
+                      {[addr.flatNo, addr.blockNo, addr.area, addr.city, addr.zipCode].filter(Boolean).join(', ')}
                     </p>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -384,19 +386,28 @@ const ProfilePage = () => {
               </div>
               
               <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="text"
-                  placeholder="Label (e.g., Home)"
-                  className="input-clean text-sm"
+                <select
+                  className="input-clean text-sm col-span-2"
                   value={newAddress.label}
                   onChange={(e) => setNewAddress({ ...newAddress, label: e.target.value })}
+                >
+                  <option value="Home">Home</option>
+                  <option value="Office">Office</option>
+                  <option value="Commercial Space">Commercial Space</option>
+                </select>
+                <input
+                  type="text"
+                  placeholder="Block no. (optional)"
+                  className="input-clean text-sm"
+                  value={newAddress.blockNo}
+                  onChange={(e) => setNewAddress({ ...newAddress, blockNo: e.target.value })}
                 />
                 <input
                   type="text"
-                  placeholder="Apartment/Building"
+                  placeholder="Flat no."
                   className="input-clean text-sm"
-                  value={newAddress.apartment}
-                  onChange={(e) => setNewAddress({ ...newAddress, apartment: e.target.value })}
+                  value={newAddress.flatNo}
+                  onChange={(e) => setNewAddress({ ...newAddress, flatNo: e.target.value })}
                 />
                 <input
                   type="text"

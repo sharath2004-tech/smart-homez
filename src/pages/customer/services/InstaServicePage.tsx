@@ -1,5 +1,5 @@
 ﻿import AppLayout from "@/components/AppLayout";
-import { authAPI, bookingsAPI, servicesAPI } from "@/lib/api";
+import { authAPI, bookingsAPI, servicesAPI, settingsAPI } from "@/lib/api";
 import { motion } from "framer-motion";
 import {
     Briefcase,
@@ -77,6 +77,7 @@ const InstaServicePage = () => {
   const [pricePerHour, setPricePerHour] = useState(DEFAULT_PRICE);
   const [mrpPerHour, setMrpPerHour] = useState(0);          // from service.originalPrice
   const [suppliesAddonPrice, setSuppliesAddonPrice] = useState(DEFAULT_SUPPLIES_PRICE);
+  const [overtimeRate, setOvertimeRate] = useState(2.5);     // from Settings.booking.overtimeRate
   const [serviceId, setServiceId] = useState<string | null>(null);
   const [taskOptions, setTaskOptions] = useState(TASK_OPTIONS);
   const [loading, setLoading] = useState(true);
@@ -118,13 +119,17 @@ const InstaServicePage = () => {
   useEffect(() => {
     const init = async () => {
       try {
-        const [profileData, servicesData] = await Promise.all([
+        const [profileData, servicesData, settingsData] = await Promise.all([
           authAPI.getProfile(),
           servicesAPI
             .getAll({ serviceType: "instant_hourly", isActive: true, limit: 5 })
             .catch(() => ({ services: [] })),
+          settingsAPI.getSettings().catch(() => null),
         ]);
         setProfile(profileData.user || profileData);
+        if (settingsData?.settings?.booking?.overtimeRate) {
+          setOvertimeRate(settingsData.settings.booking.overtimeRate);
+        }
         const list = servicesData?.services || [];
         if (list.length > 0) {
           const svc = list[0];
@@ -421,7 +426,7 @@ const InstaServicePage = () => {
               </div>
               <div className="flex items-start gap-2 mt-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
                 <span className="shrink-0 mt-0.5">⚠️</span>
-                <span>If the maid stays beyond your booked hours, <strong>overtime charges of ₹2.50/min</strong> will apply to the final bill.</span>
+                <span>If the maid stays beyond your booked hours, <strong>overtime charges of ₹{overtimeRate}/min</strong> will apply to the final bill.</span>
               </div>
             </div>
 
@@ -680,7 +685,7 @@ const InstaServicePage = () => {
               </div>
               <div className="flex items-start gap-2 pt-2 border-t border-amber-200 text-xs text-amber-800 bg-amber-50 -mx-4 -mb-4 px-4 pb-4 rounded-b-2xl mt-2">
                 <span className="shrink-0 mt-0.5">⚠️</span>
-                <span><strong>Price may vary</strong> if the service runs beyond {hours} hr{hours > 1 ? 's' : ''}. Overtime is billed at ₹2.50/min on the final bill.</span>
+                <span><strong>Price may vary</strong> if the service runs beyond {hours} hr{hours > 1 ? 's' : ''}. Overtime is billed at ₹{overtimeRate}/min on the final bill.</span>
               </div>
             </div>
 

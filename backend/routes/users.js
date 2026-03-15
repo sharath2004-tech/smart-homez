@@ -328,7 +328,7 @@ router.get('/workers/available', authenticate, async (req, res) => {
 // @access  Private
 router.post('/addresses', authenticate, async (req, res) => {
   try {
-    const { label, street, apartment, building, area, city, state, zipCode, location, isDefault } = req.body;
+    const { label, street, blockNo, flatNo, apartment, building, area, city, state, zipCode, location, isDefault } = req.body;
 
     // Validate required fields
     const areaVal = (area || '').trim();
@@ -358,6 +358,10 @@ router.post('/addresses', authenticate, async (req, res) => {
     if (aptVal && !isValidName(aptVal)) {
       return res.status(400).json({ error: { message: 'Please enter a valid apartment/building name.', status: 400 } });
     }
+    const flatVal = (flatNo || '').trim();
+    if (flatVal && !/^[a-zA-Z0-9\s/,.-]{1,20}$/.test(flatVal)) {
+      return res.status(400).json({ error: { message: 'Please enter a valid flat number.', status: 400 } });
+    }
     if (zipVal && !/^\d{6}$/.test(zipVal)) {
       return res.status(400).json({ error: { message: 'ZIP code must be exactly 6 digits.', status: 400 } });
     }
@@ -376,6 +380,8 @@ router.post('/addresses', authenticate, async (req, res) => {
     user.addresses.push({
       label: label || 'Home',
       street,
+      blockNo: (blockNo || '').trim() || undefined,
+      flatNo: flatVal || undefined,
       apartment: aptVal || undefined,
       building,
       area: areaVal,
