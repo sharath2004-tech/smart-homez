@@ -92,8 +92,10 @@ const LandingPage = () => {
           <div className="absolute top-10 right-20 w-80 h-80 rounded-full bg-primary-foreground blur-3xl" />
           <div className="absolute bottom-10 left-20 w-60 h-60 rounded-full bg-primary-foreground blur-2xl" />
         </div>
-        <div className="relative max-w-6xl mx-auto px-6">
-          <div className="max-w-2xl">
+        <div className="relative max-w-6xl mx-auto px-10">
+          <div className="flex flex-col md:flex-row items-center gap-10 md:gap-10">
+            {/* Left: Text */}
+            <div className="flex-1 max-w-2xl">
             <div className="badge-primary inline-flex mb-6 animate-fade-in" style={{ backgroundColor: "rgba(255,255,255,0.15)", color: "white" }}>
               <Sparkles className="w-3.5 h-3.5" />
               <span>{t('landing.hero.badge')}</span>
@@ -126,6 +128,21 @@ const LandingPage = () => {
                   <span>{t(item.textKey)}</span>
                 </div>
               ))}
+            </div>
+            </div>
+
+            {/* Right: Promo Video */}
+            <div className="w-full md:w-[600px] shrink-0">
+              <video
+                src="/media/booking-promo.mp4"
+                poster="/media/booking-hero.png"
+                autoPlay
+                muted
+                loop
+                playsInline
+                className="w-full rounded-2xl shadow-2xl object-cover"
+                style={{ maxHeight: "520px" }}
+              />
             </div>
           </div>
         </div>
