@@ -584,15 +584,52 @@ router.post('/',
       });
 
       if (!nearbyLocation) {
-        return res.status(400).json({ 
-          error: { 
-            message: 'Service not available in your area. Please select a location within our service coverage.', 
+        return res.status(400).json({
+          error: {
+            message: 'Service not available in your area. Please select a location within our service coverage.',
             status: 400,
             code: 'SERVICE_NOT_AVAILABLE_IN_AREA',
             suggestion: 'Try selecting a different location or check available service areas.'
-          } 
+          }
         });
       }
+
+      // ── Strict service radius check ─────────────────────────────────────
+      // Verify customer is actually within the location's defined service area,
+      // not just the broad $near pre-filter radius (5km).
+      {
+        const locLng = nearbyLocation.location.coordinates[0];
+        const locLat = nearbyLocation.location.coordinates[1];
+        const serviceRadiusM = nearbyLocation.maxServiceRadius || 500;
+        const R = 6371000; // Earth radius in metres
+        const φ1 = customerLat * Math.PI / 180;
+        const φ2 = locLat * Math.PI / 180;
+        const Δφ = (locLat - customerLat) * Math.PI / 180;
+        const Δλ = (locLng - customerLng) * Math.PI / 180;
+        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                  Math.cos(φ1) * Math.cos(φ2) *
+                  Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+        const actualDistanceM = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        if (actualDistanceM > serviceRadiusM) {
+          console.log(`⛔ Booking rejected: customer is ${Math.round(actualDistanceM)}m away, service radius is ${serviceRadiusM}m (${nearbyLocation.apartmentName})`);
+          return res.status(400).json({
+            error: {
+              message: `Service is not available at your location. You are ${Math.round(actualDistanceM)}m away from the nearest service area (${nearbyLocation.apartmentName}). Our service covers within ${serviceRadiusM}m of that location.`,
+              status: 400,
+              code: 'OUTSIDE_SERVICE_RADIUS',
+              details: {
+                yourDistanceMeters: Math.round(actualDistanceM),
+                serviceRadiusMeters: serviceRadiusM,
+                nearestServiceArea: nearbyLocation.apartmentName
+              }
+            }
+          });
+        }
+
+        console.log(`✅ Customer is ${Math.round(actualDistanceM)}m from ${nearbyLocation.apartmentName} (within ${serviceRadiusM}m radius)`);
+      }
+      // ────────────────────────────────────────────────────────────────────
 
       // Check if the requested service is available at this location
       const serviceAvailableAtLocation = nearbyLocation.availableServices?.some(
