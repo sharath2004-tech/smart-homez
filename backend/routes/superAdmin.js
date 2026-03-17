@@ -221,8 +221,20 @@ router.post(
     body('name').notEmpty().withMessage('Name is required'),
     body('email').isEmail().withMessage('Valid email is required'),
     body('phone').notEmpty().withMessage('Phone is required'),
-    body('specialization').isArray().withMessage('Specialization must be an array'),
-    body('assignedApartmentIds').optional().isArray()
+    body('specialization').custom((value) => {
+      if (Array.isArray(value)) return true;
+      if (typeof value === 'string') {
+        try { const p = JSON.parse(value); return Array.isArray(p); } catch { return false; }
+      }
+      return false;
+    }).withMessage('Specialization must be an array'),
+    body('assignedApartmentIds').optional().custom((value) => {
+      if (Array.isArray(value)) return true;
+      if (typeof value === 'string') {
+        try { const p = JSON.parse(value); return Array.isArray(p); } catch { return false; }
+      }
+      return false;
+    })
   ],
   async (req, res) => {
     try {

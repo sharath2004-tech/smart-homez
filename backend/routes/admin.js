@@ -616,8 +616,20 @@ router.post('/workers',
     body('gender').optional().isIn(['male', 'female', 'other', 'prefer_not_to_say']).withMessage('Invalid gender'),
     body('religion').optional().isString(),
     body('experience').optional().isNumeric().withMessage('Experience must be a number'),
-    body('specialization').isArray().withMessage('Specialization must be an array'),
-    body('assignedApartmentIds').optional().isArray().withMessage('Assigned apartments must be an array')
+    body('specialization').custom((value) => {
+      if (Array.isArray(value)) return true;
+      if (typeof value === 'string') {
+        try { const p = JSON.parse(value); return Array.isArray(p); } catch { return false; }
+      }
+      return false;
+    }).withMessage('Specialization must be an array'),
+    body('assignedApartmentIds').optional().custom((value) => {
+      if (Array.isArray(value)) return true;
+      if (typeof value === 'string') {
+        try { const p = JSON.parse(value); return Array.isArray(p); } catch { return false; }
+      }
+      return false;
+    }).withMessage('Assigned apartments must be an array')
   ],
   async (req, res) => {
     try {
