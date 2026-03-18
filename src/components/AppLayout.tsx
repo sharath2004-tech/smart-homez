@@ -1,6 +1,6 @@
 import { api, settingsAPI } from "@/lib/api";
 import { AlertTriangle, ArrowLeft, BarChart3, Bell, Calendar, ClipboardCheck, Clock, CreditCard, FileText, HelpCircle, Home, IndianRupee, KeyRound, LayoutDashboard, LogOut, MapPin, Menu, MessageSquare, RefreshCw, Settings, Sparkles, User, Users, Wrench, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { LanguageSelector } from "./LanguageSelector";
@@ -18,11 +18,18 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
   const [mobileOpen, setMobileOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  // Refs for scroll position preservation
+  const sidebarScrollRef = useRef<HTMLElement>(null);
+  const mobileScrollRef = useRef<HTMLElement>(null);
+  const previousPath = useRef(location.pathname);
+
   // Resolve display name: prop > localStorage cached user > "User"
-  const resolvedName = userName ?? (() => {
-    try { return (JSON.parse(localStorage.getItem('user') || '{}') as { name?: string })?.name; }
-    catch { return undefined; }
-  })() ?? "User";
+  const resolvedName = useMemo(() =>
+    userName ?? (() => {
+      try { return (JSON.parse(localStorage.getItem('user') || '{}') as { name?: string })?.name; }
+      catch { return undefined; }
+    })() ?? "User"
+  , [userName]);
 
   useEffect(() => {
     api.get('/notifications')
@@ -30,6 +37,14 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
         setUnreadCount(res.notifications?.filter((n) => !n.isRead).length ?? 0);
       })
       .catch(() => {});
+  }, [location.pathname]);
+
+  // Preserve sidebar scroll position on navigation
+  useEffect(() => {
+    if (previousPath.current !== location.pathname) {
+      // Don't reset scroll when navigating
+      previousPath.current = location.pathname;
+    }
   }, [location.pathname]);
 
   // Business hours badge
@@ -48,20 +63,21 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
       .catch(() => {});
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('userLocation');
     localStorage.removeItem('user');
     window.location.href = '/login';
-  };
+  }, []);
 
-  const notificationsPath =
+  const notificationsPath = useMemo(() =>
     userType === 'worker' ? '/worker/notifications'
     : userType === 'super_admin' ? '/super-admin/notifications'
     : userType === 'admin' ? '/admin/notifications'
-    : '/customer/notifications';
+    : '/customer/notifications'
+  , [userType]);
 
-  const customerNav = [
+  const customerNav = useMemo(() => [
     { to: "/customer/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },
     { to: "/customer/services", icon: Wrench, label: t('nav.services') },
     { to: "/customer/bookings", icon: Calendar, label: t('nav.myBookings') },
@@ -71,9 +87,9 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
     { to: "/customer/profile", icon: User, label: t('nav.profile') },
     { to: "/customer/help", icon: HelpCircle, label: "Help" },
     { to: "/change-password", icon: KeyRound, label: "Change Password" },
-  ];
+  ], [t]);
 
-  const workerNav = [
+  const workerNav = useMemo(() => [
     { to: "/worker/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },
     { to: "/worker/tasks", icon: Calendar, label: t('nav.myTasks') },
     { to: "/worker/earnings", icon: IndianRupee, label: "Salary Management" },
@@ -82,9 +98,9 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
     { to: "/worker/profile", icon: User, label: t('nav.profile') },
     { to: "/worker/help", icon: HelpCircle, label: "Help" },
     { to: "/change-password", icon: KeyRound, label: "Change Password" },
-  ];
+  ], [t]);
 
-  const adminNav = [
+  const adminNav = useMemo(() => [
     { to: "/admin/dashboard",          icon: LayoutDashboard, label: t('nav.dashboard') },
     { to: "/admin/bookings",           icon: Calendar,        label: t('nav.bookings') },
     { to: "/admin/workers",            icon: User,            label: t('nav.workers') },
@@ -100,9 +116,9 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
     { to: "/admin/services",           icon: Wrench,          label: t('nav.services') },
     { to: "/admin/settings",           icon: Settings,        label: t('nav.settings') },
     { to: "/change-password",          icon: KeyRound,        label: "Change Password" },
-  ];
+  ], [t]);
 
-  const superAdminNav = [
+  const superAdminNav = useMemo(() => [
     { to: "/super-admin/dashboard",          icon: LayoutDashboard, label: "Overview" },
     { to: "/super-admin/bookings",           icon: Calendar,        label: t('nav.bookings') },
     { to: "/super-admin/workers",            icon: User,            label: t('nav.workers') },
@@ -120,11 +136,25 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
     { to: "/super-admin/heatmap",            icon: BarChart3,       label: "Worker Heatmap" },
     { to: "/super-admin/settings",           icon: Settings,        label: t('nav.settings') },
     { to: "/change-password",                icon: KeyRound,        label: "Change Password" },
-  ];
+  ], [t]);
 
-  const navItems = userType === "admin" ? adminNav : userType === "super_admin" ? superAdminNav : userType === "worker" ? workerNav : customerNav;
-  const initials = resolvedName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
-  const dashboardPath = userType === "admin" ? "/admin/dashboard" : userType === "super_admin" ? "/super-admin/dashboard" : userType === "worker" ? "/worker/dashboard" : "/customer/dashboard";
+  const navItems = useMemo(() =>
+    userType === "admin" ? adminNav
+    : userType === "super_admin" ? superAdminNav
+    : userType === "worker" ? workerNav
+    : customerNav
+  , [userType, adminNav, superAdminNav, workerNav, customerNav]);
+
+  const initials = useMemo(() =>
+    resolvedName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+  , [resolvedName]);
+
+  const dashboardPath = useMemo(() =>
+    userType === "admin" ? "/admin/dashboard"
+    : userType === "super_admin" ? "/super-admin/dashboard"
+    : userType === "worker" ? "/worker/dashboard"
+    : "/customer/dashboard"
+  , [userType]);
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -168,21 +198,25 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
         </div>
 
         {/* Nav items */}
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        <nav
+          ref={sidebarScrollRef}
+          className="flex-1 p-4 space-y-1.5 overflow-y-auto scroll-smooth"
+          style={{ scrollBehavior: 'smooth' }}
+        >
           {navItems.map((item) => {
             const isActive = location.pathname === item.to;
             return (
               <Link
                 key={item.to}
                 to={item.to}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? "bg-primary text-primary-foreground shadow-brand"
+                    ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground"
                 }`}
               >
                 <item.icon className="w-4 h-4 shrink-0" />
-                {item.label}
+                <span className="truncate">{item.label}</span>
               </Link>
             );
           })}
@@ -324,7 +358,11 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
               )}
             </div>
             {/* Nav items - scrollable */}
-            <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+            <nav
+              ref={mobileScrollRef}
+              className="flex-1 overflow-y-auto p-4 space-y-1.5 scroll-smooth"
+              style={{ scrollBehavior: 'smooth' }}
+            >
               {navItems.map((item) => {
                 const isActive = location.pathname === item.to;
                 return (
@@ -332,14 +370,14 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
                     key={item.to}
                     to={item.to}
                     onClick={() => setMobileOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                       isActive
-                        ? "bg-primary text-primary-foreground shadow-brand"
+                        ? "bg-primary text-primary-foreground shadow-sm"
                         : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground"
                     }`}
                   >
                     <item.icon className="w-4 h-4 shrink-0" />
-                    {item.label}
+                    <span className="truncate">{item.label}</span>
                   </Link>
                 );
               })}
