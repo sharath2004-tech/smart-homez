@@ -71,11 +71,12 @@ const WorkerLeaves = () => {
 
   const [penaltyWarning, setPenaltyWarning] = useState(false);
 
-  // Check if selected date is within 24 hours from now
   const checkPenalty = (date: Date | undefined) => {
     if (!date) { setPenaltyWarning(false); return; }
     const now = new Date();
-    const hoursUntilLeave = (date.getTime() - now.getTime()) / (1000 * 60 * 60);
+    // Normalize to local midnight so the comparison is day-boundary based
+    const leaveStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+    const hoursUntilLeave = (leaveStart.getTime() - now.getTime()) / (1000 * 60 * 60);
     setPenaltyWarning(hoursUntilLeave >= 0 && hoursUntilLeave < 24);
   };
 
@@ -90,7 +91,7 @@ const WorkerLeaves = () => {
     }
 
     // Warn about penalty but allow submission
-    if (penaltyWarning && !confirm('⚠️ You are applying for leave with less than 24 hours notice.\n\nA penalty of ₹1500 will be applied as per policy.\n\nDo you still want to proceed?')) {
+    if (penaltyWarning && !confirm(t('worker.leaves.penaltyConfirmMessage', { amount: '1,500' }))) {
       return;
     }
 
@@ -100,8 +101,8 @@ const WorkerLeaves = () => {
 
       if (response.penaltyApplied) {
         toast({
-          title: '⚠️ Leave submitted with penalty',
-          description: `Your leave has been submitted. A penalty of ₹1,500 has been applied because you did not apply at least 24 hours in advance.`,
+          title: t('worker.leaves.penaltyToastTitle'),
+          description: t('worker.leaves.penaltyToastDescription', { amount: '1,500' }),
           variant: 'destructive'
         });
       } else {
@@ -209,14 +210,15 @@ const WorkerLeaves = () => {
               {penaltyWarning && (
                 <Alert variant="destructive">
                   <AlertDescription className="text-sm">
-                    ⚠️ <strong>Penalty Notice:</strong> You are applying for leave with less than 24 hours notice. A penalty of <strong>₹1,500</strong> will be applied as per company policy. Please plan ahead and apply at least 24 hours in advance to avoid this penalty.
+                    ⚠️ <strong>{t('worker.leaves.penaltyWarningTitle')}:</strong> {t('worker.leaves.penaltyWarningText', { amount: '1,500' })}
                   </AlertDescription>
                 </Alert>
               )}
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">{t('worker.leaves.reasonOptional')}</label>
+                <label htmlFor="leaveReason" className="text-sm font-medium">{t('worker.leaves.reasonOptional')}</label>
                 <Textarea
+                  id="leaveReason"
                   placeholder={t('worker.leaves.enterReason')}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
@@ -234,7 +236,7 @@ const WorkerLeaves = () => {
                 className="w-full"
               >
                 <CalendarIcon className="w-4 h-4 mr-2" />
-                {isSubmitting ? t('worker.leaves.submitting') : penaltyWarning ? '⚠️ Submit Leave (Penalty applies)' : t('worker.leaves.submitLeaveRequest')}
+                {isSubmitting ? t('worker.leaves.submitting') : penaltyWarning ? t('worker.leaves.submitLeavePenalty') : t('worker.leaves.submitLeaveRequest')}
               </Button>
 
               {remainingLeaves <= 0 && (

@@ -539,7 +539,13 @@
       "pleaseSelectDate": "Please select a date",
       "leaveSubmitted": "Leave request submitted successfully",
       "failedToApply": "Failed to apply leave",
-      "failedToCancel": "Failed to cancel leave"
+      "failedToCancel": "Failed to cancel leave",
+      "penaltyWarningTitle": "Penalty Notice",
+      "penaltyWarningText": "You are applying for leave with less than 24 hours notice. A penalty of ₹{{amount}} will be applied as per company policy. Please plan ahead and apply at least 24 hours in advance to avoid this penalty.",
+      "submitLeavePenalty": "⚠️ Submit Leave (Penalty applies)",
+      "penaltyToastTitle": "⚠️ Leave submitted with penalty",
+      "penaltyToastDescription": "Your leave has been submitted. A penalty of ₹{{amount}} has been applied because you did not apply at least 24 hours in advance.",
+      "penaltyConfirmMessage": "You are applying for leave with less than 24 hours notice.\n\nA penalty of ₹{{amount}} will be applied as per policy.\n\nDo you still want to proceed?"
     },
     "profile": {
       "title": "My Profile",
