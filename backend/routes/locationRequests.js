@@ -94,7 +94,23 @@ router.patch(
   authorize('super_admin'),
   [
     param('id').isMongoId().withMessage('Valid request ID is required'),
-    body('status').isIn(['approved', 'rejected']).withMessage('Status must be approved or rejected')
+    body('status').isIn(['approved', 'rejected']).withMessage('Status must be approved or rejected'),
+    body('coordinates').if(body('status').equals('approved')).custom((coords) => {
+      if (!coords || !Array.isArray(coords) || coords.length !== 2) {
+        throw new Error('Valid coordinates [longitude, latitude] are required for approval');
+      }
+      const [lng, lat] = coords;
+      if (typeof lng !== 'number' || typeof lat !== 'number') {
+        throw new Error('Coordinates must be numbers');
+      }
+      if (lng < -180 || lng > 180) throw new Error('Longitude must be between -180 and 180');
+      if (lat < -90 || lat > 90) throw new Error('Latitude must be between -90 and 90');
+      // Reject placeholder coordinates
+      if (lng === 0 && lat === 0) {
+        throw new Error('Please provide actual coordinates, not placeholder [0, 0]');
+      }
+      return true;
+    })
   ],
   async (req, res) => {
     try {
@@ -103,34 +119,54 @@ router.patch(
         return res.status(400).json({ error: { message: errors.array()[0].msg } });
       }
 
-      const request = await LocationRequest.findById(req.params.id);
-      if (!request) return res.status(404).json({ error: { message: 'Location request not found' } });
+      // Use findOneAndUpdate with atomic check to prevent race conditions
+      const request = await LocationRequest.findOneAndUpdate(
+        { _id: req.params.id, status: 'pending' },
+        {
+          $set: {
+            status: req.body.status,
+            reviewedBy: req.user._id,
+            reviewNote: req.body.reviewNote || '',
+            reviewedAt: new Date()
+          }
+        },
+        { new: true }
+      );
 
-      if (request.status !== 'pending') {
-        return res.status(400).json({ error: { message: `Request already ${request.status}` } });
+      if (!request) {
+        // Either request doesn't exist or status is not pending
+        const existingRequest = await LocationRequest.findById(req.params.id);
+        if (!existingRequest) {
+          return res.status(404).json({ error: { message: 'Location request not found' } });
+        }
+        return res.status(400).json({ error: { message: `Request already ${existingRequest.status}` } });
       }
 
-      request.status = req.body.status;
-      request.reviewedBy = req.user._id;
-      request.reviewNote = req.body.reviewNote || '';
-      request.reviewedAt = new Date();
-
-      await request.save();
-
-      // If approved, create the actual location
+      // If approved, create the actual location atomically
       let createdLocation = null;
       if (req.body.status === 'approved') {
-        createdLocation = new Location({
-          apartmentName: request.apartmentName,
-          building: request.building,
-          area: request.area,
-          city: request.city,
-          state: request.state,
-          zipCode: request.zipCode,
-          location: { type: 'Point', coordinates: [0, 0] },
-          maxServiceRadius: 500
-        });
-        await createdLocation.save();
+        try {
+          createdLocation = new Location({
+            apartmentName: request.apartmentName,
+            building: request.building,
+            area: request.area,
+            city: request.city,
+            state: request.state,
+            zipCode: request.zipCode,
+            location: { type: 'Point', coordinates: req.body.coordinates },
+            maxServiceRadius: 500
+          });
+          await createdLocation.save();
+        } catch (locationError) {
+          // Rollback the request status if location creation fails
+          await LocationRequest.findByIdAndUpdate(req.params.id, {
+            $set: { status: 'pending', reviewedBy: null, reviewNote: '', reviewedAt: null }
+          });
+          console.error('Location creation failed, rolled back request approval:', locationError);
+          return res.status(500).json({
+            error: { message: 'Failed to create location. Request approval has been rolled back.' }
+          });
+        }
       }
 
       await request.populate('requestedBy', 'name email');

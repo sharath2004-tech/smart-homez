@@ -75,7 +75,10 @@ export const MobileSidebar = memo(({ isOpen, onClose, brandTitle, navItems, noti
           style={{ scrollBehavior: 'smooth' }}
         >
           {navItems.map((item) => {
-            const isActive = location.pathname === item.to;
+            // Match if current path is exactly the item or starts with the item path
+            // This ensures nested routes also highlight their parent menu item
+            const isActive = location.pathname === item.to ||
+              (item.to !== '/change-password' && location.pathname.startsWith(item.to + '/'));
             return (
               <Link
                 key={item.to}

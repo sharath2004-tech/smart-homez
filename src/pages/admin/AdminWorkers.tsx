@@ -146,6 +146,26 @@ const AdminWorkers = () => {
 
   const handleConfirmArchive = async () => {
     if (!archiveWorkerData) return;
+
+    // Validate resignedDate
+    if (!resignedDate || resignedDate.trim() === '') {
+      alert('Please provide a resigned date');
+      return;
+    }
+
+    const parsedDate = new Date(resignedDate);
+    if (isNaN(parsedDate.getTime())) {
+      alert('Invalid resigned date. Please enter a valid date.');
+      return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (parsedDate > today) {
+      alert('Resigned date cannot be in the future');
+      return;
+    }
+
     try {
       await adminAPI.archiveWorker(archiveWorkerData.id, resignedDate);
       alert('Worker archived successfully');
@@ -212,6 +232,42 @@ const AdminWorkers = () => {
     if (credentialDelivery === 'phone' && !workerForm.phone) {
       alert('Phone is required for phone credential delivery');
       return;
+    }
+
+    // Validate wage inputs
+    if (workerForm.wageType === 'hourly') {
+      const rate = Number(workerForm.hourlyRate);
+      if (!workerForm.hourlyRate || rate <= 0 || isNaN(rate)) {
+        alert('Please provide a valid hourly rate greater than 0');
+        return;
+      }
+    }
+    if (workerForm.wageType === 'daily') {
+      const wage = Number(workerForm.dailyWage);
+      if (!workerForm.dailyWage || wage <= 0 || isNaN(wage)) {
+        alert('Please provide a valid daily wage greater than 0');
+        return;
+      }
+    }
+    if (workerForm.wageType === 'monthly') {
+      const wage = Number(workerForm.monthlyWage);
+      if (!workerForm.monthlyWage || wage <= 0 || isNaN(wage)) {
+        alert('Please provide a valid monthly wage greater than 0');
+        return;
+      }
+    }
+
+    // Validate gender and experience if provided
+    if (workerForm.gender && !['male', 'female', 'other'].includes(workerForm.gender.toLowerCase())) {
+      alert('Please select a valid gender option');
+      return;
+    }
+    if (workerForm.experience) {
+      const exp = Number(workerForm.experience);
+      if (isNaN(exp) || exp < 0) {
+        alert('Experience must be a positive number');
+        return;
+      }
     }
 
     setCreatingWorker(true);

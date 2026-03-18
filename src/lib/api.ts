@@ -1470,10 +1470,10 @@ export const locationRequestsAPI = {
     return apiCall(status ? `/location-requests?status=${status}` : '/location-requests');
   },
 
-  review: async (id: string, status: 'approved' | 'rejected', reviewNote?: string) => {
+  review: async (id: string, status: 'approved' | 'rejected', reviewNote?: string, coordinates?: [number, number]) => {
     return apiCall(`/location-requests/${id}/review`, {
       method: 'PATCH',
-      body: JSON.stringify({ status, reviewNote })
+      body: JSON.stringify({ status, reviewNote, coordinates })
     });
   }
 };

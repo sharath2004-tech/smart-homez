@@ -49,7 +49,10 @@ export const PersistentSidebar = memo(({ navItems, notificationsPath, unreadCoun
         style={{ scrollBehavior: 'smooth' }}
       >
         {navItems.map((item) => {
-          const isActive = location.pathname === item.to;
+          // Match if current path is exactly the item or starts with the item path
+          // This ensures nested routes also highlight their parent menu item
+          const isActive = location.pathname === item.to ||
+            (item.to !== '/change-password' && location.pathname.startsWith(item.to + '/'));
           return (
             <Link
               key={item.to}
@@ -67,13 +70,6 @@ export const PersistentSidebar = memo(({ navItems, notificationsPath, unreadCoun
         })}
       </nav>
     </>
-  );
-}, (prevProps, nextProps) => {
-  // Custom comparison function - only re-render if these specific props change
-  return (
-    prevProps.unreadCount === nextProps.unreadCount &&
-    prevProps.navItems === nextProps.navItems &&
-    prevProps.notificationsPath === nextProps.notificationsPath
   );
 });
 

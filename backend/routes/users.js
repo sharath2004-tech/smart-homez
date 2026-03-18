@@ -13,7 +13,11 @@ const router = express.Router();
 router.get('/', authenticate, authorize('admin'), async (req, res) => {
   try {
     const { role, search, page = 1, limit = 10 } = req.query;
-    
+
+    // Validate and sanitize pagination parameters
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit) || 10));
+
     const query = {};
     if (role) query.role = role;
     if (search) {
@@ -26,16 +30,16 @@ router.get('/', authenticate, authorize('admin'), async (req, res) => {
 
     const users = await User.find(query)
       .select('-password')
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
+      .limit(limitNum)
+      .skip((pageNum - 1) * limitNum)
       .sort({ createdAt: -1 });
 
     const count = await User.countDocuments(query);
 
     res.json({
       users,
-      totalPages: Math.ceil(count / limit),
-      currentPage: parseInt(page),
+      totalPages: Math.ceil(count / limitNum),
+      currentPage: pageNum,
       totalUsers: count
     });
   } catch (error) {
@@ -305,7 +309,11 @@ router.get('/workers/available', authenticate, async (req, res) => {
       query['workerProfile.specialization'] = specialization;
     }
     if (minRating) {
-      query['workerProfile.rating'] = { $gte: parseFloat(minRating) };
+      const rating = parseFloat(minRating);
+      if (isNaN(rating) || rating < 0 || rating > 5) {
+        return res.status(400).json({ error: { message: 'minRating must be a number between 0 and 5', status: 400 } });
+      }
+      query['workerProfile.rating'] = { $gte: rating };
     }
 
     console.log('🔍 GET /workers/available query:', JSON.stringify(query));

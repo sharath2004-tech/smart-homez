@@ -220,8 +220,8 @@ const AdminSalarySettlements = () => {
         toast({ title: 'Invalid amount', description: 'Please enter a valid partial payment amount', variant: 'destructive' });
         return;
       }
-      if (amt >= (sendPreview.netPayable ?? sendPreview.totalEarnings)) {
-        toast({ title: 'Invalid amount', description: 'Partial amount must be less than the total payable', variant: 'destructive' });
+      if (amt >= sendPreview.requestedAmount) {
+        toast({ title: 'Invalid amount', description: 'Partial amount must be less than the total requested amount', variant: 'destructive' });
         return;
       }
     }

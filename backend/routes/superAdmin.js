@@ -391,8 +391,19 @@ router.patch('/workers/:workerId/archive', async (req, res) => {
 
     worker.isActive = false;
     worker.isArchived = true;
+
+    // Validate and set resigned date
     if (req.body?.resignedDate) {
-      worker.workerProfile.resignedDate = new Date(req.body.resignedDate);
+      const resignedDate = new Date(req.body.resignedDate);
+      if (isNaN(resignedDate.getTime())) {
+        return res.status(400).json({ error: { message: 'Invalid resigned date format', status: 400 } });
+      }
+      const today = new Date();
+      today.setHours(23, 59, 59, 999); // End of today
+      if (resignedDate > today) {
+        return res.status(400).json({ error: { message: 'Resigned date cannot be in the future', status: 400 } });
+      }
+      worker.workerProfile.resignedDate = resignedDate;
     } else {
       worker.workerProfile.resignedDate = new Date();
     }

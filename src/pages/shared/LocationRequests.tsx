@@ -31,6 +31,9 @@ const LocationRequests = () => {
   const [submitting, setSubmitting] = useState(false);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [reviewNote, setReviewNote] = useState("");
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
 
   const [form, setForm] = useState({
@@ -87,17 +90,40 @@ const LocationRequests = () => {
   };
 
   const handleReview = async (id: string, status: "approved" | "rejected") => {
+    if (status === "approved") {
+      const lat = parseFloat(latitude);
+      const lng = parseFloat(longitude);
+      if (!latitude || !longitude || isNaN(lat) || isNaN(lng)) {
+        toast({ title: "Error", description: "Please provide valid coordinates (latitude and longitude) to approve", variant: "destructive" });
+        return;
+      }
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        toast({ title: "Error", description: "Invalid coordinates. Lat: -90 to 90, Lng: -180 to 180", variant: "destructive" });
+        return;
+      }
+      if (lat === 0 && lng === 0) {
+        toast({ title: "Error", description: "Placeholder coordinates [0, 0] are not allowed. Please provide actual location coordinates.", variant: "destructive" });
+        return;
+      }
+    }
+
+    setReviewLoading(true);
     try {
-      const res = await locationRequestsAPI.review(id, status, reviewNote);
+      const coordinates = status === "approved" ? [parseFloat(longitude), parseFloat(latitude)] as [number, number] : undefined;
+      const res = await locationRequestsAPI.review(id, status, reviewNote, coordinates);
       toast({
         title: "Success",
         description: status === "approved" ? `Location approved and created: ${res.createdLocation?.apartmentName}` : "Location request rejected.",
       });
       setReviewingId(null);
       setReviewNote("");
+      setLatitude("");
+      setLongitude("");
       fetchRequests();
     } catch (error) {
       toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to review request", variant: "destructive" });
+    } finally {
+      setReviewLoading(false);
     }
   };
 
@@ -178,29 +204,70 @@ const LocationRequests = () => {
                   <div className="space-y-2">
                     {reviewingId === req._id ? (
                       <>
-                        <textarea
-                          className="input-clean text-sm w-full"
-                          rows={2}
-                          placeholder="Review note (optional)"
-                          value={reviewNote}
-                          onChange={(e) => setReviewNote(e.target.value)}
-                        />
+                        <div className="space-y-3 border border-border rounded-lg p-3 bg-muted/30">
+                          <div className="text-sm font-medium">Review Details</div>
+                          <div>
+                            <label htmlFor="review-note" className="block text-xs text-muted-foreground mb-1">Review note (optional)</label>
+                            <textarea
+                              id="review-note"
+                              className="input-clean text-sm w-full"
+                              rows={2}
+                              placeholder="Add any comments..."
+                              value={reviewNote}
+                              onChange={(e) => setReviewNote(e.target.value)}
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label htmlFor="latitude" className="block text-xs text-muted-foreground mb-1">Latitude <span className="text-destructive">*</span></label>
+                              <input
+                                id="latitude"
+                                type="number"
+                                step="any"
+                                className="input-clean text-sm w-full"
+                                placeholder="e.g. 12.9716"
+                                value={latitude}
+                                onChange={(e) => setLatitude(e.target.value)}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label htmlFor="longitude" className="block text-xs text-muted-foreground mb-1">Longitude <span className="text-destructive">*</span></label>
+                              <input
+                                id="longitude"
+                                type="number"
+                                step="any"
+                                className="input-clean text-sm w-full"
+                                placeholder="e.g. 77.5946"
+                                value={longitude}
+                                onChange={(e) => setLongitude(e.target.value)}
+                                required
+                              />
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Coordinates are required for approval. You can get them from Google Maps.
+                          </p>
+                        </div>
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleReview(req._id, "approved")}
-                            className="flex-1 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+                            disabled={reviewLoading}
+                            className="flex-1 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            ✓ Approve & Create Location
+                            {reviewLoading ? "Processing..." : "✓ Approve & Create Location"}
                           </button>
                           <button
                             onClick={() => handleReview(req._id, "rejected")}
-                            className="flex-1 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                            disabled={reviewLoading}
+                            className="flex-1 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            ✗ Reject
+                            {reviewLoading ? "Processing..." : "✗ Reject"}
                           </button>
                           <button
-                            onClick={() => { setReviewingId(null); setReviewNote(""); }}
-                            className="py-2 px-3 text-sm border border-border rounded-lg"
+                            onClick={() => { setReviewingId(null); setReviewNote(""); setLatitude(""); setLongitude(""); }}
+                            disabled={reviewLoading}
+                            className="py-2 px-3 text-sm border border-border rounded-lg disabled:opacity-50"
                           >
                             Cancel
                           </button>
@@ -223,44 +290,59 @@ const LocationRequests = () => {
 
         {/* Admin: New Request Form */}
         {showForm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="location-request-modal-title"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowForm(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setShowForm(false);
+            }}
+          >
             <div className="bg-background rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6 space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold">Request New Location</h2>
-                <button onClick={() => setShowForm(false)} className="text-muted-foreground hover:text-foreground">
+                <h2 id="location-request-modal-title" className="text-lg font-bold">Request New Location</h2>
+                <button
+                  onClick={() => setShowForm(false)}
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="Close modal"
+                >
                   <X className="w-5 h-5" />
                 </button>
               </div>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Apartment / Society Name <span className="text-destructive">*</span></label>
-                  <input type="text" required className="input-clean" placeholder="e.g. Green Valley Apartments" value={form.apartmentName} onChange={(e) => setForm({ ...form, apartmentName: e.target.value })} />
+                  <label htmlFor="apartment-name" className="block text-sm font-medium mb-1">Apartment / Society Name <span className="text-destructive">*</span></label>
+                  <input id="apartment-name" type="text" required className="input-clean" placeholder="e.g. Green Valley Apartments" value={form.apartmentName} onChange={(e) => setForm({ ...form, apartmentName: e.target.value })} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Building (Optional)</label>
-                  <input type="text" className="input-clean" placeholder="e.g. Block A" value={form.building} onChange={(e) => setForm({ ...form, building: e.target.value })} />
+                  <label htmlFor="building" className="block text-sm font-medium mb-1">Building (Optional)</label>
+                  <input id="building" type="text" className="input-clean" placeholder="e.g. Block A" value={form.building} onChange={(e) => setForm({ ...form, building: e.target.value })} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Area <span className="text-destructive">*</span></label>
-                  <input type="text" required className="input-clean" placeholder="e.g. Koramangala" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} />
+                  <label htmlFor="area" className="block text-sm font-medium mb-1">Area <span className="text-destructive">*</span></label>
+                  <input id="area" type="text" required className="input-clean" placeholder="e.g. Koramangala" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium mb-1">City <span className="text-destructive">*</span></label>
-                    <input type="text" required className="input-clean" placeholder="e.g. Bangalore" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+                    <label htmlFor="city" className="block text-sm font-medium mb-1">City <span className="text-destructive">*</span></label>
+                    <input id="city" type="text" required className="input-clean" placeholder="e.g. Bangalore" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">State <span className="text-destructive">*</span></label>
-                    <input type="text" required className="input-clean" placeholder="e.g. Karnataka" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
+                    <label htmlFor="state" className="block text-sm font-medium mb-1">State <span className="text-destructive">*</span></label>
+                    <input id="state" type="text" required className="input-clean" placeholder="e.g. Karnataka" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">ZIP Code (Optional)</label>
-                  <input type="text" className="input-clean" placeholder="e.g. 560034" value={form.zipCode} onChange={(e) => setForm({ ...form, zipCode: e.target.value })} />
+                  <label htmlFor="zipcode" className="block text-sm font-medium mb-1">ZIP Code (Optional)</label>
+                  <input id="zipcode" type="text" className="input-clean" placeholder="e.g. 560034" value={form.zipCode} onChange={(e) => setForm({ ...form, zipCode: e.target.value })} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Reason for request (Optional)</label>
-                  <textarea className="input-clean" rows={3} maxLength={500} placeholder="Explain why this location should be added..." value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
+                  <label htmlFor="reason" className="block text-sm font-medium mb-1">Reason for request (Optional)</label>
+                  <textarea id="reason" className="input-clean" rows={3} maxLength={500} placeholder="Explain why this location should be added..." value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
                 </div>
                 <div className="flex gap-3">
                   <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-2 border border-border rounded-xl text-sm" disabled={submitting}>Cancel</button>
