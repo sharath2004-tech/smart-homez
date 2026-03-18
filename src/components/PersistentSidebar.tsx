@@ -1,7 +1,7 @@
+import type { LucideIcon } from "lucide-react";
 import { Bell } from "lucide-react";
 import { memo, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
-import type { LucideIcon } from "lucide-react";
 
 interface NavItem {
   to: string;
