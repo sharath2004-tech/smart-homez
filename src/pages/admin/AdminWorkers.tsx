@@ -16,12 +16,20 @@ interface Worker {
   name: string;
   email: string;
   phone?: string;
+  dateOfBirth?: string;
   workerProfile?: {
     specialization: string[];
     rating: number;
     completedJobs: number;
     totalEarnings: number;
     isAvailable: boolean;
+    wageType?: string;
+    hourlyRate?: number;
+    dailyWage?: number;
+    monthlyWage?: number;
+    reliabilityScore?: number;
+    joinDate?: string;
+    resignedDate?: string;
     assignedApartments: Array<{
       apartmentName: string;
       area: string;
@@ -70,16 +78,25 @@ const AdminWorkers = () => {
   const [creatingWorker, setCreatingWorker] = useState(false);
   const [credentialDelivery, setCredentialDelivery] = useState<"email" | "phone" | "both">("email");
 
+  // Archive with resigned date state
+  const [archiveWorkerData, setArchiveWorkerData] = useState<{ id: string; name: string } | null>(null);
+  const [resignedDate, setResignedDate] = useState("");
+
   const [workerForm, setWorkerForm] = useState({
     name: "",
     email: "",
     phone: "",
     gender: "" as string,
+    dateOfBirth: "",
     religion: "",
     experience: "" as string,
     specialization: [] as string[],
     selectedLocations: [] as string[],
-    aadhaarNumber: ""
+    aadhaarNumber: "",
+    wageType: "hourly" as "hourly" | "daily" | "monthly",
+    hourlyRate: "",
+    dailyWage: "",
+    monthlyWage: "",
   });
 
   const [docFiles, setDocFiles] = useState<{
@@ -122,11 +139,18 @@ const AdminWorkers = () => {
     }
   };
 
-  const handleArchiveWorker = async (workerId: string) => {
-    if (!confirm('Archive this worker? They will be deactivated but their history will be preserved.')) return;
+  const handleArchiveWorker = (workerId: string, workerName: string) => {
+    setArchiveWorkerData({ id: workerId, name: workerName });
+    setResignedDate(new Date().toISOString().split('T')[0]);
+  };
+
+  const handleConfirmArchive = async () => {
+    if (!archiveWorkerData) return;
     try {
-      await adminAPI.archiveWorker(workerId);
+      await adminAPI.archiveWorker(archiveWorkerData.id, resignedDate);
       alert('Worker archived successfully');
+      setArchiveWorkerData(null);
+      setResignedDate("");
       fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to archive worker';
@@ -159,19 +183,55 @@ const AdminWorkers = () => {
       return;
     }
 
+    // Validate Aadhaar number (must be exactly 12 digits if provided)
+    if (workerForm.aadhaarNumber) {
+      const digits = workerForm.aadhaarNumber.replace(/\s/g, '');
+      if (!/^\d{12}$/.test(digits)) {
+        alert('Aadhaar number must be exactly 12 digits');
+        return;
+      }
+    }
+
+    // Validate Date of Birth (worker must be 18+)
+    if (workerForm.dateOfBirth) {
+      const dob = new Date(workerForm.dateOfBirth);
+      const today = new Date();
+      const age = today.getFullYear() - dob.getFullYear() -
+        (today < new Date(today.getFullYear(), dob.getMonth(), dob.getDate()) ? 1 : 0);
+      if (age < 18) {
+        alert('Worker must be at least 18 years old');
+        return;
+      }
+    }
+
+    // Credential delivery validation
+    if (credentialDelivery === 'email' && !workerForm.email) {
+      alert('Email is required for email credential delivery');
+      return;
+    }
+    if (credentialDelivery === 'phone' && !workerForm.phone) {
+      alert('Phone is required for phone credential delivery');
+      return;
+    }
+
     setCreatingWorker(true);
 
     try {
       const formData = new FormData();
       formData.append('name', workerForm.name);
-      formData.append('email', workerForm.email);
-      formData.append('phone', workerForm.phone);
+      if (workerForm.email) formData.append('email', workerForm.email);
+      if (workerForm.phone) formData.append('phone', workerForm.phone);
       if (workerForm.gender) formData.append('gender', workerForm.gender);
       if (workerForm.religion) formData.append('religion', workerForm.religion);
+      if (workerForm.dateOfBirth) formData.append('dateOfBirth', workerForm.dateOfBirth);
       formData.append('experience', String(parseInt(workerForm.experience) || 0));
       formData.append('specialization', JSON.stringify(workerForm.specialization));
       formData.append('assignedApartmentIds', JSON.stringify(workerForm.selectedLocations));
-      if (workerForm.aadhaarNumber) formData.append('aadhaarNumber', workerForm.aadhaarNumber);
+      if (workerForm.aadhaarNumber) formData.append('aadhaarNumber', workerForm.aadhaarNumber.replace(/\s/g, ''));
+      formData.append('wageType', workerForm.wageType);
+      if (workerForm.wageType === 'hourly' && workerForm.hourlyRate) formData.append('hourlyRate', workerForm.hourlyRate);
+      if (workerForm.wageType === 'daily' && workerForm.dailyWage) formData.append('dailyWage', workerForm.dailyWage);
+      if (workerForm.wageType === 'monthly' && workerForm.monthlyWage) formData.append('monthlyWage', workerForm.monthlyWage);
       formData.append('credentialDelivery', credentialDelivery);
       if (docFiles.profilePicture) formData.append('profilePicture', docFiles.profilePicture);
       if (docFiles.aadhaarFront) formData.append('aadhaarFront', docFiles.aadhaarFront);
@@ -196,11 +256,16 @@ const AdminWorkers = () => {
         email: "",
         phone: "",
         gender: "",
+        dateOfBirth: "",
         religion: "",
         experience: "",
         specialization: [],
         selectedLocations: [],
-        aadhaarNumber: ""
+        aadhaarNumber: "",
+        wageType: "hourly",
+        hourlyRate: "",
+        dailyWage: "",
+        monthlyWage: "",
       });
       setDocFiles({ profilePicture: null, aadhaarFront: null, aadhaarBack: null });
       fetchData();
@@ -345,6 +410,30 @@ const AdminWorkers = () => {
                     </div>
                   </div>
 
+                  {/* Reliability Score */}
+                  {w.workerProfile?.reliabilityScore !== undefined && (
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xs text-muted-foreground">Reliability:</span>
+                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${w.workerProfile.reliabilityScore >= 80 ? 'bg-green-500' : w.workerProfile.reliabilityScore >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
+                          style={{ width: `${w.workerProfile.reliabilityScore}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-medium">{w.workerProfile.reliabilityScore}%</span>
+                    </div>
+                  )}
+
+                  {/* Wage Info */}
+                  {w.workerProfile?.wageType && (
+                    <div className="text-xs text-muted-foreground mb-3 flex items-center gap-1">
+                      <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded capitalize">{w.workerProfile.wageType} wage</span>
+                      {w.workerProfile.wageType === 'hourly' && w.workerProfile.hourlyRate && <span>₹{w.workerProfile.hourlyRate}/hr</span>}
+                      {w.workerProfile.wageType === 'daily' && w.workerProfile.dailyWage && <span>₹{w.workerProfile.dailyWage}/day</span>}
+                      {w.workerProfile.wageType === 'monthly' && w.workerProfile.monthlyWage && <span>₹{w.workerProfile.monthlyWage}/month</span>}
+                    </div>
+                  )}
+
                   {w.workerProfile?.specialization && w.workerProfile.specialization.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mb-4">
                       {w.workerProfile.specialization.map((s) => (
@@ -403,7 +492,7 @@ const AdminWorkers = () => {
                     </button>
                   ) : (
                     <button
-                      onClick={() => handleArchiveWorker(w._id)}
+                      onClick={() => handleArchiveWorker(w._id, w.name)}
                       className="w-full py-2 border border-amber-300 rounded-xl text-sm font-medium text-amber-700 hover:bg-amber-50 transition-colors flex items-center justify-center gap-1"
                     >
                       <Archive className="w-3.5 h-3.5" /> Archive Worker
@@ -439,32 +528,7 @@ const AdminWorkers = () => {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-1">Email</label>
-                  <input
-                    type="email"
-                    required
-                    className="input-clean"
-                    placeholder="worker@example.com"
-                    value={workerForm.email}
-                    onChange={(e) => setWorkerForm({...workerForm, email: e.target.value})}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Worker's login email address</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Phone</label>
-                  <input
-                    type="tel"
-                    required
-                    className="input-clean"
-                    placeholder="+91 9876543210"
-                    value={workerForm.phone}
-                    onChange={(e) => setWorkerForm({...workerForm, phone: e.target.value})}
-                  />
-                </div>
-
-                {/* Credential delivery method */}
+                {/* Credential delivery method — affects which fields are required */}
                 <div>
                   <label className="block text-sm font-medium mb-2">Send temporary password via</label>
                   <div className="grid grid-cols-3 gap-2">
@@ -483,6 +547,39 @@ const AdminWorkers = () => {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Email {credentialDelivery === 'phone' ? <span className="text-muted-foreground font-normal">(Optional)</span> : <span className="text-destructive">*</span>}
+                  </label>
+                  <input
+                    type="email"
+                    required={credentialDelivery !== 'phone'}
+                    className="input-clean"
+                    placeholder="worker@example.com"
+                    value={workerForm.email}
+                    onChange={(e) => setWorkerForm({...workerForm, email: e.target.value})}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Worker's login email address</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Phone {credentialDelivery === 'email' ? <span className="text-muted-foreground font-normal">(Optional)</span> : <span className="text-destructive">*</span>}
+                  </label>
+                  <input
+                    type="tel"
+                    required={credentialDelivery !== 'email'}
+                    className="input-clean"
+                    placeholder="+91 9876543210"
+                    value={workerForm.phone}
+                    onChange={(e) => setWorkerForm({...workerForm, phone: e.target.value})}
+                  />
+                </div>
+
+                {/* Credential delivery method */}
+                <div>
                   <p className="text-xs text-muted-foreground mt-1">
                     {credentialDelivery === "email" && "Temporary password will be sent to the email address."}
                     {credentialDelivery === "phone" && "Temporary password will be sent as an SMS to the phone number."}
@@ -504,6 +601,19 @@ const AdminWorkers = () => {
                     <option value="other">Other</option>
                     <option value="prefer_not_to_say">Prefer not to say</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Date of Birth <span className="text-destructive">*</span></label>
+                  <input
+                    type="date"
+                    required
+                    className="input-clean"
+                    max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
+                    value={workerForm.dateOfBirth}
+                    onChange={(e) => setWorkerForm({...workerForm, dateOfBirth: e.target.value})}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Worker must be at least 18 years old</p>
                 </div>
 
                 <div>
@@ -529,6 +639,45 @@ const AdminWorkers = () => {
                     value={workerForm.experience}
                     onChange={(e) => setWorkerForm({...workerForm, experience: e.target.value})}
                   />
+                </div>
+
+                {/* Wage Type */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Wage Type <span className="text-destructive">*</span></label>
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {(["hourly", "daily", "monthly"] as const).map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setWorkerForm({...workerForm, wageType: opt})}
+                        className={`py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
+                          workerForm.wageType === opt
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background border-border hover:bg-muted text-foreground"
+                        }`}
+                      >
+                        {opt === "hourly" ? "⏱ Hourly" : opt === "daily" ? "📅 Daily" : "🗓 Monthly"}
+                      </button>
+                    ))}
+                  </div>
+                  {workerForm.wageType === 'hourly' && (
+                    <div>
+                      <label className="block text-xs text-muted-foreground mb-1">Hourly Rate (₹)</label>
+                      <input type="number" min="0" className="input-clean" placeholder="e.g. 150" value={workerForm.hourlyRate} onChange={(e) => setWorkerForm({...workerForm, hourlyRate: e.target.value})} />
+                    </div>
+                  )}
+                  {workerForm.wageType === 'daily' && (
+                    <div>
+                      <label className="block text-xs text-muted-foreground mb-1">Daily Wage (₹)</label>
+                      <input type="number" min="0" className="input-clean" placeholder="e.g. 800" value={workerForm.dailyWage} onChange={(e) => setWorkerForm({...workerForm, dailyWage: e.target.value})} />
+                    </div>
+                  )}
+                  {workerForm.wageType === 'monthly' && (
+                    <div>
+                      <label className="block text-xs text-muted-foreground mb-1">Monthly Wage (₹)</label>
+                      <input type="number" min="0" className="input-clean" placeholder="e.g. 15000" value={workerForm.monthlyWage} onChange={(e) => setWorkerForm({...workerForm, monthlyWage: e.target.value})} />
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -666,8 +815,20 @@ const AdminWorkers = () => {
                       placeholder="XXXX XXXX XXXX"
                       maxLength={14}
                       value={workerForm.aadhaarNumber}
-                      onChange={(e) => setWorkerForm({ ...workerForm, aadhaarNumber: e.target.value })}
+                      onChange={(e) => {
+                        // Allow only digits and spaces
+                        const val = e.target.value.replace(/[^\d\s]/g, '');
+                        setWorkerForm({ ...workerForm, aadhaarNumber: val });
+                      }}
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Must be exactly 12 digits (data governance requirement)
+                      {workerForm.aadhaarNumber && (
+                        <span className={`ml-2 ${workerForm.aadhaarNumber.replace(/\s/g, '').length === 12 ? 'text-green-600' : 'text-destructive'}`}>
+                          {workerForm.aadhaarNumber.replace(/\s/g, '').length}/12
+                        </span>
+                      )}
+                    </p>
                   </div>
                 </div>
 
@@ -690,6 +851,50 @@ const AdminWorkers = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Archive Worker Modal */}
+        {archiveWorkerData && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-background rounded-2xl max-w-sm w-full p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold">Archive Worker</h2>
+                <button onClick={() => setArchiveWorkerData(null)} className="text-muted-foreground hover:text-foreground">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Archive <span className="font-semibold text-foreground">{archiveWorkerData.name}</span>? Their history will be preserved.
+              </p>
+              <div>
+                <label className="block text-sm font-medium mb-1">Resigned / Archive Date</label>
+                <input
+                  type="date"
+                  className="input-clean"
+                  value={resignedDate}
+                  max={new Date().toISOString().split('T')[0]}
+                  onChange={(e) => setResignedDate(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground mt-1">This date will be saved as the worker's official resigned date.</p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setArchiveWorkerData(null)}
+                  className="flex-1 py-2 border border-border rounded-xl text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmArchive}
+                  className="flex-1 py-2 bg-amber-600 text-white rounded-xl text-sm font-medium hover:bg-amber-700 transition-colors"
+                >
+                  Confirm Archive
+                </button>
+              </div>
             </div>
           </div>
         )}

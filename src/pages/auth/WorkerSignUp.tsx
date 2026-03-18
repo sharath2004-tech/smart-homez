@@ -44,6 +44,9 @@ const WorkerSignUp = () => {
     confirmPassword: "",
     gender: "",
     experience: "",
+    dateOfBirth: "",
+    aadhaarNumber: "",
+    wageType: "hourly" as "hourly" | "daily" | "monthly",
   });
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [showPassword, setShowPassword] = useState(false);
@@ -124,6 +127,25 @@ const WorkerSignUp = () => {
       setError("Mobile number must be 10 digits");
       return;
     }
+    // Date of birth validation (must be 18+)
+    if (form.dateOfBirth) {
+      const dob = new Date(form.dateOfBirth);
+      const today = new Date();
+      const age = today.getFullYear() - dob.getFullYear() -
+        (today < new Date(today.getFullYear(), dob.getMonth(), dob.getDate()) ? 1 : 0);
+      if (age < 18) {
+        setError("You must be at least 18 years old to register");
+        return;
+      }
+    }
+    // Aadhaar number validation
+    if (form.aadhaarNumber) {
+      const aadhaarDigits = form.aadhaarNumber.replace(/\s/g, '');
+      if (!/^\d{12}$/.test(aadhaarDigits)) {
+        setError("Aadhaar number must be exactly 12 digits");
+        return;
+      }
+    }
     if (form.password.length < 8) {
       setError("Password must be at least 8 characters");
       return;
@@ -193,6 +215,9 @@ const WorkerSignUp = () => {
       formData.append("skills", JSON.stringify(selectedSkills));
       formData.append("phoneVerified", "false");
       formData.append("locationId", selectedLocationId);
+      formData.append("wageType", form.wageType || "hourly");
+      if (form.dateOfBirth) formData.append("dateOfBirth", form.dateOfBirth);
+      if (form.aadhaarNumber) formData.append("aadhaarNumber", form.aadhaarNumber.replace(/\s/g, ''));
 
       if (profilePic) formData.append("profilePicture", profilePic);
       if (aadhaarFront) formData.append("aadhaarFront", aadhaarFront);
@@ -353,6 +378,70 @@ const WorkerSignUp = () => {
                     <label className="block text-sm font-medium text-foreground mb-1.5">Experience (yrs)</label>
                     <input type="number" className="input-clean" placeholder="0" min="0" max="50" value={form.experience} onChange={set("experience")} />
                   </div>
+                </div>
+
+                {/* Date of Birth */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Date of Birth <span className="text-muted-foreground font-normal">(opt.)</span>
+                  </label>
+                  <input
+                    type="date"
+                    className="input-clean"
+                    value={form.dateOfBirth}
+                    onChange={set("dateOfBirth")}
+                    max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">You must be at least 18 years old</p>
+                </div>
+
+                {/* Aadhaar Number */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Aadhaar Number <span className="text-muted-foreground font-normal">(opt.)</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input-clean"
+                    placeholder="XXXX XXXX XXXX"
+                    maxLength={14}
+                    value={form.aadhaarNumber}
+                    onChange={(e) => setForm(prev => ({ ...prev, aadhaarNumber: e.target.value.replace(/[^\d\s]/g, '') }))}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    12 digits required
+                    {form.aadhaarNumber && (
+                      <span className={`ml-2 ${form.aadhaarNumber.replace(/\s/g, '').length === 12 ? 'text-green-600' : 'text-red-500'}`}>
+                        {form.aadhaarNumber.replace(/\s/g, '').length}/12
+                      </span>
+                    )}
+                  </p>
+                </div>
+
+                {/* Wage Type */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Wage Preference</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(["hourly", "daily", "monthly"] as const).map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setForm(prev => ({ ...prev, wageType: opt }))}
+                        className={`py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
+                          form.wageType === opt
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background border-border hover:bg-muted text-foreground"
+                        }`}
+                      >
+                        {opt === "hourly" ? "⏱ Hourly" : opt === "daily" ? "📅 Daily" : "🗓 Monthly"}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {form.wageType === 'hourly' && 'You will be paid based on hours worked'}
+                    {form.wageType === 'daily' && 'You will be paid based on days worked'}
+                    {form.wageType === 'monthly' && 'You will be paid a fixed monthly salary'}
+                  </p>
                 </div>
 
                 <div>

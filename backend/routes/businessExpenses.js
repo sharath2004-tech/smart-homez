@@ -1,0 +1,148 @@
+/**
+ * Business Expenses Routes
+ * Admins and super admins can log and view business expenses
+ */
+
+import express from 'express';
+import { body, param, validationResult } from 'express-validator';
+import { authenticate, authorize } from '../middleware/auth.js';
+import BusinessExpense from '../models/BusinessExpense.js';
+
+const router = express.Router();
+
+/**
+ * Create a business expense
+ * POST /api/business-expenses
+ */
+router.post(
+  '/',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  [
+    body('title').notEmpty().withMessage('Title is required'),
+    body('amount').isFloat({ min: 0 }).withMessage('Amount must be a positive number'),
+    body('category').notEmpty().withMessage('Category is required'),
+    body('date').isISO8601().withMessage('Valid date is required')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: { message: errors.array()[0].msg } });
+      }
+
+      const { title, amount, category, customCategory, description, date, locationId } = req.body;
+
+      const expense = new BusinessExpense({
+        title,
+        amount: Number(amount),
+        category,
+        customCategory: category === 'other' ? customCategory : undefined,
+        description,
+        date: new Date(date),
+        location: locationId || null,
+        createdBy: req.user._id,
+        createdByRole: req.user.role
+      });
+
+      await expense.save();
+      await expense.populate('createdBy', 'name email');
+      await expense.populate('location', 'apartmentName area city');
+
+      res.status(201).json({ success: true, expense });
+    } catch (error) {
+      console.error('Create expense error:', error);
+      res.status(500).json({ error: { message: 'Server error' } });
+    }
+  }
+);
+
+/**
+ * Get business expenses (filtered by role)
+ * GET /api/business-expenses
+ * - Admin: only their own expenses (and for their locations)
+ * - Super admin: all expenses, optionally filtered by locationId
+ */
+router.get(
+  '/',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  async (req, res) => {
+    try {
+      const { locationId, category, from, to, page = 1, limit = 50 } = req.query;
+      const filter = {};
+
+      if (req.user.role === 'admin') {
+        // Admin can only see their own expenses
+        filter.createdBy = req.user._id;
+      }
+
+      if (locationId) filter.location = locationId;
+      if (category) filter.category = category;
+
+      if (from || to) {
+        filter.date = {};
+        if (from) filter.date.$gte = new Date(from);
+        if (to) filter.date.$lte = new Date(to);
+      }
+
+      const skip = (Number(page) - 1) * Number(limit);
+      const total = await BusinessExpense.countDocuments(filter);
+      const expenses = await BusinessExpense.find(filter)
+        .populate('createdBy', 'name email role')
+        .populate('location', 'apartmentName area city')
+        .sort({ date: -1 })
+        .skip(skip)
+        .limit(Number(limit));
+
+      // Calculate summary
+      const summary = await BusinessExpense.aggregate([
+        { $match: filter },
+        { $group: { _id: '$category', total: { $sum: '$amount' }, count: { $sum: 1 } } }
+      ]);
+
+      const grandTotal = summary.reduce((sum, s) => sum + s.total, 0);
+
+      res.json({
+        success: true,
+        expenses,
+        summary,
+        grandTotal,
+        pagination: { total, page: Number(page), limit: Number(limit), pages: Math.ceil(total / Number(limit)) }
+      });
+    } catch (error) {
+      console.error('Get expenses error:', error);
+      res.status(500).json({ error: { message: 'Server error' } });
+    }
+  }
+);
+
+/**
+ * Delete a business expense (only creator or super_admin)
+ * DELETE /api/business-expenses/:id
+ */
+router.delete(
+  '/:id',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  [param('id').isMongoId().withMessage('Valid expense ID is required')],
+  async (req, res) => {
+    try {
+      const expense = await BusinessExpense.findById(req.params.id);
+      if (!expense) return res.status(404).json({ error: { message: 'Expense not found' } });
+
+      // Only the creator or a super_admin can delete
+      if (req.user.role !== 'super_admin' && expense.createdBy.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ error: { message: 'Not authorized to delete this expense' } });
+      }
+
+      await expense.deleteOne();
+      res.json({ success: true, message: 'Expense deleted successfully' });
+    } catch (error) {
+      console.error('Delete expense error:', error);
+      res.status(500).json({ error: { message: 'Server error' } });
+    }
+  }
+);
+
+export default router;

@@ -36,6 +36,8 @@ import twilioAuthRoutes from './routes/twilioAuth.js';
 import userRoutes from './routes/users.js';
 import quotesRoutes from './routes/quotes.js';
 import deepCleaningRoutes from './routes/deepCleaning.js';
+import businessExpensesRoutes from './routes/businessExpenses.js';
+import locationRequestsRoutes from './routes/locationRequests.js';
 
 // Import utilities
 import { runBookingUpdates } from './utils/bookingStatusUpdater.js';
@@ -211,6 +213,8 @@ app.use('/api/salary-requests', salaryRequestsRoutes);
 app.use('/api/help', helpRoutes);
 app.use('/api/quotes', quotesRoutes);
 app.use('/api/deep-cleaning', deepCleaningRoutes);
+app.use('/api/business-expenses', businessExpensesRoutes);
+app.use('/api/location-requests', locationRequestsRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

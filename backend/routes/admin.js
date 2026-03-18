@@ -638,7 +638,7 @@ router.post('/workers',
         return res.status(400).json({ error: { message: errors.array()[0].msg, status: 400 } });
       }
 
-      const { name, email, phone, gender, religion, experience, hourlyRate, aadhaarNumber } = req.body;
+      const { name, email, phone, gender, religion, experience, hourlyRate, aadhaarNumber, dateOfBirth, wageType, dailyWage, monthlyWage } = req.body;
 
       // Parse array fields that may come as JSON strings from multipart forms
       let specialization = req.body.specialization;
@@ -724,6 +724,7 @@ router.post('/workers',
         phone,
         gender: gender || 'prefer_not_to_say',
         religion: religion || undefined,
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
         role: 'worker',
         isActive: true,
         isVerified: false,
@@ -732,6 +733,10 @@ router.post('/workers',
           specialization,
           experience: experience || 0,
           hourlyRate: hourlyRate || 0,
+          wageType: wageType || 'hourly',
+          dailyWage: dailyWage ? Number(dailyWage) : null,
+          monthlyWage: monthlyWage ? Number(monthlyWage) : null,
+          joinDate: new Date(),
           assignedApartments,
           availability: true,
           serviceRadius: settings.booking.serviceRadius, // configurable walking distance in meters
@@ -860,6 +865,11 @@ router.patch('/workers/:workerId/archive', authenticate, authorize('admin', 'sup
 
     worker.isActive = false;
     worker.isArchived = true;
+    if (req.body?.resignedDate) {
+      worker.workerProfile.resignedDate = new Date(req.body.resignedDate);
+    } else {
+      worker.workerProfile.resignedDate = new Date();
+    }
     await worker.save({ validateBeforeSave: false });
 
     console.log(`✅ Worker ${worker.name} (${workerId}) archived by ${req.user.role} ${req.user.name}`);

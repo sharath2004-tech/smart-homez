@@ -91,6 +91,10 @@ const userSchema = new mongoose.Schema({
     enum: ['male', 'female', 'other', 'prefer_not_to_say'],
     default: 'prefer_not_to_say'
   },
+  dateOfBirth: {
+    type: Date,
+    default: null
+  },
   religion: {
     type: String,
     trim: true
@@ -243,6 +247,14 @@ const userSchema = new mongoose.Schema({
       approvedBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
+      },
+      penaltyApplied: {
+        type: Boolean,
+        default: false
+      },
+      penaltyAmount: {
+        type: Number,
+        default: 0
       }
     }],
     // Working hours tracking
@@ -288,6 +300,37 @@ const userSchema = new mongoose.Schema({
       type: String,
       enum: ['pending_review', 'active', 'rejected'],
       default: 'active'
+    },
+    // Wage type: hourly (HR-based), daily (day-based), or monthly
+    wageType: {
+      type: String,
+      enum: ['hourly', 'daily', 'monthly'],
+      default: 'hourly'
+    },
+    dailyWage: {
+      type: Number,
+      default: null
+    },
+    monthlyWage: {
+      type: Number,
+      default: null
+    },
+    // Reliability score (0-100) based on punctuality, uniform, behaviour, etc.
+    reliabilityScore: {
+      type: Number,
+      default: 100,
+      min: 0,
+      max: 100
+    },
+    // Resigned / archive date
+    resignedDate: {
+      type: Date,
+      default: null
+    },
+    // Join date (set when worker is activated)
+    joinDate: {
+      type: Date,
+      default: null
     },
     // KYC documents
     documents: {
