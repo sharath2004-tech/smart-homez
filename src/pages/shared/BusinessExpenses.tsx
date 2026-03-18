@@ -82,6 +82,14 @@ const BusinessExpenses = () => {
       toast({ title: "Error", description: "Please fill all required fields", variant: "destructive" });
       return;
     }
+    if (Number(form.amount) <= 0) {
+      toast({ title: "Error", description: "Amount must be a positive number", variant: "destructive" });
+      return;
+    }
+    if (form.category === "other" && !form.customCategory.trim()) {
+      toast({ title: "Error", description: "Please specify the category", variant: "destructive" });
+      return;
+    }
     setSubmitting(true);
     try {
       await businessExpensesAPI.create({
