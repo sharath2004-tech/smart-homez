@@ -1,10 +1,11 @@
 import AppLayout from "@/components/AppLayout";
-import { adminAPI, authAPI, locationsAPI } from "@/lib/api";
+import { adminAPI, authAPI, locationsAPI, locationRequestsAPI } from "@/lib/api";
 import { cropQRFromImage } from "@/utils/cropQRFromImage";
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Building, FileText, MapPin, Pencil, Plus, QrCode, Search, Shield, Trash2, Upload, UserPlus, X } from "lucide-react";
+import { Building, CheckCircle, Clock, FileText, MapPin, Pencil, Plus, QrCode, Search, Shield, Trash2, Upload, UserPlus, X, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 interface Location {
   _id: string;
@@ -55,6 +56,29 @@ interface UserProfile {
   name: string;
 }
 
+interface LocationRequest {
+  _id: string;
+  apartmentName: string;
+  building?: string;
+  area: string;
+  city: string;
+  state: string;
+  zipCode?: string;
+  reason?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requestedBy?: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  createdAt: string;
+  reviewedBy?: {
+    _id: string;
+    name: string;
+  };
+  reviewNote?: string;
+}
+
 // Indian cities for selection
 const indianCities = [
   "Mumbai", "Delhi", "Bengaluru", "Hyderabad", "Chennai",
@@ -84,7 +108,21 @@ const AdminLocations = () => {
   const [showLocationForm, setShowLocationForm] = useState(false);
   const [showAdminForm, setShowAdminForm] = useState(false);
   const [cityFilter, setCityFilter] = useState("");
-  const [activeTab, setActiveTab] = useState<'locations' | 'admins'>('locations');
+  const [activeTab, setActiveTab] = useState<'locations' | 'admins' | 'requests'>('locations');
+  const [pendingRequests, setPendingRequests] = useState<LocationRequest[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [showRequestForm, setShowRequestForm] = useState(false);
+  const [rejectRequestId, setRejectRequestId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [requestForm, setRequestForm] = useState({
+    apartmentName: "",
+    building: "",
+    area: "",
+    city: "",
+    state: "Maharashtra",
+    zipCode: "",
+    reason: ""
+  });
   const [geocoding, setGeocoding] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
@@ -380,19 +418,34 @@ const AdminLocations = () => {
       setLoading(true);
       const profileRes = await authAPI.getProfile();
       setProfile(profileRes.user || profileRes);
-      
+
       const locationsRes = await adminAPI.getLocations();
       setLocations(locationsRes.locations || []);
 
-      // Only super admin can see admins
+      // Only super admin can see admins and location requests
       if (profileRes.user?.role === 'super_admin' || profileRes.role === 'super_admin') {
         const adminsRes = await adminAPI.getAdmins();
         setAdmins(adminsRes.admins || []);
+
+        // Fetch pending location requests
+        fetchLocationRequests('pending');
       }
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLocationRequests = async (status?: string) => {
+    try {
+      setRequestsLoading(true);
+      const res = await locationRequestsAPI.getAll(status);
+      setPendingRequests(res.requests || []);
+    } catch (error) {
+      console.error('Error fetching location requests:', error);
+    } finally {
+      setRequestsLoading(false);
     }
   };
 
@@ -569,6 +622,68 @@ const AdminLocations = () => {
     }
   };
 
+  const handleSubmitLocationRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!requestForm.city || !requestForm.area || !requestForm.apartmentName) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      await locationRequestsAPI.create({
+        apartmentName: requestForm.apartmentName,
+        building: requestForm.building || undefined,
+        area: requestForm.area,
+        city: requestForm.city,
+        state: requestForm.state,
+        zipCode: requestForm.zipCode || undefined,
+        reason: requestForm.reason || undefined
+      });
+      toast.success('Location request submitted successfully!');
+      setShowRequestForm(false);
+      setRequestForm({
+        apartmentName: "",
+        building: "",
+        area: "",
+        city: "",
+        state: "Maharashtra",
+        zipCode: "",
+        reason: ""
+      });
+      fetchData();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to submit location request';
+      toast.error(message);
+    }
+  };
+
+  const handleApproveRequest = async (requestId: string, request: LocationRequest) => {
+    try {
+      await locationRequestsAPI.review(requestId, 'approved');
+      toast.success('Location request approved!');
+      fetchLocationRequests('pending');
+      fetchData();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to approve location request';
+      toast.error(message);
+    }
+  };
+
+  const handleRejectRequest = async () => {
+    if (!rejectRequestId) return;
+
+    try {
+      await locationRequestsAPI.review(rejectRequestId, 'rejected', rejectReason);
+      toast.success('Location request rejected!');
+      setRejectRequestId(null);
+      setRejectReason("");
+      fetchLocationRequests('pending');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to reject location request';
+      toast.error(message);
+    }
+  };
+
   // Filter locations by city for admin form
   const cityLocations = adminForm.city 
     ? locations.filter(loc => loc.city.toLowerCase() === adminForm.city.toLowerCase())
@@ -605,26 +720,33 @@ const AdminLocations = () => {
               {isSuperAdmin ? 'Manage Locations & Admins' : 'My Locations'}
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              {isSuperAdmin 
-                ? 'Create locations and assign admins by city' 
+              {isSuperAdmin
+                ? 'Create locations and assign admins by city'
                 : 'View your assigned locations'}
             </p>
           </div>
-          {isSuperAdmin && (
+          {isSuperAdmin ? (
             <div className="flex gap-2">
-              <button 
+              <button
                 onClick={() => setShowAdminForm(true)}
                 className="flex items-center gap-2 bg-secondary text-secondary-foreground text-sm py-2.5 px-4 rounded-xl hover:bg-secondary/80 transition-colors"
               >
                 <UserPlus className="w-4 h-4" /> Add Admin
               </button>
-              <button 
+              <button
                 onClick={() => setShowLocationForm(true)}
                 className="flex items-center gap-2 btn-brand text-sm py-2.5 px-4"
               >
                 <Plus className="w-4 h-4" /> Add Location
               </button>
             </div>
+          ) : (
+            <button
+              onClick={() => setShowRequestForm(true)}
+              className="flex items-center gap-2 btn-brand text-sm py-2.5 px-4"
+            >
+              <Plus className="w-4 h-4" /> Request Location
+            </button>
           )}
         </div>
 
@@ -641,6 +763,17 @@ const AdminLocations = () => {
             >
               <Building className="w-4 h-4 inline mr-2" />
               Locations ({locations.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('requests')}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'requests'
+                  ? 'text-primary border-b-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Clock className="w-4 h-4 inline mr-2" />
+              Location Requests ({pendingRequests.length})
             </button>
             <button
               onClick={() => setActiveTab('admins')}
@@ -729,6 +862,64 @@ const AdminLocations = () => {
               </div>
             )}
           </>
+        )}
+
+        {/* Location Requests Tab - Super Admin Only */}
+        {isSuperAdmin && activeTab === 'requests' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-500" />
+                Pending Location Requests
+                {pendingRequests.length > 0 && (
+                  <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-0.5 rounded-full">{pendingRequests.length}</span>
+                )}
+              </h2>
+            </div>
+
+            {requestsLoading ? (
+              <p className="text-sm text-muted-foreground">Loading requests...</p>
+            ) : pendingRequests.length === 0 ? (
+              <div className="border border-dashed border-border rounded-xl p-4 text-center text-sm text-muted-foreground">No pending location requests</div>
+            ) : (
+              <div className="grid gap-3">
+                {pendingRequests.map((req) => (
+                  <div key={req._id} className="card-elevated p-4 border-l-4 border-amber-400">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold text-foreground">{req.apartmentName}</span>
+                          <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">Pending</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground line-clamp-1 mb-2">{req.building ? `${req.building}, ` : ''}{req.area}, {req.city}</p>
+                        {req.reason && (
+                          <p className="text-sm text-muted-foreground mb-2"><strong>Reason:</strong> {req.reason}</p>
+                        )}
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+                          <span>👤 Requested by: <strong className="text-foreground">{req.requestedBy?.name}</strong></span>
+                          <span>📅 {new Date(req.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          onClick={() => handleApproveRequest(req._id, req)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors"
+                        >
+                          <CheckCircle className="w-3.5 h-3.5" /> Approve
+                        </button>
+                        <button
+                          onClick={() => { setRejectRequestId(req._id); setRejectReason(''); }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive/10 text-destructive text-xs font-medium rounded-lg hover:bg-destructive/20 transition-colors"
+                        >
+                          <XCircle className="w-3.5 h-3.5" /> Reject
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         {/* Admins Tab - Super Admin Only */}
@@ -1362,6 +1553,192 @@ const AdminLocations = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Location Request Form Modal */}
+        {showRequestForm && !isSuperAdmin && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-card rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="sticky top-0 bg-gradient-to-r from-blue-500 to-teal-500 text-white p-6 rounded-t-2xl flex items-center gap-4">
+                <button
+                  onClick={() => setShowRequestForm(false)}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                <h2 className="text-xl font-bold flex-1">Request New Location</h2>
+              </div>
+
+              <div className="p-6 space-y-4">
+                {/* Info Box */}
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm">
+                  <p className="font-semibold text-blue-900 mb-2">📋 Request Location</p>
+                  <p className="text-blue-800">
+                    Submit a request for a new location. Your super admin will review and approve the request.
+                  </p>
+                </div>
+
+                <form onSubmit={handleSubmitLocationRequest} className="space-y-4">
+                  {/* Apartment Name */}
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Apartment Name *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g., Oberoi Realty Sky City"
+                      className="input-clean"
+                      value={requestForm.apartmentName}
+                      onChange={(e) => setRequestForm(prev => ({ ...prev, apartmentName: e.target.value }))}
+                      required
+                    />
+                  </div>
+
+                  {/* Building */}
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Building/Wing
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g., Tower A"
+                      className="input-clean"
+                      value={requestForm.building}
+                      onChange={(e) => setRequestForm(prev => ({ ...prev, building: e.target.value }))}
+                    />
+                  </div>
+
+                  {/* Area */}
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Area *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g., Borivali"
+                      className="input-clean"
+                      value={requestForm.area}
+                      onChange={(e) => setRequestForm(prev => ({ ...prev, area: e.target.value }))}
+                      required
+                    />
+                  </div>
+
+                  {/* City */}
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      City *
+                    </label>
+                    <select
+                      className="input-clean"
+                      value={requestForm.city}
+                      onChange={(e) => setRequestForm(prev => ({ ...prev, city: e.target.value }))}
+                      required
+                    >
+                      <option value="">Select City</option>
+                      {indianCities.map(city => (
+                        <option key={city} value={city}>{city}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* State */}
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      State
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g., Maharashtra"
+                      className="input-clean"
+                      value={requestForm.state}
+                      onChange={(e) => setRequestForm(prev => ({ ...prev, state: e.target.value }))}
+                    />
+                  </div>
+
+                  {/* Zip Code */}
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Zip Code
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g., 400066"
+                      className="input-clean"
+                      value={requestForm.zipCode}
+                      onChange={(e) => setRequestForm(prev => ({ ...prev, zipCode: e.target.value }))}
+                    />
+                  </div>
+
+                  {/* Reason */}
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Reason for Request
+                    </label>
+                    <textarea
+                      placeholder="e.g., New client in this area, High demand..."
+                      className="input-clean resize-none"
+                      rows={3}
+                      value={requestForm.reason}
+                      onChange={(e) => setRequestForm(prev => ({ ...prev, reason: e.target.value }))}
+                    />
+                  </div>
+
+                  {/* Buttons */}
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowRequestForm(false)}
+                      className="flex-1 px-4 py-2.5 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 font-medium transition-colors text-sm"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors text-sm"
+                    >
+                      Submit Request
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reject Location Request Modal */}
+        {rejectRequestId && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-card rounded-2xl max-w-sm w-full">
+              <div className="p-6">
+                <h2 className="text-lg font-bold text-foreground mb-4">Reject Location Request?</h2>
+                <textarea
+                  placeholder="Enter reason for rejection (optional)"
+                  className="input-clean resize-none mb-4"
+                  rows={3}
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                />
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setRejectRequestId(null);
+                      setRejectReason("");
+                    }}
+                    className="flex-1 px-4 py-2 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 font-medium transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleRejectRequest}
+                    className="flex-1 px-4 py-2 bg-destructive text-white rounded-lg hover:bg-destructive/80 font-medium transition-colors"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
