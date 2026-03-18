@@ -898,9 +898,10 @@ export const adminAPI = {
     return apiCall(locationId ? `/admin/workers?locationId=${locationId}` : '/admin/workers');
   },
 
-  archiveWorker: async (workerId: string) => {
+  archiveWorker: async (workerId: string, resignedDate?: string) => {
     return apiCall(`/admin/workers/${workerId}/archive`, {
-      method: 'PATCH'
+      method: 'PATCH',
+      body: JSON.stringify({ resignedDate })
     });
   },
 
@@ -1203,8 +1204,11 @@ export const superAdminAPI = {
     return data;
   },
 
-  archiveWorker: async (workerId: string) => {
-    return apiCall(`/super-admin/workers/${workerId}/archive`, { method: 'PATCH' });
+  archiveWorker: async (workerId: string, resignedDate?: string) => {
+    return apiCall(`/super-admin/workers/${workerId}/archive`, {
+      method: 'PATCH',
+      body: JSON.stringify({ resignedDate })
+    });
   },
 
   unarchiveWorker: async (workerId: string) => {
@@ -1402,6 +1406,75 @@ export const helpAPI = {
   // Admin: delete
   deleteMessage: async (id: string) => {
     return apiCall(`/help/${id}`, { method: 'DELETE' });
+  }
+};
+
+// ====== Business Expenses API ======
+export const businessExpensesAPI = {
+  create: async (data: {
+    title: string;
+    amount: number;
+    category: string;
+    customCategory?: string;
+    description?: string;
+    date: string;
+    locationId?: string;
+  }) => {
+    return apiCall('/business-expenses', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  getAll: async (params?: {
+    locationId?: string;
+    category?: string;
+    from?: string;
+    to?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const q = new URLSearchParams();
+    if (params?.locationId) q.append('locationId', params.locationId);
+    if (params?.category) q.append('category', params.category);
+    if (params?.from) q.append('from', params.from);
+    if (params?.to) q.append('to', params.to);
+    if (params?.page) q.append('page', String(params.page));
+    if (params?.limit) q.append('limit', String(params.limit));
+    return apiCall(`/business-expenses${q.toString() ? `?${q.toString()}` : ''}`);
+  },
+
+  delete: async (id: string) => {
+    return apiCall(`/business-expenses/${id}`, { method: 'DELETE' });
+  }
+};
+
+// ====== Location Requests API ======
+export const locationRequestsAPI = {
+  create: async (data: {
+    apartmentName: string;
+    building?: string;
+    area: string;
+    city: string;
+    state: string;
+    zipCode?: string;
+    reason?: string;
+  }) => {
+    return apiCall('/location-requests', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  getAll: async (status?: string) => {
+    return apiCall(status ? `/location-requests?status=${status}` : '/location-requests');
+  },
+
+  review: async (id: string, status: 'approved' | 'rejected', reviewNote?: string) => {
+    return apiCall(`/location-requests/${id}/review`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, reviewNote })
+    });
   }
 };
 

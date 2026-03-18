@@ -391,6 +391,11 @@ router.patch('/workers/:workerId/archive', async (req, res) => {
 
     worker.isActive = false;
     worker.isArchived = true;
+    if (req.body?.resignedDate) {
+      worker.workerProfile.resignedDate = new Date(req.body.resignedDate);
+    } else {
+      worker.workerProfile.resignedDate = new Date();
+    }
     await worker.save({ validateBeforeSave: false });
 
     res.json({ success: true, message: 'Worker archived successfully' });

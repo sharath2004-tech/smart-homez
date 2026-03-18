@@ -44,6 +44,14 @@ router.post(
       const leaveDate = new Date(date);
       leaveDate.setHours(0, 0, 0, 0);
 
+      // Enforce 24-hour advance notice rule
+      const now = new Date();
+      const hoursUntilLeave = (leaveDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+      const penaltyApplied = hoursUntilLeave < 24 && hoursUntilLeave >= 0;
+      if (hoursUntilLeave < 0) {
+        return res.status(400).json({ message: 'Cannot apply leave for a past date' });
+      }
+
       const existingLeave = worker.workerProfile.leaves.find(leave => {
         const leaveDateOnly = new Date(leave.date);
         leaveDateOnly.setHours(0, 0, 0, 0);
@@ -81,14 +89,19 @@ router.post(
         date: leaveDate,
         reason: reason || '',
         status: 'pending',
-        requestedAt: new Date()
+        requestedAt: new Date(),
+        penaltyApplied,
+        penaltyAmount: penaltyApplied ? 1500 : 0
       });
 
       await worker.save();
 
       res.status(201).json({
         message: 'Leave request submitted successfully',
-        leave: worker.workerProfile.leaves[worker.workerProfile.leaves.length - 1]
+        leave: worker.workerProfile.leaves[worker.workerProfile.leaves.length - 1],
+        penaltyApplied,
+        penaltyAmount: penaltyApplied ? 1500 : 0,
+        penaltyMessage: penaltyApplied ? 'A penalty of ₹1500 has been applied because the leave was not requested at least 24 hours in advance.' : null
       });
     } catch (error) {
       console.error('Apply leave error:', error);

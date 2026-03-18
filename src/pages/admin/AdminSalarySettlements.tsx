@@ -132,6 +132,26 @@ const AdminSalarySettlements = () => {
   const [sendPreview, setSendPreview] = useState<SalaryPreview | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [sending, setSending] = useState(false);
+  // Partial payment state
+  const [isPartialPayment, setIsPartialPayment] = useState(false);
+  const [partialAmount, setPartialAmount] = useState('');
+
+  // Helper: get last day of a given month (handles Feb 28/29, 30-day months, etc.)
+  const getMonthEndDate = (year: number, month: number): string => {
+    // month is 1-based (1=Jan, 12=Dec)
+    const lastDay = new Date(year, month, 0).getDate();
+    return `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  };
+
+  // Auto-set "To" to month end when "From" is set
+  const handleFromChange = (from: string) => {
+    setSendFrom(from);
+    if (from) {
+      const d = new Date(from);
+      const monthEnd = getMonthEndDate(d.getFullYear(), d.getMonth() + 1);
+      setSendTo(monthEnd);
+    }
+  };
 
   const fetchRequests = useCallback(async () => {
     setLoading(true);
@@ -194,12 +214,25 @@ const AdminSalarySettlements = () => {
 
   const handleSendSalary = async () => {
     if (!selectedWorker || !sendPreview) return;
+    if (isPartialPayment) {
+      const amt = Number(partialAmount);
+      if (!amt || amt <= 0) {
+        toast({ title: 'Invalid amount', description: 'Please enter a valid partial payment amount', variant: 'destructive' });
+        return;
+      }
+      if (amt >= (sendPreview.netPayable ?? sendPreview.totalEarnings)) {
+        toast({ title: 'Invalid amount', description: 'Partial amount must be less than the total payable', variant: 'destructive' });
+        return;
+      }
+    }
     setSending(true);
     try {
       const res = await api.post('/salary-requests/admin/send', {
         workerId: selectedWorker._id,
         periodFrom: sendFrom,
-        periodTo: sendTo
+        periodTo: sendTo,
+        isPartialPayment,
+        partialAmount: isPartialPayment ? Number(partialAmount) : undefined
       });
       toast({ title: 'Salary Sent!', description: res.message || `Salary sent to ${selectedWorker.name}` });
       setSendOpen(false);
@@ -208,6 +241,8 @@ const AdminSalarySettlements = () => {
       setSendFrom('');
       setSendTo('');
       setSendPreview(null);
+      setIsPartialPayment(false);
+      setPartialAmount('');
       await fetchRequests();
     } catch (err) {
       toast({
@@ -318,16 +353,17 @@ const AdminSalarySettlements = () => {
                 {/* Date range */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label htmlFor="sendFrom">From Date</Label>
+                    <Label htmlFor="sendFrom">From Date (Join date / 1st of month)</Label>
                     <Input
                       id="sendFrom"
                       type="date"
                       value={sendFrom}
-                      onChange={e => { setSendFrom(e.target.value); setSendPreview(null); }}
+                      onChange={e => { handleFromChange(e.target.value); setSendPreview(null); }}
                     />
+                    <p className="text-xs text-muted-foreground">Setting from date auto-fills the month end date</p>
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="sendTo">To Date</Label>
+                    <Label htmlFor="sendTo">To Date (end of month)</Label>
                     <Input
                       id="sendTo"
                       type="date"
@@ -398,6 +434,38 @@ const AdminSalarySettlements = () => {
 
                     <Separator />
 
+                    {/* Partial Payment Option */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          id="partialPayment"
+                          checked={isPartialPayment}
+                          onChange={(e) => { setIsPartialPayment(e.target.checked); setPartialAmount(''); }}
+                          className="w-4 h-4"
+                        />
+                        <Label htmlFor="partialPayment" className="cursor-pointer">
+                          Pay partial amount (advance / part payment)
+                        </Label>
+                      </div>
+                      {isPartialPayment && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground mb-1 block">
+                            Partial Amount (₹) — must be less than ₹{sendPreview.requestedAmount.toFixed(2)}
+                          </Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={sendPreview.requestedAmount - 1}
+                            step="0.01"
+                            value={partialAmount}
+                            onChange={(e) => setPartialAmount(e.target.value)}
+                            placeholder={`e.g. ${(sendPreview.requestedAmount / 2).toFixed(0)}`}
+                          />
+                        </div>
+                      )}
+                    </div>
+
                     <Button
                       className="w-full bg-green-600 hover:bg-green-700"
                       onClick={handleSendSalary}
@@ -405,7 +473,9 @@ const AdminSalarySettlements = () => {
                     >
                       {sending
                         ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending...</>
-                        : <><IndianRupee className="w-4 h-4 mr-2" />Send ₹{sendPreview.requestedAmount.toFixed(2)} to {selectedWorker?.name}</>}
+                        : isPartialPayment && partialAmount
+                          ? <><IndianRupee className="w-4 h-4 mr-2" />Pay ₹{Number(partialAmount).toFixed(2)} (Partial) to {selectedWorker?.name}</>
+                          : <><IndianRupee className="w-4 h-4 mr-2" />Send ₹{sendPreview.requestedAmount.toFixed(2)} to {selectedWorker?.name}</>}
                     </Button>
                   </div>
                 )}

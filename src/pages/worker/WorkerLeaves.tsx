@@ -69,6 +69,16 @@ const WorkerLeaves = () => {
     }
   };
 
+  const [penaltyWarning, setPenaltyWarning] = useState(false);
+
+  // Check if selected date is within 24 hours from now
+  const checkPenalty = (date: Date | undefined) => {
+    if (!date) { setPenaltyWarning(false); return; }
+    const now = new Date();
+    const hoursUntilLeave = (date.getTime() - now.getTime()) / (1000 * 60 * 60);
+    setPenaltyWarning(hoursUntilLeave >= 0 && hoursUntilLeave < 24);
+  };
+
   const handleApplyLeave = async () => {
     if (!selectedDate) {
       toast({
@@ -79,16 +89,30 @@ const WorkerLeaves = () => {
       return;
     }
 
+    // Warn about penalty but allow submission
+    if (penaltyWarning && !confirm('⚠️ You are applying for leave with less than 24 hours notice.\n\nA penalty of ₹1500 will be applied as per policy.\n\nDo you still want to proceed?')) {
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      await leavesAPI.applyLeave(selectedDate.toISOString(), reason.trim());
+      const response = await leavesAPI.applyLeave(selectedDate.toISOString(), reason.trim());
 
-      toast({
-        title: t('common.success'),
-        description: t('worker.leaves.leaveSubmitted')
-      });
+      if (response.penaltyApplied) {
+        toast({
+          title: '⚠️ Leave submitted with penalty',
+          description: `Your leave has been submitted. A penalty of ₹1,500 has been applied because you did not apply at least 24 hours in advance.`,
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: t('common.success'),
+          description: t('worker.leaves.leaveSubmitted')
+        });
+      }
 
       setSelectedDate(undefined);
+      setPenaltyWarning(false);
       setReason('');
       fetchLeaves();
       fetchProfile();
@@ -175,11 +199,20 @@ const WorkerLeaves = () => {
                 <Calendar
                   mode="single"
                   selected={selectedDate}
-                  onSelect={setSelectedDate}
+                  onSelect={(date) => { setSelectedDate(date); checkPenalty(date); }}
                   disabled={isDateDisabled}
                   className="rounded-md border"
                 />
               </div>
+
+              {/* 24-hour penalty warning */}
+              {penaltyWarning && (
+                <Alert variant="destructive">
+                  <AlertDescription className="text-sm">
+                    ⚠️ <strong>Penalty Notice:</strong> You are applying for leave with less than 24 hours notice. A penalty of <strong>₹1,500</strong> will be applied as per company policy. Please plan ahead and apply at least 24 hours in advance to avoid this penalty.
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">{t('worker.leaves.reasonOptional')}</label>
@@ -201,7 +234,7 @@ const WorkerLeaves = () => {
                 className="w-full"
               >
                 <CalendarIcon className="w-4 h-4 mr-2" />
-                {isSubmitting ? t('worker.leaves.submitting') : t('worker.leaves.submitLeaveRequest')}
+                {isSubmitting ? t('worker.leaves.submitting') : penaltyWarning ? '⚠️ Submit Leave (Penalty applies)' : t('worker.leaves.submitLeaveRequest')}
               </Button>
 
               {remainingLeaves <= 0 && (
