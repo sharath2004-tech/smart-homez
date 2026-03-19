@@ -226,7 +226,7 @@ const AdminDashboard = () => {
         )}
 
         {/* Quick nav */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 md:gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-3">
           {[
             { to: "/admin/bookings", icon: Calendar, label: "All Bookings", value: `${stats.todayBookings} today` },
             { to: "/admin/workers", icon: Users, label: "Workers", value: stats.workersOnlineInfo },

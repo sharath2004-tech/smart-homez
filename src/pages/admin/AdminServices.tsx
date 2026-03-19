@@ -531,7 +531,7 @@ const AdminServices = () => {
               </span>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {coverageItems.map((item) => (
               <div
                 key={item.id}
@@ -543,7 +543,7 @@ const AdminServices = () => {
               >
                 <span className="text-2xl shrink-0">{item.emoji}</span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-foreground truncate">{item.label}</p>
+                  <p className="text-xs font-semibold text-foreground line-clamp-2 break-words">{item.label}</p>
                   {item.isConfigured ? (
                     <p className="text-xs text-green-700 dark:text-green-400">
                       ✓ {item.service ? (

@@ -230,7 +230,7 @@ const WorkerDashboard = () => {
             </div>
             <p className="text-sm font-semibold text-foreground">{t('worker.dashboard.hoursWorked')}</p>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
               { label: t('worker.tasks.today'),      value: formatMinutes(stats.minutesToday) },
               { label: t('worker.tasks.thisWeek'),  value: formatMinutes(stats.minutesThisWeek) },
@@ -370,7 +370,7 @@ const WorkerDashboard = () => {
         )}
 
         {/* Quick actions */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Link to="/worker/earnings" className="card-elevated-hover p-4 flex items-center gap-3">
             <div className="w-10 h-10 bg-success-light rounded-xl flex items-center justify-center">
               <TrendingUp className="w-5 h-5 text-success" />

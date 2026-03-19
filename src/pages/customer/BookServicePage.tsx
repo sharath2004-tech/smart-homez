@@ -711,7 +711,7 @@ const BookServicePage = () => {
                 </p>
               );
             })()}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
               {[
                 { value: 1,   label: '1 hr' },
                 { value: 1.5, label: '1.5 hr' },
@@ -757,7 +757,7 @@ const BookServicePage = () => {
               When do you need it?
             </h3>
             
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => setBookingMode('now')}
@@ -854,7 +854,7 @@ const BookServicePage = () => {
                   </div>
 
                   {/* 15-min slot grid */}
-                  <div className="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
                     {!selectedDate ? (
                       <p className="col-span-4 text-sm text-muted-foreground py-4 text-center">Select a date first to see available slots</p>
                     ) : loadingSlots ? (
@@ -922,7 +922,7 @@ const BookServicePage = () => {
               )}
             </div>
             
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {subscriptionPlans.map((plan) => (
                 <button
                   key={plan.id}
