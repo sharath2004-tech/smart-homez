@@ -94,7 +94,7 @@ const WorkerProfile = () => {
         </div>
 
         {/* Profile Header Card */}
-        <div className="card-elevated p-6">
+        <div className="card-elevated p-4 sm:p-5 md:p-6">
           <div className="flex items-start gap-5">
             <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-2xl font-bold shrink-0">
               {initials}
@@ -121,7 +121,7 @@ const WorkerProfile = () => {
         </div>
 
         {/* Contact Information */}
-        <div className="card-elevated p-6">
+        <div className="card-elevated p-4 sm:p-5 md:p-6">
           <h3 className="font-bold font-heading text-foreground mb-4 flex items-center gap-2">
             <User className="w-4 h-4 text-primary" />
             {t('worker.profile.personalInfo')}
@@ -150,7 +150,7 @@ const WorkerProfile = () => {
         {profile.workerProfile && (
           <>
             {/* Specialization */}
-            <div className="card-elevated p-6">
+            <div className="card-elevated p-4 sm:p-5 md:p-6">
               <h3 className="font-bold font-heading text-foreground mb-4 flex items-center gap-2">
                 <Briefcase className="w-4 h-4 text-primary" />
                 {t('worker.profile.specialization')}
@@ -173,7 +173,7 @@ const WorkerProfile = () => {
 
             {/* Assigned Locations */}
             {profile.workerProfile.assignedApartments && profile.workerProfile.assignedApartments.length > 0 && (
-              <div className="card-elevated p-6">
+              <div className="card-elevated p-4 sm:p-5 md:p-6">
                 <h3 className="font-bold font-heading text-foreground mb-4 flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-primary" />
                   {t('worker.profile.assignedLocations')}
@@ -198,7 +198,7 @@ const WorkerProfile = () => {
             )}
 
             {/* Work Statistics */}
-            <div className="card-elevated p-6">
+            <div className="card-elevated p-4 sm:p-5 md:p-6">
               <h3 className="font-bold font-heading text-foreground mb-4 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-primary" />
                 {t('worker.profile.performance')}
@@ -220,7 +220,7 @@ const WorkerProfile = () => {
             </div>
 
             {/* Availability Status */}
-            <div className="card-elevated p-6">
+            <div className="card-elevated p-4 sm:p-5 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-bold text-foreground mb-1">{t('worker.profile.availabilityStatus')}</h3>
@@ -241,7 +241,7 @@ const WorkerProfile = () => {
         )}
 
         {/* Account Information */}
-        <div className="card-elevated p-6">
+        <div className="card-elevated p-4 sm:p-5 md:p-6">
           <h3 className="font-bold font-heading text-foreground mb-4">{t('worker.profile.accountInfo')}</h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">

@@ -351,7 +351,7 @@ const AdminSalarySettlements = () => {
                 </div>
 
                 {/* Date range */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="sendFrom">From Date (Join date / 1st of month)</Label>
                     <Input
@@ -387,7 +387,7 @@ const AdminSalarySettlements = () => {
                 {/* Preview result */}
                 {sendPreview && (
                   <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
-                    <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-center">
                       <div className="bg-background rounded-md p-3">
                         <p className="text-xs text-muted-foreground">Tasks Done</p>
                         <p className="text-xl font-bold">{sendPreview.totalTasksCompleted}</p>
@@ -557,7 +557,7 @@ const AdminSalarySettlements = () => {
                     <div className="border-t border-border">
                       <CardContent className="p-4 space-y-4">
                         {/* Work summary */}
-                        <div className="grid grid-cols-3 gap-3 text-center">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-center">
                           <div className="bg-muted/40 rounded-md p-3">
                             <p className="text-xs text-muted-foreground">Tasks</p>
                             <p className="text-xl font-bold">{req.totalTasksCompleted}</p>

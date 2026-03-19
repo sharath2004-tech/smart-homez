@@ -1537,7 +1537,7 @@ const AdminLocations = () => {
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
               {/* Header */}
-              <div className="sticky top-0 bg-gradient-to-r from-purple-500 to-pink-500 text-white p-6 rounded-t-2xl flex items-center gap-4">
+              <div className="sticky top-0 bg-gradient-to-r from-purple-500 to-pink-500 text-white p-3 sm:p-4 md:p-5 rounded-t-2xl flex items-center gap-4">
                 <button
                   onClick={() => setShowQRModal(false)}
                   className="p-2 hover:bg-white/10 rounded-lg transition-colors"

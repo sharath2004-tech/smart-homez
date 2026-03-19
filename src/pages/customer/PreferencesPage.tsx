@@ -565,7 +565,7 @@ const PreferencesPage = () => {
             {/* Language Preference */}
             <div className="space-y-3">
               <Label>Preferred Language(s)</Label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {['english', 'hindi', 'marathi', 'tamil', 'telugu', 'kannada', 'bengali'].map((lang) => {
                   const selected = (preferences.languagePreference || []).includes(lang);
                   return (

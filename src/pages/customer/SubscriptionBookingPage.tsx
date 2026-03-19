@@ -248,7 +248,7 @@ export default function SubscriptionBookingPage() {
         </div>
 
         {/* Content */}
-        <div className="bg-card rounded-xl border border-border p-6 mb-6">
+        <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6 mb-6">
           {currentStep === 'plan' && (
             <SubscriptionPlanSelector
               selectedPlan={selectedPlan}

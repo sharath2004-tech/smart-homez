@@ -408,7 +408,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div className="bg-card rounded-2xl p-6 max-w-lg w-full">
+        <div className="bg-card rounded-2xl p-3 sm:p-4 md:p-5 lg:p-6 max-w-lg w-full">
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full"></div>
           </div>
@@ -449,11 +449,11 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
           </span>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="p-3 sm:p-4 md:p-5 lg:p-6 space-y-6">
           {/* Timer for active tasks */}
           {task.status === 'in-progress' && (
             <>
-              <div className="card-elevated p-6 text-center bg-primary-light">
+              <div className="card-elevated p-4 sm:p-5 md:p-6 text-center bg-primary-light">
                 <Timer className="w-8 h-8 text-primary mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground mb-2">{t('worker.taskDetail.workInProgress')}</p>
                 <p className="text-3xl font-bold text-primary font-mono">

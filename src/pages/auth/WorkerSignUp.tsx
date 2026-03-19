@@ -379,7 +379,7 @@ const WorkerSignUp = () => {
                   <p className="text-xs text-muted-foreground mt-1">Required temporarily while OTP signup is disabled</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">
                       Gender <span className="text-muted-foreground font-normal">(opt.)</span>
@@ -439,7 +439,7 @@ const WorkerSignUp = () => {
                 {/* Wage Type */}
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">Wage Preference</label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {(["hourly", "daily", "monthly"] as const).map((opt) => (
                       <button
                         key={opt}
@@ -525,7 +525,7 @@ const WorkerSignUp = () => {
               <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Your skills</h2>
               <p className="text-muted-foreground mb-6">Select all services you can provide</p>
 
-              <div className="grid grid-cols-2 gap-2 mb-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-5">
                 {SKILLS.map((skill) => (
                   <label
                     key={skill}

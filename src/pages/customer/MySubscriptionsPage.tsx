@@ -300,7 +300,7 @@ const MySubscriptionsPage = () => {
         ) : (
           <div className="space-y-6">
             {subscriptions.map((subscription) => (
-              <div key={subscription._id} className="card-elevated p-6">
+              <div key={subscription._id} className="card-elevated p-4 sm:p-5 md:p-6">
                 {/* Subscription Header */}
                 <div className="flex items-start justify-between mb-4 pb-4 border-b border-border">
                   <div>

@@ -187,7 +187,7 @@ const MiniCleanServicePage = () => {
         {meta.includes.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
             <h3 className="font-semibold text-foreground mb-2">What's included</h3>
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
               {meta.includes.map((item) => (
                 <div key={item} className="flex items-center gap-2 text-sm text-foreground">
                   <span className="w-4 h-4 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-[10px] font-bold shrink-0">✓</span>
@@ -228,7 +228,7 @@ const MiniCleanServicePage = () => {
           <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2">
             <Calendar className="w-4 h-4 text-primary" /> Schedule
           </h3>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Date</label>
               <input

@@ -98,7 +98,7 @@ const SpotCleanPage = () => {
           </div>
         ) : (
           <motion.div
-            className="grid grid-cols-2 gap-3"
+            className="grid grid-cols-1 sm:grid-cols-2 gap-3"
             initial="hidden"
             animate="visible"
             variants={{ visible: { transition: { staggerChildren: 0.06 } }, hidden: {} }}

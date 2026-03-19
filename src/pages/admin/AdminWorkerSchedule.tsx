@@ -902,7 +902,7 @@ const AdminWorkerSchedule = () => {
           /* Card View - Original format */
           <div className="space-y-6">
             {filteredSchedules.map((schedule) => (
-              <div key={schedule.worker._id} className="card-elevated p-6">
+              <div key={schedule.worker._id} className="card-elevated p-4 sm:p-5 md:p-6">
                 {/* Worker Header */}
                 <div className="flex items-center justify-between mb-4 pb-4 border-b border-border flex-wrap gap-4">
                   <div className="flex items-center gap-3">
