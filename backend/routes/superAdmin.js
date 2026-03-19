@@ -219,8 +219,8 @@ router.post(
   ]),
   [
     body('name').notEmpty().withMessage('Name is required'),
-    body('email').isEmail().withMessage('Valid email is required'),
-    body('phone').notEmpty().withMessage('Phone is required'),
+    body('email').optional().isEmail().withMessage('Valid email format is invalid'),
+    body('phone').optional().notEmpty().withMessage('Phone cannot be empty'),
     body('specialization').custom((value) => {
       if (Array.isArray(value)) return true;
       if (typeof value === 'string') {
@@ -234,6 +234,12 @@ router.post(
         try { const p = JSON.parse(value); return Array.isArray(p); } catch { return false; }
       }
       return false;
+    }),
+    body().custom((value) => {
+      if (!value.email && !value.phone) {
+        throw new Error('Either email or phone is required');
+      }
+      return true;
     })
   ],
   async (req, res) => {

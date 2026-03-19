@@ -611,8 +611,8 @@ router.post('/workers',
   ]),
   [
     body('name').notEmpty().withMessage('Name is required'),
-    body('email').isEmail().withMessage('Valid email is required'),
-    body('phone').notEmpty().withMessage('Phone is required'),
+    body('email').optional().isEmail().withMessage('Valid email format is invalid'),
+    body('phone').optional().notEmpty().withMessage('Phone cannot be empty'),
     body('gender').optional().isIn(['male', 'female', 'other', 'prefer_not_to_say']).withMessage('Invalid gender'),
     body('religion').optional().isString(),
     body('experience').optional().isNumeric().withMessage('Experience must be a number'),
@@ -629,7 +629,13 @@ router.post('/workers',
         try { const p = JSON.parse(value); return Array.isArray(p); } catch { return false; }
       }
       return false;
-    }).withMessage('Assigned apartments must be an array')
+    }).withMessage('Assigned apartments must be an array'),
+    body().custom((value) => {
+      if (!value.email && !value.phone) {
+        throw new Error('Either email or phone is required');
+      }
+      return true;
+    })
   ],
   async (req, res) => {
     try {
