@@ -339,7 +339,7 @@ export default function DeepCleaningPage() {
             <motion.div
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               transition={{ type: "spring", stiffness: 300, damping: 32 }}
-              className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl p-6 max-h-[88vh] overflow-y-auto shadow-2xl"
+              className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl p-3 sm:p-4 md:p-5 lg:p-6 max-h-[88vh] overflow-y-auto shadow-2xl"
             >
               {success ? (
                 <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
@@ -388,7 +388,7 @@ export default function DeepCleaningPage() {
                     <label className="text-sm font-semibold text-foreground flex items-center gap-1.5 mb-2">
                       <Clock className="w-4 h-4 text-primary" /> Select Start Time
                     </label>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                       {TIME_SLOTS.map(slot => (
                         <motion.button key={slot} whileTap={{ scale: 0.92 }}
                           onClick={() => setBookingTime(slot)}

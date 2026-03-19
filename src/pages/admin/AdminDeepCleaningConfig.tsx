@@ -315,7 +315,7 @@ export default function AdminDeepCleaningConfig() {
                             exit={{ height: 0, opacity: 0 }}
                             className="border-t border-border bg-muted/40 p-3 overflow-hidden"
                           >
-                            <div className="grid grid-cols-3 gap-2 mb-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-3">
                               <div>
                                 <label className="label-clean">Emoji</label>
                                 <input value={editCatForm.emoji}
@@ -329,7 +329,7 @@ export default function AdminDeepCleaningConfig() {
                                   className="input-clean text-sm" placeholder="Display name" />
                               </div>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex flex-col sm:flex-row gap-2">
                               <motion.button whileTap={{ scale: 0.95 }} onClick={saveCategoryEdit}
                                 disabled={saving}
                                 className="flex items-center gap-1 text-xs font-semibold bg-primary text-primary-foreground px-3 py-1.5 rounded-xl disabled:opacity-50">
@@ -362,7 +362,7 @@ export default function AdminDeepCleaningConfig() {
                           <X className="w-4 h-4 text-muted-foreground" />
                         </button>
                       </div>
-                      <div className="grid grid-cols-3 gap-2 mb-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-3">
                         <div>
                           <label className="label-clean">Emoji</label>
                           <input value={addCatForm.emoji}
@@ -432,7 +432,7 @@ export default function AdminDeepCleaningConfig() {
                 <div className="flex items-center gap-3 p-4">
                   <span className="text-2xl">{item.icon}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-foreground text-sm leading-tight truncate">{item.name}</p>
+                    <p className="text-sm font-medium text-foreground line-clamp-2 break-words">{s.name}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {item.pricingType === "tiered"
                         ? item.tiers?.map(t => `${t.label}: ₹${t.price}`).join(" · ")
@@ -478,7 +478,7 @@ export default function AdminDeepCleaningConfig() {
                       className="border-t border-border bg-muted/40 p-4 overflow-hidden"
                     >
                       <ItemEditForm form={editForm} onChange={setEditForm} categoryOptions={categories} />
-                      <div className="flex gap-2 mt-4">
+                      <div className="flex flex-col sm:flex-row gap-2 mt-4">
                         <motion.button whileTap={{ scale: 0.95 }} onClick={saveEdit}
                           disabled={saving}
                           className="flex items-center gap-1.5 text-sm font-semibold bg-primary text-primary-foreground px-4 py-2 rounded-xl disabled:opacity-50">
@@ -522,7 +522,7 @@ export default function AdminDeepCleaningConfig() {
                 </button>
               </div>
               <ItemEditForm form={addForm} onChange={setAddForm} categoryOptions={categories} />
-              <div className="flex gap-2 mt-4">
+              <div className="flex flex-col sm:flex-row gap-2 mt-4">
                 <motion.button whileTap={{ scale: 0.95 }} onClick={addItem}
                   disabled={saving || !addForm.name.trim()}
                   className="flex items-center gap-1.5 text-sm font-semibold bg-primary text-primary-foreground px-4 py-2 rounded-xl disabled:opacity-50">
@@ -560,7 +560,7 @@ function ItemEditForm({
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="label-clean">Name *</label>
           <input value={form.name} onChange={e => set("name", e.target.value)} className="input-clean text-sm" placeholder="Service name" />
@@ -574,7 +574,7 @@ function ItemEditForm({
         <label className="label-clean">Description</label>
         <input value={form.description} onChange={e => set("description", e.target.value)} className="input-clean text-sm" placeholder="What's included..." />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="label-clean">Category</label>
           <select value={form.category} onChange={e => set("category", e.target.value)} className="input-clean text-sm">
@@ -591,7 +591,7 @@ function ItemEditForm({
 
       {/* Price field (for non-tiered) */}
       {form.pricingType !== "tiered" && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="label-clean">
               {form.pricingType === "per_sqft" ? "Price per sq ft (₹)" : "Price (₹)"}

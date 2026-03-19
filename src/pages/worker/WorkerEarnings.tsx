@@ -147,7 +147,7 @@ const TopServicesCard = ({ earnings }: { earnings: Earning[] }) => {
         {sorted.map(s => (
           <div key={s.name}>
             <div className="flex justify-between text-xs mb-1">
-              <span className="text-foreground font-medium truncate max-w-[60%]">{s.name}</span>
+              <span className="text-foreground font-medium line-clamp-2 break-words md:max-w-[60%]">{s.name}</span>
               <span className="text-muted-foreground">{s.count} job{s.count > 1 ? 's' : ''} · ₹{Math.round(s.total).toLocaleString('en-IN')}</span>
             </div>
             <div className="h-1.5 bg-muted rounded-full overflow-hidden">
@@ -364,7 +364,7 @@ const WorkerEarnings = () => {
           <p className="text-primary-foreground/70 text-sm mb-1">{t('worker.earnings.totalEarnings')}</p>
           <p className="text-4xl font-bold font-heading text-primary-foreground mb-1">{displayStats[period].earned}</p>
           <p className="text-primary-foreground/80 text-sm mb-4">{displayStats[period].avgRate} {t('worker.earnings.average')}</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="bg-primary-foreground/10 rounded-xl p-3 backdrop-blur-sm">
               <div className="flex items-center gap-2 text-primary-foreground/60 text-xs mb-1">
                 <Clock className="w-3.5 h-3.5" /> {t('worker.earnings.hoursWorked')}
@@ -412,8 +412,8 @@ const WorkerEarnings = () => {
                   <div key={earning._id} className="card-elevated p-4">
                     <div className="flex items-start gap-4 mb-3">
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-foreground truncate">{earning.service?.name || 'Service'}</p>
-                        <p className="text-sm text-muted-foreground truncate">{earning.customer?.name || 'Customer'}</p>
+                        <p className="font-semibold text-foreground line-clamp-2 break-words">{earning.service?.name || 'Service'}</p>
+                        <p className="text-sm text-muted-foreground line-clamp-2 break-words">{earning.customer?.name || 'Customer'}</p>
                         <div className="flex items-center gap-3 mt-1">
                           <p className="text-xs text-muted-foreground">
                             {formatDate(earning.completedAt)} • {formatTime(earning.startTime)}

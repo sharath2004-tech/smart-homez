@@ -153,7 +153,7 @@ const WorkerTasks = () => {
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-3 mb-2">
             <div className="flex-1 min-w-0">
-              <h3 className="font-bold text-foreground truncate">{task.service?.name ?? '✨ Deep Cleaning'}</h3>
+              <h3 className="font-bold text-foreground line-clamp-2 break-words">{task.service?.name ?? '✨ Deep Cleaning'}</h3>
               <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-1">
                 <User className="w-3.5 h-3.5" />
                 {task.customer.name}
@@ -172,7 +172,7 @@ const WorkerTasks = () => {
           <div className="space-y-1.5 mb-3">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <MapPin className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">
+              <span className="line-clamp-2 break-words">
                 {task.location ? [task.location.address, task.location.city, task.location.state].filter(Boolean).join(', ') : t('worker.dashboard.location')}
               </span>
             </div>

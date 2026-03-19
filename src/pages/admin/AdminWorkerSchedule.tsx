@@ -831,13 +831,13 @@ const AdminWorkerSchedule = () => {
                         <td className="px-4 py-3">
                           <div className="flex flex-col">
                             <span className="text-sm text-foreground">{booking.customer.name}</span>
-                            <span className="text-xs text-muted-foreground">{booking.customer.phone}</span>
+                            <span className="text-xs text-muted-foreground break-all">{booking.customer.phone}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex flex-col max-w-[200px]">
-                            <span className="text-sm text-foreground truncate">{booking.location.apartmentName}</span>
-                            <span className="text-xs text-muted-foreground truncate">{booking.location.area}, {booking.location.city}</span>
+                          <div className="flex flex-col max-w-[150px] sm:max-w-[200px]">
+                            <span className="text-sm text-foreground line-clamp-2 break-words">{booking.location.apartmentName}</span>
+                            <span className="text-xs text-muted-foreground line-clamp-2 break-words">{booking.location.area}, {booking.location.city}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3">
@@ -902,7 +902,7 @@ const AdminWorkerSchedule = () => {
           /* Card View - Original format */
           <div className="space-y-6">
             {filteredSchedules.map((schedule) => (
-              <div key={schedule.worker._id} className="card-elevated p-6">
+              <div key={schedule.worker._id} className="card-elevated p-4 sm:p-5 md:p-6">
                 {/* Worker Header */}
                 <div className="flex items-center justify-between mb-4 pb-4 border-b border-border flex-wrap gap-4">
                   <div className="flex items-center gap-3">
@@ -911,7 +911,7 @@ const AdminWorkerSchedule = () => {
                     </div>
                     <div>
                       <h3 className="font-bold text-foreground text-lg">{schedule.worker.name}</h3>
-                      <p className="text-sm text-muted-foreground capitalize">
+                      <p className="text-sm text-muted-foreground capitalize break-all">
                         {schedule.worker.specialization} • {schedule.worker.phone} • ⭐ {schedule.worker.rating.toFixed(1)}
                       </p>
                     </div>
@@ -946,7 +946,7 @@ const AdminWorkerSchedule = () => {
                       className="border-2 border-border rounded-lg p-4 hover:border-primary/30 transition-colors"
                     >
                       <div className="flex items-start justify-between gap-4 flex-wrap">
-                        <div className="flex-1 min-w-[250px]">
+                        <div className="flex-1 min-w-0 sm:min-w-[250px]">
                           <div className="flex items-center gap-2 mb-2 flex-wrap">
                             <span className="font-semibold text-foreground">{booking.service.name}</span>
                             {booking.isSubscription && (
@@ -984,7 +984,7 @@ const AdminWorkerSchedule = () => {
                             
                             <div className="flex items-center gap-2 text-muted-foreground">
                               <MapPin className="w-4 h-4" />
-                              <span className="truncate">{booking.location.area}, {booking.location.city}</span>
+                              <span className="line-clamp-1 break-words">{booking.location.area}, {booking.location.city}</span>
                             </div>
                           </div>
 

@@ -433,7 +433,7 @@ const SuperAdminDashboard = () => {
                   setSelectedLocationId(e.target.value);
                   setActiveTab("overview");
                 }}
-                className="pl-9 pr-4 py-2 rounded-xl border border-border bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary min-w-[220px]"
+                className="pl-9 pr-4 py-2 rounded-xl border border-border bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary w-full sm:min-w-[220px]"
               >
                 <option value="all">All Locations</option>
                 {overview.map((loc) => (
@@ -800,7 +800,7 @@ const SuperAdminDashboard = () => {
                       </div>
 
                       {/* Stats row */}
-                      <div className="grid grid-cols-3 gap-2 bg-muted/50 rounded-xl p-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-muted/50 rounded-xl p-3">
                         <div className="text-center">
                           <p className="text-lg font-bold font-heading text-foreground">{loc.stats?.workerCount ?? 0}</p>
                           <p className="text-xs text-muted-foreground">Workers</p>
@@ -942,10 +942,10 @@ const SuperAdminDashboard = () => {
                       </div>
                       <div className="card-elevated p-4">
                         <p className="text-xs text-muted-foreground mb-1">Assigned Admin</p>
-                        <p className="text-lg font-bold font-heading text-foreground truncate">
+                        <p className="text-lg font-bold font-heading text-foreground line-clamp-2 break-words">
                           {selectedLocation.assignedAdmin?.name || "—"}
                         </p>
-                        <p className="text-xs text-muted-foreground mt-1 truncate">{selectedLocation.assignedAdmin?.email || "Not assigned"}</p>
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-1 break-words" title={selectedLocation.assignedAdmin?.email || "Not assigned"}>{selectedLocation.assignedAdmin?.email || "Not assigned"}</p>
                       </div>
                       <div className="card-elevated p-4">
                         <p className="text-xs text-muted-foreground mb-1">Service Status</p>
@@ -958,7 +958,7 @@ const SuperAdminDashboard = () => {
                       </div>
                     </div>
 
-                    <div className="flex gap-3">
+                    <div className="flex flex-col sm:flex-row gap-3">
                       <button onClick={() => setActiveTab("workers")} className="btn-brand flex items-center gap-2 text-sm py-2.5 px-5">
                         <Users className="w-4 h-4" /> View Workers
                       </button>

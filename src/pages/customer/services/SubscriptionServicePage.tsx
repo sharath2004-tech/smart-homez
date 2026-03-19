@@ -344,7 +344,7 @@ const SubscriptionServicePage = () => {
                       ⚠️ No pricing tiers configured for this service. Please contact support.
                     </p>
                   ) : (
-                    <div className="grid grid-cols-4 gap-2">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                       {availableHours.map((h) => {
                         const tierOpt = selectedService.durationOptions?.find(d => d.hours === h);
                         const tierPrice = tierOpt?.price;
@@ -383,7 +383,7 @@ const SubscriptionServicePage = () => {
                     <Calendar className="w-4 h-4 text-blue-500" /> Frequency
                   </h2>
                   <p className="text-xs text-muted-foreground mb-3">How often should the maid visit?</p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {FREQUENCY_OPTIONS.map((opt) => (
                       <button
                         key={opt.id}
@@ -427,7 +427,7 @@ const SubscriptionServicePage = () => {
                       You save ₹{monthlySavings.toLocaleString("en-IN")}/mo ({savingsPct}% off vs. one-time)
                     </p>
                   )}
-                  <div className="grid grid-cols-3 gap-2 pt-1 border-t border-blue-200">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-blue-200">
                     <div className="text-center">
                       <p className="text-xs text-blue-600">Per Visit</p>
                       <p className="text-sm font-bold text-blue-800">₹{perVisitPrice}</p>
@@ -467,7 +467,7 @@ const SubscriptionServicePage = () => {
         {step === 2 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Start Date</label>
                 <input
@@ -514,7 +514,7 @@ const SubscriptionServicePage = () => {
                   <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-200 space-y-4">
                     <div>
                       <p className="text-xs font-bold text-indigo-800 mb-2">🌅 Session 1 — Morning</p>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div>
                           <label className="text-xs text-muted-foreground mb-1 block">Start Time</label>
                           <select value={preferredTime} onChange={(e) => setPreferredTime(e.target.value)} className="w-full rounded-xl border border-input bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">

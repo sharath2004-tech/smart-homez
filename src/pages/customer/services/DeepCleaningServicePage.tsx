@@ -207,7 +207,7 @@ const DeepCleaningServicePage = () => {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="grid grid-cols-3 gap-2"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2"
         >
           {[
             { icon: "👥", label: "2-member team" },
@@ -261,7 +261,7 @@ const DeepCleaningServicePage = () => {
               <p className="text-xs text-muted-foreground mb-3">
                 Includes all rooms, kitchen & bathrooms in the package
               </p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {PACKAGES.map((pkg) => (
                   <button
                     key={pkg.id}
@@ -321,7 +321,7 @@ const DeepCleaningServicePage = () => {
               <p className="text-xs text-muted-foreground mb-3">
                 Add specific areas or appliances for extra-deep cleaning
               </p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {ADD_ON_AREAS.map((ao) => (
                   <button
                     key={ao.id}
@@ -349,7 +349,7 @@ const DeepCleaningServicePage = () => {
             </div>
 
             {/* Date & Time */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Date</label>
                 <input

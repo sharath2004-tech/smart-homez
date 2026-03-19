@@ -321,7 +321,7 @@ const InstaServicePage = () => {
               <h2 className="font-semibold font-heading text-foreground mb-3">
                 How do you want to book?
               </h2>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   onClick={() => {
                     setBookingMode("now");
@@ -361,7 +361,7 @@ const InstaServicePage = () => {
                 What should the maid do?
               </h2>
               <p className="text-xs text-muted-foreground mb-3">Select all that apply</p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {taskOptions.map((task) => (
                   <button
                     key={task.id}
@@ -478,7 +478,7 @@ const InstaServicePage = () => {
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     {availableSlots.map((t) => {
                       const busy = busyWorkersBySlot[t] ?? 0;
                       const free = totalWorkers > 0 ? totalWorkers - busy : null;

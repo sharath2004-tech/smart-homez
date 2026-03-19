@@ -851,18 +851,18 @@ const AdminLocations = () => {
                         <Building className="w-5 h-5" />
                       </div>
                       <div className="flex-1 min-w-0 overflow-hidden">
-                        <h3 className="font-bold text-foreground truncate">{location.apartmentName}</h3>
+                        <h3 className="font-bold text-foreground line-clamp-2 break-words">{location.apartmentName}</h3>
                         {location.building && (
-                          <p className="text-xs text-muted-foreground truncate">{location.building}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-2 break-words">{location.building}</p>
                         )}
                         <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
                           <MapPin className="w-3 h-3 shrink-0" />
-                          <span className="truncate">{location.area}, {location.city}</span>
+                          <span className="line-clamp-2 break-words">{location.area}, {location.city}</span>
                         </p>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 p-3 bg-muted rounded-xl mb-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-muted rounded-xl mb-3">
                       <div>
                         <p className="text-xs text-muted-foreground">Workers</p>
                         <p className="text-sm font-bold text-foreground">{location.assignedWorkers?.length || 0}</p>
@@ -876,7 +876,7 @@ const AdminLocations = () => {
                     {location.assignedAdmin && (
                       <div className="text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg flex items-center gap-2 mb-3">
                         <Shield className="w-3 h-3 shrink-0" />
-                        <span className="truncate"><strong>Admin:</strong> {location.assignedAdmin.name}</span>
+                        <span className="line-clamp-2 break-words"><strong>Admin:</strong> {location.assignedAdmin.name}</span>
                       </div>
                     )}
 
@@ -948,15 +948,15 @@ const AdminLocations = () => {
                       </div>
                       <div className="flex-1 min-w-0 overflow-hidden">
                         <div className="flex items-center gap-2">
-                          <p className="font-bold text-foreground truncate">{admin.name}</p>
+                          <p className="font-bold text-foreground line-clamp-2 break-words">{admin.name}</p>
                           <span className="badge-primary text-xs shrink-0">Admin</span>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{admin.email}</p>
-                        {admin.phone && <p className="text-xs text-muted-foreground truncate">{admin.phone}</p>}
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1 break-words" title={admin.email}>{admin.email}</p>
+                        {admin.phone && <p className="text-xs text-muted-foreground line-clamp-1 break-words" title={admin.phone}>{admin.phone}</p>}
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 p-3 bg-muted rounded-xl mb-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-muted rounded-xl mb-4">
                       <div>
                         <p className="text-xs text-muted-foreground">Locations</p>
                         <p className="text-sm font-bold text-foreground">{admin.assignedLocations?.length || 0}</p>
@@ -974,7 +974,7 @@ const AdminLocations = () => {
                           {admin.assignedLocations.slice(0, 3).map((loc, idx) => (
                             <div key={idx} className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded flex items-center gap-1">
                               <MapPin className="w-3 h-3 shrink-0" />
-                              <span className="truncate">{loc.locationName} - {loc.area}, {loc.city}</span>
+                              <span className="line-clamp-1 break-words" title={`${loc.locationName} - ${loc.area}, ${loc.city}`}>{loc.locationName} - {loc.area}, {loc.city}</span>
                             </div>
                           ))}
                           {admin.assignedLocations.length > 3 && (
@@ -1033,7 +1033,7 @@ const AdminLocations = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium mb-1">Area</label>
                     <input
@@ -1061,7 +1061,7 @@ const AdminLocations = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium mb-1">State</label>
                     <input
@@ -1151,7 +1151,7 @@ const AdminLocations = () => {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium mb-1">Latitude</label>
                     <input
@@ -1194,11 +1194,11 @@ const AdminLocations = () => {
                   <p className="text-xs text-muted-foreground mt-1">Workers can serve within this distance</p>
                 </div>
 
-                <div className="flex gap-3 pt-4">
-                  <button type="button" onClick={handleCloseLocationForm} className="flex-1 py-2 border border-border rounded-xl">
+                <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                  <button type="button" onClick={handleCloseLocationForm} className="w-full sm:flex-1 py-2 border border-border rounded-xl">
                     Cancel
                   </button>
-                  <button type="submit" className="flex-1 btn-brand py-2">
+                  <button type="submit" className="w-full sm:flex-1 btn-brand py-2">
                     Create Location
                   </button>
                 </div>
@@ -1326,7 +1326,7 @@ const AdminLocations = () => {
                     <FileText className="w-4 h-4 text-primary" />
                     <p className="text-sm font-medium">ID Document Verification</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                     <div className="col-span-2">
                       <label className="block text-xs text-muted-foreground mb-1">Document Type</label>
                       <select
@@ -1347,7 +1347,7 @@ const AdminLocations = () => {
                   {adminForm.idDocumentFile ? (
                     <div className="flex items-center gap-3 p-2 bg-green-50 border border-green-200 rounded-lg">
                       <FileText className="w-4 h-4 text-green-600 shrink-0" />
-                      <span className="text-xs text-green-800 truncate flex-1">{adminForm.idDocumentFile.name}</span>
+                      <span className="text-xs text-green-800 line-clamp-1 break-words flex-1" title={adminForm.idDocumentFile.name}>{adminForm.idDocumentFile.name}</span>
                       <button
                         type="button"
                         onClick={() => setAdminForm({...adminForm, idDocumentFile: null})}
@@ -1508,7 +1508,7 @@ const AdminLocations = () => {
                     <FileText className="w-5 h-5 text-green-600 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-green-800">ID Document on file</p>
-                      <p className="text-xs text-green-600 truncate">{editingAdmin.idDocumentType || 'Document'}</p>
+                      <p className="text-xs text-green-600 line-clamp-1 break-words">{editingAdmin.idDocumentType || 'Document'}</p>
                     </div>
                     <a
                       href={`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${editingAdmin.idDocument}`}
@@ -1537,7 +1537,7 @@ const AdminLocations = () => {
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
               {/* Header */}
-              <div className="sticky top-0 bg-gradient-to-r from-purple-500 to-pink-500 text-white p-6 rounded-t-2xl flex items-center gap-4">
+              <div className="sticky top-0 bg-gradient-to-r from-purple-500 to-pink-500 text-white p-3 sm:p-4 md:p-5 rounded-t-2xl flex items-center gap-4">
                 <button
                   onClick={() => setShowQRModal(false)}
                   className="p-2 hover:bg-white/10 rounded-lg transition-colors"
@@ -1862,4 +1862,6 @@ const AdminLocations = () => {
       </div>
     </AppLayout>
   );
-}
+};
+
+export default AdminLocations;

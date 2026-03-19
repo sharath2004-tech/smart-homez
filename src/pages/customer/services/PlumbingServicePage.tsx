@@ -223,7 +223,7 @@ const PlumbingServicePage = () => {
 
         <form onSubmit={handleBooking} className="space-y-6">
           {/* Schedule Section */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
             <h2 className="text-xl font-bold mb-4">Schedule Service</h2>
             <div className="grid md:grid-cols-2 gap-4">
               <div>
@@ -251,7 +251,7 @@ const PlumbingServicePage = () => {
           </div>
 
           {/* Issue Type */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
             <h2 className="text-xl font-bold mb-4">Issue Type</h2>
             <div className="grid md:grid-cols-2 gap-3">
               {[
@@ -279,7 +279,7 @@ const PlumbingServicePage = () => {
           </div>
 
           {/* Location Selection */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
             <h2 className="text-xl font-bold mb-4">Problem Location(s)</h2>
             <div className="grid md:grid-cols-3 gap-3">
               {locationOptions.map((loc) => (
@@ -301,7 +301,7 @@ const PlumbingServicePage = () => {
           </div>
 
           {/* Urgency & Details */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
             <h2 className="text-xl font-bold mb-4">Additional Details</h2>
             <div className="space-y-4">
               <div>
@@ -372,7 +372,7 @@ const PlumbingServicePage = () => {
           </div>
 
           {/* Summary */}
-          <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl border-2 border-primary/20 p-6">
+          <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl border-2 border-primary/20 p-4 sm:p-5 md:p-6">
             <h2 className="text-xl font-bold mb-4">Booking Summary</h2>
             <div className="space-y-2 mb-4">
               <div className="flex justify-between">

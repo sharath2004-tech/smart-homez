@@ -292,7 +292,7 @@ const ProfilePage = () => {
     <AppLayout userType="customer" userName={profile.name}>
       <div className="max-w-2xl mx-auto space-y-6 animate-fade-in pb-20 md:pb-0">
         {/* Profile header */}
-        <div className="card-elevated p-6 text-center relative">
+        <div className="card-elevated p-4 sm:p-5 md:p-6 text-center relative">
           <button onClick={() => setShowAccountModal(true)} className="absolute top-4 right-4 p-2 bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors" title="Edit profile">
             <Edit2 className="w-4 h-4" />
           </button>
@@ -385,7 +385,7 @@ const ProfilePage = () => {
                 </button>
               </div>
               
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <select
                   className="input-clean text-sm col-span-2"
                   value={newAddress.label}

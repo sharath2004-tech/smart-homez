@@ -265,7 +265,7 @@ const ACServicingPage = () => {
 
         <form onSubmit={handleBooking} className="space-y-6">
           {/* Schedule Section */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
             <h2 className="text-xl font-bold mb-4">Schedule Service</h2>
             <div className="grid md:grid-cols-2 gap-4">
               <div>
@@ -293,7 +293,7 @@ const ACServicingPage = () => {
           </div>
 
           {/* Service Type */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
             <h2 className="text-xl font-bold mb-4">Service Type</h2>
             <div className="grid md:grid-cols-2 gap-3">
               {[
@@ -320,7 +320,7 @@ const ACServicingPage = () => {
           </div>
 
           {/* AC Units */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">AC Unit Details</h2>
               <Button type="button" onClick={addACUnit} variant="outline" size="sm">
@@ -393,7 +393,7 @@ const ACServicingPage = () => {
           </div>
 
           {/* Additional Details */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
             <h2 className="text-xl font-bold mb-4">Additional Information</h2>
             <div className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
@@ -447,7 +447,7 @@ const ACServicingPage = () => {
           </div>
 
           {/* Summary */}
-          <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl border-2 border-primary/20 p-6">
+          <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl border-2 border-primary/20 p-4 sm:p-5 md:p-6">
             <h2 className="text-xl font-bold mb-4">Booking Summary</h2>
             <div className="space-y-2 mb-4">
               <div className="flex justify-between">

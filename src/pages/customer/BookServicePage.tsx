@@ -669,7 +669,7 @@ const BookServicePage = () => {
         </div>
 
         {/* Service Details Card */}
-        <div className="card-elevated p-6">
+        <div className="card-elevated p-4 sm:p-5 md:p-6">
           <h2 className="text-xl font-bold text-foreground mb-2">{service.name}</h2>
           <p className="text-sm text-muted-foreground mb-4">{service.description}</p>
           
@@ -698,7 +698,7 @@ const BookServicePage = () => {
         {/* Booking Form */}
         <form onSubmit={handleBooking} className="space-y-6">
           {/* ── Step 1: Hours per Session (must pick first — price drives everything) */}
-          <div className="card-elevated p-6">
+          <div className="card-elevated p-4 sm:p-5 md:p-6">
             <h3 className="font-bold text-foreground mb-1 flex items-center gap-2">
               <Clock className="w-5 h-5 text-primary" />
               How many hours?
@@ -711,7 +711,7 @@ const BookServicePage = () => {
                 </p>
               );
             })()}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
               {[
                 { value: 1,   label: '1 hr' },
                 { value: 1.5, label: '1.5 hr' },
@@ -751,13 +751,13 @@ const BookServicePage = () => {
           </div>
 
           {/* Booking Mode: Book Now vs Schedule */}
-          <div className="card-elevated p-6">
+          <div className="card-elevated p-4 sm:p-5 md:p-6">
             <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
               <Zap className="w-5 h-5 text-primary" />
               When do you need it?
             </h3>
             
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => setBookingMode('now')}
@@ -794,7 +794,7 @@ const BookServicePage = () => {
 
           {/* Time Slot Selection (for Schedule mode) */}
           {bookingMode === 'schedule' && (
-            <div className="card-elevated p-6">
+            <div className="card-elevated p-4 sm:p-5 md:p-6">
               <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
                 <Clock className="w-5 h-5 text-primary" />
                 Select Date & Time Slot
@@ -854,7 +854,7 @@ const BookServicePage = () => {
                   </div>
 
                   {/* 15-min slot grid */}
-                  <div className="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
                     {!selectedDate ? (
                       <p className="col-span-4 text-sm text-muted-foreground py-4 text-center">Select a date first to see available slots</p>
                     ) : loadingSlots ? (
@@ -911,7 +911,7 @@ const BookServicePage = () => {
             </div>
           )}
 
-          <div className="card-elevated p-6">
+          <div className="card-elevated p-4 sm:p-5 md:p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-foreground flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-primary" />
@@ -922,7 +922,7 @@ const BookServicePage = () => {
               )}
             </div>
             
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {subscriptionPlans.map((plan) => (
                 <button
                   key={plan.id}
@@ -996,7 +996,7 @@ const BookServicePage = () => {
 
           {/* Subscription Schedule Details */}
           {bookingType !== 'oneTime' && (
-            <div className="card-elevated p-6">
+            <div className="card-elevated p-4 sm:p-5 md:p-6">
               <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-primary" />
                 Subscription Schedule
@@ -1189,10 +1189,10 @@ const BookServicePage = () => {
 
           {/* Available Workers Section (Pronto-style) */}
           {workers.length > 0 && (
-            <div className="card-elevated p-6">
+            <div className="card-elevated p-4 sm:p-5 md:p-6">
               <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
                 <Users className="w-5 h-5 text-primary" />
-                Available Workers {workers.filter(w => w.workerProfile.availability).length > 0 && 
+                Available Workers {workers.filter(w => w.workerProfile.availability).length > 0 &&
                   <span className="text-sm font-normal text-muted-foreground">
                     ({workers.filter(w => w.workerProfile.availability).length} nearby)
                   </span>
@@ -1291,7 +1291,7 @@ const BookServicePage = () => {
           )}
 
           {/* Worker Preferences */}
-          <div className="card-elevated p-6">
+          <div className="card-elevated p-4 sm:p-5 md:p-6">
             <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
               <User className="w-5 h-5 text-primary" />
               Additional Preferences
@@ -1388,7 +1388,7 @@ const BookServicePage = () => {
           )}
 
           {/* Summary */}
-          <div className="card-elevated p-6 bg-accent border-2 border-primary/20">
+          <div className="card-elevated p-4 sm:p-5 md:p-6 bg-accent border-2 border-primary/20">
             <h3 className="font-bold text-foreground mb-4">Booking Summary</h3>
             
             <div className="space-y-2 text-sm">

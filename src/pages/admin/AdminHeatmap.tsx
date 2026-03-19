@@ -70,7 +70,7 @@ const AdminHeatmap = () => {
         </div>
 
         {/* Summary cards */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="card-elevated p-4 text-center">
             <Users className="w-6 h-6 text-primary mx-auto mb-1" />
             <p className="text-2xl font-bold text-foreground">{totalWorkers}</p>
@@ -118,7 +118,7 @@ const AdminHeatmap = () => {
                     <div className="flex items-center gap-2 min-w-0">
                       <Icon className={`w-5 h-5 shrink-0 ${meta.iconColor}`} />
                       <div className="min-w-0">
-                        <p className="font-semibold text-foreground truncate">{s.area}</p>
+                        <p className="font-semibold text-foreground line-clamp-2 break-words">{s.area}</p>
                         <p className="text-xs text-muted-foreground">{s.city} · {ratio}</p>
                       </div>
                     </div>

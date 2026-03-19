@@ -391,7 +391,7 @@ const AdminWorkers = () => {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="bg-success-light rounded-xl p-4">
             <p className="text-2xl font-bold font-heading text-success">{onlineCount}</p>
             <p className="text-xs text-muted-foreground mt-0.5">Available</p>
@@ -448,7 +448,7 @@ const AdminWorkers = () => {
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-3 gap-2 p-3 bg-muted rounded-xl mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-3 bg-muted rounded-xl mb-4">
                     <div className="text-center">
                       <p className="text-sm font-bold text-foreground flex items-center justify-center gap-1">
                         <Star className="w-3 h-3 fill-warning text-warning" />
@@ -587,7 +587,7 @@ const AdminWorkers = () => {
                 {/* Credential delivery method — affects which fields are required */}
                 <div>
                   <label className="block text-sm font-medium mb-2">Send temporary password via</label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {(["email", "phone", "both"] as const).map((opt) => (
                       <button
                         key={opt}
@@ -700,7 +700,7 @@ const AdminWorkers = () => {
                 {/* Wage Type */}
                 <div>
                   <label className="block text-sm font-medium mb-2">Wage Type <span className="text-destructive">*</span></label>
-                  <div className="grid grid-cols-3 gap-2 mb-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
                     {(["hourly", "daily", "monthly"] as const).map((opt) => (
                       <button
                         key={opt}
@@ -888,18 +888,18 @@ const AdminWorkers = () => {
                   </div>
                 </div>
 
-                <div className="flex gap-3 pt-4">
+                <div className="flex flex-col sm:flex-row gap-3 pt-4">
                   <button 
                     type="button" 
                     onClick={() => setShowWorkerForm(false)} 
-                    className="flex-1 py-2 border border-border rounded-xl"
+                    className="w-full sm:flex-1 py-2 border border-border rounded-xl"
                     disabled={creatingWorker}
                   >
                     Cancel
                   </button>
                   <button 
                     type="submit" 
-                    className="flex-1 btn-brand py-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full sm:flex-1 btn-brand py-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     disabled={creatingWorker}
                   >
                     {creatingWorker && <Loader2 className="w-4 h-4 animate-spin" />}

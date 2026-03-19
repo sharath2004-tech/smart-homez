@@ -160,7 +160,7 @@ const AdminHelpMessages = () => {
         </div>
 
         {/* Counts */}
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
           {(['', 'new', 'read', 'resolved'] as const).map((s) => {
             const count = s === '' ? counts.total : counts[s];
             const label = s === '' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1);
@@ -217,7 +217,7 @@ const AdminHelpMessages = () => {
                           {meta.label}
                         </Badge>
                       </div>
-                      <p className="text-sm text-foreground font-medium truncate">{msg.subject}</p>
+                      <p className="text-sm text-foreground font-medium line-clamp-2 break-words">{msg.subject}</p>
                       <p className="text-xs text-muted-foreground">{fmtDate(msg.createdAt)}</p>
                     </div>
                     {isOpen ? (

@@ -75,7 +75,7 @@ export default function SubscriptionsPage() {
                   </div>
 
                   {/* Details Grid */}
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <IndianRupee className="w-4 h-4" />
                       <span className="font-semibold text-foreground">₹{sub.totalAmount}</span>

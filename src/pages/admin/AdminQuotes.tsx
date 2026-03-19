@@ -146,10 +146,10 @@ const AdminQuotes = () => {
                             {q.status.charAt(0).toUpperCase() + q.status.slice(1)}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1 mt-1 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1 mt-1 text-sm text-muted-foreground flex-wrap">
                           <Phone className="w-3.5 h-3.5" />
-                          <span>{q.phone}</span>
-                          {q.email && <span className="ml-2">· {q.email}</span>}
+                          <span className="break-all">{q.phone}</span>
+                          {q.email && <span className="ml-2 break-all">· {q.email}</span>}
                         </div>
                       </div>
                     </div>

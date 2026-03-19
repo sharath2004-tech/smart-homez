@@ -300,7 +300,7 @@ const MySubscriptionsPage = () => {
         ) : (
           <div className="space-y-6">
             {subscriptions.map((subscription) => (
-              <div key={subscription._id} className="card-elevated p-6">
+              <div key={subscription._id} className="card-elevated p-4 sm:p-5 md:p-6">
                 {/* Subscription Header */}
                 <div className="flex items-start justify-between mb-4 pb-4 border-b border-border">
                   <div>
@@ -356,7 +356,7 @@ const MySubscriptionsPage = () => {
                     <div className="flex items-center gap-2 text-sm">
                       <MapPin className="w-4 h-4 text-muted-foreground" />
                       <span className="text-muted-foreground">Location:</span>
-                      <span className="font-medium text-foreground truncate">
+                      <span className="font-medium text-foreground line-clamp-2 break-words">
                         {subscription.location.area}, {subscription.location.city}
                       </span>
                     </div>
@@ -384,7 +384,7 @@ const MySubscriptionsPage = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-foreground">{subscription.worker.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">
+                        <p className="text-xs text-muted-foreground line-clamp-2 break-words">
                           {subscription.worker.workerProfile.specialization} • ⭐ {subscription.worker.workerProfile.rating.toFixed(1)}
                         </p>
                       </div>

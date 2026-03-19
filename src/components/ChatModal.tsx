@@ -96,7 +96,7 @@ export default function ChatModal({ bookingId, currentUserId, currentUserRole, o
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <MessageCircle className="w-5 h-5 shrink-0" />
             <div className="min-w-0">
-              <p className="font-bold truncate">{otherPartyName}</p>
+              <p className="font-bold line-clamp-2 break-words">{otherPartyName}</p>
               <p className="text-xs opacity-75 capitalize">
                 {currentUserRole === 'customer' ? 'Your assigned worker' : 'Your customer'}
               </p>
