@@ -1,9 +1,9 @@
 import AppLayout from "@/components/AppLayout";
-import { adminAPI, authAPI, locationsAPI } from "@/lib/api";
+import { adminAPI, authAPI, locationsAPI, locationRequestsAPI } from "@/lib/api";
 import { cropQRFromImage } from "@/utils/cropQRFromImage";
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Building, FileText, MapPin, Pencil, Plus, QrCode, Search, Shield, Trash2, Upload, UserPlus, X } from "lucide-react";
+import { Building, CheckCircle, Clock, FileText, MapPin, Pencil, Plus, QrCode, Search, Shield, Trash2, Upload, UserPlus, X, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface Location {
@@ -55,6 +55,29 @@ interface UserProfile {
   name: string;
 }
 
+interface LocationRequest {
+  _id: string;
+  apartmentName: string;
+  building?: string;
+  area: string;
+  city: string;
+  state: string;
+  zipCode?: string;
+  reason?: string;
+  status: "pending" | "approved" | "rejected";
+  requestedBy: {
+    _id: string;
+    name: string;
+  };
+  reviewedBy?: {
+    _id: string;
+    name: string;
+  };
+  reviewNote?: string;
+  reviewedAt?: string;
+  createdAt: string;
+}
+
 // Indian cities for selection
 const indianCities = [
   "Mumbai", "Delhi", "Bengaluru", "Hyderabad", "Chennai",
@@ -84,7 +107,7 @@ const AdminLocations = () => {
   const [showLocationForm, setShowLocationForm] = useState(false);
   const [showAdminForm, setShowAdminForm] = useState(false);
   const [cityFilter, setCityFilter] = useState("");
-  const [activeTab, setActiveTab] = useState<'locations' | 'admins'>('locations');
+  const [activeTab, setActiveTab] = useState<'locations' | 'admins' | 'request' | 'location-requests'>('locations');
   const [geocoding, setGeocoding] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
@@ -140,6 +163,27 @@ const AdminLocations = () => {
     }
   });
   const [updatingAdmin, setUpdatingAdmin] = useState(false);
+
+  // Location Request States
+  const [locationRequests, setLocationRequests] = useState([]);
+  const [requestLoading, setRequestLoading] = useState(false);
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const [requestReviewingId, setRequestReviewingId] = useState<string | null>(null);
+  const [requestReviewNote, setRequestReviewNote] = useState("");
+  const [requestReviewLatitude, setRequestReviewLatitude] = useState("");
+  const [requestReviewLongitude, setRequestReviewLongitude] = useState("");
+  const [requestReviewLoading, setRequestReviewLoading] = useState(false);
+  const [requestFilterStatus, setRequestFilterStatus] = useState("");
+  
+  const [requestForm, setRequestForm] = useState({
+    apartmentName: "",
+    building: "",
+    area: "",
+    city: "",
+    state: "",
+    zipCode: "",
+    reason: "",
+  });
 
   const isSuperAdmin = profile?.role === 'super_admin';
 
@@ -577,6 +621,89 @@ const AdminLocations = () => {
   // Get unique cities from locations
   const uniqueCities = [...new Set(locations.map(loc => loc.city))];
 
+  // Location Request Handlers
+  const fetchLocationRequests = async (status?: string) => {
+    try {
+      setRequestLoading(true);
+      const res = await locationRequestsAPI.getAll(status || undefined);
+      setLocationRequests(res.requests || []);
+    } catch (error) {
+      console.error('Error fetching location requests:', error);
+    } finally {
+      setRequestLoading(false);
+    }
+  };
+
+  const handleSubmitLocationRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRequestSubmitting(true);
+    try {
+      await locationRequestsAPI.create({
+        apartmentName: requestForm.apartmentName,
+        building: requestForm.building || undefined,
+        area: requestForm.area,
+        city: requestForm.city,
+        state: requestForm.state,
+        zipCode: requestForm.zipCode || undefined,
+        reason: requestForm.reason || undefined,
+      });
+      alert('✅ Location request submitted! Super admin will review it and approve or reject.');
+      setActiveTab('locations');
+      setRequestForm({ apartmentName: "", building: "", area: "", city: "", state: "", zipCode: "", reason: "" });
+      fetchLocationRequests();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to submit request';
+      alert(message);
+    } finally {
+      setRequestSubmitting(false);
+    }
+  };
+
+  const handleReviewLocationRequest = async (id: string, status: "approved" | "rejected") => {
+    if (status === "approved") {
+      const lat = parseFloat(requestReviewLatitude);
+      const lng = parseFloat(requestReviewLongitude);
+      if (!requestReviewLatitude || !requestReviewLongitude || isNaN(lat) || isNaN(lng)) {
+        alert('Please provide valid coordinates (latitude and longitude) to approve');
+        return;
+      }
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        alert('Invalid coordinates. Lat: -90 to 90, Lng: -180 to 180');
+        return;
+      }
+      if (lat === 0 && lng === 0) {
+        alert('Placeholder coordinates [0, 0] are not allowed. Please provide actual location coordinates.');
+        return;
+      }
+    }
+
+    setRequestReviewLoading(true);
+    try {
+      const coordinates = status === "approved" ? [parseFloat(requestReviewLongitude), parseFloat(requestReviewLatitude)] as [number, number] : undefined;
+      await locationRequestsAPI.review(id, status, requestReviewNote, coordinates);
+      alert(status === "approved" ? '✅ Location approved and created!' : '❌ Location request rejected.');
+      setRequestReviewingId(null);
+      setRequestReviewNote("");
+      setRequestReviewLatitude("");
+      setRequestReviewLongitude("");
+      fetchLocationRequests();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to review request';
+      alert(message);
+    } finally {
+      setRequestReviewLoading(false);
+    }
+  };
+
+  const getRequestStatusBadge = (status: string) => {
+    switch (status) {
+      case "pending": return <span className="flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full"><Clock className="w-3 h-3" /> Pending</span>;
+      case "approved": return <span className="flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded-full"><CheckCircle className="w-3 h-3" /> Approved</span>;
+      case "rejected": return <span className="flex items-center gap-1 text-xs text-red-700 bg-red-50 px-2 py-0.5 rounded-full"><XCircle className="w-3 h-3" /> Rejected</span>;
+      default: return null;
+    }
+  };
+
   // Filter admins by city
   const filteredAdmins = cityFilter
     ? admins.filter(admin => 
@@ -630,10 +757,10 @@ const AdminLocations = () => {
 
         {/* Tabs for Super Admin */}
         {isSuperAdmin && (
-          <div className="flex gap-2 border-b border-border">
+          <div className="flex gap-2 border-b border-border overflow-x-auto">
             <button
-              onClick={() => setActiveTab('locations')}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
+              onClick={() => { setActiveTab('locations'); }}
+              className={`px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
                 activeTab === 'locations'
                   ? 'text-primary border-b-2 border-primary'
                   : 'text-muted-foreground hover:text-foreground'
@@ -643,8 +770,8 @@ const AdminLocations = () => {
               Locations ({locations.length})
             </button>
             <button
-              onClick={() => setActiveTab('admins')}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
+              onClick={() => { setActiveTab('admins'); }}
+              className={`px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
                 activeTab === 'admins'
                   ? 'text-primary border-b-2 border-primary'
                   : 'text-muted-foreground hover:text-foreground'
@@ -652,6 +779,45 @@ const AdminLocations = () => {
             >
               <Shield className="w-4 h-4 inline mr-2" />
               Admins ({admins.length})
+            </button>
+            <button
+              onClick={() => { setActiveTab('location-requests'); fetchLocationRequests(requestFilterStatus); }}
+              className={`px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
+                activeTab === 'location-requests'
+                  ? 'text-primary border-b-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <FileText className="w-4 h-4 inline mr-2" />
+              Location Requests
+            </button>
+          </div>
+        )}
+
+        {/* Tabs for Admin (non-super admin) */}
+        {!isSuperAdmin && (
+          <div className="flex gap-2 border-b border-border overflow-x-auto">
+            <button
+              onClick={() => { setActiveTab('locations'); }}
+              className={`px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
+                activeTab === 'locations'
+                  ? 'text-primary border-b-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Building className="w-4 h-4 inline mr-2" />
+              My Locations ({locations.length})
+            </button>
+            <button
+              onClick={() => { setActiveTab('request'); }}
+              className={`px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
+                activeTab === 'request'
+                  ? 'text-primary border-b-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Plus className="w-4 h-4 inline mr-2" />
+              Request Location
             </button>
           </div>
         )}
@@ -1506,9 +1672,194 @@ const AdminLocations = () => {
             </div>
           </div>
         )}
+
+        {/* Location Requests Tab - Super Admin */}
+        {isSuperAdmin && activeTab === 'location-requests' && (
+          <div className="space-y-4">
+            {/* Filter */}
+            <div className="flex flex-wrap gap-2">
+              {["", "pending", "approved", "rejected"].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => { setRequestFilterStatus(s); fetchLocationRequests(s); }}
+                  className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${requestFilterStatus === s ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border hover:bg-muted"}`}
+                >
+                  {s ? s.charAt(0).toUpperCase() + s.slice(1) : "All"}
+                </button>
+              ))}
+            </div>
+
+            {/* Requests List */}
+            {requestLoading ? (
+              <div className="text-center py-10 text-muted-foreground">Loading requests...</div>
+            ) : locationRequests.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground card-elevated">
+                <div className="text-4xl mb-3">📋</div>
+                <p>No location requests</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {locationRequests.map((req: LocationRequest) => (
+                  <div key={req._id} className="bg-card border border-border rounded-lg p-4 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                      <div>
+                        <h3 className="font-semibold">{req.apartmentName}{req.building ? `, ${req.building}` : ""}</h3>
+                        <p className="text-sm text-muted-foreground">{req.area}, {req.city}, {req.state}{req.zipCode ? ` - ${req.zipCode}` : ""}</p>
+                      </div>
+                      {getRequestStatusBadge(req.status)}
+                    </div>
+                    {req.reason && <p className="text-sm text-muted-foreground">Reason: {req.reason}</p>}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-xs text-muted-foreground">
+                      <span>Requested by: {req.requestedBy?.name}</span>
+                      <span className="hidden sm:block">·</span>
+                      <span>{new Date(req.createdAt).toLocaleDateString("en-IN")}</span>
+                    </div>
+                    {req.reviewedBy && (
+                      <div className="text-xs text-muted-foreground space-y-0.5">
+                        <div>Reviewed by: {req.reviewedBy.name}{req.reviewedAt ? ` on ${new Date(req.reviewedAt).toLocaleDateString("en-IN")}` : ""}</div>
+                        {req.reviewNote && <div>Note: {req.reviewNote}</div>}
+                      </div>
+                    )}
+
+                    {/* Review Panel */}
+                    {req.status === "pending" && (
+                      <div className="space-y-2">
+                        {requestReviewingId === req._id ? (
+                          <>
+                            <div className="space-y-3 border border-border rounded-lg p-3 bg-muted/30">
+                              <div className="text-sm font-medium">Review Details</div>
+                              <div>
+                                <label className="block text-xs text-muted-foreground mb-1">Review note (optional)</label>
+                                <textarea
+                                  className="input-clean text-sm w-full"
+                                  rows={2}
+                                  placeholder="Add any comments..."
+                                  value={requestReviewNote}
+                                  onChange={(e) => setRequestReviewNote(e.target.value)}
+                                />
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div>
+                                  <label className="block text-xs text-muted-foreground mb-1">Latitude <span className="text-destructive">*</span></label>
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    className="input-clean text-sm w-full"
+                                    placeholder="e.g. 12.9716"
+                                    value={requestReviewLatitude}
+                                    onChange={(e) => setRequestReviewLatitude(e.target.value)}
+                                    required
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-muted-foreground mb-1">Longitude <span className="text-destructive">*</span></label>
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    className="input-clean text-sm w-full"
+                                    placeholder="e.g. 77.5946"
+                                    value={requestReviewLongitude}
+                                    onChange={(e) => setRequestReviewLongitude(e.target.value)}
+                                    required
+                                  />
+                                </div>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                Coordinates are required for approval. Get them from Google Maps.
+                              </p>
+                            </div>
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <button
+                                onClick={() => handleReviewLocationRequest(req._id, "approved")}
+                                disabled={requestReviewLoading}
+                                className="flex-1 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg disabled:opacity-50"
+                              >
+                                {requestReviewLoading ? "Processing..." : "✓ Approve & Create"}
+                              </button>
+                              <button
+                                onClick={() => handleReviewLocationRequest(req._id, "rejected")}
+                                disabled={requestReviewLoading}
+                                className="flex-1 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50"
+                              >
+                                {requestReviewLoading ? "Processing..." : "✗ Reject"}
+                              </button>
+                              <button
+                                onClick={() => { setRequestReviewingId(null); setRequestReviewNote(""); setRequestReviewLatitude(""); setRequestReviewLongitude(""); }}
+                                disabled={requestReviewLoading}
+                                className="py-2 px-3 border border-border rounded-lg"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => setRequestReviewingId(req._id)}
+                            className="text-sm text-primary hover:underline"
+                          >
+                            Review this request →
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Request Location Tab - Admin Only */}
+        {!isSuperAdmin && activeTab === 'request' && (
+          <div className="max-w-2xl">
+            <div className="bg-card border border-border rounded-lg p-6 space-y-4">
+              <div>
+                <h2 className="text-lg font-bold mb-2">Request New Location</h2>
+                <p className="text-sm text-muted-foreground">Submit a location request for super admin approval</p>
+              </div>
+              
+              <form onSubmit={handleSubmitLocationRequest} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Apartment / Society Name <span className="text-destructive">*</span></label>
+                  <input type="text" required className="input-clean" placeholder="e.g. Green Valley Apartments" value={requestForm.apartmentName} onChange={(e) => setRequestForm({ ...requestForm, apartmentName: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Building (Optional)</label>
+                  <input type="text" className="input-clean" placeholder="e.g. Block A" value={requestForm.building} onChange={(e) => setRequestForm({ ...requestForm, building: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Area <span className="text-destructive">*</span></label>
+                  <input type="text" required className="input-clean" placeholder="e.g. Koramangala" value={requestForm.area} onChange={(e) => setRequestForm({ ...requestForm, area: e.target.value })} />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">City <span className="text-destructive">*</span></label>
+                    <input type="text" required className="input-clean" placeholder="e.g. Bangalore" value={requestForm.city} onChange={(e) => setRequestForm({ ...requestForm, city: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">State <span className="text-destructive">*</span></label>
+                    <input type="text" required className="input-clean" placeholder="e.g. Karnataka" value={requestForm.state} onChange={(e) => setRequestForm({ ...requestForm, state: e.target.value })} />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">ZIP Code (Optional)</label>
+                  <input type="text" className="input-clean" placeholder="e.g. 560034" value={requestForm.zipCode} onChange={(e) => setRequestForm({ ...requestForm, zipCode: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Reason for request (Optional)</label>
+                  <textarea className="input-clean" rows={3} maxLength={500} placeholder="Explain why this location should be added..." value={requestForm.reason} onChange={(e) => setRequestForm({ ...requestForm, reason: e.target.value })} />
+                </div>
+                <div className="flex flex-col-reverse sm:flex-row gap-3">
+                  <button type="button" onClick={() => setActiveTab('locations')} className="flex-1 py-2 border border-border rounded-lg" disabled={requestSubmitting}>Cancel</button>
+                  <button type="submit" className="flex-1 btn-brand py-2 disabled:opacity-50" disabled={requestSubmitting}>
+                    {requestSubmitting ? "Submitting..." : "Submit Request"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </AppLayout>
   );
-};
-
-export default AdminLocations;
+}
