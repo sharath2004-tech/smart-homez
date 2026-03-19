@@ -533,7 +533,7 @@ const AdminSalarySettlements = () => {
                         <User className="w-4 h-4 text-muted-foreground" />
                       </div>
                       <div className="min-w-0">
-                        <p className="font-semibold text-foreground truncate">{req.worker.name}</p>
+                        <p className="font-semibold text-foreground line-clamp-2 break-words">{req.worker.name}</p>
                         <p className="text-xs text-muted-foreground">{req.worker.email}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {fmtDate(req.periodFrom)} – {fmtDate(req.periodTo)}

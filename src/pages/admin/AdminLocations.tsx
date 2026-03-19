@@ -851,13 +851,13 @@ const AdminLocations = () => {
                         <Building className="w-5 h-5" />
                       </div>
                       <div className="flex-1 min-w-0 overflow-hidden">
-                        <h3 className="font-bold text-foreground truncate">{location.apartmentName}</h3>
+                        <h3 className="font-bold text-foreground line-clamp-2 break-words">{location.apartmentName}</h3>
                         {location.building && (
-                          <p className="text-xs text-muted-foreground truncate">{location.building}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-2 break-words">{location.building}</p>
                         )}
                         <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
                           <MapPin className="w-3 h-3 shrink-0" />
-                          <span className="truncate">{location.area}, {location.city}</span>
+                          <span className="line-clamp-2 break-words">{location.area}, {location.city}</span>
                         </p>
                       </div>
                     </div>
@@ -876,7 +876,7 @@ const AdminLocations = () => {
                     {location.assignedAdmin && (
                       <div className="text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg flex items-center gap-2 mb-3">
                         <Shield className="w-3 h-3 shrink-0" />
-                        <span className="truncate"><strong>Admin:</strong> {location.assignedAdmin.name}</span>
+                        <span className="line-clamp-2 break-words"><strong>Admin:</strong> {location.assignedAdmin.name}</span>
                       </div>
                     )}
 
@@ -948,11 +948,11 @@ const AdminLocations = () => {
                       </div>
                       <div className="flex-1 min-w-0 overflow-hidden">
                         <div className="flex items-center gap-2">
-                          <p className="font-bold text-foreground truncate">{admin.name}</p>
+                          <p className="font-bold text-foreground line-clamp-2 break-words">{admin.name}</p>
                           <span className="badge-primary text-xs shrink-0">Admin</span>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{admin.email}</p>
-                        {admin.phone && <p className="text-xs text-muted-foreground truncate">{admin.phone}</p>}
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1 break-words" title={admin.email}>{admin.email}</p>
+                        {admin.phone && <p className="text-xs text-muted-foreground line-clamp-1 break-words" title={admin.phone}>{admin.phone}</p>}
                       </div>
                     </div>
 
@@ -974,7 +974,7 @@ const AdminLocations = () => {
                           {admin.assignedLocations.slice(0, 3).map((loc, idx) => (
                             <div key={idx} className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded flex items-center gap-1">
                               <MapPin className="w-3 h-3 shrink-0" />
-                              <span className="truncate">{loc.locationName} - {loc.area}, {loc.city}</span>
+                              <span className="line-clamp-1 break-words" title={`${loc.locationName} - ${loc.area}, ${loc.city}`}>{loc.locationName} - {loc.area}, {loc.city}</span>
                             </div>
                           ))}
                           {admin.assignedLocations.length > 3 && (
@@ -1347,7 +1347,7 @@ const AdminLocations = () => {
                   {adminForm.idDocumentFile ? (
                     <div className="flex items-center gap-3 p-2 bg-green-50 border border-green-200 rounded-lg">
                       <FileText className="w-4 h-4 text-green-600 shrink-0" />
-                      <span className="text-xs text-green-800 truncate flex-1">{adminForm.idDocumentFile.name}</span>
+                      <span className="text-xs text-green-800 line-clamp-1 break-words flex-1" title={adminForm.idDocumentFile.name}>{adminForm.idDocumentFile.name}</span>
                       <button
                         type="button"
                         onClick={() => setAdminForm({...adminForm, idDocumentFile: null})}
@@ -1508,7 +1508,7 @@ const AdminLocations = () => {
                     <FileText className="w-5 h-5 text-green-600 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-green-800">ID Document on file</p>
-                      <p className="text-xs text-green-600 truncate">{editingAdmin.idDocumentType || 'Document'}</p>
+                      <p className="text-xs text-green-600 line-clamp-1 break-words">{editingAdmin.idDocumentType || 'Document'}</p>
                     </div>
                     <a
                       href={`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${editingAdmin.idDocument}`}

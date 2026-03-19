@@ -667,8 +667,8 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
 
               {qrCodeImage ? (
                 <div>
-                  <div className="bg-white p-4 rounded-xl inline-block mb-3">
-                    <img src={qrCodeImage} alt="Service Start QR" className="w-64 h-64" />
+                  <div className="bg-white p-4 rounded-xl inline-block mb-3 max-w-full">
+                    <img src={qrCodeImage} alt="Service Start QR" className="w-64 h-64 max-w-full" />
                   </div>
                   <p className="text-sm text-muted-foreground mb-2">
                     {t('worker.taskDetail.showQRToCustomer')}
@@ -771,8 +771,8 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                 
                 {task.serviceEndQRCode ? (
                   <div>
-                    <div className="bg-white p-4 rounded-xl inline-block mb-3 shadow-lg">
-                      <img src={qrCodeImage} alt="Service End QR" className="w-64 h-64" />
+                    <div className="bg-white p-4 rounded-xl inline-block mb-3 shadow-lg max-w-full">
+                      <img src={qrCodeImage} alt="Service End QR" className="w-64 h-64 max-w-full" />
                     </div>
                     <p className="text-sm font-medium text-green-700 mb-2">
                       ✅ {t('worker.taskDetail.showEndQR')}
@@ -845,8 +845,8 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                   
                   {paymentQRImage ? (
                     <div>
-                      <div className="bg-white p-4 rounded-xl inline-block mb-3 shadow-lg">
-                        <img src={paymentQRImage} alt="Payment QR" className="w-64 h-64 object-contain" />
+                      <div className="bg-white p-4 rounded-xl inline-block mb-3 shadow-lg max-w-full">
+                        <img src={paymentQRImage} alt="Payment QR" className="w-64 h-64 object-contain max-w-full" />
                       </div>
                       
                       <div className="text-xs bg-purple-100 text-purple-800 p-3 rounded-lg space-y-1">

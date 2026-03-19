@@ -203,7 +203,7 @@ const CustomerDashboard = () => {
         <motion.div variants={itemVariants}>
           <Link to="/customer/profile" className="flex items-center gap-2 p-3 bg-card rounded-xl border border-border hover:bg-muted transition-colors group">
             <MapPin className="w-4 h-4 text-primary shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="text-sm text-foreground font-medium truncate">{displayAddress}</span>
+            <span className="text-sm text-foreground line-clamp-2 break-words">{displayAddress}</span>
             <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto shrink-0 group-hover:translate-x-1 transition-transform" />
           </Link>
         </motion.div>

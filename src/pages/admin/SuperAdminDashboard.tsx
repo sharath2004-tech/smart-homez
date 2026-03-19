@@ -433,7 +433,7 @@ const SuperAdminDashboard = () => {
                   setSelectedLocationId(e.target.value);
                   setActiveTab("overview");
                 }}
-                className="pl-9 pr-4 py-2 rounded-xl border border-border bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary min-w-[220px]"
+                className="pl-9 pr-4 py-2 rounded-xl border border-border bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary w-full sm:min-w-[220px]"
               >
                 <option value="all">All Locations</option>
                 {overview.map((loc) => (

@@ -339,7 +339,7 @@ export default function DeepCleaningPage() {
             <motion.div
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               transition={{ type: "spring", stiffness: 300, damping: 32 }}
-              className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl p-6 max-h-[88vh] overflow-y-auto shadow-2xl"
+              className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl p-3 sm:p-4 md:p-5 lg:p-6 max-h-[88vh] overflow-y-auto shadow-2xl"
             >
               {success ? (
                 <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}

@@ -192,7 +192,7 @@ const PaymentsPage = () => {
                     {getServiceEmoji(tx.service?.name || 'Service')}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{tx.service?.name || 'Service'}</p>
+                    <p className="text-sm font-medium text-foreground line-clamp-2 break-words">{tx.service?.name || 'Service'}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-xs text-muted-foreground">
                         {formatDate(tx.completedAt || tx.bookingDate)}

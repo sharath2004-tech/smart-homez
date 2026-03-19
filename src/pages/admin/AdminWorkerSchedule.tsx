@@ -835,7 +835,7 @@ const AdminWorkerSchedule = () => {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex flex-col max-w-[200px]">
+                          <div className="flex flex-col max-w-[150px] sm:max-w-[200px]">
                             <span className="text-sm text-foreground truncate">{booking.location.apartmentName}</span>
                             <span className="text-xs text-muted-foreground truncate">{booking.location.area}, {booking.location.city}</span>
                           </div>
@@ -946,7 +946,7 @@ const AdminWorkerSchedule = () => {
                       className="border-2 border-border rounded-lg p-4 hover:border-primary/30 transition-colors"
                     >
                       <div className="flex items-start justify-between gap-4 flex-wrap">
-                        <div className="flex-1 min-w-[250px]">
+                        <div className="flex-1 min-w-0 sm:min-w-[250px]">
                           <div className="flex items-center gap-2 mb-2 flex-wrap">
                             <span className="font-semibold text-foreground">{booking.service.name}</span>
                             {booking.isSubscription && (

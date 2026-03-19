@@ -217,7 +217,7 @@ const AdminHelpMessages = () => {
                           {meta.label}
                         </Badge>
                       </div>
-                      <p className="text-sm text-foreground font-medium truncate">{msg.subject}</p>
+                      <p className="text-sm text-foreground font-medium line-clamp-2 break-words">{msg.subject}</p>
                       <p className="text-xs text-muted-foreground">{fmtDate(msg.createdAt)}</p>
                     </div>
                     {isOpen ? (

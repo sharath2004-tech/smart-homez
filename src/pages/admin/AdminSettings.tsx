@@ -281,7 +281,7 @@ const AdminSettings = () => {
                       <img
                         src={settings.payment.qrCodeImage}
                         alt="Payment QR Code"
-                        className="w-64 h-64 object-contain border-2 border-primary rounded-xl"
+                        className="w-64 h-64 object-contain border-2 border-primary rounded-xl max-w-full"
                       />
                       <button
                         onClick={() => setSettings(prev => ({

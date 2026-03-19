@@ -198,7 +198,7 @@ const BusinessExpenses = () => {
                       {getCategoryLabel(exp.category, exp.customCategory)}
                     </span>
                   </div>
-                  {exp.description && <p className="text-xs text-muted-foreground mt-1 truncate">{exp.description}</p>}
+                  {exp.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2 break-words">{exp.description}</p>}
                   <div className="flex items-center gap-3 mt-2">
                     <span className="text-xs text-muted-foreground">{new Date(exp.date).toLocaleDateString("en-IN")}</span>
                     {exp.location && (

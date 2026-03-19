@@ -454,7 +454,7 @@ const CleaningServicePage = () => {
             Back to Services
           </Link>
           
-          <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30 rounded-2xl p-6 border border-blue-100 dark:border-blue-900">
+          <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30 rounded-2xl p-4 sm:p-5 md:p-6 border border-blue-100 dark:border-blue-900">
             <div className="flex items-start gap-4">
               <div className="w-16 h-16 bg-primary rounded-xl flex items-center justify-center flex-shrink-0">
                 <Sparkles className="w-8 h-8 text-primary-foreground" />
@@ -479,7 +479,7 @@ const CleaningServicePage = () => {
 
         <form onSubmit={handleBooking} className="space-y-6">
           {/* Booking Type Selection - Dynamic from Service */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
             <h2 className="text-xl font-bold mb-4">Select Booking Plan</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {subscriptionPlans.map((plan) => (
@@ -510,7 +510,7 @@ const CleaningServicePage = () => {
 
           {/* Schedule Section - One-Time */}
           {bookingType === 'oneTime' && (
-            <div className="bg-card rounded-xl border border-border p-6">
+            <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
               <h2 className="text-xl font-bold mb-4">Schedule Your Cleaning</h2>
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
@@ -540,7 +540,7 @@ const CleaningServicePage = () => {
 
           {/* Subscription Schedule Section */}
           {bookingType !== 'oneTime' && (
-            <div className="bg-gradient-to-br from-primary/5 to-accent/5 rounded-xl border-2 border-primary/20 p-6">
+            <div className="bg-gradient-to-br from-primary/5 to-accent/5 rounded-xl border-2 border-primary/20 p-4 sm:p-5 md:p-6">
               <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-primary" />
                 Subscription Schedule
@@ -679,7 +679,7 @@ const CleaningServicePage = () => {
 
           {/* Worker Selection - Show if plan requires fixed worker */}
           {bookingType !== 'oneTime' && subscriptionPlans.find(plan => plan.name === bookingType)?.requiresFixedWorker && (
-            <div className="bg-amber-50 dark:bg-amber-950/30 rounded-xl border-2 border-amber-200 dark:border-amber-900 p-6">
+            <div className="bg-amber-50 dark:bg-amber-950/30 rounded-xl border-2 border-amber-200 dark:border-amber-900 p-4 sm:p-5 md:p-6">
               <h2 className="text-xl font-bold mb-3 flex items-center gap-2">
                 <Users className="w-5 h-5 text-amber-600" />
                 Select Your Fixed Worker
@@ -756,7 +756,7 @@ const CleaningServicePage = () => {
           )}
 
           {/* Schedule Section - moved from above */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
             <h2 className="text-xl font-bold mb-4">Cleaning Type</h2>
             <div className="grid md:grid-cols-2 gap-3">
               {[
@@ -783,7 +783,7 @@ const CleaningServicePage = () => {
           </div>
 
           {/* Property Details */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
             <h2 className="text-xl font-bold mb-4">Property Details</h2>
             <div className="grid md:grid-cols-2 gap-4">
               <div>

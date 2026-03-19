@@ -118,7 +118,7 @@ const AdminHeatmap = () => {
                     <div className="flex items-center gap-2 min-w-0">
                       <Icon className={`w-5 h-5 shrink-0 ${meta.iconColor}`} />
                       <div className="min-w-0">
-                        <p className="font-semibold text-foreground truncate">{s.area}</p>
+                        <p className="font-semibold text-foreground line-clamp-2 break-words">{s.area}</p>
                         <p className="text-xs text-muted-foreground">{s.city} · {ratio}</p>
                       </div>
                     </div>
