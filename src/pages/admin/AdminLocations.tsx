@@ -1,5 +1,5 @@
 import AppLayout from "@/components/AppLayout";
-import { adminAPI, authAPI, locationsAPI, locationRequestsAPI } from "@/lib/api";
+import { adminAPI, authAPI, locationRequestsAPI, locationsAPI } from "@/lib/api";
 import { cropQRFromImage } from "@/utils/cropQRFromImage";
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
