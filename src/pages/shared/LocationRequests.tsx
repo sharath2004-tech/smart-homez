@@ -177,25 +177,28 @@ const LocationRequests = () => {
             {isSuperAdmin ? "No location requests yet." : "You haven't submitted any location requests."}
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             {requests.map((req) => (
-              <div key={req._id} className="bg-card border border-border rounded-xl p-4 space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="font-semibold">{req.apartmentName}{req.building ? `, ${req.building}` : ""}</h3>
-                    <p className="text-sm text-muted-foreground">{req.area}, {req.city}, {req.state}{req.zipCode ? ` - ${req.zipCode}` : ""}</p>
+              <div key={req._id} className="bg-card border border-border rounded-lg sm:rounded-xl p-3 sm:p-4 space-y-2 sm:space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-3">
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-sm sm:text-base break-words">{req.apartmentName}{req.building ? `, ${req.building}` : ""}</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground">{req.area}, {req.city}, {req.state}{req.zipCode ? ` - ${req.zipCode}` : ""}</p>
                   </div>
-                  {getStatusBadge(req.status)}
+                  <div className="shrink-0">
+                    {getStatusBadge(req.status)}
+                  </div>
                 </div>
-                {req.reason && <p className="text-sm text-muted-foreground">Reason: {req.reason}</p>}
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                {req.reason && <p className="text-xs sm:text-sm text-muted-foreground">Reason: {req.reason}</p>}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-xs text-muted-foreground">
                   <span>Requested by: {req.requestedBy?.name}</span>
+                  <span className="hidden sm:block">·</span>
                   <span>{new Date(req.createdAt).toLocaleDateString("en-IN")}</span>
                 </div>
                 {req.reviewedBy && (
-                  <div className="text-xs text-muted-foreground">
-                    Reviewed by: {req.reviewedBy.name}{req.reviewedAt ? ` on ${new Date(req.reviewedAt).toLocaleDateString("en-IN")}` : ""}
-                    {req.reviewNote && <span> — Note: {req.reviewNote}</span>}
+                  <div className="text-xs text-muted-foreground space-y-0.5">
+                    <div>Reviewed by: {req.reviewedBy.name}{req.reviewedAt ? ` on ${new Date(req.reviewedAt).toLocaleDateString("en-IN")}` : ""}</div>
+                    {req.reviewNote && <div>Note: {req.reviewNote}</div>}
                   </div>
                 )}
 
@@ -204,27 +207,27 @@ const LocationRequests = () => {
                   <div className="space-y-2">
                     {reviewingId === req._id ? (
                       <>
-                        <div className="space-y-3 border border-border rounded-lg p-3 bg-muted/30">
-                          <div className="text-sm font-medium">Review Details</div>
+                        <div className="space-y-2 sm:space-y-3 border border-border rounded-lg p-3 bg-muted/30">
+                          <div className="text-xs sm:text-sm font-medium">Review Details</div>
                           <div>
                             <label htmlFor="review-note" className="block text-xs text-muted-foreground mb-1">Review note (optional)</label>
                             <textarea
                               id="review-note"
-                              className="input-clean text-sm w-full"
+                              className="input-clean text-xs sm:text-sm w-full"
                               rows={2}
                               placeholder="Add any comments..."
                               value={reviewNote}
                               onChange={(e) => setReviewNote(e.target.value)}
                             />
                           </div>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <div>
                               <label htmlFor="latitude" className="block text-xs text-muted-foreground mb-1">Latitude <span className="text-destructive">*</span></label>
                               <input
                                 id="latitude"
                                 type="number"
                                 step="any"
-                                className="input-clean text-sm w-full"
+                                className="input-clean text-xs sm:text-sm w-full"
                                 placeholder="e.g. 12.9716"
                                 value={latitude}
                                 onChange={(e) => setLatitude(e.target.value)}
@@ -237,7 +240,7 @@ const LocationRequests = () => {
                                 id="longitude"
                                 type="number"
                                 step="any"
-                                className="input-clean text-sm w-full"
+                                className="input-clean text-xs sm:text-sm w-full"
                                 placeholder="e.g. 77.5946"
                                 value={longitude}
                                 onChange={(e) => setLongitude(e.target.value)}
@@ -249,25 +252,25 @@ const LocationRequests = () => {
                             Coordinates are required for approval. You can get them from Google Maps.
                           </p>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-col sm:flex-row gap-2">
                           <button
                             onClick={() => handleReview(req._id, "approved")}
                             disabled={reviewLoading}
-                            className="flex-1 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex-1 py-2 text-xs sm:text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {reviewLoading ? "Processing..." : "✓ Approve & Create Location"}
                           </button>
                           <button
                             onClick={() => handleReview(req._id, "rejected")}
                             disabled={reviewLoading}
-                            className="flex-1 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex-1 py-2 text-xs sm:text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {reviewLoading ? "Processing..." : "✗ Reject"}
                           </button>
                           <button
                             onClick={() => { setReviewingId(null); setReviewNote(""); setLatitude(""); setLongitude(""); }}
                             disabled={reviewLoading}
-                            className="py-2 px-3 text-sm border border-border rounded-lg disabled:opacity-50"
+                            className="py-2 px-3 text-xs sm:text-sm border border-border rounded-lg disabled:opacity-50"
                           >
                             Cancel
                           </button>
@@ -276,7 +279,7 @@ const LocationRequests = () => {
                     ) : (
                       <button
                         onClick={() => setReviewingId(req._id)}
-                        className="text-sm text-primary hover:underline"
+                        className="text-xs sm:text-sm text-primary hover:underline"
                       >
                         Review this request →
                       </button>
@@ -291,7 +294,7 @@ const LocationRequests = () => {
         {/* Admin: New Request Form */}
         {showForm && (
           <div
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto"
             role="dialog"
             aria-modal="true"
             aria-labelledby="location-request-modal-title"
@@ -302,51 +305,51 @@ const LocationRequests = () => {
               if (e.key === 'Escape') setShowForm(false);
             }}
           >
-            <div className="bg-background rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 id="location-request-modal-title" className="text-lg font-bold">Request New Location</h2>
+            <div className="bg-background rounded-xl sm:rounded-2xl max-w-md w-full max-h-[95vh] overflow-y-auto p-4 sm:p-6 space-y-4 my-auto">
+              <div className="flex items-center justify-between gap-2">
+                <h2 id="location-request-modal-title" className="text-lg sm:text-xl font-bold">Request New Location</h2>
                 <button
                   onClick={() => setShowForm(false)}
-                  className="text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground shrink-0"
                   aria-label="Close modal"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
                 <div>
-                  <label htmlFor="apartment-name" className="block text-sm font-medium mb-1">Apartment / Society Name <span className="text-destructive">*</span></label>
-                  <input id="apartment-name" type="text" required className="input-clean" placeholder="e.g. Green Valley Apartments" value={form.apartmentName} onChange={(e) => setForm({ ...form, apartmentName: e.target.value })} />
+                  <label htmlFor="apartment-name" className="block text-xs sm:text-sm font-medium mb-1">Apartment / Society Name <span className="text-destructive">*</span></label>
+                  <input id="apartment-name" type="text" required className="input-clean text-sm" placeholder="e.g. Green Valley Apartments" value={form.apartmentName} onChange={(e) => setForm({ ...form, apartmentName: e.target.value })} />
                 </div>
                 <div>
-                  <label htmlFor="building" className="block text-sm font-medium mb-1">Building (Optional)</label>
-                  <input id="building" type="text" className="input-clean" placeholder="e.g. Block A" value={form.building} onChange={(e) => setForm({ ...form, building: e.target.value })} />
+                  <label htmlFor="building" className="block text-xs sm:text-sm font-medium mb-1">Building (Optional)</label>
+                  <input id="building" type="text" className="input-clean text-sm" placeholder="e.g. Block A" value={form.building} onChange={(e) => setForm({ ...form, building: e.target.value })} />
                 </div>
                 <div>
-                  <label htmlFor="area" className="block text-sm font-medium mb-1">Area <span className="text-destructive">*</span></label>
-                  <input id="area" type="text" required className="input-clean" placeholder="e.g. Koramangala" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} />
+                  <label htmlFor="area" className="block text-xs sm:text-sm font-medium mb-1">Area <span className="text-destructive">*</span></label>
+                  <input id="area" type="text" required className="input-clean text-sm" placeholder="e.g. Koramangala" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                   <div>
-                    <label htmlFor="city" className="block text-sm font-medium mb-1">City <span className="text-destructive">*</span></label>
-                    <input id="city" type="text" required className="input-clean" placeholder="e.g. Bangalore" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+                    <label htmlFor="city" className="block text-xs sm:text-sm font-medium mb-1">City <span className="text-destructive">*</span></label>
+                    <input id="city" type="text" required className="input-clean text-sm" placeholder="e.g. Bangalore" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
                   </div>
                   <div>
-                    <label htmlFor="state" className="block text-sm font-medium mb-1">State <span className="text-destructive">*</span></label>
-                    <input id="state" type="text" required className="input-clean" placeholder="e.g. Karnataka" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
+                    <label htmlFor="state" className="block text-xs sm:text-sm font-medium mb-1">State <span className="text-destructive">*</span></label>
+                    <input id="state" type="text" required className="input-clean text-sm" placeholder="e.g. Karnataka" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
                   </div>
                 </div>
                 <div>
-                  <label htmlFor="zipcode" className="block text-sm font-medium mb-1">ZIP Code (Optional)</label>
-                  <input id="zipcode" type="text" className="input-clean" placeholder="e.g. 560034" value={form.zipCode} onChange={(e) => setForm({ ...form, zipCode: e.target.value })} />
+                  <label htmlFor="zipcode" className="block text-xs sm:text-sm font-medium mb-1">ZIP Code (Optional)</label>
+                  <input id="zipcode" type="text" className="input-clean text-sm" placeholder="e.g. 560034" value={form.zipCode} onChange={(e) => setForm({ ...form, zipCode: e.target.value })} />
                 </div>
                 <div>
-                  <label htmlFor="reason" className="block text-sm font-medium mb-1">Reason for request (Optional)</label>
-                  <textarea id="reason" className="input-clean" rows={3} maxLength={500} placeholder="Explain why this location should be added..." value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
+                  <label htmlFor="reason" className="block text-xs sm:text-sm font-medium mb-1">Reason for request (Optional)</label>
+                  <textarea id="reason" className="input-clean text-sm" rows={3} maxLength={500} placeholder="Explain why this location should be added..." value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
                 </div>
-                <div className="flex gap-3">
-                  <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-2 border border-border rounded-xl text-sm" disabled={submitting}>Cancel</button>
-                  <button type="submit" className="flex-1 btn-brand py-2 rounded-xl text-sm font-medium disabled:opacity-50" disabled={submitting}>
+                <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 pt-2">
+                  <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-2 border border-border rounded-lg text-xs sm:text-sm" disabled={submitting}>Cancel</button>
+                  <button type="submit" className="flex-1 btn-brand py-2 rounded-lg text-xs sm:text-sm font-medium disabled:opacity-50" disabled={submitting}>
                     {submitting ? "Submitting..." : "Submit Request"}
                   </button>
                 </div>
