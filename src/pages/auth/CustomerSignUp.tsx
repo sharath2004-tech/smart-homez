@@ -90,6 +90,7 @@ const CustomerSignUp = () => {
       setError("Email is required");
       return;
     }
+    // Validate password field requirements
     if (form.password.length < 8) {
       setError("Password must be at least 8 characters");
       return;
@@ -106,6 +107,24 @@ const CustomerSignUp = () => {
       setError("Password must include a special character (e.g. @, #, $, !)");
       return;
     }
+    // Validate confirm password field requirements
+    if (form.confirmPassword.length < 8) {
+      setError("Confirm password must be at least 8 characters");
+      return;
+    }
+    if (!/[A-Z]/.test(form.confirmPassword)) {
+      setError("Confirm password must contain at least one uppercase letter");
+      return;
+    }
+    if (!/[0-9]/.test(form.confirmPassword)) {
+      setError("Confirm password must contain at least one number");
+      return;
+    }
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(form.confirmPassword)) {
+      setError("Confirm password must include a special character (e.g. @, #, $, !)");
+      return;
+    }
+    // Finally, check if passwords match
     if (form.password !== form.confirmPassword) {
       setError("Passwords do not match");
       return;

@@ -138,11 +138,11 @@ const AdminDashboard = () => {
 
   return (
     <AppLayout userType={role} userName={name}>
-      <div className="max-w-5xl mx-auto space-y-8 animate-fade-in pb-20 md:pb-0">
+      <div className="max-w-5xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 md:space-y-8 animate-fade-in pb-20 md:pb-0">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold font-heading text-foreground">Admin Dashboard</h1>
-            <p className="text-muted-foreground text-sm mt-1">Operations overview for today</p>
+            <h1 className="text-xl sm:text-2xl font-bold font-heading text-foreground">Admin Dashboard</h1>
+            <p className="text-muted-foreground text-xs sm:text-sm mt-1">Operations overview for today</p>
           </div>
           <div className="text-right text-sm">
             <p className="font-semibold text-foreground">{formatDate()}</p>
@@ -151,7 +151,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
           {[
             { 
               label: "Today's Bookings", 
@@ -186,12 +186,12 @@ const AdminDashboard = () => {
               bg: "bg-primary-light" 
             },
           ].map((card) => (
-            <div key={card.label} className="card-elevated p-5">
-              <div className={`w-10 h-10 ${card.bg} rounded-xl flex items-center justify-center mb-3`}>
-                <card.icon className={`w-5 h-5 ${card.color}`} />
+            <div key={card.label} className="card-elevated p-3 sm:p-4 md:p-5">
+              <div className={`w-9 h-9 sm:w-10 sm:h-10 ${card.bg} rounded-lg sm:rounded-xl flex items-center justify-center mb-2 sm:mb-3`}>
+                <card.icon className={`w-4 sm:w-5 h-4 sm:h-5 ${card.color}`} />
               </div>
               <p className="text-xs text-muted-foreground mb-1">{card.label}</p>
-              <p className="text-2xl font-bold font-heading text-foreground">{card.value}</p>
+              <p className="text-xl sm:text-2xl font-bold font-heading text-foreground">{card.value}</p>
               <p className={`text-xs font-medium mt-1 ${
                 typeof card.change === 'string' && card.change.startsWith('+') ? 'text-success' : 'text-muted-foreground'
               }`}>
@@ -226,19 +226,19 @@ const AdminDashboard = () => {
         )}
 
         {/* Quick nav */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 md:gap-3">
           {[
             { to: "/admin/bookings", icon: Calendar, label: "All Bookings", value: `${stats.todayBookings} today` },
             { to: "/admin/workers", icon: Users, label: "Workers", value: stats.workersOnlineInfo },
             { to: "/admin/settings", icon: Settings, label: "Settings", value: "Configure QR/UPI" },
             { to: "/admin/payments", icon: BarChart2, label: "Revenue", value: `₹${stats.todayRevenue.toLocaleString()} today` },
           ].map((item) => (
-            <Link key={item.to} to={item.to} className="card-elevated-hover p-4 group">
-              <div className="w-9 h-9 bg-accent rounded-xl flex items-center justify-center mb-3 group-hover:bg-primary transition-colors">
+            <Link key={item.to} to={item.to} className="card-elevated-hover p-3 sm:p-4 group">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 bg-accent rounded-lg sm:rounded-xl flex items-center justify-center mb-2 sm:mb-3 group-hover:bg-primary transition-colors">
                 <item.icon className="w-4 h-4 text-accent-foreground group-hover:text-primary-foreground transition-colors" />
               </div>
-              <p className="text-sm font-semibold text-foreground">{item.label}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{item.value}</p>
+              <p className="text-xs sm:text-sm font-semibold text-foreground">{item.label}</p>
+              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{item.value}</p>
             </Link>
           ))}
         </div>
@@ -258,36 +258,74 @@ const AdminDashboard = () => {
               <p className="text-sm text-muted-foreground">Bookings will appear here</p>
             </div>
           ) : (
-            <div className="card-elevated overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/50">
-                      {["Booking ID", "Customer", "Worker", "Service", "Time", "Amount", "Status"].map((h) => (
-                        <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentBookings.map((b, i) => (
-                      <tr key={b._id} className={`border-b border-border last:border-0 hover:bg-muted/30 transition-colors ${i % 2 === 0 ? "" : "bg-muted/10"}`}>
-                        <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{b._id.slice(-8)}</td>
-                        <td className="px-4 py-3 text-sm font-medium text-foreground">{b.customer?.name || 'Unknown'}</td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">{b.worker?.name || '—'}</td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">{b.service?.name || 'Unknown'}</td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">{b.startTime} - {b.endTime}</td>
-                        <td className="px-4 py-3 text-sm font-semibold text-foreground">₹{b.totalAmount}</td>
-                        <td className="px-4 py-3">
-                          <span className={statusConfig[b.status]}>
-                            {b.status.charAt(0).toUpperCase() + b.status.slice(1)}
-                          </span>
-                        </td>
+            <>
+              {/* Desktop table view */}
+              <div className="hidden md:block card-elevated overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/50">
+                        {["Booking ID", "Customer", "Worker", "Service", "Time", "Amount", "Status"].map((h) => (
+                          <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {recentBookings.map((b, i) => (
+                        <tr key={b._id} className={`border-b border-border last:border-0 hover:bg-muted/30 transition-colors ${i % 2 === 0 ? "" : "bg-muted/10"}`}>
+                          <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{b._id.slice(-8)}</td>
+                          <td className="px-4 py-3 text-sm font-medium text-foreground">{b.customer?.name || 'Unknown'}</td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">{b.worker?.name || '—'}</td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">{b.service?.name || 'Unknown'}</td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">{b.startTime} - {b.endTime}</td>
+                          <td className="px-4 py-3 text-sm font-semibold text-foreground">₹{b.totalAmount}</td>
+                          <td className="px-4 py-3">
+                            <span className={statusConfig[b.status]}>
+                              {b.status.charAt(0).toUpperCase() + b.status.slice(1)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+
+              {/* Mobile card view */}
+              <div className="md:hidden space-y-3">
+                {recentBookings.map((b) => (
+                  <div key={b._id} className="card-elevated p-4 space-y-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-xs text-muted-foreground">#{b._id.slice(-8)}</p>
+                        <p className="text-sm font-semibold text-foreground">{b.customer?.name || 'Unknown'}</p>
+                      </div>
+                      <span className={statusConfig[b.status]}>
+                        {b.status.charAt(0).toUpperCase() + b.status.slice(1)}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <p className="text-muted-foreground">Worker</p>
+                        <p className="text-foreground font-medium">{b.worker?.name || '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Service</p>
+                        <p className="text-foreground font-medium">{b.service?.name || 'Unknown'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Time</p>
+                        <p className="text-foreground font-medium text-xs">{b.startTime}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Amount</p>
+                        <p className="text-foreground font-semibold">₹{b.totalAmount}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </div>

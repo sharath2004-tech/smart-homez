@@ -409,7 +409,7 @@ const SuperAdminDashboard = () => {
 
   return (
     <AppLayout userType="super_admin" userName={userName}>
-      <div className="max-w-6xl mx-auto space-y-6 animate-fade-in pb-20 md:pb-0">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 md:space-y-6 animate-fade-in pb-20 md:pb-0">
 
         {/* ── Header bar ── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -469,19 +469,19 @@ const SuperAdminDashboard = () => {
             </div>
 
             {/* Platform summary numbers */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="card-elevated p-4 text-center">
-                <p className="text-3xl font-bold font-heading text-foreground">{overview.length}</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
+              <div className="card-elevated p-3 sm:p-4 text-center">
+                <p className="text-2xl sm:text-3xl font-bold font-heading text-foreground">{overview.length}</p>
                 <p className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1"><Building2 className="w-3.5 h-3.5" /> Locations</p>
               </div>
-              <div className="card-elevated p-4 text-center">
-                <p className="text-3xl font-bold font-heading text-foreground">
+              <div className="card-elevated p-3 sm:p-4 text-center">
+                <p className="text-2xl sm:text-3xl font-bold font-heading text-foreground">
                   {overview.reduce((s, l) => s + (l.stats?.workerCount || 0), 0)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1"><Users className="w-3.5 h-3.5" /> Total Workers</p>
               </div>
-              <div className="card-elevated p-4 text-center">
-                <p className="text-3xl font-bold font-heading text-foreground">
+              <div className="card-elevated p-3 sm:p-4 text-center col-span-2 sm:col-span-1">
+                <p className="text-2xl sm:text-3xl font-bold font-heading text-foreground">
                   ₹{overview.reduce((s, l) => s + (l.stats?.revenue || 0), 0).toLocaleString()}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1"><TrendingUp className="w-3.5 h-3.5" /> Total Revenue</p>
