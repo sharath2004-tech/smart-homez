@@ -64,7 +64,6 @@ import AdminWorkers from "./pages/admin/AdminWorkers";
 import AdminWorkerSchedule from "./pages/admin/AdminWorkerSchedule";
 import AdminWorkforce from "./pages/admin/AdminWorkforce";
 import BusinessExpenses from "./pages/shared/BusinessExpenses";
-import LocationRequests from "./pages/shared/LocationRequests";
 
 // Super Admin pages
 import SuperAdminBookings from "./pages/superadmin/SuperAdminBookings";
@@ -156,7 +155,6 @@ const App = () => (
           <Route path="/admin/sos" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminSOS /></ProtectedRoute>} />
           <Route path="/admin/quotes" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminQuotes /></ProtectedRoute>} />
           <Route path="/admin/business-expenses" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><BusinessExpenses /></ProtectedRoute>} />
-          <Route path="/admin/location-requests" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><LocationRequests /></ProtectedRoute>} />
 
           {/* Super Admin */}
           <Route path="/super-admin/dashboard" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminDashboard /></ProtectedRoute>} />
@@ -178,7 +176,6 @@ const App = () => (
           <Route path="/super-admin/deep-cleaning-config" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminDeepCleaningConfig /></ProtectedRoute>} />
           <Route path="/super-admin/heatmap" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminHeatmap /></ProtectedRoute>} />
           <Route path="/super-admin/business-expenses" element={<ProtectedRoute allowedRoles={['super_admin']}><BusinessExpenses /></ProtectedRoute>} />
-          <Route path="/super-admin/location-requests" element={<ProtectedRoute allowedRoles={['super_admin']}><LocationRequests /></ProtectedRoute>} />
 
           {/* Catch-all */}
           <Route path="*" element={<NotFound />} />
