@@ -84,7 +84,7 @@ const AdminQuotes = () => {
 
   return (
     <AppLayout userType="admin">
-      <div className="max-w-5xl mx-auto space-y-6 pb-10">
+      <div className="max-w-5xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 pb-10">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold font-heading text-foreground">Quote Requests</h1>

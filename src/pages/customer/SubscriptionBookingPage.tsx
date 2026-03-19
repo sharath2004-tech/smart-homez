@@ -184,7 +184,7 @@ export default function SubscriptionBookingPage() {
 
   return (
     <AppLayout userType="customer" userName={profile?.name}>
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6">
         {/* Header */}
         <div className="mb-6">
           <Link 

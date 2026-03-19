@@ -206,7 +206,7 @@ export default function AdminDeepCleaningConfig() {
 
   return (
     <AppLayout userType="super_admin">
-      <div className="max-w-3xl mx-auto pb-12 space-y-6">
+      <div className="max-w-3xl mx-auto px-3 sm:px-4 md:px-6 pb-12 space-y-6">
 
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-3">

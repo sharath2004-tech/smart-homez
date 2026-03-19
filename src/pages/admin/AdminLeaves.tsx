@@ -229,7 +229,7 @@ const AdminLeaves = () => {
 
   return (
     <AppLayout userType={role} userName={name}>
-      <div className="max-w-6xl mx-auto space-y-8 animate-fade-in pb-20 md:pb-0">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 space-y-8 animate-fade-in pb-20 md:pb-0">
         {/* Header */}
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent rounded-2xl -z-10"></div>

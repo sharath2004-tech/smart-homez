@@ -54,7 +54,7 @@ const SpotCleanPage = () => {
 
   return (
     <AppLayout userType="customer" userName={profile?.name || "Guest"}>
-      <div className="max-w-2xl mx-auto pb-24 space-y-5">
+      <div className="max-w-2xl mx-auto px-3 sm:px-4 md:px-6 pb-24 space-y-5">
 
         {/* Header */}
         <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="flex items-center gap-3">

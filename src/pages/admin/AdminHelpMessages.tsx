@@ -140,7 +140,7 @@ const AdminHelpMessages = () => {
 
   return (
     <AppLayout userType={role}>
-      <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-20 md:pb-0">
+      <div className="max-w-4xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 animate-fade-in pb-20 md:pb-0">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>

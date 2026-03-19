@@ -26,7 +26,7 @@ const ServiceAreaDemo = () => {
   return (
     <ServiceAvailabilityChecker onAvailabilityConfirmed={handleAvailabilityConfirmed}>
       <AppLayout userType="customer" userName="Guest">
-        <div className="max-w-6xl mx-auto space-y-6 animate-fade-in pb-20 md:pb-0">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 animate-fade-in pb-20 md:pb-0">
           <div>
             <h1 className="text-2xl font-bold font-heading text-foreground mb-1">
               Service Availability

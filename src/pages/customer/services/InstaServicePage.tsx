@@ -254,7 +254,7 @@ const InstaServicePage = () => {
 
   return (
     <AppLayout userType="customer" userName={profile?.name || "Guest"}>
-      <div className="max-w-lg mx-auto pb-24 space-y-6">
+      <div className="max-w-lg mx-auto px-3 sm:px-4 md:px-6 pb-24 space-y-6">
 
         {/* Header */}
         <div>
