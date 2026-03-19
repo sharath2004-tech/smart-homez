@@ -306,7 +306,7 @@ const AdminWorkforce = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-lg font-bold text-foreground truncate">{worker.name}</h3>
+                          <h3 className="text-lg font-bold text-foreground line-clamp-2 break-words">{worker.name}</h3>
                           {getStatusBadge(worker.status)}
                         </div>
                         <div className="space-y-1 mb-3">

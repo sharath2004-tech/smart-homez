@@ -256,21 +256,21 @@ const LocationRequests = () => {
                           <button
                             onClick={() => handleReview(req._id, "approved")}
                             disabled={reviewLoading}
-                            className="flex-1 py-2 text-xs sm:text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex-1 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {reviewLoading ? "Processing..." : "✓ Approve & Create Location"}
                           </button>
                           <button
                             onClick={() => handleReview(req._id, "rejected")}
                             disabled={reviewLoading}
-                            className="flex-1 py-2 text-xs sm:text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex-1 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {reviewLoading ? "Processing..." : "✗ Reject"}
                           </button>
                           <button
                             onClick={() => { setReviewingId(null); setReviewNote(""); setLatitude(""); setLongitude(""); }}
                             disabled={reviewLoading}
-                            className="py-2 px-3 text-xs sm:text-sm border border-border rounded-lg disabled:opacity-50"
+                            className="py-2 px-3 text-sm border border-border rounded-lg disabled:opacity-50"
                           >
                             Cancel
                           </button>

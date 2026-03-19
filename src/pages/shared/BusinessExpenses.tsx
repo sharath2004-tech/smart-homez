@@ -267,9 +267,9 @@ const BusinessExpenses = () => {
                   <label className="block text-sm font-medium mb-1">Description (Optional)</label>
                   <textarea className="input-clean" rows={3} maxLength={500} placeholder="Additional details..." value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
                 </div>
-                <div className="flex gap-3">
-                  <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-2 border border-border rounded-xl text-sm" disabled={submitting}>Cancel</button>
-                  <button type="submit" className="flex-1 btn-brand py-2 rounded-xl text-sm font-medium disabled:opacity-50" disabled={submitting}>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button type="button" onClick={() => setShowForm(false)} className="w-full sm:flex-1 py-2 border border-border rounded-xl text-sm" disabled={submitting}>Cancel</button>
+                  <button type="submit" className="w-full sm:flex-1 btn-brand py-2 rounded-xl text-sm font-medium disabled:opacity-50" disabled={submitting}>
                     {submitting ? "Adding..." : "Add Expense"}
                   </button>
                 </div>

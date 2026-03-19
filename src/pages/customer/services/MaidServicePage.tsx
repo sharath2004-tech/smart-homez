@@ -286,7 +286,7 @@ const MaidServicePage = () => {
 
         <form onSubmit={handleBooking} className="space-y-6">
           {/* Booking Type */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
             <h2 className="text-xl font-bold mb-4">Booking Type</h2>
             <div className="grid md:grid-cols-2 gap-3">
               {[
@@ -319,7 +319,7 @@ const MaidServicePage = () => {
           </div>
 
           {/* Schedule Section */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
             <h2 className="text-xl font-bold mb-4">Schedule</h2>
             <div className="grid md:grid-cols-3 gap-4">
               <div>
@@ -368,7 +368,7 @@ const MaidServicePage = () => {
           </div>
 
           {/* Hours Selection */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
             <h2 className="text-xl font-bold mb-4">Duration (Minimum 1 Hour)</h2>
             <div className="flex items-center gap-4">
               <Button
@@ -405,7 +405,7 @@ const MaidServicePage = () => {
           </div>
 
           {/* Task Selection */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
             <h2 className="text-xl font-bold mb-4">Select Tasks *</h2>
             <div className="grid md:grid-cols-2 gap-3">
               {taskOptions.map((task) => (
@@ -426,7 +426,7 @@ const MaidServicePage = () => {
           </div>
 
           {/* Preferences */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
             <h2 className="text-xl font-bold mb-4">Preferences</h2>
             <div className="space-y-4">
               <div>
@@ -469,7 +469,7 @@ const MaidServicePage = () => {
           </div>
 
           {/* Summary */}
-          <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl border-2 border-primary/20 p-6">
+          <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl border-2 border-primary/20 p-4 sm:p-5 md:p-6">
             <h2 className="text-xl font-bold mb-4">Booking Summary</h2>
             <div className="space-y-2 mb-4">
               <div className="flex justify-between">

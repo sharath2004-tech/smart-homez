@@ -364,7 +364,7 @@ const WorkerEarnings = () => {
           <p className="text-primary-foreground/70 text-sm mb-1">{t('worker.earnings.totalEarnings')}</p>
           <p className="text-4xl font-bold font-heading text-primary-foreground mb-1">{displayStats[period].earned}</p>
           <p className="text-primary-foreground/80 text-sm mb-4">{displayStats[period].avgRate} {t('worker.earnings.average')}</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="bg-primary-foreground/10 rounded-xl p-3 backdrop-blur-sm">
               <div className="flex items-center gap-2 text-primary-foreground/60 text-xs mb-1">
                 <Clock className="w-3.5 h-3.5" /> {t('worker.earnings.hoursWorked')}

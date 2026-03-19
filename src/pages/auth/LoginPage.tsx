@@ -196,7 +196,7 @@ const LoginPage = () => {
               {t("auth.login.yourHome")}<br />{t("auth.login.perfectlyClean")}
             </h1>
             <p className="text-primary-foreground/70 text-lg leading-relaxed">{t("auth.login.tagline")}</p>
-            <div className="mt-8 grid grid-cols-3 gap-4">
+            <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {[
                 { label: t("auth.login.activeWorkers"), value: formatNumber(stats.totalWorkers) },
                 { label: t("auth.login.happyCustomers"), value: formatNumber(stats.totalCustomers) },

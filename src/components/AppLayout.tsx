@@ -183,7 +183,7 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
               {initials}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-foreground truncate">{resolvedName}</p>
+              <p className="text-sm font-semibold text-foreground line-clamp-2 break-words">{resolvedName}</p>
               <p className="text-xs text-muted-foreground capitalize">{userType === 'super_admin' ? 'Super Admin' : t(`nav.${userType}`)}</p>
             </div>
           </div>

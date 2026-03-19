@@ -135,7 +135,7 @@ const PaymentsPage = () => {
         </div>
 
         {/* Summary cards */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
             { icon: CheckCircle, label: t('customer.payments.totalServices'), value: stats.totalServices, color: "text-success", bg: "bg-success-light" },
             { icon: Wallet, label: t('customer.payments.savedSub'), value: `₹${stats.savedAmount}`, color: "text-warning", bg: "bg-warning-light" },

@@ -406,19 +406,19 @@ const BookingsPage = () => {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex flex-col sm:flex-row gap-2 pt-2">
                     {isUpcoming && booking.status !== 'cancelled' && (
                       <>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleReschedule(booking); }}
-                          className="flex-1 py-2.5 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors"
+                          className="w-full sm:flex-1 py-2.5 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors"
                         >
                           Reschedule
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleCancelBooking(booking._id); }}
                           disabled={booking.status === 'in-progress'}
-                          className="flex-1 py-2.5 bg-destructive text-destructive-foreground rounded-lg text-sm font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full sm:flex-1 py-2.5 bg-destructive text-destructive-foreground rounded-lg text-sm font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           title={booking.status === 'in-progress' ? 'Cannot cancel a service already in progress' : ''}
                         >
                           Cancel
@@ -429,7 +429,7 @@ const BookingsPage = () => {
                     {isOngoing && (
                       <button
                         onClick={() => handleTrackWorker(booking)}
-                        className="flex-1 btn-brand py-2.5 text-sm"
+                        className="w-full sm:flex-1 btn-brand py-2.5 text-sm"
                       >
                         Track Worker
                       </button>

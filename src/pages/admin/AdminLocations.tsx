@@ -862,7 +862,7 @@ const AdminLocations = () => {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 p-3 bg-muted rounded-xl mb-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-muted rounded-xl mb-3">
                       <div>
                         <p className="text-xs text-muted-foreground">Workers</p>
                         <p className="text-sm font-bold text-foreground">{location.assignedWorkers?.length || 0}</p>
@@ -956,7 +956,7 @@ const AdminLocations = () => {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 p-3 bg-muted rounded-xl mb-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-muted rounded-xl mb-4">
                       <div>
                         <p className="text-xs text-muted-foreground">Locations</p>
                         <p className="text-sm font-bold text-foreground">{admin.assignedLocations?.length || 0}</p>
@@ -1033,7 +1033,7 @@ const AdminLocations = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium mb-1">Area</label>
                     <input
@@ -1061,7 +1061,7 @@ const AdminLocations = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium mb-1">State</label>
                     <input
@@ -1151,7 +1151,7 @@ const AdminLocations = () => {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium mb-1">Latitude</label>
                     <input
@@ -1194,11 +1194,11 @@ const AdminLocations = () => {
                   <p className="text-xs text-muted-foreground mt-1">Workers can serve within this distance</p>
                 </div>
 
-                <div className="flex gap-3 pt-4">
-                  <button type="button" onClick={handleCloseLocationForm} className="flex-1 py-2 border border-border rounded-xl">
+                <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                  <button type="button" onClick={handleCloseLocationForm} className="w-full sm:flex-1 py-2 border border-border rounded-xl">
                     Cancel
                   </button>
-                  <button type="submit" className="flex-1 btn-brand py-2">
+                  <button type="submit" className="w-full sm:flex-1 btn-brand py-2">
                     Create Location
                   </button>
                 </div>
@@ -1326,7 +1326,7 @@ const AdminLocations = () => {
                     <FileText className="w-4 h-4 text-primary" />
                     <p className="text-sm font-medium">ID Document Verification</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                     <div className="col-span-2">
                       <label className="block text-xs text-muted-foreground mb-1">Document Type</label>
                       <select

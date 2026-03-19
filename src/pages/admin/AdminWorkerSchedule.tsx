@@ -831,13 +831,13 @@ const AdminWorkerSchedule = () => {
                         <td className="px-4 py-3">
                           <div className="flex flex-col">
                             <span className="text-sm text-foreground">{booking.customer.name}</span>
-                            <span className="text-xs text-muted-foreground">{booking.customer.phone}</span>
+                            <span className="text-xs text-muted-foreground break-all">{booking.customer.phone}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-col max-w-[150px] sm:max-w-[200px]">
-                            <span className="text-sm text-foreground truncate">{booking.location.apartmentName}</span>
-                            <span className="text-xs text-muted-foreground truncate">{booking.location.area}, {booking.location.city}</span>
+                            <span className="text-sm text-foreground line-clamp-2 break-words">{booking.location.apartmentName}</span>
+                            <span className="text-xs text-muted-foreground line-clamp-2 break-words">{booking.location.area}, {booking.location.city}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3">
@@ -911,7 +911,7 @@ const AdminWorkerSchedule = () => {
                     </div>
                     <div>
                       <h3 className="font-bold text-foreground text-lg">{schedule.worker.name}</h3>
-                      <p className="text-sm text-muted-foreground capitalize">
+                      <p className="text-sm text-muted-foreground capitalize break-all">
                         {schedule.worker.specialization} • {schedule.worker.phone} • ⭐ {schedule.worker.rating.toFixed(1)}
                       </p>
                     </div>
@@ -984,7 +984,7 @@ const AdminWorkerSchedule = () => {
                             
                             <div className="flex items-center gap-2 text-muted-foreground">
                               <MapPin className="w-4 h-4" />
-                              <span className="truncate">{booking.location.area}, {booking.location.city}</span>
+                              <span className="line-clamp-1 break-words">{booking.location.area}, {booking.location.city}</span>
                             </div>
                           </div>
 

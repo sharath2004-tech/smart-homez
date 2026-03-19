@@ -97,7 +97,7 @@ export default function NotificationCenter() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     {!notif.isRead && <span className="w-2 h-2 bg-blue-500 rounded-full shrink-0" />}
-                    <h3 className="font-semibold truncate">{notif.title}</h3>
+                    <h3 className="font-semibold line-clamp-2 break-words">{notif.title}</h3>
                   </div>
                   <p className="text-sm text-gray-600 mt-0.5">{notif.message}</p>
                   <p className="text-xs text-gray-400 mt-1">{new Date(notif.createdAt).toLocaleString()}</p>

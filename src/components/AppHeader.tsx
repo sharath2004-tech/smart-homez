@@ -74,7 +74,7 @@ export const AppHeader = memo(({
           <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
             {initials}
           </div>
-          <span className="text-sm font-medium text-foreground max-w-[120px] truncate">
+          <span className="text-sm font-medium text-foreground md:max-w-[120px] line-clamp-1 break-words">
             {userName}
           </span>
         </div>

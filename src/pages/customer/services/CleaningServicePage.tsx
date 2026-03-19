@@ -851,7 +851,7 @@ const CleaningServicePage = () => {
           </div>
 
           {/* Additional Services */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
             <h2 className="text-xl font-bold mb-4">Additional Services</h2>
             <div className="space-y-3">
               {additionalServiceOptions.map((option) => (
@@ -875,7 +875,7 @@ const CleaningServicePage = () => {
           </div>
 
           {/* Special Instructions */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
             <h2 className="text-xl font-bold mb-4">Special Instructions</h2>
             <textarea
               placeholder="Any specific requirements or areas of focus..."
@@ -886,7 +886,7 @@ const CleaningServicePage = () => {
           </div>
 
           {/* Summary */}
-          <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl border-2 border-primary/20 p-6">
+          <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl border-2 border-primary/20 p-4 sm:p-5 md:p-6">
             <h2 className="text-xl font-bold mb-4">Booking Summary</h2>
             <div className="space-y-2 mb-4">
               <div className="flex justify-between">

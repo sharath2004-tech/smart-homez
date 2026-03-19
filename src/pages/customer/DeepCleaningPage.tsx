@@ -388,7 +388,7 @@ export default function DeepCleaningPage() {
                     <label className="text-sm font-semibold text-foreground flex items-center gap-1.5 mb-2">
                       <Clock className="w-4 h-4 text-primary" /> Select Start Time
                     </label>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                       {TIME_SLOTS.map(slot => (
                         <motion.button key={slot} whileTap={{ scale: 0.92 }}
                           onClick={() => setBookingTime(slot)}

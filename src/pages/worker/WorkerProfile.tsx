@@ -203,7 +203,7 @@ const WorkerProfile = () => {
                 <Clock className="w-4 h-4 text-primary" />
                 {t('worker.profile.performance')}
               </h3>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="text-center p-4 bg-accent rounded-lg">
                   <p className="text-2xl font-bold text-foreground">{stats.today || 0}</p>
                   <p className="text-xs text-muted-foreground mt-1">{t('worker.tasks.today')}</p>

@@ -942,10 +942,10 @@ const SuperAdminDashboard = () => {
                       </div>
                       <div className="card-elevated p-4">
                         <p className="text-xs text-muted-foreground mb-1">Assigned Admin</p>
-                        <p className="text-lg font-bold font-heading text-foreground truncate">
+                        <p className="text-lg font-bold font-heading text-foreground line-clamp-2 break-words">
                           {selectedLocation.assignedAdmin?.name || "—"}
                         </p>
-                        <p className="text-xs text-muted-foreground mt-1 truncate">{selectedLocation.assignedAdmin?.email || "Not assigned"}</p>
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-1 break-words" title={selectedLocation.assignedAdmin?.email || "Not assigned"}>{selectedLocation.assignedAdmin?.email || "Not assigned"}</p>
                       </div>
                       <div className="card-elevated p-4">
                         <p className="text-xs text-muted-foreground mb-1">Service Status</p>

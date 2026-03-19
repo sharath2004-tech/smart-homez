@@ -366,10 +366,10 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <button
                     onClick={() => setStep('show-qr')}
-                    className="flex-1 btn-secondary py-3"
+                    className="w-full sm:flex-1 btn-secondary py-3"
                     disabled={uploading}
                   >
                     Back
@@ -377,7 +377,7 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
                   <button
                     onClick={handleConfirmPayment}
                     disabled={uploading || !transactionId.trim() || !screenshot}
-                    className="flex-1 btn-brand py-3 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full sm:flex-1 btn-brand py-3 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {uploading ? (
                       <>

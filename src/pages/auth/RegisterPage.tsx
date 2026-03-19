@@ -236,7 +236,7 @@ const RegisterPage = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             {step === 1 ? (
               <>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">{t('auth.register.firstName')}</label>
                     <input className="input-clean" placeholder={t('auth.register.firstNamePlaceholder')} value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} required />
@@ -371,7 +371,7 @@ const RegisterPage = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-3">Skills & services</label>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {["General Cleaning", "Deep Cleaning", "Kitchen Cleaning", "Bathroom Cleaning", "Laundry", "Cooking"].map((skill) => (
                           <label key={skill} className="flex items-center gap-2 p-2.5 border border-border rounded-lg cursor-pointer hover:bg-accent transition-colors">
                             <input type="checkbox" className="accent-primary w-4 h-4" />

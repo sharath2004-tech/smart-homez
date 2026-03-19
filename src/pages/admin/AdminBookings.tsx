@@ -414,7 +414,7 @@ const AdminBookings = () => {
 
             <div className="p-6 space-y-6">
               {/* Booking summary */}
-              <div className="bg-muted/40 rounded-xl p-4 grid grid-cols-2 gap-3 text-sm">
+              <div className="bg-muted/40 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className="text-muted-foreground text-xs">Customer</p>
                   <p className="font-medium">{selectedProofBooking.customer?.name || '—'}</p>
@@ -442,7 +442,7 @@ const AdminBookings = () => {
                   )}
                 </h3>
                 {selectedProofBooking.completionPhotos && selectedProofBooking.completionPhotos.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {selectedProofBooking.completionPhotos.map((photo, i) => (
                       <div key={i} className="space-y-1">
                         <div className="rounded-xl overflow-hidden border-2 border-blue-200 bg-black aspect-square">
