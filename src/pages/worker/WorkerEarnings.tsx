@@ -95,7 +95,7 @@ const WeeklyEarningsChart = ({ earnings }: { earnings: Earning[] }) => {
   const maxTotal = Math.max(...dailyTotals.map(d => d.total), 1);
 
   return (
-    <div className="card-elevated p-4 space-y-3">
+    <div className="card-elevated p-4 sm:p-5 md:p-6 space-y-3">
       <div className="flex items-center gap-2">
         <BarChart2 className="w-4 h-4 text-primary" />
         <h2 className="text-sm font-bold text-foreground">Last 7 Days Earnings</h2>
@@ -138,11 +138,7 @@ const TopServicesCard = ({ earnings }: { earnings: Earning[] }) => {
   const maxTotal = sorted[0].total;
 
   return (
-    <div className="card-elevated p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <TrendingUp className="w-4 h-4 text-primary" />
-        <h2 className="text-sm font-bold text-foreground">Top Services</h2>
-      </div>
+    <div className="card-elevated p-4 sm:p-5 md:p-6 space-y-3">
       <div className="space-y-2">
         {sorted.map(s => (
           <div key={s.name}>
@@ -340,7 +336,7 @@ const WorkerEarnings = () => {
         </div>
 
         {/* Hourly Rate Card */}
-        <div className="card-elevated p-4 bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
+        <div className="card-elevated p-4 sm:p-5 md:p-6 bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center">
@@ -395,7 +391,7 @@ const WorkerEarnings = () => {
             </button>
           </div>
           {getRecentEarnings().filter(earning => earning.service && earning.customer).length === 0 ? (
-            <div className="card-elevated p-12 text-center">
+            <div className="card-elevated p-4 sm:p-5 md:p-6 text-center">
               <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
                 <IndianRupee className="w-8 h-8 text-muted-foreground" />
               </div>
@@ -409,7 +405,7 @@ const WorkerEarnings = () => {
                 const hoursWorked = calculateHoursWorked(earning);
                 
                 return (
-                  <div key={earning._id} className="card-elevated p-4">
+                  <div key={earning._id} className="card-elevated p-4 sm:p-5 md:p-6">
                     <div className="flex items-start gap-4 mb-3">
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-foreground line-clamp-2 break-words">{earning.service?.name || 'Service'}</p>
@@ -463,7 +459,7 @@ const WorkerEarnings = () => {
         </div>
 
         {/* Salary Settlement CTA */}
-        <div className="card-elevated p-5 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200">
+        <div className="card-elevated p-4 sm:p-5 md:p-6 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h3 className="font-bold text-foreground text-sm mb-1">{t('worker.earnings.viewSalaryPayments')}</h3>
