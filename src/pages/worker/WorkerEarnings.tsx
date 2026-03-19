@@ -139,7 +139,6 @@ const TopServicesCard = ({ earnings }: { earnings: Earning[] }) => {
 
   return (
     <div className="card-elevated p-4 sm:p-5 md:p-6 space-y-3">
-      </div>
       <div className="space-y-2">
         {sorted.map(s => (
           <div key={s.name}>
