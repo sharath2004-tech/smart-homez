@@ -290,7 +290,7 @@ const ProfilePage = () => {
 
   return (
     <AppLayout userType="customer" userName={profile.name}>
-      <div className="max-w-2xl mx-auto space-y-6 animate-fade-in pb-20 md:pb-0">
+      <div className="max-w-2xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 animate-fade-in pb-20 md:pb-0">
         {/* Profile header */}
         <div className="card-elevated p-4 sm:p-5 md:p-6 text-center relative">
           <button onClick={() => setShowAccountModal(true)} className="absolute top-4 right-4 p-2 bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors" title="Edit profile">

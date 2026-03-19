@@ -201,7 +201,7 @@ const BookingsPage = () => {
 
   return (
     <AppLayout userType="customer" userName="Customer">
-      <div className="max-w-2xl mx-auto space-y-6 animate-fade-in pb-20 md:pb-0">
+      <div className="max-w-2xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 animate-fade-in pb-20 md:pb-0">
         {/* Header */}
         <div className="card-elevated p-5">
           <div className="flex items-start justify-between">

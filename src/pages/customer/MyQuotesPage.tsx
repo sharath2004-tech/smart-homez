@@ -64,7 +64,7 @@ const MyQuotesPage = () => {
 
   return (
     <AppLayout userType="customer" userName={profile?.name || "Loading..."}>
-      <div className="max-w-2xl mx-auto pb-20 md:pb-0 space-y-5">
+      <div className="max-w-2xl mx-auto px-3 sm:px-4 md:px-6 pb-20 md:pb-0 space-y-5">
 
         {/* Header */}
         <div>
