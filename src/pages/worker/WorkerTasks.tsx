@@ -143,7 +143,7 @@ const WorkerTasks = () => {
   const renderTaskCard = (task: Task, isCurrent: boolean = false) => (
     <div 
       key={task._id} 
-      className="card-elevated p-5 hover:shadow-lg transition-all cursor-pointer"
+      className="card-elevated p-4 sm:p-5 md:p-6 hover:shadow-lg transition-all cursor-pointer"
       onClick={() => setSelectedTaskId(task._id)}
     >
       <div className="flex items-start gap-4">

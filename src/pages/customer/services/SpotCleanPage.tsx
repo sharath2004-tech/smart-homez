@@ -107,7 +107,7 @@ const SpotCleanPage = () => {
               <motion.div
                 key={svc._id}
                 variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}
-                className="bg-card border border-border rounded-2xl p-4 flex flex-col gap-2 hover:shadow-md transition-shadow"
+                className="bg-card border border-border rounded-2xl p-4 sm:p-5 md:p-6 flex flex-col gap-2 hover:shadow-md transition-shadow"
               >
                 <div className="text-3xl">{getIcon(svc.name)}</div>
                 <div className="flex-1">

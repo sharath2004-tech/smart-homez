@@ -69,7 +69,7 @@ const HelpPage = ({ userType = "customer" }: HelpPageProps) => {
         </div>
 
         {/* Contact card */}
-        <div className="card-elevated p-5 flex items-center gap-4 bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
+        <div className="card-elevated p-4 sm:p-5 md:p-6 flex items-center gap-4 bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
           <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center shrink-0">
             <Phone className="w-6 h-6 text-primary-foreground" />
           </div>
@@ -127,7 +127,7 @@ const HelpPage = ({ userType = "customer" }: HelpPageProps) => {
           </h2>
 
           {submitted ? (
-            <div className="card-elevated p-6 flex flex-col items-center gap-3 text-center">
+            <div className="card-elevated p-4 sm:p-5 md:p-6 flex flex-col items-center gap-3 text-center">
               <CheckCircle className="w-10 h-10 text-green-500" />
               <p className="font-semibold text-foreground">{t('customer.help.messageSent')}</p>
               <p className="text-sm text-muted-foreground">
@@ -141,7 +141,7 @@ const HelpPage = ({ userType = "customer" }: HelpPageProps) => {
               </button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="card-elevated p-5 space-y-4">
+            <form onSubmit={handleSubmit} className="card-elevated p-4 sm:p-5 md:p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
                   {t('customer.help.subject')} <span className="text-muted-foreground font-normal">{t('customer.help.subjectOptional')}</span>

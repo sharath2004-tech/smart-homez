@@ -302,7 +302,7 @@ const LandingPage = () => {
         </div>
         <div className="grid md:grid-cols-3 gap-6">
           {testimonials.map((testimonial) => (
-            <div key={testimonial.nameKey} className="card-elevated p-6">
+            <div key={testimonial.nameKey} className="card-elevated p-4 sm:p-5 md:p-6">
               <div className="flex gap-1 mb-3">
                 {Array.from({ length: testimonial.rating }).map((_, i) => (
                   <Star key={i} className="w-4 h-4 fill-warning text-warning" />

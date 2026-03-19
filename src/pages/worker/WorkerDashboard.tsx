@@ -223,7 +223,7 @@ const WorkerDashboard = () => {
         </div>
 
         {/* Hours worked summary */}
-        <div className="card-elevated p-4">
+        <div className="card-elevated p-4 sm:p-5 md:p-6">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
               <Clock className="w-4 h-4 text-primary" />
@@ -344,7 +344,7 @@ const WorkerDashboard = () => {
               {upcomingTasks.map((task) => (
                 <div 
                   key={task._id} 
-                  className="card-elevated p-4 flex items-center gap-4 hover:shadow-lg transition-all cursor-pointer"
+                  className="card-elevated p-4 sm:p-5 md:p-6 flex items-center gap-4 hover:shadow-lg transition-all cursor-pointer"
                   onClick={() => setSelectedTaskId(task._id)}
                 >
                   <div className="w-11 h-11 bg-accent rounded-xl flex items-center justify-center text-xl shrink-0">
