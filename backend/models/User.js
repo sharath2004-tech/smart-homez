@@ -478,6 +478,22 @@ const userSchema = new mongoose.Schema({
   isVerified: {
     type: Boolean,
     default: false
+  },
+  isEmailVerified: {
+    type: Boolean,
+    default: false
+  },
+  oauthProviders: {
+    google: {
+      id: { type: String, default: null },
+      email: { type: String, default: null },
+      linkedAt: { type: Date, default: null }
+    },
+    facebook: {
+      id: { type: String, default: null },
+      email: { type: String, default: null },
+      linkedAt: { type: Date, default: null }
+    }
   }
 }, {
   timestamps: true

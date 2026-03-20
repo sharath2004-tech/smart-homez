@@ -2,6 +2,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import twilio from 'twilio';
 import User from '../models/User.js';
+import { sendOTP, verifyOTP, toE164 } from '../utils/msg91Service.js';
 
 const router = express.Router();
 
@@ -34,31 +35,25 @@ router.post('/send-otp', async (req, res) => {
     const { phone } = req.body;
     if (!phone) return res.status(400).json({ message: 'Phone number is required' });
 
-    const e164 = toE164(phone);
-    const client = getTwilioClient();
-
-    await client.verify.v2.services(getVerifySid()).verifications.create({
-      to: e164,
-      channel: 'sms',
-    });
+    // Send OTP via MSG91 (automatically falls back to Twilio if MSG91 fails)
+    await sendOTP(phone);
 
     res.json({ success: true, message: 'OTP sent successfully' });
   } catch (error) {
-    console.error('Send OTP error:', error.message, error.code, error.status);
+    console.error('Send OTP error:', error.message);
 
+    // Universal error handling (works for both MSG91 and Twilio)
     if (error.message.includes('valid 10-digit')) {
       return res.status(400).json({ message: error.message });
     }
-    if (error.message.includes('credentials not configured') || error.message.includes('Verify SID')) {
+    if (error.message.includes('not configured') || error.message.includes('Contact support')) {
       return res.status(500).json({ message: 'SMS service is not configured. Contact support.' });
     }
-    // Twilio-specific error codes
-    if (error.code === 60200) return res.status(400).json({ message: 'Invalid phone number format.' });
-    if (error.code === 60203) return res.status(429).json({ message: 'Max OTP attempts reached. Please wait 10 minutes and try again.' });
-    if (error.code === 60212) return res.status(429).json({ message: 'Too many requests. Please wait a moment and try again.' });
-    if (error.code === 20003) return res.status(500).json({ message: 'SMS service authentication failed. Contact support.' });
-    if (error.code === 20404) return res.status(500).json({ message: 'SMS service not found. Contact support.' });
+    if (error.message.includes('Too many')) {
+      return res.status(429).json({ message: error.message });
+    }
 
+    // Generic error
     res.status(400).json({ message: error.message || 'Failed to send OTP. Please try again.' });
   }
 });
@@ -74,14 +69,11 @@ router.post('/verify-otp', async (req, res) => {
     }
 
     const e164 = toE164(phone);
-    const client = getTwilioClient();
 
-    const check = await client.verify.v2.services(getVerifySid()).verificationChecks.create({
-      to: e164,
-      code,
-    });
+    // Verify OTP via MSG91 (automatically falls back to Twilio if needed)
+    const result = await verifyOTP(e164, code);
 
-    if (check.status !== 'approved') {
+    if (!result.verified) {
       return res.status(401).json({ message: 'Invalid or expired OTP. Please try again.' });
     }
 
@@ -146,12 +138,19 @@ router.post('/verify-otp', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Verify OTP error:', error.message, error.code, error.status);
-    if (error.status === 404 || error.code === 20404) {
-      return res.status(401).json({ message: 'OTP has expired or already been used. Please request a new one.' });
+    console.error('Verify OTP error:', error.message);
+
+    // Handle common verification errors
+    if (error.message.includes('expired') || error.message.includes('already been used')) {
+      return res.status(401).json({ message: error.message });
     }
-    if (error.code === 60200) return res.status(400).json({ message: 'Invalid phone number.' });
-    if (error.code === 60202) return res.status(429).json({ message: 'Max verification attempts reached. Please request a new OTP.' });
+    if (error.message.includes('Invalid OTP')) {
+      return res.status(401).json({ message: error.message });
+    }
+    if (error.message.includes('Too many')) {
+      return res.status(429).json({ message: error.message });
+    }
+
     res.status(500).json({ message: error.message || 'Verification failed. Please try again.' });
   }
 });
@@ -167,24 +166,29 @@ router.post('/check-otp', async (req, res) => {
     }
 
     const e164 = toE164(phone);
-    const client = getTwilioClient();
 
-    const check = await client.verify.v2.services(getVerifySid()).verificationChecks.create({
-      to: e164,
-      code,
-    });
+    // Verify OTP via MSG91 (automatically falls back to Twilio if needed)
+    const result = await verifyOTP(e164, code);
 
-    if (check.status !== 'approved') {
+    if (!result.verified) {
       return res.status(401).json({ message: 'Invalid or expired OTP. Please try again.' });
     }
 
     res.json({ success: true, verified: true });
   } catch (error) {
-    console.error('Check OTP error:', error.message, error.code, error.status);
-    if (error.status === 404 || error.code === 20404) {
-      return res.status(401).json({ message: 'OTP has expired or already been used. Please request a new one.' });
+    console.error('Check OTP error:', error.message);
+
+    // Handle common verification errors
+    if (error.message.includes('expired') || error.message.includes('already been used')) {
+      return res.status(401).json({ message: error.message });
     }
-    if (error.code === 60202) return res.status(429).json({ message: 'Max verification attempts reached. Please request a new OTP.' });
+    if (error.message.includes('Invalid OTP')) {
+      return res.status(401).json({ message: error.message });
+    }
+    if (error.message.includes('Too many')) {
+      return res.status(429).json({ message: error.message });
+    }
+
     res.status(500).json({ message: error.message || 'Verification failed. Please try again.' });
   }
 });

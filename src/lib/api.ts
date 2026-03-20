@@ -204,6 +204,14 @@ export const authAPI = {
       throw new Error(data.error?.message || data.message || 'Worker registration failed');
     }
     return data;
+  },
+
+  // Google OAuth login/signup
+  googleLogin: async (credential: string) => {
+    return apiCall('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ credential })
+    });
   }
 };
 

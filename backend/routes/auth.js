@@ -11,6 +11,11 @@ import Notification from '../models/Notification.js';
 import Settings from '../models/Settings.js';
 import User from '../models/User.js';
 import { sendPasswordChangeConfirmation, sendPasswordResetEmail, sendPasswordResetOtpEmail, sendSignupOtpEmail } from '../utils/emailService.js';
+import { sendOTP, verifyOTP } from '../utils/msg91Service.js';
+
+// Google OAuth
+import { OAuth2Client } from 'google-auth-library';
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 function getTwilioClient() {
   const sid = process.env.TWILIO_ACCOUNT_SID;
@@ -656,8 +661,8 @@ router.post('/forgot-password-phone',
         return res.json({ success: true, message: 'If that phone is registered, an OTP has been sent.' });
       }
 
-      const client = getTwilioClient();
-      await client.verify.v2.services(getVerifySid()).verifications.create({ to: e164, channel: 'sms' });
+      // Send OTP via MSG91 (automatically falls back to Twilio if configured)
+      await sendOTP(e164);
 
       res.json({ success: true, message: 'OTP sent to your phone.' });
     } catch (error) {
@@ -695,10 +700,10 @@ router.post('/reset-password-phone',
       const { phone, otp, newPassword } = req.body;
       const e164 = toE164(phone);
 
-      const client = getTwilioClient();
-      const check = await client.verify.v2.services(getVerifySid()).verificationChecks.create({ to: e164, code: otp });
+      // Verify OTP via MSG91 (automatically falls back to Twilio if needed)
+      const result = await verifyOTP(e164, otp);
 
-      if (check.status !== 'approved') {
+      if (!result.verified) {
         return res.status(400).json({ error: { message: 'Invalid or expired OTP', status: 400 } });
       }
 
@@ -716,9 +721,16 @@ router.post('/reset-password-phone',
 
       res.json({ success: true, message: 'Password reset successfully. You can now log in.' });
     } catch (error) {
-      console.error('Reset password phone error:', error.message, error.code);
-      if (error.code === 60200) return res.status(400).json({ error: { message: 'Invalid phone number', status: 400 } });
-      if (error.code === 60202) return res.status(400).json({ error: { message: 'Incorrect OTP', status: 400 } });
+      console.error('Reset password phone error:', error.message);
+
+      // Handle verification errors
+      if (error.message.includes('Invalid OTP')) {
+        return res.status(400).json({ error: { message: 'Incorrect OTP', status: 400 } });
+      }
+      if (error.message.includes('expired')) {
+        return res.status(400).json({ error: { message: 'OTP has expired. Please request a new one.', status: 400 } });
+      }
+
       res.status(500).json({ error: { message: error.message || 'Server error', status: 500 } });
     }
   }
@@ -818,7 +830,12 @@ router.post('/register-worker',
   ]),
   async (req, res) => {
     try {
-      const { name, email, password, phone, gender, experience, skills, location, phoneVerified } = req.body;
+      const { name, email, password, phone, gender, experience, skills, location, phoneVerified, emailVerified, contactMethod, otpVerified } = req.body;
+
+      // Validate OTP verification
+      if (otpVerified !== 'true') {
+        return res.status(400).json({ error: { message: 'Please verify your email or phone before registering', status: 400 } });
+      }
 
       // Validate required text fields
       if (!name || !email || !password || !phone) {
@@ -897,7 +914,8 @@ router.post('/register-worker',
         gender: gender || 'prefer_not_to_say',
         profileImage: `/uploads/profile-pics/${profilePicFile.filename}`,
         isFirstLogin: false,
-        isPhoneVerified: phoneVerified === 'true' || phoneVerified === true,
+        isPhoneVerified: contactMethod === 'phone' && (phoneVerified === 'true' || phoneVerified === true),
+        isEmailVerified: contactMethod === 'email' && (emailVerified === 'true' || emailVerified === true),
         workerProfile: {
           experience: parseInt(experience) || 0,
           specialization: parsedSkills,
@@ -996,5 +1014,135 @@ router.post('/register-worker',
     }
   }
 );
+
+// @route   POST /api/auth/google
+// @desc    Google OAuth login/signup (customers only)
+// @access  Public
+router.post('/google', async (req, res) => {
+  try {
+    const { credential } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({ error: { message: 'Google credential is required', status: 400 } });
+    }
+
+    // Check if Google OAuth is configured
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      return res.status(500).json({
+        error: { message: 'Google authentication is not configured. Please use email signup.', status: 500 }
+      });
+    }
+
+    // Verify Google token
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload) {
+      return res.status(401).json({ error: { message: 'Invalid Google token', status: 401 } });
+    }
+
+    const { email, name, picture, sub: googleId, email_verified } = payload;
+
+    if (!email) {
+      return res.status(400).json({ error: { message: 'Email not provided by Google', status: 400 } });
+    }
+
+    // Check if user exists (by email or Google ID)
+    let user = await User.findOne({
+      $or: [
+        { email: email.toLowerCase().trim() },
+        { 'oauthProviders.google.id': googleId }
+      ],
+      role: 'customer' // Only customers can use OAuth
+    });
+
+    if (!user) {
+      // Create new customer account
+      user = new User({
+        name: name || 'Customer',
+        email: email.toLowerCase().trim(),
+        role: 'customer',
+        profileImage: picture || undefined,
+        isEmailVerified: email_verified || true, // Google verified the email
+        oauthProviders: {
+          google: {
+            id: googleId,
+            email,
+            linkedAt: new Date()
+          }
+        },
+        // Generate random password (OAuth users don't need it)
+        password: crypto.randomBytes(32).toString('hex'),
+        isFirstLogin: false
+      });
+
+      await user.save();
+      console.log(`✅ New customer via Google OAuth: ${email} (ID: ${user._id})`);
+    } else {
+      // Update OAuth info if not already linked
+      if (!user.oauthProviders?.google?.id) {
+        user.oauthProviders = {
+          ...user.oauthProviders,
+          google: {
+            id: googleId,
+            email,
+            linkedAt: new Date()
+          }
+        };
+
+        // Update profile image if not set
+        if (!user.profileImage && picture) {
+          user.profileImage = picture;
+        }
+
+        await user.save();
+        console.log(`✅ Linked Google OAuth to existing customer: ${email}`);
+      }
+    }
+
+    // Check if account is active
+    if (!user.isActive) {
+      return res.status(401).json({
+        error: { message: 'Account is deactivated', status: 401 }
+      });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+
+    res.json({
+      success: true,
+      message: user.isNew ? 'Account created successfully' : 'Login successful',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        profileImage: user.profileImage
+      }
+    });
+  } catch (error) {
+    console.error('Google OAuth error:', error);
+
+    // Handle specific Google OAuth errors
+    if (error.message?.includes('Token used too late') || error.message?.includes('Invalid token')) {
+      return res.status(401).json({
+        error: { message: 'Google authentication session expired. Please try again.', status: 401 }
+      });
+    }
+
+    res.status(500).json({
+      error: { message: 'Google authentication failed. Please try again or use email signup.', status: 500 }
+    });
+  }
+});
 
 export default router;

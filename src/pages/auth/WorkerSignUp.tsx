@@ -14,7 +14,7 @@ import {
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-type Step = "form" | "skills" | "documents" | "location" | "pending";
+type Step = "form" | "verify" | "skills" | "documents" | "location" | "pending";
 
 const SKILLS = [
   "General Cleaning",
@@ -56,6 +56,13 @@ const WorkerSignUp = () => {
   const [error, setError] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
 
+  // OTP verification states
+  const [contactMethod, setContactMethod] = useState<"email" | "phone">("email");
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+
   const [availableLocations, setAvailableLocations] = useState<AvailableLocation[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState("");
 
@@ -95,6 +102,56 @@ const WorkerSignUp = () => {
 
   const toggleSkill = (skill: string) =>
     setSelectedSkills((prev) => (prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill]));
+
+  const handleSendOTP = async () => {
+    setOtpLoading(true);
+    setError("");
+    try {
+      if (contactMethod === "email") {
+        await authAPI.sendEmailOTP(form.email.trim().toLowerCase());
+      } else {
+        const digits = form.phone.replace(/\D/g, "").slice(-10);
+        await authAPI.sendOTP("+91" + digits);
+      }
+      setOtpSent(true);
+      setError("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send OTP. Please try again.");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    if (otp.length !== 6) {
+      setError("Please enter a 6-digit OTP");
+      return;
+    }
+    setOtpLoading(true);
+    setError("");
+    try {
+      if (contactMethod === "email") {
+        await authAPI.verifyEmailOTP(form.email.trim().toLowerCase(), otp);
+      } else {
+        const digits = form.phone.replace(/\D/g, "").slice(-10);
+        await authAPI.checkOTP("+91" + digits, otp);
+      }
+      setOtpVerified(true);
+      setError("");
+      // Move to skills step after successful verification
+      setTimeout(() => setStep("skills"), 500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Invalid OTP. Please try again.");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    setOtp("");
+    setError("");
+    await handleSendOTP();
+  };
 
   const handleFileChange = (
     file: File | null,
@@ -185,7 +242,7 @@ const WorkerSignUp = () => {
       return;
     }
     setError("");
-    setStep("skills");
+    setStep("verify");
   };
 
   const handleSkillsNext = () => {
@@ -219,6 +276,10 @@ const WorkerSignUp = () => {
       setError("Please select a service area");
       return;
     }
+    if (!otpVerified) {
+      setError("Please verify your email or phone first");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
@@ -231,7 +292,10 @@ const WorkerSignUp = () => {
       formData.append("gender", form.gender || "prefer_not_to_say");
       formData.append("experience", form.experience || "0");
       formData.append("skills", JSON.stringify(selectedSkills));
-      formData.append("phoneVerified", "false");
+      formData.append("phoneVerified", contactMethod === "phone" ? "true" : "false");
+      formData.append("emailVerified", contactMethod === "email" ? "true" : "false");
+      formData.append("contactMethod", contactMethod);
+      formData.append("otpVerified", "true");
       formData.append("locationId", selectedLocationId);
       formData.append("wageType", form.wageType || "hourly");
       if (form.dateOfBirth) formData.append("dateOfBirth", form.dateOfBirth);
@@ -252,8 +316,8 @@ const WorkerSignUp = () => {
     }
   };
 
-  const stepLabels = ["Your details", "Skills", "Documents", "Service area"];
-  const stepIdx = step === "form" ? 0 : step === "skills" ? 1 : step === "documents" ? 2 : 3;
+  const stepLabels = ["Your details", "Verify contact", "Skills", "Documents", "Service area"];
+  const stepIdx = step === "form" ? 0 : step === "verify" ? 1 : step === "skills" ? 2 : step === "documents" ? 3 : 4;
 
   if (step === "pending") {
     return (
@@ -376,7 +440,7 @@ const WorkerSignUp = () => {
                       required
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Required temporarily while OTP signup is disabled</p>
+                  <p className="text-xs text-muted-foreground mt-1">Used for OTP verification and future login</p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -517,6 +581,165 @@ const WorkerSignUp = () => {
                   Log in
                 </Link>
               </p>
+            </>
+          )}
+
+          {step === "verify" && (
+            <>
+              <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Verify your contact</h2>
+              <p className="text-muted-foreground mb-6">
+                {otpSent
+                  ? `Enter the 6-digit code sent to your ${contactMethod}`
+                  : "Choose how you want to verify your account"}
+              </p>
+
+              {!otpSent ? (
+                <>
+                  <div className="space-y-3 mb-6">
+                    <button
+                      type="button"
+                      onClick={() => setContactMethod("email")}
+                      className={`w-full flex items-center justify-between p-4 border-2 rounded-xl transition-all ${
+                        contactMethod === "email"
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:bg-accent"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          contactMethod === "email" ? "bg-primary text-primary-foreground" : "bg-muted"
+                        }`}>
+                          📧
+                        </div>
+                        <div className="text-left">
+                          <div className="font-semibold text-sm">Verify via Email</div>
+                          <div className="text-xs text-muted-foreground">{form.email}</div>
+                        </div>
+                      </div>
+                      {contactMethod === "email" && (
+                        <CheckCircle className="w-5 h-5 text-primary" />
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setContactMethod("phone")}
+                      className={`w-full flex items-center justify-between p-4 border-2 rounded-xl transition-all ${
+                        contactMethod === "phone"
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:bg-accent"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          contactMethod === "phone" ? "bg-primary text-primary-foreground" : "bg-muted"
+                        }`}>
+                          📱
+                        </div>
+                        <div className="text-left">
+                          <div className="font-semibold text-sm">Verify via Phone</div>
+                          <div className="text-xs text-muted-foreground">+91 {form.phone}</div>
+                        </div>
+                      </div>
+                      {contactMethod === "phone" && (
+                        <CheckCircle className="w-5 h-5 text-primary" />
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800 mb-6">
+                    We'll send a 6-digit verification code to your selected {contactMethod}
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStep("form");
+                        setError("");
+                      }}
+                      className="flex-1 py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSendOTP}
+                      disabled={otpLoading}
+                      className="btn-brand flex-1"
+                    >
+                      {otpLoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
+                          Sending...
+                        </>
+                      ) : (
+                        "Send OTP"
+                      )}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Enter 6-digit OTP
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      className="input-clean text-center text-2xl font-bold tracking-widest"
+                      placeholder="000000"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                      autoFocus
+                    />
+                    <p className="text-xs text-muted-foreground mt-2 text-center">
+                      Code sent to {contactMethod === "email" ? form.email : `+91 ${form.phone}`}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleVerifyOTP}
+                    disabled={otpLoading || otp.length !== 6}
+                    className="btn-brand w-full mb-3"
+                  >
+                    {otpLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
+                        Verifying...
+                      </>
+                    ) : (
+                      "Verify OTP"
+                    )}
+                  </button>
+
+                  <div className="text-center">
+                    <button
+                      type="button"
+                      onClick={handleResendOTP}
+                      disabled={otpLoading}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      Didn't receive code? Resend OTP
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOtpSent(false);
+                      setOtp("");
+                      setError("");
+                    }}
+                    className="w-full mt-4 py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm"
+                  >
+                    Change verification method
+                  </button>
+                </>
+              )}
             </>
           )}
 
