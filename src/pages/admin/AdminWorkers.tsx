@@ -82,6 +82,24 @@ const AdminWorkers = () => {
   const [archiveWorkerData, setArchiveWorkerData] = useState<{ id: string; name: string } | null>(null);
   const [resignedDate, setResignedDate] = useState("");
 
+  // Edit documents state
+  const [editDocumentsWorker, setEditDocumentsWorker] = useState<Worker | null>(null);
+  const [updatingDocuments, setUpdatingDocuments] = useState(false);
+  const [editDocFiles, setEditDocFiles] = useState<{
+    profilePicture: File | null;
+    aadhaarFront: File | null;
+    aadhaarBack: File | null;
+  }>({
+    profilePicture: null,
+    aadhaarFront: null,
+    aadhaarBack: null
+  });
+  const [editAadhaarNumber, setEditAadhaarNumber] = useState("");
+
+  const editProfilePicRef = useRef<HTMLInputElement>(null);
+  const editAadhaarFrontRef = useRef<HTMLInputElement>(null);
+  const editAadhaarBackRef = useRef<HTMLInputElement>(null);
+
   const [workerForm, setWorkerForm] = useState({
     name: "",
     email: "",
@@ -187,6 +205,58 @@ const AdminWorkers = () => {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to restore worker';
       alert(message);
+    }
+  };
+
+  const handleOpenEditDocuments = (worker: Worker) => {
+    setEditDocumentsWorker(worker);
+    // Pre-populate aadhaar number if exists
+    // Note: We'd need to fetch this from backend or extend Worker interface
+    setEditAadhaarNumber("");
+    setEditDocFiles({ profilePicture: null, aadhaarFront: null, aadhaarBack: null });
+  };
+
+  const handleUpdateDocuments = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!editDocumentsWorker) return;
+
+    // Validate Aadhaar number if provided
+    if (editAadhaarNumber) {
+      const digits = editAadhaarNumber.replace(/\s/g, '');
+      if (!/^\d{12}$/.test(digits)) {
+        alert('Aadhaar number must be exactly 12 digits');
+        return;
+      }
+    }
+
+    // At least one document must be selected or aadhaar number provided
+    if (!editDocFiles.profilePicture && !editDocFiles.aadhaarFront && !editDocFiles.aadhaarBack && !editAadhaarNumber) {
+      alert('Please select at least one document to upload or provide Aadhaar number');
+      return;
+    }
+
+    setUpdatingDocuments(true);
+
+    try {
+      const formData = new FormData();
+      if (editDocFiles.profilePicture) formData.append('profilePicture', editDocFiles.profilePicture);
+      if (editDocFiles.aadhaarFront) formData.append('aadhaarFront', editDocFiles.aadhaarFront);
+      if (editDocFiles.aadhaarBack) formData.append('aadhaarBack', editDocFiles.aadhaarBack);
+      if (editAadhaarNumber) formData.append('aadhaarNumber', editAadhaarNumber.replace(/\s/g, ''));
+
+      await adminAPI.updateWorkerDocuments(editDocumentsWorker._id, formData);
+
+      alert('Worker documents updated successfully!');
+      setEditDocumentsWorker(null);
+      setEditAadhaarNumber("");
+      setEditDocFiles({ profilePicture: null, aadhaarFront: null, aadhaarBack: null });
+      fetchData();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update worker documents';
+      alert('❌ Error: ' + message);
+    } finally {
+      setUpdatingDocuments(false);
     }
   };
 
@@ -547,12 +617,20 @@ const AdminWorkers = () => {
                       <ArchiveRestore className="w-3.5 h-3.5" /> Restore Worker
                     </button>
                   ) : (
-                    <button
-                      onClick={() => handleArchiveWorker(w._id, w.name)}
-                      className="w-full py-2 border border-amber-300 rounded-xl text-sm font-medium text-amber-700 hover:bg-amber-50 transition-colors flex items-center justify-center gap-1"
-                    >
-                      <Archive className="w-3.5 h-3.5" /> Archive Worker
-                    </button>
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => handleOpenEditDocuments(w)}
+                        className="w-full py-2 border border-blue-300 rounded-xl text-sm font-medium text-blue-700 hover:bg-blue-50 transition-colors flex items-center justify-center gap-1"
+                      >
+                        <Edit className="w-3.5 h-3.5" /> Edit Documents
+                      </button>
+                      <button
+                        onClick={() => handleArchiveWorker(w._id, w.name)}
+                        className="w-full py-2 border border-amber-300 rounded-xl text-sm font-medium text-amber-700 hover:bg-amber-50 transition-colors flex items-center justify-center gap-1"
+                      >
+                        <Archive className="w-3.5 h-3.5" /> Archive Worker
+                      </button>
+                    </div>
                   )}
                 </div>
               );
@@ -951,6 +1029,143 @@ const AdminWorkers = () => {
                   Confirm Archive
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Documents Modal */}
+        {editDocumentsWorker && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-background rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold">Edit Worker Documents</h2>
+                <button onClick={() => setEditDocumentsWorker(null)} className="text-muted-foreground hover:text-foreground">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="mb-4 p-3 bg-accent rounded-lg">
+                <p className="text-sm font-semibold text-foreground">{editDocumentsWorker.name}</p>
+                <p className="text-xs text-muted-foreground">{editDocumentsWorker.email}</p>
+              </div>
+
+              <form onSubmit={handleUpdateDocuments} className="space-y-4">
+                {/* Profile Picture */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Profile Picture</label>
+                  <input
+                    ref={editProfilePicRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(e) => setEditDocFiles(prev => ({ ...prev, profilePicture: e.target.files?.[0] || null }))}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => editProfilePicRef.current?.click()}
+                    className="flex items-center gap-2 text-xs px-3 py-2 border border-dashed border-border rounded-lg hover:bg-muted transition-colors w-full"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-muted-foreground" />
+                    {editDocFiles.profilePicture ? (
+                      <span className="text-foreground">{editDocFiles.profilePicture.name}</span>
+                    ) : (
+                      <span className="text-muted-foreground">Upload new profile photo (JPEG/PNG)</span>
+                    )}
+                  </button>
+                </div>
+
+                {/* Aadhaar Front */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Aadhaar Card — Front</label>
+                  <input
+                    ref={editAadhaarFrontRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
+                    className="hidden"
+                    onChange={(e) => setEditDocFiles(prev => ({ ...prev, aadhaarFront: e.target.files?.[0] || null }))}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => editAadhaarFrontRef.current?.click()}
+                    className="flex items-center gap-2 text-xs px-3 py-2 border border-dashed border-border rounded-lg hover:bg-muted transition-colors w-full"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-muted-foreground" />
+                    {editDocFiles.aadhaarFront ? (
+                      <span className="text-foreground">{editDocFiles.aadhaarFront.name}</span>
+                    ) : (
+                      <span className="text-muted-foreground">Upload new Aadhaar front (image or PDF)</span>
+                    )}
+                  </button>
+                </div>
+
+                {/* Aadhaar Back */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Aadhaar Card — Back</label>
+                  <input
+                    ref={editAadhaarBackRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
+                    className="hidden"
+                    onChange={(e) => setEditDocFiles(prev => ({ ...prev, aadhaarBack: e.target.files?.[0] || null }))}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => editAadhaarBackRef.current?.click()}
+                    className="flex items-center gap-2 text-xs px-3 py-2 border border-dashed border-border rounded-lg hover:bg-muted transition-colors w-full"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-muted-foreground" />
+                    {editDocFiles.aadhaarBack ? (
+                      <span className="text-foreground">{editDocFiles.aadhaarBack.name}</span>
+                    ) : (
+                      <span className="text-muted-foreground">Upload new Aadhaar back (image or PDF)</span>
+                    )}
+                  </button>
+                </div>
+
+                {/* Aadhaar Number */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Aadhaar Number</label>
+                  <input
+                    type="text"
+                    className="input-clean"
+                    placeholder="XXXX XXXX XXXX"
+                    maxLength={14}
+                    value={editAadhaarNumber}
+                    onChange={(e) => {
+                      // Allow only digits and spaces
+                      const val = e.target.value.replace(/[^\d\s]/g, '');
+                      setEditAadhaarNumber(val);
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Must be exactly 12 digits
+                    {editAadhaarNumber && (
+                      <span className={`ml-2 ${editAadhaarNumber.replace(/\s/g, '').length === 12 ? 'text-green-600' : 'text-destructive'}`}>
+                        {editAadhaarNumber.replace(/\s/g, '').length}/12
+                      </span>
+                    )}
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setEditDocumentsWorker(null)}
+                    className="w-full sm:flex-1 py-2 border border-border rounded-xl"
+                    disabled={updatingDocuments}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="w-full sm:flex-1 btn-brand py-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    disabled={updatingDocuments}
+                  >
+                    {updatingDocuments && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {updatingDocuments ? 'Updating...' : 'Update Documents'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
