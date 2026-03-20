@@ -747,8 +747,8 @@ router.patch('/preferences', authenticate, async (req, res) => {
     ).select('-password');
 
     if (!user) {
-      return res.status(404).json({ 
-        error: { message: 'User not found', status: 404 } 
+      return res.status(404).json({
+        error: { message: 'User not found', status: 404 }
       });
     }
 
@@ -758,6 +758,93 @@ router.patch('/preferences', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('Update preferences error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   POST /api/auth/update-location
+// @desc    Update customer location (used after Google OAuth signup)
+// @access  Private
+router.post('/update-location', authenticate, async (req, res) => {
+  try {
+    const { locationId } = req.body;
+
+    if (!locationId) {
+      return res.status(400).json({
+        error: { message: 'Location ID is required', status: 400 }
+      });
+    }
+
+    // Only customers can update location this way
+    if (req.user.role !== 'customer') {
+      return res.status(403).json({
+        error: { message: 'This endpoint is only for customer accounts', status: 403 }
+      });
+    }
+
+    // Find the location document
+    const foundLocation = await Location.findById(locationId).select('_id apartmentName area city state zipCode location');
+    if (!foundLocation) {
+      return res.status(400).json({
+        error: { message: 'Selected location does not exist. Please choose a valid location.', status: 400 }
+      });
+    }
+
+    // Prepare location data
+    const updateData = {};
+
+    // Add to addresses array
+    if (foundLocation.location?.coordinates?.length === 2) {
+      updateData.addresses = [{
+        label: 'Home',
+        street: '',
+        area: foundLocation.area || '',
+        city: foundLocation.city || '',
+        zipCode: foundLocation.zipCode || '',
+        location: {
+          type: 'Point',
+          coordinates: foundLocation.location.coordinates // [longitude, latitude]
+        },
+        isDefault: true
+      }];
+
+      // Set currentLocation
+      updateData.currentLocation = {
+        type: 'Point',
+        coordinates: foundLocation.location.coordinates,
+        lastUpdated: new Date()
+      };
+    }
+
+    // Update user
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({
+        error: { message: 'User not found', status: 404 }
+      });
+    }
+
+    console.log(`✅ Location updated for customer ${user.email}: ${foundLocation.city}, ${foundLocation.area}`);
+
+    res.json({
+      success: true,
+      message: 'Location updated successfully',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        addresses: user.addresses,
+        currentLocation: user.currentLocation
+      }
+    });
+  } catch (error) {
+    console.error('Update location error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
   }
 });

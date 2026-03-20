@@ -212,6 +212,14 @@ export const authAPI = {
       method: 'POST',
       body: JSON.stringify({ credential })
     });
+  },
+
+  // Update customer location after OAuth signup
+  updateLocation: async (locationId: string) => {
+    return apiCall('/auth/update-location', {
+      method: 'POST',
+      body: JSON.stringify({ locationId })
+    });
   }
 };
 

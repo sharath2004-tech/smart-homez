@@ -82,6 +82,7 @@ const CustomerSignUp = () => {
   const [citiesLoading, setCitiesLoading] = useState(false);
   const [selectedCity, setSelectedCity] = useState("");
   const [selectedLocationId, setSelectedLocationId] = useState("");
+  const [isOAuthFlow, setIsOAuthFlow] = useState(false);
 
   // Google OAuth handler
   const handleGoogleSuccess = async (credential: string) => {
@@ -91,10 +92,9 @@ const CustomerSignUp = () => {
       const response = await authAPI.googleLogin(credential);
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
-      setStep("done");
-      setTimeout(() => {
-        window.location.href = "/customer/dashboard";
-      }, 2000);
+      // Instead of going to dashboard, show location step
+      setIsOAuthFlow(true);
+      setStep("location");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google login failed. Please try again.");
     } finally {
@@ -280,6 +280,32 @@ const CustomerSignUp = () => {
       lng: loc.coordinates?.lng ?? 0,
     };
     await registerAccount(geo);
+  };
+
+  // Handle location confirmation for OAuth users
+  const handleOAuthLocationConfirm = async () => {
+    if (!selectedCity) {
+      setError("Please select your city");
+      return;
+    }
+    if (!selectedLocationId) {
+      setError("Please select your area / apartment");
+      return;
+    }
+    setError("");
+    setLoading(true);
+
+    try {
+      await authAPI.updateLocation(selectedLocationId);
+      setStep("done");
+      setTimeout(() => {
+        window.location.href = "/customer/dashboard";
+      }, 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update location. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const steps = ["Your details", "Your area", "All set!"];
@@ -515,8 +541,14 @@ const CustomerSignUp = () => {
 
           {step === "location" && (
             <>
-              <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Select your area</h2>
-              <p className="text-muted-foreground mb-5">Choose the city and location where you need home services.</p>
+              <h2 className="text-2xl font-bold font-heading text-foreground mb-1">
+                {isOAuthFlow ? "One more thing!" : "Select your area"}
+              </h2>
+              <p className="text-muted-foreground mb-5">
+                {isOAuthFlow
+                  ? "Choose your location so we can connect you with nearby workers."
+                  : "Choose the city and location where you need home services."}
+              </p>
 
               {citiesLoading ? (
                 <div className="flex items-center justify-center py-10">
@@ -599,33 +631,36 @@ const CustomerSignUp = () => {
 
               <div className="space-y-3 mt-6">
                 <button
-                  onClick={handleConfirmLocation}
+                  onClick={isOAuthFlow ? handleOAuthLocationConfirm : handleConfirmLocation}
                   disabled={loading || !selectedCity || !selectedLocationId}
                   className="btn-brand w-full flex items-center justify-center gap-2"
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" /> Creating account…
+                      <Loader2 className="w-4 h-4 animate-spin" /> {isOAuthFlow ? "Updating location…" : "Creating account…"}
                     </>
                   ) : (
                     <>
-                      <MapPin className="w-4 h-4" /> Confirm &amp; Create Account
+                      <MapPin className="w-4 h-4" /> {isOAuthFlow ? "Confirm Location" : "Confirm & Create Account"}
                     </>
                   )}
                 </button>
 
-                <button
-                  onClick={handleSkipLocation}
-                  disabled={loading}
-                  className="w-full py-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Skip — I'll set location later
-                </button>
+                {!isOAuthFlow && (
+                  <button
+                    onClick={handleSkipLocation}
+                    disabled={loading}
+                    className="w-full py-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Skip — I'll set location later
+                  </button>
+                )}
 
                 <button
                   onClick={() => {
                     setStep("form");
                     setError("");
+                    setIsOAuthFlow(false);
                   }}
                   className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm"
                 >
