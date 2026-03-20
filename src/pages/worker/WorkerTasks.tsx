@@ -91,11 +91,11 @@ const WorkerTasks = () => {
   };
 
   const handleCompleteTask = async (taskId: string) => {
-    if (confirm('Mark this task as completed?')) {
+    if (confirm('Mark this task as completed? It will be sent for admin approval.')) {
       try {
-        await bookingsAPI.update(taskId, { status: 'completed', completedAt: new Date().toISOString() });
+        await bookingsAPI.update(taskId, { status: 'pending-review', completedAt: new Date().toISOString() });
         await fetchTasks();
-        setActiveTab('completed');
+        alert('Task submitted for admin approval. Please upload payment proof.');
       } catch (error) {
         console.error('Error completing task:', error);
         alert('Failed to complete task');

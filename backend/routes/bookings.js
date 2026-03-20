@@ -2459,6 +2459,13 @@ router.post('/:id/admin-approve',
         });
       }
 
+      // Require payment proof to be uploaded before approval
+      if (!booking.paymentProof || !booking.paymentProof.url) {
+        return res.status(400).json({
+          error: { message: 'Payment proof must be uploaded before admin can approve completion', status: 400 }
+        });
+      }
+
       booking.status = 'completed';
 
       // Mark all photos as verified

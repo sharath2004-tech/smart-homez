@@ -147,9 +147,9 @@ const WorkerDashboard = () => {
 
     if (confirm(t('worker.dashboard.markCompletedConfirm'))) {
       try {
-        await bookingsAPI.update(currentTask._id, { status: 'completed', completedAt: new Date().toISOString() });
+        await bookingsAPI.update(currentTask._id, { status: 'pending-review', completedAt: new Date().toISOString() });
         await fetchDashboardData();
-        alert(t('worker.dashboard.serviceCompletedSuccess'));
+        alert('Service marked as completed. Awaiting admin approval.');
       } catch (error) {
         console.error('Error completing service:', error);
         alert(t('worker.dashboard.failedCompleteService'));

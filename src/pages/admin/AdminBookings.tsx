@@ -525,14 +525,23 @@ const AdminBookings = () => {
 
               {/* Approve Button for pending-review bookings */}
               {selectedProofBooking.status === 'pending-review' && (
-                <button
-                  onClick={() => handleApproveBooking(selectedProofBooking._id)}
-                  disabled={approvingBookingId === selectedProofBooking._id}
-                  className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
-                >
-                  <CheckCircle className="w-5 h-5" />
-                  {approvingBookingId === selectedProofBooking._id ? 'Approving…' : 'Approve & Mark Complete'}
-                </button>
+                <>
+                  {!selectedProofBooking.paymentProof?.url && (
+                    <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 text-center">
+                      <p className="text-red-700 font-semibold mb-1">⚠️ Payment Proof Required</p>
+                      <p className="text-sm text-red-600">Payment proof must be uploaded before approval</p>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => handleApproveBooking(selectedProofBooking._id)}
+                    disabled={approvingBookingId === selectedProofBooking._id || !selectedProofBooking.paymentProof?.url}
+                    className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
+                    title={!selectedProofBooking.paymentProof?.url ? 'Payment proof must be uploaded first' : 'Approve and mark as completed'}
+                  >
+                    <CheckCircle className="w-5 h-5" />
+                    {approvingBookingId === selectedProofBooking._id ? 'Approving…' : 'Approve & Mark Complete'}
+                  </button>
+                </>
               )}
 
               <button
