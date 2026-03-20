@@ -1146,8 +1146,11 @@ router.post('/google', async (req, res) => {
       role: 'customer' // Only customers can use OAuth
     });
 
+    let isNewUser = false;
+
     if (!user) {
       // Create new customer account
+      isNewUser = true;
       user = new User({
         name: name || 'Customer',
         email: email.toLowerCase().trim(),
@@ -1187,6 +1190,8 @@ router.post('/google', async (req, res) => {
 
         await user.save();
         console.log(`✅ Linked Google OAuth to existing customer: ${email}`);
+      } else {
+        console.log(`✅ Existing customer signed in via Google OAuth: ${email}`);
       }
     }
 
@@ -1197,6 +1202,9 @@ router.post('/google', async (req, res) => {
       });
     }
 
+    // Check if user has location data
+    const hasLocation = !!(user.addresses?.length > 0 || user.currentLocation?.coordinates?.length > 0);
+
     // Generate JWT token
     const token = jwt.sign(
       { userId: user._id, role: user.role },
@@ -1206,8 +1214,10 @@ router.post('/google', async (req, res) => {
 
     res.json({
       success: true,
-      message: user.isNew ? 'Account created successfully' : 'Login successful',
+      message: isNewUser ? 'Account created successfully' : 'Login successful',
       token,
+      isNewUser,
+      hasLocation,
       user: {
         id: user._id,
         name: user.name,

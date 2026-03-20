@@ -92,9 +92,22 @@ const CustomerSignUp = () => {
       const response = await authAPI.googleLogin(credential);
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
-      // Instead of going to dashboard, show location step
-      setIsOAuthFlow(true);
-      setStep("location");
+
+      // Check if this is a new user or existing user
+      const isNewUser = response.isNewUser === true;
+      const hasLocation = response.hasLocation === true;
+
+      if (isNewUser || !hasLocation) {
+        // New users or existing users without location → show location step
+        setIsOAuthFlow(true);
+        setStep("location");
+      } else {
+        // Existing user with location → go to dashboard
+        setStep("done");
+        setTimeout(() => {
+          window.location.href = "/customer/dashboard";
+        }, 1500);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google login failed. Please try again.");
     } finally {
@@ -542,11 +555,11 @@ const CustomerSignUp = () => {
           {step === "location" && (
             <>
               <h2 className="text-2xl font-bold font-heading text-foreground mb-1">
-                {isOAuthFlow ? "One more thing!" : "Select your area"}
+                {isOAuthFlow ? "One last step!" : "Select your area"}
               </h2>
               <p className="text-muted-foreground mb-5">
                 {isOAuthFlow
-                  ? "Choose your location so we can connect you with nearby workers."
+                  ? "Help us find the best workers near you by selecting your location."
                   : "Choose the city and location where you need home services."}
               </p>
 
