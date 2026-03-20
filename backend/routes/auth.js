@@ -58,6 +58,7 @@ const sensitiveAuthLimiter = rateLimit({
 // @desc    Register a new user
 // @access  Public
 router.post('/register',
+  sensitiveAuthLimiter,
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
     body('email').isEmail().withMessage('Valid email is required'),
@@ -241,6 +242,7 @@ router.post('/register',
 // @desc    Login user
 // @access  Public
 router.post('/login',
+  sensitiveAuthLimiter,
   [
     body('email').isEmail().withMessage('Valid email is required'),
     body('password').notEmpty().withMessage('Password is required')

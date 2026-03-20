@@ -998,7 +998,9 @@ router.put('/:id', authenticate, async (req, res) => {
         if (!existingEarnings) {
           // Get platform settings
           const settings = await Settings.getSettings();
-          const commissionRate = settings.earnings?.platformCommissionRate || 0;
+          // Validate commission rate is between 0 and 1
+          const rawCommissionRate = settings.earnings?.platformCommissionRate || 0;
+          const commissionRate = Math.min(1, Math.max(0, rawCommissionRate));
 
           // Calculate earnings
           const baseAmount = booking.totalAmount - (booking.overtimeCharges || 0);
@@ -1026,13 +1028,29 @@ router.put('/:id', authenticate, async (req, res) => {
             date: new Date()
           });
           
-          await earnings.save();
-          console.log(`✅ Earnings auto-created: ₹${netEarning.toFixed(2)} (Booking ${booking._id})`);
+          // Create earnings BEFORE marking booking complete
+          try {
+            await earnings.save();
+            console.log(`✅ Earnings auto-created: ₹${netEarning.toFixed(2)} (Booking ${booking._id})`);
+          } catch (saveError) {
+            console.error('❌ Failed to create earnings record:', saveError);
+            return res.status(500).json({ 
+              error: { 
+                message: 'Failed to create earnings record for worker', 
+                status: 500 
+              }
+            });
+          }
         }
       } catch (earningsError) {
-        // Log error but don't fail the booking update
-        console.error('❌ Error creating worker earnings:', earningsError);
-        console.error('Error details:', earningsError.message);
+        // Log error and fail the booking update
+        console.error('❌ Error processing worker earnings:', earningsError);
+        return res.status(500).json({ 
+          error: { 
+            message: 'Error processing worker earnings', 
+            status: 500 
+          }
+        });
       }
     }
 

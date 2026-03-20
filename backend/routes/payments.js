@@ -131,10 +131,18 @@ router.post('/',
         });
       }
 
+      // Calculate GST (18% for India)
+      const GST_RATE = 0.18;
+      const subtotal = amount / (1 + GST_RATE); // Extract base amount
+      const gstAmount = amount - subtotal;
+
       const payment = new Payment({
         booking,
         customer: req.user._id,
         amount,
+        subtotal,
+        gstAmount,
+        gstRate: GST_RATE,
         paymentMethod,
         transactionId,
         status: 'pending' // Remains pending until admin approves via /qr-payments/:id/admin-verify

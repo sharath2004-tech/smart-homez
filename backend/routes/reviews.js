@@ -12,11 +12,20 @@ router.post('/', authenticate, [
   body('overallRating').isInt({ min: 1, max: 5 }),
   body('categoryRatings.quality').isInt({ min: 1, max: 5 }),
   body('categoryRatings.timeliness').isInt({ min: 1, max: 5 }),
-  body('categoryRatings.professionalism').isInt({ min: 1, max: 5 })
+  body('categoryRatings.professionalism').isInt({ min: 1, max: 5 }),
+  body('comment').optional().isLength({ max: 500 }).withMessage('Comment max 500 characters')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+    // Verify worker exists BEFORE creating review
+    const worker = await User.findById(req.body.worker);
+    if (!worker) {
+      return res.status(404).json({ 
+        error: { message: 'Worker not found', status: 404 } 
+      });
+    }
 
     const review = new Review({
       ...req.body,
@@ -24,18 +33,26 @@ router.post('/', authenticate, [
     });
     await review.save();
 
-    const worker = await User.findById(req.body.worker);
-    if (!worker) {
-      // Review saved but worker not found for rating update
-      return res.status(201).json({ review });
+    // Safe rating aggregation with null checks
+    const currentRating = worker.workerProfile?.rating || 0;
+    const currentReviews = worker.workerProfile?.totalReviews || 0;
+    const currentTotal = currentRating * currentReviews;
+    const newTotal = currentTotal + req.body.overallRating;
+    const newCount = currentReviews + 1;
+    
+    // Initialize workerProfile if doesn't exist
+    if (!worker.workerProfile) {
+      worker.workerProfile = {};
     }
-    const totalRating = worker.workerProfile.rating * worker.workerProfile.totalReviews + req.body.overallRating;
-    worker.workerProfile.totalReviews += 1;
-    worker.workerProfile.rating = totalRating / worker.workerProfile.totalReviews;
+    
+    worker.workerProfile.totalReviews = newCount;
+    worker.workerProfile.rating = newTotal / newCount;
+    
     await worker.save();
 
     res.status(201).json({ review });
   } catch (error) {
+    console.error('Error creating review:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
   }
 });

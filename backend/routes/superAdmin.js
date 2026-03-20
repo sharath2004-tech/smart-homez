@@ -71,41 +71,148 @@ router.use(authenticate, authorize('super_admin'));
 // @desc    All locations with aggregate stats (workers, bookings, revenue)
 router.get('/overview', async (req, res) => {
   try {
-    const locations = await Location.find({ isActive: true })
-      .populate('assignedAdmin', 'name email')
-      .lean();
-
-    const overviewData = await Promise.all(
-      locations.map(async (loc) => {
-        const workers = await User.find({
-          role: 'worker',
-          isActive: true,
-          'workerProfile.assignedApartments.locationId': loc._id
-        }).select('_id workerProfile.availability workerProfile.rating').lean();
-
-        const workerIds = workers.map((w) => w._id);
-
-        const [activeBookings, completedBookings, revenueResult] = await Promise.all([
-          Booking.countDocuments({ worker: { $in: workerIds }, status: { $in: ['pending', 'confirmed', 'in-progress'] } }),
-          Booking.countDocuments({ worker: { $in: workerIds }, status: 'completed' }),
-          Booking.aggregate([
-            { $match: { worker: { $in: workerIds }, status: 'completed' } },
+    // Use aggregation pipeline to avoid N+1 queries
+    const overviewData = await Location.aggregate([
+      { $match: { isActive: true } },
+      {
+        $lookup: {
+          from: 'users',
+          let: { locationId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$role', 'worker'] },
+                    { $eq: ['$isActive', true] },
+                    {
+                      $in: ['$$locationId', '$workerProfile.assignedApartments.locationId']
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              $project: {
+                _id: 1,
+                availability: '$workerProfile.availability',
+                rating: '$workerProfile.rating'
+              }
+            }
+          ],
+          as: 'workers'
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'assignedAdmin',
+          foreignField: '_id',
+          as: 'adminData'
+        }
+      },
+      {
+        $addFields: {
+          workerIds: '$workers._id',
+          assignedAdmin: { $arrayElemAt: ['$adminData', 0] }
+        }
+      },
+      {
+        $lookup: {
+          from: 'bookings',
+          let: { workerIds: '$workerIds' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $in: ['$worker', '$$workerIds'] },
+                    { $in: ['$status', ['pending', 'confirmed', 'in-progress']] }
+                  ]
+                }
+              }
+            },
+            { $count: 'count' }
+          ],
+          as: 'activeBookingsData'
+        }
+      },
+      {
+        $lookup: {
+          from: 'bookings',
+          let: { workerIds: '$workerIds' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $in: ['$worker', '$$workerIds'] },
+                    { $eq: ['$status', 'completed'] }
+                  ]
+                }
+              }
+            },
+            { $count: 'count' }
+          ],
+          as: 'completedBookingsData'
+        }
+      },
+      {
+        $lookup: {
+          from: 'bookings',
+          let: { workerIds: '$workerIds' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $in: ['$worker', '$$workerIds'] },
+                    { $eq: ['$status', 'completed'] }
+                  ]
+                }
+              }
+            },
             { $group: { _id: null, total: { $sum: '$totalAmount' } } }
-          ])
-        ]);
-
-        return {
-          ...loc,
+          ],
+          as: 'revenueData'
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          address: 1,
+          coordinates: 1,
+          isActive: 1,
+          assignedAdmin: {
+            _id: '$assignedAdmin._id',
+            name: '$assignedAdmin.name',
+            email: '$assignedAdmin.email'
+          },
           stats: {
-            workerCount: workers.length,
-            onlineWorkers: workers.filter((w) => w.workerProfile?.availability).length,
-            activeBookings,
-            completedBookings,
-            revenue: revenueResult[0]?.total || 0
+            workerCount: { $size: '$workers' },
+            onlineWorkers: {
+              $size: {
+                $filter: {
+                  input: '$workers',
+                  as: 'worker',
+                  cond: { $eq: ['$$worker.availability', true] }
+                }
+              }
+            },
+            activeBookings: {
+              $ifNull: [{ $arrayElemAt: ['$activeBookingsData.count', 0] }, 0]
+            },
+            completedBookings: {
+              $ifNull: [{ $arrayElemAt: ['$completedBookingsData.count', 0] }, 0]
+            },
+            revenue: {
+              $ifNull: [{ $arrayElemAt: ['$revenueData.total', 0] }, 0]
+            }
           }
-        };
-      })
-    );
+        }
+      }
+    ]);
 
     res.json({ success: true, locations: overviewData });
   } catch (error) {
