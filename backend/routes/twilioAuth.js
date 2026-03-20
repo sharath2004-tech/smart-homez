@@ -2,7 +2,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import twilio from 'twilio';
 import User from '../models/User.js';
-import { sendOTP, verifyOTP, toE164 } from '../utils/msg91Service.js';
+import { sendOTP, toE164, verifyOTP } from '../utils/msg91Service.js';
 
 const router = express.Router();
 
@@ -19,12 +19,6 @@ function getVerifySid() {
   const sid = process.env.TWILIO_VERIFY_SID;
   if (!sid) throw new Error('Twilio Verify SID not configured. Set TWILIO_VERIFY_SID in .env');
   return sid;
-}
-
-function toE164(phone) {
-  const digits = phone.replace(/\D/g, '').slice(-10);
-  if (digits.length < 10) throw new Error('Enter a valid 10-digit mobile number');
-  return `+91${digits}`;
 }
 
 // POST /api/auth/send-otp
