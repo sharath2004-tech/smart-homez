@@ -328,7 +328,7 @@ const LoginPage = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="btn-brand w-full flex items-center justify-center gap-2 mt-2"
+                className="btn-brand w-full flex items-center justify-center gap-2 mt-6"
               >
                 {loading ? (
                   <><Loader2 className="w-4 h-4 animate-spin" /> {t("auth.login.signingIn")}</>
