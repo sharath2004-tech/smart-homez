@@ -758,6 +758,10 @@ export const workersAPI = {
     return apiCall('/users/worker/dashboard-stats');
   },
 
+  getDocuments: async () => {
+    return apiCall('/users/worker/documents');
+  },
+
   getCurrentTask: async () => {
     return apiCall('/users/worker/current-task');
   },
@@ -929,6 +933,18 @@ export const adminAPI = {
     return apiCall(`/admin/workers/${workerId}/unarchive`, {
       method: 'PATCH'
     });
+  },
+
+  updateWorkerDocuments: async (workerId: string, formData: FormData) => {
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/admin/workers/${workerId}/documents`, {
+      method: 'PATCH',
+      headers: { ...(token && { Authorization: `Bearer ${token}` }) },
+      body: formData
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error?.message || data.message || 'Failed to update worker documents');
+    return data;
   },
 
   // Worker approval requests

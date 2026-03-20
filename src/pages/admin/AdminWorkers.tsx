@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { adminAPI } from "@/lib/api";
-import { Archive, ArchiveRestore, CheckCircle, FileText, Loader2, MapPin, Plus, Search, Star, Upload, X } from "lucide-react";
+import { Archive, ArchiveRestore, CheckCircle, FileText, Loader2, MapPin, Plus, Search, Star, Upload, X, Edit } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface Location {

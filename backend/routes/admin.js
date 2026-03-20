@@ -2524,4 +2524,248 @@ router.get('/area-stats', authenticate, authorize('super_admin'), async (req, re
   }
 });
 
+// @route   PATCH /api/admin/workers/:id/documents
+// @desc    Update worker documents (profile picture, Aadhaar) - Admin/Super Admin only
+// @access  Private/Admin/Super Admin
+router.patch('/workers/:id/documents',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  uploadWorkerFiles.fields([
+    { name: 'profilePicture', maxCount: 1 },
+    { name: 'aadhaarFront', maxCount: 1 },
+    { name: 'aadhaarBack', maxCount: 1 }
+  ]),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { aadhaarNumber } = req.body;
+
+      // Find the worker
+      const worker = await User.findOne({ _id: id, role: 'worker' });
+      if (!worker) {
+        return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
+      }
+
+      // Check if admin has permission to manage this worker's location
+      if (req.user.role === 'admin') {
+        const adminLocationIds = req.user.adminProfile.assignedLocations.map(
+          loc => loc.locationId.toString()
+        );
+        const workerLocationIds = worker.workerProfile.assignedApartments.map(
+          apt => apt.locationId.toString()
+        );
+        
+        const hasAccess = workerLocationIds.some(locId => adminLocationIds.includes(locId));
+        if (!hasAccess) {
+          return res.status(403).json({ 
+            error: { message: 'Cannot update documents for workers outside your assigned locations', status: 403 } 
+          });
+        }
+      }
+
+      // Extract uploaded document paths
+      const files = req.files || {};
+      const updates = {};
+
+      if (files.profilePicture?.[0]) {
+        updates.profileImage = `/uploads/profile-pics/${files.profilePicture[0].filename}`;
+      }
+
+      if (files.aadhaarFront?.[0]) {
+        updates['workerProfile.documents.aadhaarFront'] = `/uploads/worker-docs/${files.aadhaarFront[0].filename}`;
+        updates['workerProfile.documents.uploadedAt'] = new Date();
+      }
+
+      if (files.aadhaarBack?.[0]) {
+        updates['workerProfile.documents.aadhaarBack'] = `/uploads/worker-docs/${files.aadhaarBack[0].filename}`;
+        updates['workerProfile.documents.uploadedAt'] = new Date();
+      }
+
+      if (aadhaarNumber) {
+        updates['workerProfile.documents.aadhaarNumber'] = aadhaarNumber;
+      }
+
+      // Update worker
+      const updatedWorker = await User.findByIdAndUpdate(
+        id,
+        { $set: updates },
+        { new: true, runValidators: true }
+      ).select('name email profileImage workerProfile.documents');
+
+      console.log(`✅ Worker documents updated by ${req.user.role} ${req.user.name} for worker ${worker.name}`);
+
+      res.json({
+        success: true,
+        message: 'Worker documents updated successfully',
+        worker: {
+          _id: updatedWorker._id,
+          name: updatedWorker.name,
+          email: updatedWorker.email,
+          profileImage: updatedWorker.profileImage,
+          documents: updatedWorker.workerProfile.documents
+        }
+      });
+    } catch (error) {
+      console.error('Update worker documents error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   GET /api/admin/customers
+// @desc    Get all customers with addresses - Admin/Super Admin only
+// @access  Private/Admin/Super Admin
+router.get('/customers',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  async (req, res) => {
+    try {
+      const { search, page = 1, limit = 20, city } = req.query;
+      
+      const pageNum = Math.max(1, parseInt(page) || 1);
+      const limitNum = Math.max(1, Math.min(100, parseInt(limit) || 20));
+      
+      const query = { role: 'customer', isActive: true };
+      
+      // Search by name or email
+      if (search) {
+        const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        query.$or = [
+          { name: { $regex: escapedSearch, $options: 'i' } },
+          { email: { $regex: escapedSearch, $options: 'i' } },
+          { phone: { $regex: escapedSearch, $options: 'i' } }
+        ];
+      }
+      
+      // Filter by city in addresses
+      if (city) {
+        query['addresses.city'] = { $regex: new RegExp(city, 'i') };
+      }
+      
+      const customers = await User.find(query)
+        .select('name email phone addresses createdAt isVerified')
+        .sort({ createdAt: -1 })
+        .limit(limitNum)
+        .skip((pageNum - 1) * limitNum)
+        .lean();
+      
+      const count = await User.countDocuments(query);
+      
+      // Get booking count for each customer
+      const customersWithStats = await Promise.all(
+        customers.map(async (customer) => {
+          const bookingCount = await Booking.countDocuments({ 
+            customer: customer._id 
+          });
+          
+          return {
+            _id: customer._id,
+            name: customer.name,
+            email: customer.email,
+            phone: customer.phone,
+            totalAddresses: customer.addresses?.length || 0,
+            addresses: customer.addresses,
+            bookingCount,
+            isVerified: customer.isVerified,
+            joinedAt: customer.createdAt
+          };
+        })
+      );
+      
+      res.json({
+        success: true,
+        customers: customersWithStats,
+        totalPages: Math.ceil(count / limitNum),
+        currentPage: pageNum,
+        totalCustomers: count
+      });
+    } catch (error) {
+      console.error('Get customers error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   GET /api/admin/customers/:id
+// @desc    Get specific customer details with full info - Admin/Super Admin only
+// @access  Private/Admin/Super Admin
+router.get('/customers/:id',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const customer = await User.findOne({ _id: id, role: 'customer' })
+        .select('name email phone addresses preferences createdAt isVerified isEmailVerified isPhoneVerified')
+        .lean();
+      
+      if (!customer) {
+        return res.status(404).json({ error: { message: 'Customer not found', status: 404 } });
+      }
+      
+      // Get booking statistics
+      const [totalBookings, completedBookings, cancelledBookings] = await Promise.all([
+        Booking.countDocuments({ customer: id }),
+        Booking.countDocuments({ customer: id, status: 'completed' }),
+        Booking.countDocuments({ customer: id, status: 'cancelled' })
+      ]);
+      
+      // Get preferred workers
+      const preferredWorkerIds = [
+        customer.preferences?.preferredWorkerP1,
+        customer.preferences?.preferredWorkerP2,
+        customer.preferences?.preferredWorkerP3,
+        ...(customer.preferences?.preferredWorkers || [])
+      ].filter(Boolean);
+      
+      const preferredWorkers = await User.find({
+        _id: { $in: preferredWorkerIds },
+        role: 'worker'
+      }).select('name email phone workerProfile.specialization workerProfile.rating').lean();
+      
+      // Get recent bookings
+      const recentBookings = await Booking.find({ customer: id })
+        .populate('worker', 'name phone')
+        .populate('service', 'name')
+        .select('bookingDate status totalAmount service worker createdAt')
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .lean();
+      
+      // Calculate months active
+      const monthsActive = Math.floor(
+        (new Date() - new Date(customer.createdAt)) / (1000 * 60 * 60 * 24 * 30)
+      );
+      
+      res.json({
+        success: true,
+        customer: {
+          _id: customer._id,
+          name: customer.name,
+          email: customer.email,
+          phone: customer.phone,
+          addresses: customer.addresses,
+          preferences: customer.preferences,
+          isVerified: customer.isVerified,
+          isEmailVerified: customer.isEmailVerified,
+          isPhoneVerified: customer.isPhoneVerified,
+          joinedAt: customer.createdAt,
+          monthsActive,
+          stats: {
+            totalBookings,
+            completedBookings,
+            cancelledBookings,
+            preferredWorkers,
+            recentBookings
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Get customer details error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
 export default router;

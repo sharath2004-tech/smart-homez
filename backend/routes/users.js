@@ -997,4 +997,35 @@ router.get('/:id/performance', authenticate, async (req, res) => {
   }
 });
 
+// @route   GET /api/users/worker/documents
+// @desc    Get worker's own documents (profile picture, Aadhaar front/back)
+// @access  Private/Worker
+router.get('/worker/documents', authenticate, authorize('worker'), async (req, res) => {
+  try {
+    const workerId = req.user._id;
+    
+    const worker = await User.findById(workerId)
+      .select('name email profileImage workerProfile.documents')
+      .lean();
+    
+    if (!worker) {
+      return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
+    }
+    
+    res.json({
+      success: true,
+      documents: {
+        profileImage: worker.profileImage,
+        aadhaarFront: worker.workerProfile?.documents?.aadhaarFront,
+        aadhaarBack: worker.workerProfile?.documents?.aadhaarBack,
+        aadhaarNumber: worker.workerProfile?.documents?.aadhaarNumber,
+        uploadedAt: worker.workerProfile?.documents?.uploadedAt
+      }
+    });
+  } catch (error) {
+    console.error('Get worker documents error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
 export default router;

@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { authAPI, workersAPI } from "@/lib/api";
-import { Briefcase, CheckCircle, Clock, Mail, MapPin, Phone, Star, User } from "lucide-react";
+import { Briefcase, CheckCircle, Clock, FileText, Download, Mail, MapPin, Phone, Star, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -29,9 +29,18 @@ interface Profile {
   createdAt: string;
 }
 
+interface WorkerDocuments {
+  profileImage?: string;
+  aadhaarFront?: string;
+  aadhaarBack?: string;
+  aadhaarNumber?: string;
+  uploadedAt?: string;
+}
+
 const WorkerProfile = () => {
   const { t } = useTranslation();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [documents, setDocuments] = useState<WorkerDocuments | null>(null);
   const [stats, setStats] = useState({ today: 0, thisWeek: 0, thisMonth: 0 });
   const [loading, setLoading] = useState(true);
 
@@ -42,13 +51,15 @@ const WorkerProfile = () => {
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const [profileData, statsData] = await Promise.all([
+      const [profileData, statsData, documentsData] = await Promise.all([
         authAPI.getProfile(),
-        workersAPI.getDashboardStats()
+        workersAPI.getDashboardStats(),
+        workersAPI.getDocuments()
       ]);
 
       setProfile(profileData.user || profileData);
       setStats(statsData.stats || { today: 0, thisWeek: 0, thisMonth: 0 });
+      setDocuments(documentsData.documents || null);
     } catch (error) {
       console.error('Error fetching profile:', error);
     } finally {
@@ -238,6 +249,113 @@ const WorkerProfile = () => {
               </div>
             </div>
           </>
+        )}
+
+        {/* Documents Section */}
+        {documents && (
+          <div className="card-elevated p-4 sm:p-5 md:p-6">
+            <h3 className="font-bold font-heading text-foreground mb-4 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-primary" />
+              {t('worker.profile.documents', 'My Documents')}
+            </h3>
+            <div className="space-y-4">
+              {/* Profile Picture */}
+              {documents.profileImage && (
+                <div className="flex items-start gap-3 p-3 bg-accent rounded-lg">
+                  <FileText className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground mb-1">Profile Picture</p>
+                    <img 
+                      src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${documents.profileImage}`}
+                      alt="Profile"
+                      className="w-32 h-32 object-cover rounded-lg mb-2"
+                    />
+                    <a
+                      href={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${documents.profileImage}`}
+                      download
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Aadhaar Front */}
+              {documents.aadhaarFront && (
+                <div className="flex items-start gap-3 p-3 bg-accent rounded-lg">
+                  <FileText className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground mb-1">Aadhaar Card (Front)</p>
+                    {documents.aadhaarNumber && (
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Number: {documents.aadhaarNumber}
+                      </p>
+                    )}
+                    <img 
+                      src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${documents.aadhaarFront}`}
+                      alt="Aadhaar Front"
+                      className="w-full max-w-md h-auto object-contain rounded-lg mb-2"
+                    />
+                    <a
+                      href={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${documents.aadhaarFront}`}
+                      download
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Aadhaar Back */}
+              {documents.aadhaarBack && (
+                <div className="flex items-start gap-3 p-3 bg-accent rounded-lg">
+                  <FileText className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground mb-1">Aadhaar Card (Back)</p>
+                    <img 
+                      src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${documents.aadhaarBack}`}
+                      alt="Aadhaar Back"
+                      className="w-full max-w-md h-auto object-contain rounded-lg mb-2"
+                    />
+                    <a
+                      href={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${documents.aadhaarBack}`}
+                      download
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {documents.uploadedAt && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Last updated: {new Date(documents.uploadedAt).toLocaleDateString('en-IN', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric'
+                  })}
+                </p>
+              )}
+
+              {!documents.profileImage && !documents.aadhaarFront && !documents.aadhaarBack && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No documents uploaded yet. Contact your admin to add documents.
+                </p>
+              )}
+            </div>
+          </div>
         )}
 
         {/* Account Information */}
