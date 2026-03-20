@@ -478,8 +478,25 @@ const BookServicePage = () => {
     if (manageLoading) setLoadingSlots(true);
     try {
       const token = localStorage.getItem('token');
+      
+      // Get user location from localStorage to filter workers by location
+      const userLocation = localStorage.getItem('userLocation');
+      let locationParams = '';
+      
+      if (userLocation) {
+        try {
+          const location = JSON.parse(userLocation);
+          if (location.lng && location.lat && 
+              !isNaN(location.lng) && !isNaN(location.lat)) {
+            locationParams = `&lng=${location.lng}&lat=${location.lat}`;
+          }
+        } catch (e) {
+          console.error('Failed to parse user location:', e);
+        }
+      }
+      
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/bookings/booked-slots?date=${date}`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/bookings/booked-slots?date=${date}${locationParams}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (response.ok) {
@@ -905,6 +922,22 @@ const BookServicePage = () => {
                     <p className="mt-3 text-xs text-muted-foreground">
                       Selected: <span className="font-semibold text-foreground">{formatSlotTime(selectedExactTime)}</span>
                     </p>
+                  )}
+                  
+                  {/* Warning when no workers available at location */}
+                  {selectedDate && !loadingSlots && totalWorkersCount === 0 && (
+                    <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                        <div className="text-xs text-amber-800 dark:text-amber-200">
+                          <p className="font-semibold mb-1">No workers available at your location</p>
+                          <p className="text-amber-700 dark:text-amber-300">
+                            There are currently no active workers assigned to serve your area. 
+                            Please contact support or try a different location.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

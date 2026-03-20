@@ -294,7 +294,7 @@ router.post('/:id/accept-order', authenticate, authorize('worker'), async (req, 
 // @access  Private/Customer
 router.get('/booked-slots', authenticate, async (req, res) => {
   try {
-    const { date } = req.query;
+    const { date, locationId, lng, lat } = req.query;
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return res.status(400).json({ error: { message: 'date query param required (YYYY-MM-DD)', status: 400 } });
     }
@@ -304,10 +304,44 @@ router.get('/booked-slots', authenticate, async (req, res) => {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // All active bookings on this date
+    // Parse booking date for leave checking
+    const bookingDate = new Date(date);
+    bookingDate.setHours(0, 0, 0, 0);
+
+    // Determine location for worker filtering
+    let targetLocationId = locationId;
+    
+    // If no locationId but coordinates provided, find nearby location
+    if (!targetLocationId && lng && lat) {
+      const customerLng = parseFloat(lng);
+      const customerLat = parseFloat(lat);
+      
+      if (!isNaN(customerLng) && !isNaN(customerLat)) {
+        const nearbyLocation = await Location.findOne({
+          location: {
+            $near: {
+              $geometry: {
+                type: 'Point',
+                coordinates: [customerLng, customerLat]
+              },
+              $maxDistance: 5000 // 5km radius
+            }
+          },
+          isActive: true,
+          isServiceAvailable: true
+        });
+        
+        if (nearbyLocation) {
+          targetLocationId = nearbyLocation._id.toString();
+        }
+      }
+    }
+
+    // All active bookings on this date (only those with assigned workers)
     const bookings = await Booking.find({
       bookingDate: { $gte: startOfDay, $lte: endOfDay },
-      status: { $in: ['pending', 'confirmed', 'in-progress'] }
+      status: { $in: ['pending', 'confirmed', 'in-progress'] },
+      worker: { $ne: null } // Only count bookings that have a worker assigned
     }).select('worker startTime endTime').lean();
 
     // Build per-worker booked ranges
@@ -317,10 +351,45 @@ router.get('/booked-slots', authenticate, async (req, res) => {
       endTime: b.endTime
     }));
 
-    // Count total active workers in the system
-    const totalWorkers = await User.countDocuments({ role: 'worker', isActive: true });
+    // Build query for available workers
+    const workerQuery = {
+      role: 'worker',
+      isActive: true,
+      'workerProfile.availability': true // Only count workers who are available
+    };
 
-    res.json({ success: true, bookedRanges, totalWorkers });
+    // If location determined, filter workers by assigned location
+    if (targetLocationId) {
+      workerQuery['workerProfile.assignedApartments.locationId'] = targetLocationId;
+    }
+
+    // Get all potentially available workers
+    const workers = await User.find(workerQuery)
+      .select('_id workerProfile.leaves')
+      .lean();
+
+    // Filter out workers on approved leave for this date
+    const availableWorkers = workers.filter(worker => {
+      if (!worker.workerProfile?.leaves || worker.workerProfile.leaves.length === 0) {
+        return true;
+      }
+
+      // Check if worker has approved leave on this date
+      const hasLeave = worker.workerProfile.leaves.some(leave => {
+        if (leave.status !== 'approved') {
+          return false;
+        }
+        const leaveDate = new Date(leave.date);
+        leaveDate.setHours(0, 0, 0, 0);
+        return leaveDate.getTime() === bookingDate.getTime();
+      });
+
+      return !hasLeave;
+    });
+
+    const totalWorkers = availableWorkers.length;
+
+    res.json({ success: true, bookedRanges, totalWorkers, locationId: targetLocationId });
   } catch (error) {
     console.error('Get booked slots error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });

@@ -161,7 +161,22 @@ const InstaServicePage = () => {
   useEffect(() => {
     const fetchSlots = async () => {
       try {
-        const data = await bookingsAPI.getBookedSlots(bookingDate);
+        // Get user location from localStorage
+        const userLocation = localStorage.getItem('userLocation');
+        let location = null;
+        
+        if (userLocation) {
+          try {
+            const loc = JSON.parse(userLocation);
+            if (loc.lng && loc.lat && !isNaN(loc.lng) && !isNaN(loc.lat)) {
+              location = { lng: loc.lng, lat: loc.lat };
+            }
+          } catch (e) {
+            console.error('Failed to parse user location:', e);
+          }
+        }
+        
+        const data = await bookingsAPI.getBookedSlots(bookingDate, location);
         const ranges: { workerId: string | null; startTime: string; endTime: string }[] =
           data.bookedRanges || [];
         setTotalWorkers(data.totalWorkers || 0);
