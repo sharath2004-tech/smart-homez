@@ -273,6 +273,21 @@
       "privacy": "Privacy",
       "terms": "Terms",
       "support": "Support"
+    },
+    "comparison": {
+      "badge": "Best Prices Guaranteed",
+      "title": "Why Pay More? Compare Our Prices",
+      "subtitle": "See how Healthy Homez stacks up against other home cleaning platforms — quality service at the lowest price.",
+      "serviceHeader": "Service",
+      "bestValueBadge": "Best Value",
+      "cheapest": "Cheapest",
+      "service1": "Regular Cleaning (per hour)",
+      "service2": "Deep Cleaning — 2 BHK",
+      "service3": "Kitchen Deep Clean",
+      "service4": "Bathroom Deep Clean",
+      "service5": "Sofa Cleaning",
+      "disclaimer": "* Competitor prices are indicative based on publicly listed rates and may vary by city.",
+      "ctaButton": "Book at Best Price"
     }
   },
   "auth": {
@@ -1064,7 +1079,7 @@
     "title": "Business Hours",
     "subtitle": "Platform-wide slot generation config",
     "saveChanges": "Save Changes",
-    "saving": "Saving\u2026",
+    "saving": "Saving…",
     "slotDuration": "Slot Duration (minutes)",
     "timezone": "Timezone",
     "weeklySchedule": "Weekly Schedule & Breaks",

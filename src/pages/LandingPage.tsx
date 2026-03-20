@@ -1,6 +1,6 @@
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { publicAPI } from "@/lib/api";
-import { ArrowRight, CheckCircle, ChevronRight, Clock, Home, MapPin, Shield, Sparkles, Star, X } from "lucide-react";
+import { ArrowRight, CheckCircle, ChevronRight, Clock, Home, MapPin, Shield, Sparkles, Star, TrendingDown, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -318,6 +318,124 @@ const LandingPage = () => {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Pricing Comparison Section */}
+      <section id="pricing-comparison" className="py-20 bg-muted">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 bg-green-100 text-green-800 text-xs font-semibold px-3 py-1.5 rounded-full mb-4">
+              <TrendingDown className="w-3.5 h-3.5" />
+              {t('landing.comparison.badge')}
+            </div>
+            <h2 className="section-title mb-3">{t('landing.comparison.title')}</h2>
+            <p className="text-muted-foreground max-w-md mx-auto">{t('landing.comparison.subtitle')}</p>
+          </div>
+
+          {/* Comparison Table */}
+          <div className="overflow-x-auto rounded-2xl border border-border shadow-sm">
+            <table className="w-full bg-card text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left px-5 py-4 font-semibold text-foreground w-2/5">
+                    {t('landing.comparison.serviceHeader')}
+                  </th>
+                  <th className="px-4 py-4 text-center font-semibold text-muted-foreground">
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-base">🏙️</span>
+                      <span>Urban Company</span>
+                    </div>
+                  </th>
+                  <th className="px-4 py-4 text-center font-semibold text-muted-foreground">
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-base">🔧</span>
+                      <span>Workspace</span>
+                    </div>
+                  </th>
+                  <th className="px-4 py-4 text-center font-bold bg-primary/5 rounded-t-xl">
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-base">🏠</span>
+                      <span className="text-primary">Healthy Homez</span>
+                      <span className="text-xs bg-primary text-primary-foreground font-semibold px-2 py-0.5 rounded-full">
+                        {t('landing.comparison.bestValueBadge')}
+                      </span>
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {([
+                  {
+                    serviceKey: 'landing.comparison.service1',
+                    urbanPrice: '₹329/hr',
+                    workspacePrice: '₹269/hr',
+                    ourPrice: '₹200/hr',
+                  },
+                  {
+                    serviceKey: 'landing.comparison.service2',
+                    urbanPrice: '₹3,699',
+                    workspacePrice: '₹3,199',
+                    ourPrice: '₹2,299',
+                  },
+                  {
+                    serviceKey: 'landing.comparison.service3',
+                    urbanPrice: '₹749',
+                    workspacePrice: '₹599',
+                    ourPrice: '₹399',
+                  },
+                  {
+                    serviceKey: 'landing.comparison.service4',
+                    urbanPrice: '₹499',
+                    workspacePrice: '₹399',
+                    ourPrice: '₹249',
+                  },
+                  {
+                    serviceKey: 'landing.comparison.service5',
+                    urbanPrice: '₹799',
+                    workspacePrice: '₹649',
+                    ourPrice: '₹499',
+                  },
+                ] as const).map((row, i) => (
+                  <tr
+                    key={row.serviceKey}
+                    className={`border-b border-border last:border-0 ${i % 2 === 1 ? 'bg-muted/40' : ''}`}
+                  >
+                    <td className="px-5 py-4 font-medium text-foreground">
+                      {t(row.serviceKey)}
+                    </td>
+                    <td className="px-4 py-4 text-center text-muted-foreground line-through">
+                      {row.urbanPrice}
+                    </td>
+                    <td className="px-4 py-4 text-center text-muted-foreground line-through">
+                      {row.workspacePrice}
+                    </td>
+                    <td className="px-4 py-4 text-center bg-primary/5 font-bold text-primary">
+                      <div className="flex flex-col items-center gap-1">
+                        <span>{row.ourPrice}</span>
+                        <span className="flex items-center gap-0.5 text-xs font-semibold text-green-600 bg-green-100 px-2 py-0.5 rounded-full">
+                          <CheckCircle className="w-3 h-3" />
+                          {t('landing.comparison.cheapest')}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center items-center">
+            <p className="text-xs text-muted-foreground text-center">
+              {t('landing.comparison.disclaimer')}
+            </p>
+            <Link
+              to="/register"
+              className="shrink-0 inline-flex items-center gap-2 btn-brand text-sm font-semibold py-2.5 px-5"
+            >
+              {t('landing.comparison.ctaButton')} <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
       </section>
 
