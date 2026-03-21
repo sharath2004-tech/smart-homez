@@ -27,7 +27,7 @@ interface Worker {
     rating: number;
     completedJobs: number;
     totalEarnings: number;
-    isAvailable: boolean;
+    availability: boolean;
     wageType?: string;
     hourlyRate?: number;
     dailyWage?: number;
@@ -296,7 +296,7 @@ const AdminWorkers = () => {
           hourlyRate: editWorker.workerProfile.hourlyRate || 0,
           dailyWage: editWorker.workerProfile.dailyWage || 0,
           monthlyWage: editWorker.workerProfile.monthlyWage || 0,
-          availability: editWorker.workerProfile.isAvailable,
+          availability: editWorker.workerProfile.availability,
           accountStatus: editWorker.workerProfile.accountStatus || 'active',
           joinDate: editWorker.workerProfile.joinDate || null,
           resignedDate: editWorker.workerProfile.resignedDate || null,
@@ -489,17 +489,17 @@ const AdminWorkers = () => {
   };
 
   const filtered = workers.filter((w) => {
-    const matchSearch = w.name.toLowerCase().includes(search.toLowerCase()) || 
+    const matchSearch = w.name.toLowerCase().includes(search.toLowerCase()) ||
       w.email.toLowerCase().includes(search.toLowerCase());
-    
+
     if (statusFilter === "all") return matchSearch;
-    
-    const workerStatus = w.workerProfile?.isAvailable ? 'available' : 'offline';
+
+    const workerStatus = w.workerProfile?.availability ? 'available' : 'offline';
     return matchSearch && workerStatus === statusFilter;
   });
 
-  const onlineCount = workers.filter(w => w.workerProfile?.isAvailable && w.isActive).length;
-  const offlineCount = workers.filter(w => !w.workerProfile?.isAvailable || !w.isActive).length;
+  const onlineCount = workers.filter(w => w.workerProfile?.availability && w.isActive).length;
+  const offlineCount = workers.filter(w => !w.workerProfile?.availability || !w.isActive).length;
 
   if (loading) {
     return (
@@ -568,7 +568,7 @@ const AdminWorkers = () => {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {filtered.map((w) => {
-              const status = w.workerProfile?.isAvailable ? 'available' : 'offline';
+              const status = w.workerProfile?.availability ? 'available' : 'offline';
               return (
                 <div key={w._id} className="card-elevated p-5">
                   <div className="flex items-start gap-3 mb-4">
@@ -1224,10 +1224,10 @@ const AdminWorkers = () => {
                           <label className="block text-sm font-medium mb-1">Availability</label>
                           <select
                             className="input-clean"
-                            value={editWorker.workerProfile.isAvailable ? 'true' : 'false'}
+                            value={editWorker.workerProfile.availability ? 'true' : 'false'}
                             onChange={(e) => setEditWorker({
                               ...editWorker,
-                              workerProfile: { ...editWorker.workerProfile!, isAvailable: e.target.value === 'true' }
+                              workerProfile: { ...editWorker.workerProfile!, availability: e.target.value === 'true' }
                             })}
                           >
                             <option value="true">Available</option>
