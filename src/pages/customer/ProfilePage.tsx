@@ -43,8 +43,18 @@ const ProfilePage = () => {
   const [stats, setStats] = useState<Stats>({ totalBookings: 0, preferredWorkers: [], monthsActive: 0 });
   const [loading, setLoading] = useState(true);
   const [showAddressForm, setShowAddressForm] = useState(false);
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [addressError, setAddressError] = useState("");
   const [newAddress, setNewAddress] = useState({
+    label: 'Home',
+    blockNo: '',
+    flatNo: '',
+    apartment: '',
+    area: '',
+    city: '',
+    zipCode: ''
+  });
+  const [editAddress, setEditAddress] = useState({
     label: 'Home',
     blockNo: '',
     flatNo: '',
@@ -186,6 +196,101 @@ const ProfilePage = () => {
     } finally {
       setGeocoding(false);
     }
+  };
+
+  const handleEditAddress = async () => {
+    setAddressError("");
+    // Validate area and city are non-empty text (not purely numeric)
+    const areaVal = editAddress.area.trim();
+    const cityVal = editAddress.city.trim();
+    const zipVal = editAddress.zipCode.trim();
+    const flatVal = editAddress.flatNo.trim();
+    if (!areaVal || !cityVal) {
+      setAddressError(t('customer.profile.areaAndCityRequired'));
+      return;
+    }
+    if (/^\d+$/.test(areaVal)) {
+      setAddressError(t('customer.profile.areaCannotBeNumbers'));
+      return;
+    }
+    if (/^\d+$/.test(cityVal)) {
+      setAddressError(t('customer.profile.cityCannotBeNumbers'));
+      return;
+    }
+    if (!isValidName(areaVal)) {
+      setAddressError(t('customer.profile.invalidArea'));
+      return;
+    }
+    if (!isValidName(cityVal)) {
+      setAddressError(t('customer.profile.invalidCity'));
+      return;
+    }
+    if (flatVal && !/^[a-zA-Z0-9\s/,.-]{1,20}$/.test(flatVal)) {
+      setAddressError('Invalid flat number.');
+      return;
+    }
+    if (zipVal && !/^\d{6}$/.test(zipVal)) {
+      setAddressError(t('customer.profile.zipCodeInvalid'));
+      return;
+    }
+
+    try {
+      setGeocoding(true);
+
+      // Geocode the address using OpenStreetMap
+      const coordinates = await locationsAPI.geocode({
+        area: editAddress.area,
+        city: editAddress.city,
+        zipCode: editAddress.zipCode
+      });
+
+      await usersAPI.updateAddress(editingAddressId!, {
+        label: editAddress.label,
+        blockNo: editAddress.blockNo,
+        flatNo: editAddress.flatNo,
+        apartment: editAddress.apartment,
+        area: editAddress.area,
+        city: editAddress.city,
+        zipCode: editAddress.zipCode,
+        location: {
+          type: 'Point',
+          coordinates: [coordinates.data.longitude, coordinates.data.latitude]
+        }
+      });
+
+      // Reset edit form
+      setEditAddress({ label: 'Home', blockNo: '', flatNo: '', apartment: '', area: '', city: '', zipCode: '' });
+      setEditingAddressId(null);
+
+      // Refresh profile
+      await fetchProfileData();
+    } catch (error) {
+      console.error('Error updating address:', error);
+      alert(t('customer.profile.failedToUpdateAddress'));
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
+  const handleStartEditAddress = (address: Address) => {
+    setEditAddress({
+      label: address.label,
+      blockNo: address.blockNo || '',
+      flatNo: address.flatNo || '',
+      apartment: address.apartment || '',
+      area: address.area,
+      city: address.city,
+      zipCode: address.zipCode || ''
+    });
+    setEditingAddressId(address._id);
+    setAddressError('');
+    setShowAddressForm(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingAddressId(null);
+    setEditAddress({ label: 'Home', blockNo: '', flatNo: '', apartment: '', area: '', city: '', zipCode: '' });
+    setAddressError('');
   };
 
   const handleSaveAccount = async () => {
@@ -347,6 +452,13 @@ const ProfilePage = () => {
                     </p>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => handleStartEditAddress(addr)}
+                      className="p-1.5 hover:bg-primary/10 rounded-lg text-primary"
+                      title="Edit address"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
                     {!addr.isDefault && (
                       <button
                         onClick={() => handleSetDefaultAddress(addr._id)}
@@ -366,6 +478,87 @@ const ProfilePage = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Edit Address Form */}
+          {editingAddressId && (
+            <div className="mt-4 p-4 border-2 border-orange-300 rounded-xl bg-orange-50 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold text-foreground">Edit Address</h4>
+                <button
+                  onClick={handleCancelEdit}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Cancel
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <select
+                  className="input-clean text-sm col-span-2"
+                  value={editAddress.label}
+                  onChange={(e) => setEditAddress({ ...editAddress, label: e.target.value })}
+                >
+                  <option value="Home">Home</option>
+                  <option value="Office">Office</option>
+                  <option value="Commercial Space">Commercial Space</option>
+                </select>
+                <input
+                  type="text"
+                  placeholder="Apartment Name"
+                  className="input-clean text-sm col-span-2"
+                  value={editAddress.apartment}
+                  onChange={(e) => setEditAddress({ ...editAddress, apartment: e.target.value })}
+                />
+                <input
+                  type="text"
+                  placeholder="Block no. (optional)"
+                  className="input-clean text-sm"
+                  value={editAddress.blockNo}
+                  onChange={(e) => setEditAddress({ ...editAddress, blockNo: e.target.value })}
+                />
+                <input
+                  type="text"
+                  placeholder="Flat no."
+                  className="input-clean text-sm"
+                  value={editAddress.flatNo}
+                  onChange={(e) => setEditAddress({ ...editAddress, flatNo: e.target.value })}
+                />
+                <input
+                  type="text"
+                  placeholder="Area *"
+                  className="input-clean text-sm"
+                  value={editAddress.area}
+                  onChange={(e) => { setEditAddress({ ...editAddress, area: e.target.value }); setAddressError(''); }}
+                  required
+                />
+                <input
+                  type="text"
+                  placeholder="City *"
+                  className="input-clean text-sm"
+                  value={editAddress.city}
+                  onChange={(e) => { setEditAddress({ ...editAddress, city: e.target.value }); setAddressError(''); }}
+                  required
+                />
+                <input
+                  type="text"
+                  placeholder="ZIP Code"
+                  className="input-clean text-sm col-span-2"
+                  value={editAddress.zipCode}
+                  onChange={(e) => setEditAddress({ ...editAddress, zipCode: e.target.value })}
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={handleEditAddress}
+                  disabled={!editAddress.area || !editAddress.city || geocoding}
+                  className="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 text-xs disabled:opacity-50 rounded-lg transition-colors"
+                >
+                  {geocoding ? 'Updating...' : 'Update Address'}
+                </button>
+              </div>
             </div>
           )}
 

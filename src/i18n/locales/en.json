@@ -850,6 +850,7 @@
       "failedToChangePassword": "Failed to change password.",
       "confirmDeleteAddress": "Are you sure you want to delete this address?",
       "failedToDeleteAddress": "Failed to delete address.",
+      "failedToUpdateAddress": "Failed to update address. Please try again.",
       "failedToSetDefault": "Failed to set default address.",
       "pleaseLogIn": "Please Log In",
       "needToBeLoggedIn": "You need to be logged in to view your profile.",
