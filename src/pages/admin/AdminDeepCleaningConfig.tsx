@@ -50,7 +50,7 @@ const BLANK_CATEGORY: DeepCleaningCategory = {
 };
 
 export default function AdminDeepCleaningConfig() {
-  const { name } = useAdminRole();
+  const { name, role } = useAdminRole();
   const [config, setConfig]           = useState<Config | null>(null);
   const [loading, setLoading]         = useState(true);
   const [saving, setSaving]           = useState(false);
@@ -198,7 +198,7 @@ export default function AdminDeepCleaningConfig() {
   const activeCatLabel = categories.find(c => c.id === activeCategory)?.label ?? activeCategory;
 
   if (loading) return (
-    <AppLayout userType="super_admin" userName={name}>
+    <AppLayout userType={role} userName={name}>
       <div className="flex items-center justify-center py-24">
         <motion.div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full"
           animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.9, ease: "linear" }} />
@@ -207,7 +207,7 @@ export default function AdminDeepCleaningConfig() {
   );
 
   return (
-    <AppLayout userType="super_admin" userName={name}>
+    <AppLayout userType={role} userName={name}>
       <div className="max-w-3xl mx-auto px-3 sm:px-4 md:px-6 pb-12 space-y-6">
 
         {/* Header */}

@@ -364,17 +364,6 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
           />
         )}
 
-        {/* Super admin role preview */}
-        {userType === 'super_admin' && (
-          <div className="px-4 py-3 border-t border-sidebar-border shrink-0">
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">View As</p>
-            <div className="flex gap-1.5">
-              <a href="/customer/dashboard" className="flex-1 text-center text-xs py-1.5 rounded-lg bg-sidebar-accent hover:bg-primary/10 hover:text-primary transition-colors font-medium text-sidebar-foreground">Customer</a>
-              <a href="/admin/dashboard" className="flex-1 text-center text-xs py-1.5 rounded-lg bg-sidebar-accent hover:bg-primary/10 hover:text-primary transition-colors font-medium text-sidebar-foreground">Admin</a>
-              <a href="/worker/dashboard" className="flex-1 text-center text-xs py-1.5 rounded-lg bg-sidebar-accent hover:bg-primary/10 hover:text-primary transition-colors font-medium text-sidebar-foreground">Worker</a>
-            </div>
-          </div>
-        )}
       </aside>
 
       {/* Mobile Sidebar */}

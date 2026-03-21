@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useAdminRole } from "@/hooks/useAdminRole";
 import { api } from "@/lib/api";
 import { AlertTriangle, BarChart3, MapPin, RefreshCw, TrendingDown, TrendingUp, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -12,6 +13,7 @@ interface AreaStat {
 }
 
 const AdminHeatmap = () => {
+  const { role, name } = useAdminRole();
   const [stats, setStats] = useState<AreaStat[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -53,7 +55,7 @@ const AdminHeatmap = () => {
   const understaffed  = stats.filter(s => getDemandLevel(s) === 'critical' || getDemandLevel(s) === 'high').length;
 
   return (
-    <AppLayout userType="super_admin" userName="Super Admin">
+    <AppLayout userType={role} userName={name}>
       <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">

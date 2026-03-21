@@ -23,7 +23,7 @@ interface LocationRequest {
 }
 
 const LocationRequests = () => {
-  const { role } = useAdminRole();
+  const { role, name } = useAdminRole();
   const { toast } = useToast();
   const [requests, setRequests] = useState<LocationRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -137,7 +137,7 @@ const LocationRequests = () => {
   };
 
   return (
-    <AppLayout>
+    <AppLayout userType={role} userName={name}>
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
