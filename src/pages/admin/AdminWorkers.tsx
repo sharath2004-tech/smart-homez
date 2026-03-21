@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
-import { adminAPI } from "@/lib/api";
+import { adminAPI, API_BASE_URL } from "@/lib/api";
 import { AlertTriangle, Archive, ArchiveRestore, CheckCircle, Clock, Edit, Eye, EyeOff, FileText, Info, Loader2, MapPin, Plus, Search, Star, Upload, X, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -148,6 +148,16 @@ const AdminWorkers = () => {
   const profilePicRef = useRef<HTMLInputElement>(null);
   const aadhaarFrontRef = useRef<HTMLInputElement>(null);
   const aadhaarBackRef = useRef<HTMLInputElement>(null);
+
+  // Helper function to convert document paths to full URLs
+  const getDocumentUrl = (path: string | undefined) => {
+    if (!path) return '';
+    // If already a full URL, return as is
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    // Convert relative path to full URL
+    const baseUrl = API_BASE_URL.replace('/api', '');
+    return `${baseUrl}${path}`;
+  };
 
   useEffect(() => {
     fetchData();
@@ -1690,7 +1700,7 @@ const AdminWorkers = () => {
                             <FileText className="w-4 h-4 text-green-600" />
                             <span className="text-foreground">Aadhaar Front:</span>
                             <a
-                              href={editWorker.workerProfile.documents.aadhaarFront}
+                              href={getDocumentUrl(editWorker.workerProfile.documents.aadhaarFront)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-blue-600 hover:underline flex items-center gap-1"
@@ -1712,7 +1722,7 @@ const AdminWorkers = () => {
                             <FileText className="w-4 h-4 text-green-600" />
                             <span className="text-foreground">Aadhaar Back:</span>
                             <a
-                              href={editWorker.workerProfile.documents.aadhaarBack}
+                              href={getDocumentUrl(editWorker.workerProfile.documents.aadhaarBack)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-blue-600 hover:underline flex items-center gap-1"
@@ -1734,7 +1744,7 @@ const AdminWorkers = () => {
                             <FileText className="w-4 h-4 text-green-600" />
                             <span className="text-foreground">Profile Picture:</span>
                             <a
-                              href={editWorker.profileImage}
+                              href={getDocumentUrl(editWorker.profileImage)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-blue-600 hover:underline flex items-center gap-1"
