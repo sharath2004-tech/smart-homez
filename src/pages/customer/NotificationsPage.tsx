@@ -19,22 +19,31 @@ interface NotificationCenterProps {
   userType?: "customer" | "worker" | "admin" | "super_admin";
 }
 
-export default function NotificationCenter({ userType = "customer" }: NotificationCenterProps) {
+export default function NotificationCenter({ userType }: NotificationCenterProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [profile, setProfile] = useState<any>(null);
+  const [detectedUserType, setDetectedUserType] = useState<"customer" | "worker" | "admin" | "super_admin">("customer");
 
-  // Fetch current user profile from API
+  // Fetch current user profile from API and detect userType
   useEffect(() => {
     authAPI.getProfile()
       .then((res: any) => {
         const user = res.user || res;
         setProfile(user);
+        
+        // Auto-detect userType from profile if not explicitly provided
+        if (!userType && user?.role) {
+          setDetectedUserType(user.role);
+        }
       })
       .catch((err: any) => {
         console.error('Error fetching profile:', err);
       });
-  }, []);
+  }, [userType]);
+  
+  // Use provided userType or detected userType
+  const effectiveUserType = userType || detectedUserType;
 
   const { data: notifications, isLoading } = useQuery<Notification[]>({
     queryKey: ['notifications'],
@@ -58,7 +67,7 @@ export default function NotificationCenter({ userType = "customer" }: Notificati
 
   if (isLoading) {
     return (
-      <AppLayout userType={userType} userName={profile?.name || "Loading..."}>
+      <AppLayout userType={effectiveUserType} userName={profile?.name || "Loading..."}>
         <div className="flex items-center justify-center min-h-[200px]">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
@@ -67,7 +76,7 @@ export default function NotificationCenter({ userType = "customer" }: Notificati
   }
 
   return (
-    <AppLayout userType={userType} userName={profile?.name || "User"}>
+    <AppLayout userType={effectiveUserType} userName={profile?.name || "User"}>
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold flex items-center gap-2">
