@@ -249,7 +249,14 @@ const ServicesPage = () => {
                   className={`p-3 rounded-2xl border-2 text-center transition-all ${cat.color} hover:border-primary/60 hover:shadow-md active:scale-95`}
                 >
                   <div className="text-2xl mb-1">{cat.icon}</div>
-                  <p className="text-xs font-semibold text-foreground leading-tight">{t(cat.labelKey)}</p>
+                  <div>
+                    <p className="text-xs font-semibold text-foreground leading-tight">
+                      {cat.key === 'deep' ? 'Move In / Move Out Cleaning' : t(cat.labelKey)}
+                    </p>
+                    {cat.key === 'deep' && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Full Home Deep Clean</p>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block leading-tight">{t(cat.descKey)}</p>
                   <span className={`inline-block mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full ${cat.badgeColor}`}>{t(cat.badgeKey)}</span>
                 </button>
@@ -291,11 +298,79 @@ const ServicesPage = () => {
                   <Sparkles className="w-6 h-6 text-green-700" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-green-900 text-sm leading-tight">Deep Cleaning — Commercial &amp; Residential</p>
+                  <p className="font-bold text-green-900 text-sm leading-tight">Move In / Move Out — Commercial &amp; Residential</p>
                   <p className="text-xs text-green-700 mt-0.5">Villas · Restaurants · Offices · Bungalows</p>
                 </div>
                 <span className="shrink-0 text-xs font-semibold bg-green-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">Get Free Quote →</span>
               </Link>
+            </motion.div>
+
+            {/* Deep Cleaning Sub-Services Cards */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.45 }}
+              className="space-y-3"
+            >
+              <h3 className="text-sm font-semibold text-foreground px-1">Room-Specific Deep Cleaning</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Bathroom DC */}
+                <button
+                  onClick={() => {
+                    const bathroomService = services.find(s =>
+                      s.name.toLowerCase().includes('bathroom') &&
+                      (s.name.toLowerCase().includes('deep') || s.serviceType?.includes('bathroom'))
+                    );
+                    if (bathroomService) {
+                      navigate(`/customer/book/${bathroomService._id}`);
+                    }
+                  }}
+                  className="p-4 rounded-xl border-2 border-purple-300 bg-purple-50 hover:bg-purple-100 hover:border-purple-400 transition-all text-center group"
+                >
+                  <div className="text-3xl mb-2">🚿</div>
+                  <p className="font-semibold text-purple-900 text-sm">Bathroom DC</p>
+                  <p className="text-xs text-purple-700 mt-1">Professional cleaning</p>
+                  <span className="inline-block mt-2 text-[10px] font-semibold bg-purple-600 text-white px-2 py-1 rounded-full">Quick Book</span>
+                </button>
+
+                {/* Kitchen DC */}
+                <button
+                  onClick={() => {
+                    const kitchenService = services.find(s =>
+                      s.name.toLowerCase().includes('kitchen') &&
+                      (s.name.toLowerCase().includes('deep') || s.serviceType?.includes('kitchen'))
+                    );
+                    if (kitchenService) {
+                      navigate(`/customer/book/${kitchenService._id}`);
+                    }
+                  }}
+                  className="p-4 rounded-xl border-2 border-orange-300 bg-orange-50 hover:bg-orange-100 hover:border-orange-400 transition-all text-center group"
+                >
+                  <div className="text-3xl mb-2">🍽️</div>
+                  <p className="font-semibold text-orange-900 text-sm">Kitchen DC</p>
+                  <p className="text-xs text-orange-700 mt-1">Professional cleaning</p>
+                  <span className="inline-block mt-2 text-[10px] font-semibold bg-orange-600 text-white px-2 py-1 rounded-full">Quick Book</span>
+                </button>
+
+                {/* Windows DC */}
+                <button
+                  onClick={() => {
+                    const windowService = services.find(s =>
+                      s.name.toLowerCase().includes('window') &&
+                      (s.name.toLowerCase().includes('clean') || s.serviceType?.includes('window'))
+                    );
+                    if (windowService) {
+                      navigate(`/customer/book/${windowService._id}`);
+                    }
+                  }}
+                  className="p-4 rounded-xl border-2 border-blue-300 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 transition-all text-center group"
+                >
+                  <div className="text-3xl mb-2">🪟</div>
+                  <p className="font-semibold text-blue-900 text-sm">Windows DC</p>
+                  <p className="text-xs text-blue-700 mt-1">Professional cleaning</p>
+                  <span className="inline-block mt-2 text-[10px] font-semibold bg-blue-600 text-white px-2 py-1 rounded-full">Quick Book</span>
+                </button>
+              </div>
             </motion.div>
 
             {/* Search */}

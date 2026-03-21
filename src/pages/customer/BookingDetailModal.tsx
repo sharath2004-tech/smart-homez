@@ -1,9 +1,11 @@
 import ChatModal from "@/components/ChatModal";
 import EmbeddedQRScanner from "@/components/EmbeddedQRScanner";
+import BookingOrderPrint from "@/components/BookingOrderPrint";
 import { API_BASE_URL, bookingsAPI } from "@/lib/api";
-import { ArrowLeft, Calendar, Camera, CheckCircle, ClipboardCheck, Clock3, DollarSign, MapPin, MessageCircle, Phone, QrCode, Timer, User, XCircle } from "lucide-react";
+import { ArrowLeft, Calendar, Camera, CheckCircle, ClipboardCheck, Clock3, DollarSign, Download, MapPin, MessageCircle, Phone, Printer, QrCode, Timer, User, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import html2pdf from "html2pdf.js";
 import ReviewModal from "./ReviewModal";
 
 interface Worker {
@@ -157,6 +159,8 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
   const [overtimeMinutes, setOvertimeMinutes] = useState(0);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [endingService, setEndingService] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
   const OVERTIME_RATE = 2.5; // ₹2.5 per minute
 
   // Use refs to persist values across renders
@@ -349,6 +353,41 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
     return baseAmount + overtimeAmount;
   };
 
+  const handlePrintToPDF = () => {
+    if (!printRef.current || !booking) return;
+
+    const filename = `booking-order-${booking.bookingId || booking._id.slice(-8)}.pdf`;
+
+    const opt = {
+      margin: 10,
+      filename: filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+    };
+
+    // @ts-ignore - html2pdf types not perfect
+    html2pdf().set(opt).from(printRef.current).save();
+  };
+
+  const handlePrintToPrinter = () => {
+    if (!printRef.current) return;
+
+    const printWindow = window.open('', '', 'height=600,width=800');
+    if (printWindow) {
+      printWindow.document.write('<html><head><title>Booking Order</title>');
+      printWindow.document.write('<style>body { font-family: Arial, sans-serif; } @media print { body { margin: 0; } }</style>');
+      printWindow.document.write('</head><body>');
+      printWindow.document.write(printRef.current.innerHTML);
+      printWindow.document.write('</body></html>');
+      printWindow.document.close();
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 250);
+    }
+  };
+
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -377,6 +416,13 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
               <h2 className="text-xl font-bold">{t('customer.bookings.bookingDetails')}</h2>
               <p className="text-sm opacity-90">ID: {booking._id.slice(-8)}</p>
             </div>
+            <button
+              onClick={() => setShowPrintModal(true)}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              title="Print or download booking order"
+            >
+              <Printer className="w-5 h-5" />
+            </button>
           </div>
 
           <div className="overflow-y-auto flex-1 p-6 space-y-6">
@@ -736,6 +782,53 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
           otherPartyName={booking.worker.name}
           onClose={() => setShowChat(false)}
         />
+      )}
+
+      {/* Print Modal */}
+      {showPrintModal && booking && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-4xl w-full shadow-2xl flex flex-col max-h-[90vh]">
+            {/* Print Modal Header */}
+            <div className="bg-primary text-primary-foreground px-6 py-4 rounded-t-2xl flex items-center justify-between shrink-0">
+              <h2 className="text-xl font-bold">Booking Order</h2>
+              <button
+                onClick={() => setShowPrintModal(false)}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Print Preview */}
+            <div className="overflow-y-auto flex-1">
+              <BookingOrderPrint ref={printRef} booking={booking} />
+            </div>
+
+            {/* Print Modal Actions */}
+            <div className="border-t border-border px-6 py-4 flex gap-3 shrink-0">
+              <button
+                onClick={handlePrintToPDF}
+                className="flex-1 btn btn-primary flex items-center justify-center gap-2"
+              >
+                <Download className="w-5 h-5" />
+                Download PDF
+              </button>
+              <button
+                onClick={handlePrintToPrinter}
+                className="flex-1 btn btn-secondary flex items-center justify-center gap-2"
+              >
+                <Printer className="w-5 h-5" />
+                Print
+              </button>
+              <button
+                onClick={() => setShowPrintModal(false)}
+                className="flex-1 btn btn-ghost"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

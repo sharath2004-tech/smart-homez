@@ -1,9 +1,11 @@
 import AppLayout from "@/components/AppLayout";
+import BookingOrderPrint from "@/components/BookingOrderPrint";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { bookingsAPI, superAdminAPI } from "@/lib/api";
 import ExcelJS from "exceljs";
-import { CheckCircle, Download, Eye, MapPin, Search, Users, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { CheckCircle, Download, Eye, MapPin, Printer, Search, Users, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import html2pdf from "html2pdf.js";
 
 interface ProofPhoto {
   url: string;
@@ -66,6 +68,10 @@ const AdminBookings = () => {
   const [allWorkers, setAllWorkers] = useState<{ _id: string; name: string; email: string }[]>([]);
   const [workerSearch, setWorkerSearch] = useState('');
   const [teamActionLoading, setTeamActionLoading] = useState(false);
+
+  // Print state
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -192,6 +198,41 @@ const AdminBookings = () => {
       alert((e as Error).message || 'Failed to remove support staff');
     } finally {
       setTeamActionLoading(false);
+    }
+  };
+
+  const handlePrintToPDF = () => {
+    if (!printRef.current || !selectedProofBooking) return;
+
+    const filename = `booking-order-${selectedProofBooking.bookingId || selectedProofBooking._id.slice(-8)}.pdf`;
+
+    const opt = {
+      margin: 10,
+      filename: filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+    };
+
+    // @ts-ignore - html2pdf types not perfect
+    html2pdf().set(opt).from(printRef.current).save();
+  };
+
+  const handlePrintToPrinter = () => {
+    if (!printRef.current) return;
+
+    const printWindow = window.open('', '', 'height=600,width=800');
+    if (printWindow) {
+      printWindow.document.write('<html><head><title>Booking Order</title>');
+      printWindow.document.write('<style>body { font-family: Arial, sans-serif; } @media print { body { margin: 0; } }</style>');
+      printWindow.document.write('</head><body>');
+      printWindow.document.write(printRef.current.innerHTML);
+      printWindow.document.write('</body></html>');
+      printWindow.document.close();
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 250);
     }
   };
 
@@ -404,12 +445,21 @@ const AdminBookings = () => {
                   {selectedProofBooking.service?.name} · {selectedProofBooking.worker?.name || 'Unknown worker'} · {formatDate(selectedProofBooking.bookingDate)}
                 </p>
               </div>
-              <button
-                onClick={() => setSelectedProofBooking(null)}
-                className="p-2 hover:bg-muted rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowPrintModal(true)}
+                  className="p-2 hover:bg-muted rounded-lg transition-colors"
+                  title="Print booking order"
+                >
+                  <Printer className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => setSelectedProofBooking(null)}
+                  className="p-2 hover:bg-muted rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             <div className="p-6 space-y-6">
@@ -667,6 +717,53 @@ const AdminBookings = () => {
                 className="w-full py-3 border border-border rounded-xl text-foreground font-medium hover:bg-muted transition-colors"
               >
                 Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Print Modal */}
+      {showPrintModal && selectedProofBooking && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-4xl w-full shadow-2xl flex flex-col max-h-[90vh]">
+            {/* Print Modal Header */}
+            <div className="bg-primary text-primary-foreground px-6 py-4 rounded-t-2xl flex items-center justify-between shrink-0">
+              <h2 className="text-xl font-bold">Booking Order</h2>
+              <button
+                onClick={() => setShowPrintModal(false)}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Print Preview */}
+            <div className="overflow-y-auto flex-1">
+              <BookingOrderPrint ref={printRef} booking={selectedProofBooking} />
+            </div>
+
+            {/* Print Modal Actions */}
+            <div className="border-t border-border px-6 py-4 flex gap-3 shrink-0">
+              <button
+                onClick={handlePrintToPDF}
+                className="flex-1 btn btn-primary flex items-center justify-center gap-2"
+              >
+                <Download className="w-5 h-5" />
+                Download PDF
+              </button>
+              <button
+                onClick={handlePrintToPrinter}
+                className="flex-1 btn btn-secondary flex items-center justify-center gap-2"
+              >
+                <Printer className="w-5 h-5" />
+                Print
+              </button>
+              <button
+                onClick={() => setShowPrintModal(false)}
+                className="flex-1 btn btn-ghost"
+              >
+                Close
               </button>
             </div>
           </div>
