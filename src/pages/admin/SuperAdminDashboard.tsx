@@ -169,20 +169,16 @@ const SuperAdminDashboard = () => {
   const fetchOverview = useCallback(async () => {
     try {
       setLoading(true);
-      console.log("🔍 SuperAdmin: Starting to fetch overview data...");
       const [overviewRes, statsRes] = await Promise.all([
         superAdminAPI.getOverview(),
         superAdminAPI.getStats(),
       ]);
-      console.log("✅ SuperAdmin: Overview data:", overviewRes);
-      console.log("✅ SuperAdmin: Stats data:", statsRes);
       setOverview(overviewRes.locations || []);
       if (statsRes.stats) setGlobalStats(statsRes.stats);
     } catch (err) {
       console.error("❌ SuperAdmin: Error fetching overview:", err);
     } finally {
       setLoading(false);
-      console.log("🏁 SuperAdmin: Finished loading, setting loading to false");
     }
   }, []);
 
@@ -393,10 +389,7 @@ const SuperAdminDashboard = () => {
 
   // ── Loading ────────────────────────────────────────────────────────────────
 
-  console.log("🎯 SuperAdmin render: loading =", loading, "name =", name);
-
   if (loading) {
-    console.log("⏳ SuperAdmin: Showing loading screen");
     return (
       <AppLayout userType="super_admin" userName={name}>
         <div className="max-w-6xl mx-auto flex items-center justify-center py-24">
@@ -410,8 +403,6 @@ const SuperAdminDashboard = () => {
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
-
-  console.log("🎨 SuperAdmin: Rendering main dashboard, overview =", overview.length, "stats =", globalStats);
 
   return (
     <AppLayout userType="super_admin" userName={name}>
