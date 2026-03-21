@@ -219,11 +219,18 @@ const AdminExpenses = () => {
     return matchesSearch && matchesCategory && matchesType;
   });
 
-  const filteredBookings = bookings.filter(booking =>
-    formData.bookingSearch === "" ||
-    booking.bookingId.toLowerCase().includes(formData.bookingSearch.toLowerCase()) ||
-    booking.customerId.toLowerCase().includes(formData.bookingSearch.toLowerCase())
-  );
+  const filteredBookings = bookings.filter(booking => {
+    if (formData.bookingSearch === "") return true;
+    try {
+      const search = (formData.bookingSearch || "").toLowerCase();
+      const bookingId = (booking.bookingId || "").toString().toLowerCase();
+      const customerId = (booking.customerId || "").toString().toLowerCase();
+      return bookingId.includes(search) || customerId.includes(search);
+    } catch (err) {
+      console.error("Booking filter error:", err);
+      return false;
+    }
+  });
 
   return (
     <AppLayout userType={role} userName={name}>
@@ -393,42 +400,53 @@ const AdminExpenses = () => {
                     <label className="block text-sm font-semibold text-blue-900 mb-2">
                       Select Booking <span className="text-red-500">*</span>
                     </label>
-                    {bookings.length > 5 ? (
+                    {bookings.length === 0 ? (
+                      <p className="text-sm text-red-600">❌ No bookings found. Please create a booking first.</p>
+                    ) : bookings.length > 5 ? (
                       <>
                         <input
                           type="text"
-                          placeholder="Search booking ID or customer..."
+                          placeholder="🔍 Search booking ID or customer name..."
                           value={formData.bookingSearch}
                           onChange={(e) => setFormData({ ...formData, bookingSearch: e.target.value })}
                           className="input-clean w-full"
+                          autoComplete="off"
                         />
-                        {formData.bookingSearch && filteredBookings.length > 0 && (
-                          <select
-                            value={formData.bookingId}
-                            onChange={(e) => setFormData({ ...formData, bookingId: e.target.value })}
-                            className="input-clean w-full"
-                            required
-                          >
-                            <option value="">Select a booking</option>
-                            {filteredBookings.map(booking => (
-                              <option key={booking._id} value={booking._id}>
-                                {booking.bookingId} (Customer: {booking.customerId})
-                              </option>
-                            ))}
-                          </select>
+                        {formData.bookingSearch ? (
+                          filteredBookings.length > 0 ? (
+                            <select
+                              value={formData.bookingId}
+                              onChange={(e) => setFormData({ ...formData, bookingId: e.target.value })}
+                              className="input-clean w-full bg-white"
+                              required
+                            >
+                              <option value="">Select a booking from results</option>
+                              {filteredBookings.map(booking => (
+                                <option key={booking._id} value={booking._id}>
+                                  {booking.bookingId} - {booking.customerId}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <div className="p-3 bg-white border border-amber-200 rounded text-sm text-amber-700">
+                              ⚠️ No bookings match "{formData.bookingSearch}". Try a different search.
+                            </div>
+                          )
+                        ) : (
+                          <p className="text-xs text-blue-700 italic">👉 Type a booking ID or customer name to search...</p>
                         )}
                       </>
                     ) : (
                       <select
                         value={formData.bookingId}
                         onChange={(e) => setFormData({ ...formData, bookingId: e.target.value })}
-                        className="input-clean w-full"
+                        className="input-clean w-full bg-white"
                         required
                       >
                         <option value="">Select a booking</option>
                         {bookings.map(booking => (
                           <option key={booking._id} value={booking._id}>
-                            {booking.bookingId} (Customer: {booking.customerId})
+                            {booking.bookingId} - {booking.customerId}
                           </option>
                         ))}
                       </select>
