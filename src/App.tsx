@@ -127,7 +127,7 @@ const App = () => (
           <Route path="/customer/subscriptions" element={<ProtectedRoute allowedRoles={['customer']}><MySubscriptionsPage /></ProtectedRoute>} />
           <Route path="/customer/payments" element={<ProtectedRoute allowedRoles={['customer']}><PaymentsPage /></ProtectedRoute>} />
           <Route path="/customer/preferences" element={<ProtectedRoute allowedRoles={['customer']}><PreferencesPage /></ProtectedRoute>} />
-          <Route path="/customer/notifications" element={<ProtectedRoute allowedRoles={['customer']}><NotificationsPage /></ProtectedRoute>} />
+          <Route path="/customer/notifications" element={<ProtectedRoute allowedRoles={['customer']}><NotificationsPage userType="customer" /></ProtectedRoute>} />
           <Route path="/customer/notification-settings" element={<ProtectedRoute allowedRoles={['customer']}><NotificationSettingsPage /></ProtectedRoute>} />
           <Route path="/customer/profile" element={<ProtectedRoute allowedRoles={['customer']}><ProfilePage /></ProtectedRoute>} />
           <Route path="/customer/help" element={<ProtectedRoute allowedRoles={['customer']}><HelpPage userType="customer" /></ProtectedRoute>} />
@@ -140,7 +140,7 @@ const App = () => (
           <Route path="/worker/leaves" element={<ProtectedRoute allowedRoles={['worker']}><WorkerLeaves /></ProtectedRoute>} />
           <Route path="/worker/salary" element={<ProtectedRoute allowedRoles={['worker']}><WorkerSalaryRequest /></ProtectedRoute>} />
           <Route path="/worker/profile" element={<ProtectedRoute allowedRoles={['worker']}><WorkerProfile /></ProtectedRoute>} />
-          <Route path="/worker/notifications" element={<ProtectedRoute allowedRoles={['worker']}><NotificationsPage /></ProtectedRoute>} />
+          <Route path="/worker/notifications" element={<ProtectedRoute allowedRoles={['worker']}><NotificationsPage userType="worker" /></ProtectedRoute>} />
           <Route path="/worker/help" element={<ProtectedRoute allowedRoles={['worker']}><HelpPage userType="worker" /></ProtectedRoute>} />
 
           {/* Admin */}

@@ -8,13 +8,26 @@ import ServiceAreaMap from '@/components/ServiceAreaMap';
 import ServiceAvailabilityChecker from '@/components/ServiceAvailabilityChecker';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { authAPI } from '@/lib/api';
 import { getAvailableCities } from '@/data/serviceAreas';
 import { CheckCircle2, MapPin } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const ServiceAreaDemo = () => {
+  const [profile, setProfile] = useState<{ name: string } | null>(null);
   const [confirmedArea, setConfirmedArea] = useState<string | null>(null);
   const [confirmedLocation, setConfirmedLocation] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Fetch current user profile
+  useEffect(() => {
+    authAPI.getProfile()
+      .then((res: any) => {
+        setProfile(res.user || res);
+      })
+      .catch((err: any) => {
+        console.error('Error fetching profile:', err);
+      });
+  }, []);
 
   const handleAvailabilityConfirmed = (serviceArea: string, coordinates: { lat: number; lng: number }) => {
     setConfirmedArea(serviceArea);
@@ -25,7 +38,7 @@ const ServiceAreaDemo = () => {
 
   return (
     <ServiceAvailabilityChecker onAvailabilityConfirmed={handleAvailabilityConfirmed}>
-      <AppLayout userType="customer" userName="Guest">
+      <AppLayout userType="customer" userName={profile?.name || "Loading..."}>
         <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 animate-fade-in pb-20 md:pb-0">
           <div>
             <h1 className="text-2xl font-bold font-heading text-foreground mb-1">

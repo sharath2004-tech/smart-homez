@@ -51,7 +51,7 @@ function fmtDate(iso: string) {
 
 const AdminHelpMessages = () => {
   const { toast } = useToast();
-  const { role } = useAdminRole();
+  const { role, name } = useAdminRole();
 
   const [messages, setMessages] = useState<HelpMessage[]>([]);
   const [counts, setCounts] = useState<Counts>({ total: 0, new: 0, read: 0, resolved: 0 });
@@ -139,7 +139,7 @@ const AdminHelpMessages = () => {
   };
 
   return (
-    <AppLayout userType={role}>
+    <AppLayout userType={role} userName={name}>
       <div className="max-w-4xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 animate-fade-in pb-20 md:pb-0">
         {/* Header */}
         <div className="flex items-center justify-between">

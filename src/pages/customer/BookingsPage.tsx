@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import RescheduleModal from "@/components/RescheduleModal";
 import WorkerTrackingMap from "@/components/WorkerTrackingMap";
 import { Badge } from "@/components/ui/badge";
-import { bookingsAPI } from "@/lib/api";
+import { authAPI, bookingsAPI } from "@/lib/api";
 import { Calendar, CalendarPlus, Clock, MapPin, Phone, QrCode, RefreshCw, Star } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -67,6 +67,7 @@ const BookingsPage = () => {
   const { t } = useTranslation();
   const routeLocation = useLocation();
   const navigate = useNavigate();
+  const [profile, setProfile] = useState<{ name: string } | null>(null);
   const [activeTab, setActiveTab] = useState<"upcoming" | "ongoing" | "past">("upcoming");
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,6 +86,17 @@ const BookingsPage = () => {
       window.history.replaceState({}, '');
     }
   }, [routeLocation.state]);
+
+  // Fetch current user profile
+  useEffect(() => {
+    authAPI.getProfile()
+      .then((res: any) => {
+        setProfile(res.user || res);
+      })
+      .catch((err: any) => {
+        console.error('Error fetching profile:', err);
+      });
+  }, []);
 
   const fetchBookings = useCallback(async (silent = false) => {
     try {
@@ -200,7 +212,7 @@ const BookingsPage = () => {
   };
 
   return (
-    <AppLayout userType="customer" userName="Customer">
+    <AppLayout userType="customer" userName={profile?.name || "Loading..."}>
       <div className="max-w-2xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 animate-fade-in pb-20 md:pb-0">
         {/* Header */}
         <div className="card-elevated p-5">

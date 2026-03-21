@@ -1,20 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useEffect, useState } from 'react';
 import AppLayout from '../../components/AppLayout';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
-import { api } from '../../lib/api';
-
-const getUserFromStorage = () => {
-  try {
-    const stored = localStorage.getItem('user');
-    if (stored) return JSON.parse(stored);
-  } catch {
-    // Ignore parsing errors
-  }
-  return null;
-};
+import { api, authAPI } from '../../lib/api';
 
 interface Notification {
   _id: string;
@@ -24,16 +15,26 @@ interface Notification {
   createdAt: string;
 }
 
-export default function NotificationCenter() {
+interface NotificationCenterProps {
+  userType?: "customer" | "worker" | "admin" | "super_admin";
+}
+
+export default function NotificationCenter({ userType = "customer" }: NotificationCenterProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const storedUser = getUserFromStorage();
-  const userType: 'customer' | 'worker' | 'admin' | 'super_admin' =
-    storedUser?.role === 'worker' ? 'worker'
-    : storedUser?.role === 'admin' ? 'admin'
-    : storedUser?.role === 'super_admin' ? 'super_admin'
-    : 'customer';
-  const userName: string = storedUser?.name || 'User';
+  const [profile, setProfile] = useState<any>(null);
+
+  // Fetch current user profile from API
+  useEffect(() => {
+    authAPI.getProfile()
+      .then((res: any) => {
+        const user = res.user || res;
+        setProfile(user);
+      })
+      .catch((err: any) => {
+        console.error('Error fetching profile:', err);
+      });
+  }, []);
 
   const { data: notifications, isLoading } = useQuery<Notification[]>({
     queryKey: ['notifications'],
@@ -57,7 +58,7 @@ export default function NotificationCenter() {
 
   if (isLoading) {
     return (
-      <AppLayout userType={userType} userName={userName}>
+      <AppLayout userType={userType} userName={profile?.name || "Loading..."}>
         <div className="flex items-center justify-center min-h-[200px]">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
@@ -66,7 +67,7 @@ export default function NotificationCenter() {
   }
 
   return (
-    <AppLayout userType={userType} userName={userName}>
+    <AppLayout userType={userType} userName={profile?.name || "User"}>
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold flex items-center gap-2">

@@ -1,8 +1,8 @@
 import AppLayout from "@/components/AppLayout";
-import { helpAPI } from "@/lib/api";
+import { authAPI, helpAPI } from "@/lib/api";
 import { SUPPORT_PHONE_NUMBER } from "@/lib/constants";
 import { CheckCircle, ChevronDown, ChevronUp, HelpCircle, Phone, Send } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 interface FaqItem {
@@ -26,6 +26,7 @@ interface HelpPageProps {
 
 const HelpPage = ({ userType = "customer" }: HelpPageProps) => {
   const { t } = useTranslation();
+  const [profile, setProfile] = useState<{ name: string } | null>(null);
   const faqs = useFaqs(t);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [subject, setSubject] = useState("");
@@ -33,6 +34,17 @@ const HelpPage = ({ userType = "customer" }: HelpPageProps) => {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
+
+  // Fetch current user profile
+  useEffect(() => {
+    authAPI.getProfile()
+      .then((res: any) => {
+        setProfile(res.user || res);
+      })
+      .catch((err: any) => {
+        console.error('Error fetching profile:', err);
+      });
+  }, []);
 
   const toggle = (index: number) => {
     setOpenIndex((prev) => (prev === index ? null : index));
@@ -56,7 +68,7 @@ const HelpPage = ({ userType = "customer" }: HelpPageProps) => {
   };
 
   return (
-    <AppLayout userType={userType}>
+    <AppLayout userType={userType} userName={profile?.name || "Loading..."}>
       <div className="max-w-2xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 animate-fade-in pb-20 md:pb-0">
         {/* Header */}
         <div>
