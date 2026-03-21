@@ -3,6 +3,7 @@ import { body, validationResult } from 'express-validator';
 import { authenticate } from '../middleware/auth.js';
 import Review from '../models/Review.js';
 import User from '../models/User.js';
+import reviewAnalytics from '../utils/reviewAnalytics.js';
 
 const router = express.Router();
 
@@ -64,6 +65,66 @@ router.get('/worker/:workerId', async (req, res) => {
       .sort({ createdAt: -1 });
     res.json({ reviews });
   } catch (error) {
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// Analytics endpoints
+router.get('/worker/:workerId/analytics', authenticate, async (req, res) => {
+  try {
+    const { workerId } = req.params;
+
+    // Verify worker exists
+    const worker = await User.findById(workerId).select('role');
+    if (!worker || worker.role !== 'worker') {
+      return res.status(404).json({
+        error: { message: 'Worker not found', status: 404 }
+      });
+    }
+
+    const analytics = await reviewAnalytics.getWorkerCompleteAnalytics(workerId);
+    res.json({ analytics });
+  } catch (error) {
+    console.error('Error getting worker analytics:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+router.get('/worker/:workerId/trends', authenticate, async (req, res) => {
+  try {
+    const { workerId } = req.params;
+
+    // Verify worker exists
+    const worker = await User.findById(workerId).select('role');
+    if (!worker || worker.role !== 'worker') {
+      return res.status(404).json({
+        error: { message: 'Worker not found', status: 404 }
+      });
+    }
+
+    const trends = await reviewAnalytics.getWorkerRatingTrends(workerId);
+    res.json({ trends });
+  } catch (error) {
+    console.error('Error getting rating trends:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+router.get('/analytics/dashboard', authenticate, async (req, res) => {
+  try {
+    // Only allow admin/super_admin access
+    if (!['admin', 'super_admin'].includes(req.user.role)) {
+      return res.status(403).json({
+        error: { message: 'Access denied', status: 403 }
+      });
+    }
+
+    const adminId = req.user.role === 'admin' ? req.user._id : null;
+    const dashboardData = await reviewAnalytics.getAdminDashboardRatings(adminId);
+
+    res.json({ dashboard: dashboardData });
+  } catch (error) {
+    console.error('Error getting dashboard analytics:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
   }
 });

@@ -1564,6 +1564,58 @@ export const locationRequestsAPI = {
   }
 };
 
+// ====== Reliability Score APIs ======
+export const reliabilityAPI = {
+  // Get reliability score and history for a specific worker
+  getWorkerScore: async (workerId: string) => {
+    return apiCall(`/reliability/worker/${workerId}`);
+  },
+
+  // Get reliability dashboard statistics (admin only)
+  getDashboard: async () => {
+    return apiCall('/reliability/dashboard');
+  },
+
+  // Get monthly reliability score trends
+  getTrends: async (months?: number) => {
+    const params = months ? `?months=${months}` : '';
+    return apiCall(`/reliability/trends${params}`);
+  },
+
+  // Get bulk reliability scores for multiple workers
+  getBulkScores: async (workerIds: string[]) => {
+    return apiCall('/reliability/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ workerIds })
+    });
+  },
+
+  // Manually recalculate reliability scores (super admin only)
+  recalculate: async () => {
+    return apiCall('/reliability/recalculate', {
+      method: 'POST'
+    });
+  }
+};
+
+// ====== Review Analytics APIs ======
+export const reviewAnalyticsAPI = {
+  // Get complete analytics for a worker (weekly, monthly, trends)
+  getWorkerAnalytics: async (workerId: string) => {
+    return apiCall(`/reviews/worker/${workerId}/analytics`);
+  },
+
+  // Get rating trends for a worker (30-day comparison)
+  getWorkerTrends: async (workerId: string) => {
+    return apiCall(`/reviews/worker/${workerId}/trends`);
+  },
+
+  // Get admin dashboard review analytics
+  getDashboard: async () => {
+    return apiCall('/reviews/analytics/dashboard');
+  }
+};
+
 // ====== Generic API wrapper (axios-like convenience object) ======
 // Used by pages that call api.get(), api.patch(), etc. directly.
 export const api = {
@@ -1591,6 +1643,8 @@ export default {
   settings: settingsAPI,
   preferences: preferencesAPI,
   leaves: leavesAPI,
-  reviews: reviewsAPI
+  reviews: reviewsAPI,
+  reliability: reliabilityAPI,
+  reviewAnalytics: reviewAnalyticsAPI
 };
 

@@ -1,7 +1,9 @@
 import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
-import { adminAPI, API_BASE_URL } from "@/lib/api";
-import { AlertTriangle, Archive, ArchiveRestore, CheckCircle, Clock, Edit, Eye, EyeOff, FileText, Info, Loader2, MapPin, Plus, Search, Star, Upload, X, XCircle } from "lucide-react";
+import { adminAPI, API_BASE_URL, reliabilityAPI, reviewAnalyticsAPI } from "@/lib/api";
+import { ReliabilityScoreCard } from "@/components/ReliabilityScoreCard";
+import { WorkerRatingAnalytics } from "@/components/WorkerRatingAnalytics";
+import { AlertTriangle, Archive, ArchiveRestore, CheckCircle, Clock, Edit, Eye, EyeOff, FileText, Info, Loader2, MapPin, Plus, Search, Star, Upload, X, XCircle, BarChart3, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface Location {
@@ -117,6 +119,11 @@ const AdminWorkers = () => {
   const [editWorker, setEditWorker] = useState<Worker | null>(null);
   const [updatingWorker, setUpdatingWorker] = useState(false);
 
+  // Worker analytics state
+  const [workerReliabilityData, setWorkerReliabilityData] = useState<any>(null);
+  const [workerRatingAnalytics, setWorkerRatingAnalytics] = useState<any>(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+
   // Credential management (superadmin only)
   const [showCredentials, setShowCredentials] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
@@ -186,6 +193,74 @@ const AdminWorkers = () => {
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Fetch worker reliability and rating analytics
+  const fetchWorkerAnalytics = async (workerId: string) => {
+    try {
+      setLoadingAnalytics(true);
+
+      const [reliabilityRes, ratingAnalyticsRes] = await Promise.all([
+        // Fetch reliability score and history using new API
+        reliabilityAPI.getWorkerScore(workerId),
+
+        // Fetch rating analytics using new API
+        reviewAnalyticsAPI.getWorkerAnalytics(workerId)
+      ]);
+
+      // Set reliability data if successful
+      if (reliabilityRes && !reliabilityRes.error) {
+        setWorkerReliabilityData(reliabilityRes);
+      }
+
+      // Set rating analytics data if successful
+      if (ratingAnalyticsRes && !ratingAnalyticsRes.error) {
+        setWorkerRatingAnalytics(ratingAnalyticsRes.analytics);
+      }
+    } catch (error) {
+      console.error('Error fetching worker analytics:', error);
+    } finally {
+      setLoadingAnalytics(false);
+    }
+  };
+
+  // Enhanced handleEditWorker to include analytics
+  const handleEditWorkerWithAnalytics = async (workerId: string) => {
+    try {
+      // First fetch detailed worker information (existing logic)
+      const response = await adminAPI.getWorkerDetails(workerId);
+      const worker = response.worker;
+
+      // Migrate old working time window format to new time slots format
+      if (worker.workerProfile?.workingTimeWindow) {
+        const wtw = worker.workerProfile.workingTimeWindow;
+
+        // If old format exists but no timeSlots, create timeSlots from legacy data
+        if (wtw.startTime && wtw.endTime && (!wtw.timeSlots || wtw.timeSlots.length === 0)) {
+          wtw.timeSlots = [{
+            startTime: wtw.startTime,
+            endTime: wtw.endTime
+          }];
+        }
+
+        // Ensure timeSlots exists as empty array if enabled
+        if (wtw.enabled && !wtw.timeSlots) {
+          wtw.timeSlots = [];
+        }
+      }
+
+      setEditWorker(worker);
+
+      // Clear previous analytics data
+      setWorkerReliabilityData(null);
+      setWorkerRatingAnalytics(null);
+
+      // Fetch analytics data for this worker
+      fetchWorkerAnalytics(workerId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load worker details';
+      alert(message);
     }
   };
 
@@ -592,28 +667,62 @@ const AdminWorkers = () => {
                         {w.workerProfile?.rating?.toFixed(1) || '0.0'}
                       </p>
                       <p className="text-xs text-muted-foreground">Rating</p>
+                      {w.workerProfile?.totalReviews && (
+                        <p className="text-xs text-blue-600">
+                          {w.workerProfile.totalReviews} reviews
+                        </p>
+                      )}
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-bold text-foreground">{w.workerProfile?.completedJobs || 0}</p>
                       <p className="text-xs text-muted-foreground">Jobs</p>
+                      <p className="text-xs text-green-600">
+                        {w.workerProfile?.rating && w.workerProfile.rating >= 4 ? '🔥 Top Performer' : ''}
+                      </p>
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-bold text-foreground">₹{w.workerProfile?.totalEarnings || 0}</p>
                       <p className="text-xs text-muted-foreground">Earned</p>
+                      <p className="text-xs text-purple-600">
+                        {w.workerProfile?.availability ? '🟢 Online' : '🔴 Offline'}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Reliability Score */}
+                  {/* Enhanced Reliability Score */}
                   {w.workerProfile?.reliabilityScore !== undefined && (
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs text-muted-foreground">Reliability:</span>
-                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${w.workerProfile.reliabilityScore >= 80 ? 'bg-green-500' : w.workerProfile.reliabilityScore >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
-                          style={{ width: `${w.workerProfile.reliabilityScore}%` }}
-                        />
+                    <div className="mb-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium text-blue-800">Reliability Score</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-sm font-bold text-blue-900">
+                            {Math.round((w.workerProfile.reliabilityScore / 100) * 20 * 10) / 10}/20
+                          </span>
+                          <div className={`w-2 h-2 rounded-full ${
+                            w.workerProfile.reliabilityScore >= 80 ? 'bg-green-500' :
+                            w.workerProfile.reliabilityScore >= 60 ? 'bg-amber-500' : 'bg-red-500'
+                          }`} />
+                        </div>
                       </div>
-                      <span className="text-xs font-medium">{w.workerProfile.reliabilityScore}%</span>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-2 bg-blue-200 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ${
+                              w.workerProfile.reliabilityScore >= 80 ? 'bg-green-500' :
+                              w.workerProfile.reliabilityScore >= 60 ? 'bg-amber-500' : 'bg-red-500'
+                            }`}
+                            style={{ width: `${w.workerProfile.reliabilityScore}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-medium text-blue-700">{w.workerProfile.reliabilityScore}%</span>
+                      </div>
+                      <div className={`text-xs mt-1 font-medium ${
+                        w.workerProfile.reliabilityScore >= 80 ? 'text-green-700' :
+                        w.workerProfile.reliabilityScore >= 60 ? 'text-amber-700' : 'text-red-700'
+                      }`}>
+                        {w.workerProfile.reliabilityScore >= 80 ? '🌟 Excellent' :
+                         w.workerProfile.reliabilityScore >= 60 ? '👍 Good' : '⚠️ Needs Improvement'}
+                      </div>
                     </div>
                   )}
 
@@ -678,7 +787,7 @@ const AdminWorkers = () => {
 
                   {/* Edit Button */}
                   <button
-                    onClick={() => handleEditWorker(w._id)}
+                    onClick={() => handleEditWorkerWithAnalytics(w._id)}
                     className="w-full py-2 mb-2 border border-blue-300 rounded-xl text-sm font-medium text-blue-700 hover:bg-blue-50 transition-colors flex items-center justify-center gap-1"
                   >
                     <Edit className="w-3.5 h-3.5" /> Edit Worker
@@ -1860,6 +1969,92 @@ const AdminWorkers = () => {
                     </div>
                   </>
                 )}
+
+                {/* Worker Analytics Section */}
+                <div className="space-y-6 border-t pt-6">
+                  <h3 className="text-sm font-bold text-foreground border-b pb-2 flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4" />
+                    Performance Analytics
+                  </h3>
+
+                  {loadingAnalytics ? (
+                    <div className="flex items-center justify-center p-8">
+                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                      <span className="ml-2 text-sm text-muted-foreground">Loading analytics...</span>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Reliability Score Card */}
+                      <ReliabilityScoreCard
+                        workerId={editWorker._id}
+                        workerName={editWorker.name}
+                        currentScore={editWorker.workerProfile?.reliabilityScore || 100}
+                        data={workerReliabilityData}
+                      />
+
+                      {/* Rating Analytics Card */}
+                      <WorkerRatingAnalytics
+                        workerId={editWorker._id}
+                        workerName={editWorker.name}
+                        currentRating={editWorker.workerProfile?.rating || 0}
+                        totalReviews={editWorker.workerProfile?.totalReviews || 0}
+                        trends={workerRatingAnalytics?.trends}
+                        weeklyData={workerRatingAnalytics?.weeklyData}
+                        monthlyData={workerRatingAnalytics?.monthlyData}
+                      />
+                    </div>
+                  )}
+
+                  {/* Quick Performance Summary */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl">
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                        <span className="text-lg font-bold text-gray-900">
+                          {editWorker.workerProfile?.rating?.toFixed(1) || '0.0'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-600">Customer Rating</p>
+                      {workerRatingAnalytics?.trends && (
+                        <div className="flex items-center justify-center gap-1 mt-1">
+                          {workerRatingAnalytics.trends.trend === 'improving' && (
+                            <TrendingUp className="w-3 h-3 text-green-600" />
+                          )}
+                          <span className="text-xs text-gray-500">
+                            {workerRatingAnalytics.trends.trend}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-gray-900 mb-1">
+                        {Math.round((editWorker.workerProfile?.reliabilityScore || 100) / 5)}/20
+                      </div>
+                      <p className="text-xs text-gray-600">Reliability Score</p>
+                      <div className={`text-xs mt-1 font-medium ${
+                        (editWorker.workerProfile?.reliabilityScore || 100) >= 80
+                          ? 'text-green-600'
+                          : (editWorker.workerProfile?.reliabilityScore || 100) >= 60
+                          ? 'text-amber-600'
+                          : 'text-red-600'
+                      }`}>
+                        {(editWorker.workerProfile?.reliabilityScore || 100) >= 80 ? 'Excellent' :
+                         (editWorker.workerProfile?.reliabilityScore || 100) >= 60 ? 'Good' : 'Needs Improvement'}
+                      </div>
+                    </div>
+
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-gray-900 mb-1">
+                        {editWorker.workerProfile?.totalReviews || 0}
+                      </div>
+                      <p className="text-xs text-gray-600">Total Reviews</p>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {editWorker.workerProfile?.completedJobs || 0} jobs completed
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
                 {/* Action Buttons */}
                 <div className="flex gap-3 pt-4">
