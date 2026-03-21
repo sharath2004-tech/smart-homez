@@ -84,6 +84,9 @@ const CustomerSignUp = () => {
   const [selectedLocationId, setSelectedLocationId] = useState("");
   const [isOAuthFlow, setIsOAuthFlow] = useState(false);
 
+  // Google Sign-In initialization state
+  const [googleInitialized, setGoogleInitialized] = useState(false);
+
   // Google OAuth handler
   const handleGoogleSuccess = async (credential: string) => {
     setLoading(true);
@@ -114,6 +117,17 @@ const CustomerSignUp = () => {
       setLoading(false);
     }
   };
+
+  // Initialize Google Sign-In once
+  useEffect(() => {
+    if (window.google && !googleInitialized) {
+      window.google.accounts.id.initialize({
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
+        callback: (response: CredentialResponse) => handleGoogleSuccess(response.credential)
+      });
+      setGoogleInitialized(true);
+    }
+  }, [googleInitialized]);
 
   useEffect(() => {
     if (step !== "location") return;
@@ -408,18 +422,10 @@ const CustomerSignUp = () => {
                 <button
                   type="button"
                   onClick={() => {
-                    // This will use Google Identity Services API
-                    // Requires google-oauth script to be loaded in index.html
-                    if (!window.google) {
+                    if (!window.google || !googleInitialized) {
                       setError("Google Sign-In is not available. Please use email signup.");
                       return;
                     }
-
-                    window.google.accounts.id.initialize({
-                      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
-                      callback: (response: CredentialResponse) => handleGoogleSuccess(response.credential)
-                    });
-
                     window.google.accounts.id.prompt();
                   }}
                   disabled={loading}

@@ -36,8 +36,22 @@ const LoginPage = () => {
   const [resendCountdown, setResendCountdown] = useState(0);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Google Sign-In initialization state
+  const [googleInitialized, setGoogleInitialized] = useState(false);
+
   useEffect(() => {
     publicAPI.getStats().then((r) => { if (r.success) setStats(r.stats); }).catch(() => {});
+  }, []);
+
+  // Initialize Google Sign-In once
+  useEffect(() => {
+    if (window.google && !googleInitialized) {
+      window.google.accounts.id.initialize({
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || "",
+        callback: (response) => handleGoogleLogin(response.credential),
+      });
+      setGoogleInitialized(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -195,14 +209,10 @@ const LoginPage = () => {
   };
 
   const triggerGoogleSignIn = () => {
-    if (!window.google) {
+    if (!window.google || !googleInitialized) {
       setError("Google Sign-In is not available. Please use email or OTP login.");
       return;
     }
-    window.google.accounts.id.initialize({
-      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || "",
-      callback: (response) => handleGoogleLogin(response.credential),
-    });
     window.google.accounts.id.prompt();
   };
 
