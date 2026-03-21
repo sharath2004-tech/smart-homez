@@ -1,4 +1,4 @@
-import DashboardPreferences from '../models/DashboardPreferences.js';
+import DashboardPreferences from './models/DashboardPreferences.js';
 
 /**
  * Initialize dashboard preferences with default services
