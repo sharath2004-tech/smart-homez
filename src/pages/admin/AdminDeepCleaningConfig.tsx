@@ -434,7 +434,7 @@ export default function AdminDeepCleaningConfig() {
                 <div className="flex items-center gap-3 p-4">
                   <span className="text-2xl">{item.icon}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground line-clamp-2 break-words">{s.name}</p>
+                    <p className="text-sm font-medium text-foreground line-clamp-2 break-words">{item.name}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {item.pricingType === "tiered"
                         ? item.tiers?.map(t => `${t.label}: ₹${t.price}`).join(" · ")
