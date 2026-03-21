@@ -16,18 +16,26 @@ export default function SubscriptionsPage() {
     queryKey: ['subscriptions'],
     queryFn: async () => {
       const res = await api.get('/subscriptions');
-      return res.data.subscriptions;
+      return res.data.subscriptions || [];
+    }
+  });
+
+  const { data: sections = [] } = useQuery({
+    queryKey: ['subscription-sections'],
+    queryFn: async () => {
+      const res = await api.get('/subscription-sections');
+      return res.data.sections || [];
     }
   });
 
   const pauseMutation = useMutation({
     mutationFn: (id) => api.patch(`/subscriptions/${id}/pause`, { reason: 'User requested' }),
-    onSuccess: () => queryClient.invalidateQueries(['subscriptions'])
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['subscriptions'] })
   });
 
   const resumeMutation = useMutation({
     mutationFn: (id) => api.patch(`/subscriptions/${id}/resume`),
-    onSuccess: () => queryClient.invalidateQueries(['subscriptions'])
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['subscriptions'] })
   });
 
   const getStatusColor = (status: string) => {
@@ -39,101 +47,165 @@ export default function SubscriptionsPage() {
     }
   };
 
+  const getColorGradient = (color: string) => {
+    const colorMap: Record<string, string> = {
+      blue: 'from-blue-50 to-blue-100',
+      teal: 'from-teal-50 to-teal-100',
+      green: 'from-green-50 to-green-100',
+      purple: 'from-purple-50 to-purple-100',
+      orange: 'from-orange-50 to-orange-100',
+      red: 'from-red-50 to-red-100',
+      pink: 'from-pink-50 to-pink-100',
+      yellow: 'from-yellow-50 to-yellow-100'
+    };
+    return colorMap[color] || 'from-gray-50 to-gray-100';
+  };
+
+  const SubscriptionCard = ({ sub }: any) => (
+    <Card className="p-6 hover:shadow-lg transition-shadow">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+        {/* Left Section */}
+        <div className="flex-1">
+          <div className="flex items-start gap-3 mb-3">
+            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
+              <Package className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-foreground">{sub.service?.name}</h3>
+              <p className="text-sm text-muted-foreground">{sub.plan} {t('subscription.plan')}</p>
+            </div>
+          </div>
+
+          {/* Status Badge */}
+          <div className="flex items-center gap-2 mb-3">
+            <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(sub.status)}`}>
+              {sub.status === 'active' && <Play className="w-3 h-3" />}
+              {sub.status === 'paused' && <Pause className="w-3 h-3" />}
+              {t(`subscription.${sub.status}`)}
+            </span>
+          </div>
+
+          {/* Details Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <IndianRupee className="w-4 h-4" />
+              <span className="font-semibold text-foreground">₹{sub.totalAmount}</span>
+              <span>/ {sub.plan}</span>
+            </div>
+            {sub.nextBillingDate && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Calendar className="w-4 h-4" />
+                <span>Next: {new Date(sub.nextBillingDate).toLocaleDateString()}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Section - Actions */}
+        <div className="flex flex-col gap-2">
+          {sub.status === 'active' ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => pauseMutation.mutate(sub._id)}
+              className="gap-2"
+            >
+              <Pause className="w-4 h-4" />
+              {t('subscription.pause')}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              onClick={() => resumeMutation.mutate(sub._id)}
+              className="gap-2"
+            >
+              <Play className="w-4 h-4" />
+              {t('subscription.resume')}
+            </Button>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+
+  const EmptySection = ({ section }: { section: any }) => (
+    <Card className="p-8 text-center border-dashed">
+      <div className="max-w-md mx-auto">
+        <div className="w-14 h-14 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+          <span className="text-2xl">{section.emoji}</span>
+        </div>
+        <h4 className="text-base font-semibold text-muted-foreground mb-2">No {section.name} Subscriptions</h4>
+        <p className="text-sm text-muted-foreground mb-4">Start a subscription to enjoy regular, discounted service</p>
+        <Link to="/customer/services">
+          <Button size="sm" variant="outline" className="gap-2">
+            <Package className="w-4 h-4" />
+            Browse Services
+          </Button>
+        </Link>
+      </div>
+    </Card>
+  );
+
   return (
-    <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6">
+    <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 py-6">
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-8">
         <h1 className="text-3xl font-bold font-heading text-foreground mb-2">{t('subscription.mySubscriptions')}</h1>
         <p className="text-muted-foreground">Manage your active subscriptions and recurring services</p>
       </div>
 
-      {/* Subscriptions Grid */}
-      <div className="grid gap-4 mb-8">
-        {subscriptions && subscriptions.length > 0 ? (
-          subscriptions.map((sub) => (
-            <Card key={sub._id} className="p-6 hover:shadow-lg transition-shadow">
-              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                {/* Left Section */}
-                <div className="flex-1">
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
-                      <Package className="w-6 h-6 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-foreground">{sub.service?.name}</h3>
-                      <p className="text-sm text-muted-foreground">{sub.plan} {t('subscription.plan')}</p>
-                    </div>
-                  </div>
-                  
-                  {/* Status Badge */}
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(sub.status)}`}>
-                      {sub.status === 'active' && <Play className="w-3 h-3" />}
-                      {sub.status === 'paused' && <Pause className="w-3 h-3" />}
-                      {t(`subscription.${sub.status}`)}
-                    </span>
-                  </div>
+      {/* Subscription Sections */}
+      {sections.length > 0 ? (
+        sections.map((section: any) => {
+          const sectionSubs = subscriptions?.filter(sub => {
+            const serviceName = (sub.service?.name || '').toLowerCase();
+            const patterns = section.filterConfig?.namePatternsInclude || [];
+            if (patterns.length === 0) return false;
+            return patterns.some(pattern => serviceName.includes(pattern.toLowerCase()));
+          }) || [];
 
-                  {/* Details Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <IndianRupee className="w-4 h-4" />
-                      <span className="font-semibold text-foreground">₹{sub.totalAmount}</span>
-                      <span>/ {sub.plan}</span>
-                    </div>
-                    {sub.nextBillingDate && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Calendar className="w-4 h-4" />
-                        <span>Next: {new Date(sub.nextBillingDate).toLocaleDateString()}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                {/* Right Section - Actions */}
-                <div className="flex flex-col gap-2">
-                  {sub.status === 'active' ? (
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={() => pauseMutation.mutate(sub._id)}
-                      className="gap-2"
-                    >
-                      <Pause className="w-4 h-4" />
-                      {t('subscription.pause')}
-                    </Button>
-                  ) : (
-                    <Button 
-                      size="sm" 
-                      onClick={() => resumeMutation.mutate(sub._id)}
-                      className="gap-2"
-                    >
-                      <Play className="w-4 h-4" />
-                      {t('subscription.resume')}
-                    </Button>
-                  )}
+          return (
+            <div key={section._id} className="mb-10">
+              <div className={`flex items-center gap-3 mb-5 p-4 bg-gradient-to-r ${getColorGradient(section.color)} rounded-lg`}>
+                <div className="text-3xl">{section.emoji}</div>
+                <div className="flex-1">
+                  <h2 className="text-2xl font-bold text-foreground">{section.name}</h2>
+                  <p className="text-sm text-muted-foreground mt-1">{section.description}</p>
                 </div>
               </div>
-            </Card>
-          ))
-        ) : (
-          <Card className="p-12 text-center">
-            <div className="max-w-md mx-auto">
-              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                <Package className="w-8 h-8 text-muted-foreground" />
+
+              <div className="grid gap-4">
+                {sectionSubs.length > 0 ? (
+                  sectionSubs.map((sub) => (
+                    <SubscriptionCard key={sub._id} sub={sub} />
+                  ))
+                ) : (
+                  <EmptySection section={section} />
+                )}
               </div>
-              <h3 className="text-lg font-semibold mb-2">No Active Subscriptions</h3>
-              <p className="text-muted-foreground mb-4">Save time and money with recurring service plans</p>
-              <Link to="/customer/services">
-                <Button className="gap-2">
-                  <Package className="w-4 h-4" />
-                  Browse Services
-                </Button>
-              </Link>
             </div>
-          </Card>
-        )}
-      </div>
+          );
+        })
+      ) : null}
+
+      {/* No Subscriptions at All */}
+      {(!subscriptions || subscriptions.length === 0) && sections.length === 0 && (
+        <Card className="p-12 text-center mb-8">
+          <div className="max-w-md mx-auto">
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+              <Package className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-semibold text-foreground mb-2">No Active Subscriptions</h3>
+            <p className="text-muted-foreground mb-4">Save time and money with recurring service plans</p>
+            <Link to="/customer/services">
+              <Button className="gap-2">
+                <Package className="w-4 h-4" />
+                Browse Services
+              </Button>
+            </Link>
+          </div>
+        </Card>
+      )}
 
       {/* Next Steps Section */}
       <Card className="p-6 bg-accent/50">
@@ -148,6 +220,23 @@ export default function SubscriptionsPage() {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-primary mt-0.5">•</span>
+                <span><strong>Pause Anytime:</strong> Going on vacation? Pause your subscription and resume when you're back</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-primary mt-0.5">•</span>
+                <span><strong>Priority Booking:</strong> Subscription members get priority worker assignment during peak hours</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-primary mt-0.5">•</span>
+                <span><strong>Flexible Scheduling:</strong> Modify your service schedule up to 24 hours before each appointment</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
                 <span><strong>Pause Anytime:</strong> Going on vacation? Pause your subscription and resume when you're back</span>
               </li>
               <li className="flex items-start gap-2">
