@@ -498,7 +498,12 @@ const AdminServices = () => {
   const missingCount = coverageItems.filter(c => !c.isConfigured).length;
 
   // Service Card Component
-  const ServiceCard = ({ service, handleEdit, handleDelete }: { service: Service; handleEdit: (service: Service) => void; handleDelete: (id: string) => void }) => (
+  const ServiceCard = ({ service, handleEdit, handleDelete }: { service: Service; handleEdit: (service: Service) => void; handleDelete: (id: string) => void }) => {
+    const activeSubscriptionPlans = (service.subscriptionPlans || [])
+      .filter(p => p.isActive)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+
+    return (
     <div className="card-elevated p-3 sm:p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
@@ -552,32 +557,27 @@ const AdminServices = () => {
                 <p className="text-xs text-purple-700 font-medium">⚠️ No hourly pricing tiers set</p>
               </div>
             )
-          ) : (
+          ) : activeSubscriptionPlans.length > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <div className="p-2 bg-muted rounded-lg">
-                <div className="text-xs text-muted-foreground mb-0.5">One Time</div>
-                <div className="text-sm font-bold text-foreground">₹{service.pricingPlans?.oneTime || service.price}</div>
-              </div>
-              <div className="p-2 bg-muted rounded-lg">
-                <div className="text-xs text-muted-foreground mb-0.5">Daily</div>
-                <div className="text-sm font-bold text-foreground">₹{service.pricingPlans?.daily || Math.round(service.price * 0.85)}</div>
-              </div>
-              <div className="p-2 bg-muted rounded-lg">
-                <div className="text-xs text-muted-foreground mb-0.5">Weekly</div>
-                <div className="text-sm font-bold text-foreground">₹{service.pricingPlans?.weekly || Math.round(service.price * 0.75 * 7)}</div>
-              </div>
-              <div className="p-2 bg-muted rounded-lg">
-                <div className="text-xs text-muted-foreground mb-0.5">Monthly</div>
-                <div className="text-sm font-bold text-foreground">₹{service.pricingPlans?.monthly || Math.round(service.price * 0.65 * 30)}</div>
-              </div>
+              {activeSubscriptionPlans.slice(0, 4).map((plan) => (
+                <div key={plan.id} className="p-2 bg-muted rounded-lg">
+                  <div className="text-xs text-muted-foreground mb-0.5">{plan.displayName || plan.name}</div>
+                  <div className="text-sm font-bold text-foreground">₹{plan.price}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-3 bg-muted rounded-lg">
+              <div className="text-xs text-muted-foreground mb-0.5">Base Price</div>
+              <div className="text-sm font-bold text-foreground">₹{service.price}</div>
             </div>
           )}
 
           <div className="mt-2 text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
             <span>Duration: {service.duration} min</span>
-            {service.subscriptionPlans && service.subscriptionPlans.filter(p => p.isActive).length > 0 && (
+            {activeSubscriptionPlans.length > 0 && (
               <span className="px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded text-xs font-medium">
-                {service.subscriptionPlans.filter(p => p.isActive).length} plan{service.subscriptionPlans.filter(p => p.isActive).length > 1 ? 's' : ''}
+                {activeSubscriptionPlans.length} plan{activeSubscriptionPlans.length > 1 ? 's' : ''}
               </span>
             )}
             {service.additionalServiceOptions && service.additionalServiceOptions.length > 0 && (
@@ -600,6 +600,7 @@ const AdminServices = () => {
       </div>
     </div>
   );
+  };
 
   return (
     <AppLayout userType={isSuperAdmin ? 'super_admin' : 'admin'} userName={profile?.name || 'Admin'}>
@@ -1242,7 +1243,7 @@ const AdminServices = () => {
                   
                   {selectedServiceType !== 'monthly_subscription' && formData.subscriptionPlans && formData.subscriptionPlans.length > 0 && (
                     <div className="space-y-3 mt-3">
-                      {formData.subscriptionPlans.sort((a, b) => a.sortOrder - b.sortOrder).map((plan, index) => (
+                      {[...(formData.subscriptionPlans || [])].sort((a, b) => a.sortOrder - b.sortOrder).map((plan, index) => (
                         <div key={plan.id} className="p-4 bg-background rounded-lg border-2 border-border hover:border-primary/50 transition-colors">
                           <div className="grid gap-3">
                             {/* Row 1: Display Name, Icon, Active Status */}
