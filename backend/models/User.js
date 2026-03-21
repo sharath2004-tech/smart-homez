@@ -276,6 +276,7 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false // If false, worker available 24/7
       },
+      // Legacy fields (backward compatibility - will be migrated to timeSlots)
       startTime: {
         type: String, // Format: "HH:MM" (24-hour format, e.g., "09:00")
         default: "09:00"
@@ -284,6 +285,17 @@ const userSchema = new mongoose.Schema({
         type: String, // Format: "HH:MM" (24-hour format, e.g., "18:00")
         default: "18:00"
       },
+      // New: Multiple time slots for split-time support (e.g., 8-12 AM + 2-6 PM)
+      timeSlots: [{
+        startTime: {
+          type: String, // Format: "HH:MM" (24-hour format)
+          required: true
+        },
+        endTime: {
+          type: String, // Format: "HH:MM" (24-hour format)
+          required: true
+        }
+      }],
       workingDays: {
         type: [Number], // 0-6 (Sunday-Saturday). Empty array = all days
         default: [1, 2, 3, 4, 5, 6] // Monday to Saturday
@@ -520,6 +532,23 @@ const userSchema = new mongoose.Schema({
   }
 }, {
   timestamps: true
+});
+
+// Migrate old workingTimeWindow format to new timeSlots format
+userSchema.pre('save', function(next) {
+  // Only for workers with workerProfile
+  if (this.role === 'worker' && this.workerProfile?.workingTimeWindow) {
+    const wtw = this.workerProfile.workingTimeWindow;
+    
+    // If old format exists (startTime/endTime) but no timeSlots, migrate
+    if (wtw.startTime && wtw.endTime && (!wtw.timeSlots || wtw.timeSlots.length === 0)) {
+      wtw.timeSlots = [{
+        startTime: wtw.startTime,
+        endTime: wtw.endTime
+      }];
+    }
+  }
+  next();
 });
 
 // Hash password before saving

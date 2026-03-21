@@ -1102,6 +1102,100 @@ router.put('/workers/:workerId',
           if (workerProfile.bankDetails.bankName) updateData['workerProfile.bankDetails.bankName'] = workerProfile.bankDetails.bankName;
           if (workerProfile.bankDetails.upiId) updateData['workerProfile.bankDetails.upiId'] = workerProfile.bankDetails.upiId;
         }
+
+        // Working Time Window - with validation for time slots
+        if (workerProfile.workingTimeWindow !== undefined) {
+          const wtw = workerProfile.workingTimeWindow;
+          
+          if (wtw.enabled !== undefined) {
+            updateData['workerProfile.workingTimeWindow.enabled'] = wtw.enabled;
+          }
+          
+          if (wtw.workingDays !== undefined) {
+            updateData['workerProfile.workingTimeWindow.workingDays'] = wtw.workingDays;
+          }
+          
+          if (wtw.timezone !== undefined) {
+            updateData['workerProfile.workingTimeWindow.timezone'] = wtw.timezone;
+          }
+          
+          // Handle time slots with validation
+          if (wtw.timeSlots !== undefined) {
+            // Validate time slots
+            if (!Array.isArray(wtw.timeSlots)) {
+              return res.status(400).json({
+                error: { message: 'timeSlots must be an array', status: 400 }
+              });
+            }
+            
+            // Validate each time slot
+            for (const slot of wtw.timeSlots) {
+              if (!slot.startTime || !slot.endTime) {
+                return res.status(400).json({
+                  error: { message: 'Each time slot must have startTime and endTime', status: 400 }
+                });
+              }
+              
+              // Validate time format (HH:MM)
+              const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+              if (!timeRegex.test(slot.startTime) || !timeRegex.test(slot.endTime)) {
+                return res.status(400).json({
+                  error: { message: 'Time must be in HH:MM format (24-hour)', status: 400 }
+                });
+              }
+              
+              // Validate start time is before end time
+              const [startHour, startMin] = slot.startTime.split(':').map(Number);
+              const [endHour, endMin] = slot.endTime.split(':').map(Number);
+              const startMinutes = startHour * 60 + startMin;
+              const endMinutes = endHour * 60 + endMin;
+              
+              if (startMinutes >= endMinutes) {
+                return res.status(400).json({
+                  error: { message: 'Start time must be before end time in each slot', status: 400 }
+                });
+              }
+            }
+            
+            // Check for overlapping time slots
+            for (let i = 0; i < wtw.timeSlots.length; i++) {
+              for (let j = i + 1; j < wtw.timeSlots.length; j++) {
+                const slot1 = wtw.timeSlots[i];
+                const slot2 = wtw.timeSlots[j];
+                
+                const [s1StartH, s1StartM] = slot1.startTime.split(':').map(Number);
+                const [s1EndH, s1EndM] = slot1.endTime.split(':').map(Number);
+                const [s2StartH, s2StartM] = slot2.startTime.split(':').map(Number);
+                const [s2EndH, s2EndM] = slot2.endTime.split(':').map(Number);
+                
+                const s1Start = s1StartH * 60 + s1StartM;
+                const s1End = s1EndH * 60 + s1EndM;
+                const s2Start = s2StartH * 60 + s2StartM;
+                const s2End = s2EndH * 60 + s2EndM;
+                
+                // Check for overlap: slot1 starts before slot2 ends AND slot1 ends after slot2 starts
+                if (s1Start < s2End && s1End > s2Start) {
+                  return res.status(400).json({
+                    error: { 
+                      message: `Time slots overlap: ${slot1.startTime}-${slot1.endTime} and ${slot2.startTime}-${slot2.endTime}`,
+                      status: 400 
+                    }
+                  });
+                }
+              }
+            }
+            
+            updateData['workerProfile.workingTimeWindow.timeSlots'] = wtw.timeSlots;
+          }
+          
+          // Legacy support: if startTime/endTime provided (for backward compatibility)
+          if (wtw.startTime !== undefined) {
+            updateData['workerProfile.workingTimeWindow.startTime'] = wtw.startTime;
+          }
+          if (wtw.endTime !== undefined) {
+            updateData['workerProfile.workingTimeWindow.endTime'] = wtw.endTime;
+          }
+        }
       }
 
       // Handle file uploads

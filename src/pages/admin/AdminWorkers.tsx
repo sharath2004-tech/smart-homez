@@ -57,8 +57,12 @@ interface Worker {
     };
     workingTimeWindow?: {
       enabled: boolean;
-      startTime?: string;
-      endTime?: string;
+      startTime?: string; // Legacy support
+      endTime?: string; // Legacy support
+      timeSlots?: Array<{
+        startTime: string;
+        endTime: string;
+      }>;
       workingDays?: number[];
       timezone?: string;
     };
@@ -239,7 +243,27 @@ const AdminWorkers = () => {
   const handleEditWorker = async (workerId: string) => {
     try {
       const response = await adminAPI.getWorkerDetails(workerId);
-      setEditWorker(response.worker);
+      const worker = response.worker;
+      
+      // Migrate old working time window format to new time slots format
+      if (worker.workerProfile?.workingTimeWindow) {
+        const wtw = worker.workerProfile.workingTimeWindow;
+        
+        // If old format exists but no timeSlots, create timeSlots from legacy data
+        if (wtw.startTime && wtw.endTime && (!wtw.timeSlots || wtw.timeSlots.length === 0)) {
+          wtw.timeSlots = [{
+            startTime: wtw.startTime,
+            endTime: wtw.endTime
+          }];
+        }
+        
+        // Ensure timeSlots exists as empty array if enabled
+        if (wtw.enabled && !wtw.timeSlots) {
+          wtw.timeSlots = [];
+        }
+      }
+      
+      setEditWorker(worker);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load worker details';
       alert(message);
@@ -1259,8 +1283,10 @@ const AdminWorkers = () => {
                                     workingTimeWindow: {
                                       ...current,
                                       enabled: e.target.checked,
-                                      startTime: current.startTime || "09:00",
-                                      endTime: current.endTime || "18:00",
+                                      timeSlots: current.timeSlots || [{
+                                        startTime: "09:00",
+                                        endTime: "18:00"
+                                      }],
                                       workingDays: current.workingDays || [1, 2, 3, 4, 5, 6]
                                     }
                                   }
@@ -1274,43 +1300,106 @@ const AdminWorkers = () => {
 
                         {editWorker.workerProfile?.workingTimeWindow?.enabled && (
                           <>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-sm font-medium mb-1">Start Time</label>
-                                <input
-                                  type="time"
-                                  className="input-clean"
-                                  value={editWorker.workerProfile.workingTimeWindow?.startTime || "09:00"}
-                                  onChange={(e) => {
+                            {/* Time Slots */}
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <label className="block text-sm font-medium">Time Slots</label>
+                                <button
+                                  type="button"
+                                  onClick={() => {
                                     const current = editWorker.workerProfile?.workingTimeWindow || {};
+                                    const currentSlots = current.timeSlots || [];
                                     setEditWorker({
                                       ...editWorker,
                                       workerProfile: {
                                         ...editWorker.workerProfile!,
-                                        workingTimeWindow: { ...current, startTime: e.target.value }
+                                        workingTimeWindow: {
+                                          ...current,
+                                          timeSlots: [
+                                            ...currentSlots,
+                                            { startTime: "09:00", endTime: "18:00" }
+                                          ]
+                                        }
                                       }
                                     });
                                   }}
-                                />
+                                  className="text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                  Add Time Slot
+                                </button>
                               </div>
-                              <div>
-                                <label className="block text-sm font-medium mb-1">End Time</label>
-                                <input
-                                  type="time"
-                                  className="input-clean"
-                                  value={editWorker.workerProfile.workingTimeWindow?.endTime || "18:00"}
-                                  onChange={(e) => {
-                                    const current = editWorker.workerProfile?.workingTimeWindow || {};
-                                    setEditWorker({
-                                      ...editWorker,
-                                      workerProfile: {
-                                        ...editWorker.workerProfile!,
-                                        workingTimeWindow: { ...current, endTime: e.target.value }
-                                      }
-                                    });
-                                  }}
-                                />
-                              </div>
+
+                              {(editWorker.workerProfile.workingTimeWindow?.timeSlots || []).map((slot, index) => (
+                                <div key={index} className="flex items-center gap-2 p-3 bg-background rounded-lg border border-border">
+                                  <div className="flex-1 grid grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="block text-xs font-medium mb-1 text-muted-foreground">Start Time</label>
+                                      <input
+                                        type="time"
+                                        className="input-clean text-sm"
+                                        value={slot.startTime}
+                                        onChange={(e) => {
+                                          const current = editWorker.workerProfile?.workingTimeWindow || {};
+                                          const updatedSlots = [...(current.timeSlots || [])];
+                                          updatedSlots[index] = { ...updatedSlots[index], startTime: e.target.value };
+                                          setEditWorker({
+                                            ...editWorker,
+                                            workerProfile: {
+                                              ...editWorker.workerProfile!,
+                                              workingTimeWindow: { ...current, timeSlots: updatedSlots }
+                                            }
+                                          });
+                                        }}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium mb-1 text-muted-foreground">End Time</label>
+                                      <input
+                                        type="time"
+                                        className="input-clean text-sm"
+                                        value={slot.endTime}
+                                        onChange={(e) => {
+                                          const current = editWorker.workerProfile?.workingTimeWindow || {};
+                                          const updatedSlots = [...(current.timeSlots || [])];
+                                          updatedSlots[index] = { ...updatedSlots[index], endTime: e.target.value };
+                                          setEditWorker({
+                                            ...editWorker,
+                                            workerProfile: {
+                                              ...editWorker.workerProfile!,
+                                              workingTimeWindow: { ...current, timeSlots: updatedSlots }
+                                            }
+                                          });
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const current = editWorker.workerProfile?.workingTimeWindow || {};
+                                      const updatedSlots = (current.timeSlots || []).filter((_, i) => i !== index);
+                                      setEditWorker({
+                                        ...editWorker,
+                                        workerProfile: {
+                                          ...editWorker.workerProfile!,
+                                          workingTimeWindow: { ...current, timeSlots: updatedSlots }
+                                        }
+                                      });
+                                    }}
+                                    className="p-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                                    title="Remove time slot"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              ))}
+
+                              {(!editWorker.workerProfile.workingTimeWindow?.timeSlots || editWorker.workerProfile.workingTimeWindow.timeSlots.length === 0) && (
+                                <p className="text-xs text-muted-foreground italic">
+                                  No time slots added. Click "Add Time Slot" to define working hours.
+                                </p>
+                              )}
                             </div>
 
                             <div>
