@@ -618,63 +618,13 @@ const BookServicePage = () => {
     );
   }
 
-  // Use service's subscription plans or fall back to defaults
+  // Use service's subscription plans only if configured by admin
   const subscriptionPlans = service?.subscriptionPlans && service.subscriptionPlans.length > 0
     ? service.subscriptionPlans.filter(plan => plan.isActive).sort((a, b) => a.sortOrder - b.sortOrder)
-    : [
-        {
-          id: 'oneTime',
-          name: 'oneTime',
-          displayName: 'One-Time',
-          icon: '📅',
-          description: 'Single service',
-          price: service?.price || 500,
-          discountPercentage: 0,
-          isActive: true,
-          requiresFixedWorker: false,
-          allowDaySelection: false,
-          sortOrder: 1
-        },
-        {
-          id: 'daily',
-          name: 'daily',
-          displayName: 'Daily',
-          icon: '🌅',
-          description: 'Every day',
-          price: Math.round((service?.price || 500) * 0.85),
-          discountPercentage: 15,
-          isActive: true,
-          requiresFixedWorker: true,
-          allowDaySelection: false,
-          sortOrder: 2
-        },
-        {
-          id: 'weekly',
-          name: 'weekly',
-          displayName: 'Weekly',
-          icon: '📆',
-          description: 'Select days',
-          price: Math.round((service?.price || 500) * 0.75),
-          discountPercentage: 25,
-          isActive: true,
-          requiresFixedWorker: true,
-          allowDaySelection: true,
-          sortOrder: 3
-        },
-        {
-          id: 'monthly',
-          name: 'monthly',
-          displayName: 'Monthly',
-          icon: '🗓️',
-          description: 'Once a month',
-          price: Math.round((service?.price || 500) * 0.65),
-          discountPercentage: 35,
-          isActive: true,
-          requiresFixedWorker: true,
-          allowDaySelection: false,
-          sortOrder: 4
-        }
-      ];
+    : [];
+
+  // Check if subscription plans are available
+  const hasSubscriptionPlans = subscriptionPlans.length > 0;
 
   return (
     <AppLayout userType="customer" userName={profile?.name || "Guest"}>
@@ -944,6 +894,8 @@ const BookServicePage = () => {
             </div>
           )}
 
+          {/* Booking Plan Selection - Only show if admin configured subscription plans */}
+          {hasSubscriptionPlans && (
           <div className="card-elevated p-4 sm:p-5 md:p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-foreground flex items-center gap-2">
@@ -1026,6 +978,7 @@ const BookServicePage = () => {
               </div>
             )}
           </div>
+          )}
 
           {/* Subscription Schedule Details */}
           {bookingType !== 'oneTime' && (
