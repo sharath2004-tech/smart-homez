@@ -74,10 +74,13 @@ const MaidServicePage = () => {
       setProfile(profileData.user || profileData);
       
       // Set default booking type based on service
-      if (serviceData.service.name?.toLowerCase().includes('monthly') || 
+      if (serviceData.service.name?.toLowerCase().includes('monthly') ||
           serviceData.service.name?.toLowerCase().includes('subscription')) {
         setMaidDetails(prev => ({ ...prev, bookingType: 'monthly' }));
       }
+
+      // Auto-select all tasks as they are admin-configured
+      setMaidDetails(prev => ({ ...prev, taskList: taskOptions }));
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load service details');
@@ -98,15 +101,6 @@ const MaidServicePage = () => {
     'Vacuuming',
     'Balcony Cleaning'
   ];
-
-  const toggleTask = (task: string) => {
-    setMaidDetails(prev => ({
-      ...prev,
-      taskList: prev.taskList.includes(task)
-        ? prev.taskList.filter(t => t !== task)
-        : [...prev.taskList, task]
-    }));
-  };
 
   const calculateTotalPrice = () => {
     if (!service) return 0;
@@ -163,11 +157,6 @@ const MaidServicePage = () => {
 
     if (maidDetails.hours < 1) {
       toast.error('Minimum 1 hour booking required');
-      return;
-    }
-
-    if (maidDetails.taskList.length === 0) {
-      toast.error('Please select at least one task');
       return;
     }
 
@@ -404,23 +393,18 @@ const MaidServicePage = () => {
             </div>
           </div>
 
-          {/* Task Selection */}
+          {/* Task Inclusion */}
           <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
-            <h2 className="text-xl font-bold mb-4">Select Tasks *</h2>
+            <h2 className="text-xl font-bold mb-4">Service Includes</h2>
             <div className="grid md:grid-cols-2 gap-3">
               {taskOptions.map((task) => (
-                <label
+                <div
                   key={task}
-                  className="flex items-center gap-2 p-3 rounded-lg border border-border hover:bg-muted/50 cursor-pointer"
+                  className="flex items-center gap-2 p-3 rounded-lg border border-green-200 bg-green-50"
                 >
-                  <input
-                    type="checkbox"
-                    checked={maidDetails.taskList.includes(task)}
-                    onChange={() => toggleTask(task)}
-                    className="w-4 h-4 text-primary"
-                  />
-                  <span className="text-sm">{task}</span>
-                </label>
+                  <span className="text-green-600">✓</span>
+                  <span className="text-sm text-green-800">{task}</span>
+                </div>
               ))}
             </div>
           </div>
@@ -485,8 +469,8 @@ const MaidServicePage = () => {
                 <span className="font-semibold">{calculateTotalHours()} hours</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Selected Tasks:</span>
-                <span className="font-semibold">{maidDetails.taskList.length}</span>
+                <span className="text-muted-foreground">Service Includes:</span>
+                <span className="font-semibold">{maidDetails.taskList.length} tasks</span>
               </div>
               {maidDetails.bringSupplies && (
                 <div className="flex justify-between text-sm">

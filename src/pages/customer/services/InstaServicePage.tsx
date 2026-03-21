@@ -143,7 +143,14 @@ const InstaServicePage = () => {
           // Task options from DB, filter active only, fallback to hardcoded list
           if (svc.taskOptions && svc.taskOptions.length > 0) {
             const active = svc.taskOptions.filter((t: any) => t.isActive !== false);
-            if (active.length > 0) setTaskOptions(active);
+            if (active.length > 0) {
+              setTaskOptions(active);
+              // Auto-select all admin-configured tasks
+              setSelectedTasks(active.map((t: any) => t.id));
+            }
+          } else {
+            // Auto-select all default tasks if no admin configuration
+            setSelectedTasks(TASK_OPTIONS.map(t => t.id));
           }
         } else {
           setNoServiceWarning(true);
@@ -207,9 +214,6 @@ const InstaServicePage = () => {
     };
     fetchSlots();
   }, [bookingDate, hours]);
-
-  const toggleTask = (id: string) =>
-    setSelectedTasks((p) => (p.includes(id) ? p.filter((t) => t !== id) : [...p, id]));
 
   const handleBook = async () => {
     if (!serviceId) {
@@ -320,7 +324,7 @@ const InstaServicePage = () => {
             </div>
           ))}
           <span className="ml-2 text-xs text-muted-foreground font-medium">
-            {step === 1 ? "What & When" : step === 2 ? "Time & Extras" : "Confirm & Pay"}
+            {step === 1 ? "When & How" : step === 2 ? "Time & Extras" : "Confirm & Pay"}
           </span>
         </div>
 
@@ -373,35 +377,27 @@ const InstaServicePage = () => {
             {/* Tasks */}
             <div>
               <h2 className="font-semibold font-heading text-foreground mb-1">
-                What should the maid do?
+                What the maid will do
               </h2>
-              <p className="text-xs text-muted-foreground mb-3">Select all that apply</p>
+              <p className="text-xs text-muted-foreground mb-3">Service includes these tasks</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {taskOptions.map((task) => (
-                  <button
+                  <div
                     key={task.id}
-                    onClick={() => toggleTask(task.id)}
-                    className={`flex items-center gap-2 p-3 rounded-xl border-2 text-left transition-all ${
-                      selectedTasks.includes(task.id)
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:border-primary/40"
-                    }`}
+                    className="flex items-center gap-2 p-3 rounded-xl border border-green-200 bg-green-50"
                   >
                     <span className="text-xl">{task.icon}</span>
-                    <span className="text-xs font-medium text-foreground leading-snug">
+                    <span className="text-xs font-medium text-green-800 leading-snug">
                       {task.label}
                     </span>
-                  </button>
+                    <span className="ml-auto text-green-600">✓</span>
+                  </div>
                 ))}
               </div>
             </div>
 
             <button
-              onClick={() => {
-                if (selectedTasks.length === 0)
-                  return toast.error("Select at least one task");
-                setStep(2);
-              }}
+              onClick={() => setStep(2)}
               className="btn-brand w-full"
             >
               Continue →
@@ -662,13 +658,13 @@ const InstaServicePage = () => {
 
             <div className="card-elevated p-4 rounded-2xl">
               <p className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-                <Briefcase className="w-4 h-4 text-primary" /> Tasks Selected
+                <Briefcase className="w-4 h-4 text-primary" /> Service Includes
               </p>
               <div className="flex flex-wrap gap-2">
                 {selectedTasks.map((t) => {
                   const task = taskOptions.find((o) => o.id === t);
                   return (
-                    <span key={t} className="badge-primary text-xs">
+                    <span key={t} className="badge-success text-xs">
                       {task?.icon} {task?.label}
                     </span>
                   );
