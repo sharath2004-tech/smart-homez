@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import "../styles/sidebar-enhancements.css";
 
 interface NavigationItem {
   to: string;
@@ -77,9 +78,9 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
             {/* Section Header */}
             <button
               onClick={() => toggleSection(section.id)}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group ${
+              className={`sidebar-section-header sidebar-focusable w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group ${
                 hasActiveItem
-                  ? 'bg-primary/10 text-primary border border-primary/20'
+                  ? 'sidebar-section-active bg-primary/10 text-primary border border-primary/20'
                   : 'text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent'
               }`}
             >
@@ -87,16 +88,16 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                 <SectionIcon className={`w-4 h-4 ${hasActiveItem ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`} />
                 <span className="font-semibold">{section.title}</span>
               </div>
-              <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-0' : '-rotate-90'}`}>
+              <div className={`section-chevron transition-transform duration-200 ${isExpanded ? 'section-expanded' : 'section-collapsed'}`}>
                 <ChevronDown className="w-4 h-4" />
               </div>
             </button>
 
             {/* Section Items */}
-            <div className={`overflow-hidden transition-all duration-300 ${
+            <div className={`sidebar-section-content overflow-hidden transition-all duration-300 ${
               isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
             }`}>
-              <div className="ml-4 mt-1 space-y-1 border-l border-border/30 pl-1">
+              <div className="ml-4 mt-1 space-y-1 sidebar-item-connector border-l border-border/30 pl-1">
                 {section.items.map((item) => {
                   const ItemIcon = item.icon;
                   const isActive = isItemActive(item.to);
@@ -105,9 +106,9 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     <Link
                       key={item.to}
                       to={item.to}
-                      className={`flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-all duration-200 group ${
+                      className={`sidebar-nav-item sidebar-focusable flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-all duration-200 group ${
                         isActive
-                          ? 'bg-primary text-primary-foreground font-medium shadow-sm'
+                          ? 'active bg-primary text-primary-foreground font-medium shadow-sm'
                           : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent'
                       }`}
                     >
@@ -123,9 +124,6 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                           ? t(item.label)
                           : item.label}
                       </span>
-                      {isActive && (
-                        <div className="ml-auto w-1 h-4 bg-primary-foreground rounded-full opacity-80" />
-                      )}
                     </Link>
                   );
                 })}

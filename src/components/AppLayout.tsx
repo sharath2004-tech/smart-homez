@@ -7,6 +7,7 @@ import { AppHeader } from "./AppHeader";
 import { MobileSidebar } from "./MobileSidebar";
 import { PersistentSidebar } from "./PersistentSidebar";
 import { CollapsibleSidebar } from "./CollapsibleSidebar";
+import "../styles/sidebar-enhancements.css";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -327,19 +328,19 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
 
         {/* Navigation */}
         {(userType === 'admin' || userType === 'super_admin') ? (
-          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-sidebar-border">
+          <div className="flex-1 overflow-y-auto sidebar-scroll">
             {/* Notifications */}
             <div className="p-4 border-b border-sidebar-border">
               <Link
                 to={notificationsPath}
-                className="flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors group"
+                className="sidebar-focusable flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors group"
               >
                 <div className="flex items-center gap-3">
                   <Bell className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
                   <span>Notifications</span>
                 </div>
                 {unreadCount > 0 && (
-                  <span className="bg-destructive text-destructive-foreground text-xs font-bold px-2 py-1 rounded-full min-w-[20px] text-center">
+                  <span className="notification-badge bg-destructive text-destructive-foreground text-xs font-bold px-2 py-1 rounded-full min-w-[20px] text-center">
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 )}
