@@ -1,9 +1,9 @@
 import express from 'express';
 import { param, validationResult } from 'express-validator';
 import { authenticate } from '../middleware/auth.js';
-import reliabilityScoring from '../utils/reliabilityScoring.js';
-import User from '../models/User.js';
 import ReliabilityScore from '../models/ReliabilityScore.js';
+import User from '../models/User.js';
+import reliabilityScoring from '../utils/reliabilityScoring.js';
 
 const router = express.Router();
 

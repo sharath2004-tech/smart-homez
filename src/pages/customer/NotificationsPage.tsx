@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import AppLayout from '../../components/AppLayout';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';

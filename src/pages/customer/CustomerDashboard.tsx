@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { useGeolocation } from "@/hooks/useGeolocation";
-import { authAPI, bookingsAPI, locationsAPI, dashboardPreferencesAPI } from "@/lib/api";
+import { authAPI, bookingsAPI, dashboardPreferencesAPI, locationsAPI } from "@/lib/api";
 import { motion } from "framer-motion";
 import { AlertCircle, ArrowRight, Bell, ChevronRight, Clock, MapPin, Settings, Star } from "lucide-react";
 import { useEffect, useState } from "react";

@@ -1,9 +1,9 @@
-import mongoose from 'mongoose';
 import dotenv from 'dotenv';
-import User from './models/User.js';
+import mongoose from 'mongoose';
+import { SUPPORT_PHONE_NUMBER } from './config/constants.js';
 import Location from './models/Location.js';
 import Service from './models/Service.js';
-import { SUPPORT_PHONE_NUMBER } from './config/constants.js';
+import User from './models/User.js';
 
 dotenv.config();
 

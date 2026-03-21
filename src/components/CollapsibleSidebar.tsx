@@ -1,7 +1,7 @@
-import { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link, useLocation } from "react-router-dom";
 import "../styles/sidebar-enhancements.css";
 
 interface NavigationItem {

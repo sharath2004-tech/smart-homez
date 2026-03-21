@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { toast } from "@/hooks/use-toast";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { dashboardPreferencesAPI } from "@/lib/api";
-import { Eye, EyeOff, Save, RotateCcw, Settings2, AlertCircle, ArrowUp, ArrowDown } from "lucide-react";
+import { AlertCircle, ArrowDown, ArrowUp, Eye, EyeOff, RotateCcw, Save, Settings2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface DashboardService {

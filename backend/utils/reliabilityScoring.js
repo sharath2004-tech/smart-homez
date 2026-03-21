@@ -1,6 +1,5 @@
-import mongoose from 'mongoose';
-import User from '../models/User.js';
 import ReliabilityScore from '../models/ReliabilityScore.js';
+import User from '../models/User.js';
 
 /**
  * Reliability Scoring Service

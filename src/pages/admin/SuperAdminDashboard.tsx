@@ -1,5 +1,6 @@
 import AppLayout from "@/components/AppLayout";
-import { authAPI, superAdminAPI } from "@/lib/api";
+import { useAdminRole } from "@/hooks/useAdminRole";
+import { superAdminAPI } from "@/lib/api";
 import ExcelJS from "exceljs";
 import {
     Archive,
@@ -127,7 +128,7 @@ const statusBadge: Record<string, string> = {
 
 const SuperAdminDashboard = () => {
   const { t } = useTranslation();
-  const [userName, setUserName] = useState("Super Admin");
+  const { name } = useAdminRole();
   const [overview, setOverview] = useState<LocationOverview[]>([]);
   const [globalStats, setGlobalStats] = useState<GlobalStats>({
     todayBookings: 0,
@@ -168,24 +169,24 @@ const SuperAdminDashboard = () => {
   const fetchOverview = useCallback(async () => {
     try {
       setLoading(true);
+      console.log("🔍 SuperAdmin: Starting to fetch overview data...");
       const [overviewRes, statsRes] = await Promise.all([
         superAdminAPI.getOverview(),
         superAdminAPI.getStats(),
       ]);
+      console.log("✅ SuperAdmin: Overview data:", overviewRes);
+      console.log("✅ SuperAdmin: Stats data:", statsRes);
       setOverview(overviewRes.locations || []);
       if (statsRes.stats) setGlobalStats(statsRes.stats);
     } catch (err) {
-      console.error("Error fetching super admin overview:", err);
+      console.error("❌ SuperAdmin: Error fetching overview:", err);
     } finally {
       setLoading(false);
+      console.log("🏁 SuperAdmin: Finished loading, setting loading to false");
     }
   }, []);
 
   useEffect(() => {
-    authAPI.getProfile().then(res => {
-      const name = res?.user?.name || res?.name;
-      if (name) setUserName(name);
-    }).catch(() => {});
     fetchOverview();
   }, [fetchOverview]);
 
@@ -392,9 +393,12 @@ const SuperAdminDashboard = () => {
 
   // ── Loading ────────────────────────────────────────────────────────────────
 
+  console.log("🎯 SuperAdmin render: loading =", loading, "name =", name);
+
   if (loading) {
+    console.log("⏳ SuperAdmin: Showing loading screen");
     return (
-      <AppLayout userType="super_admin" userName={userName}>
+      <AppLayout userType="super_admin" userName={name}>
         <div className="max-w-6xl mx-auto flex items-center justify-center py-24">
           <div className="flex flex-col items-center gap-4">
             <Loader2 className="w-10 h-10 animate-spin text-primary" />
@@ -407,8 +411,10 @@ const SuperAdminDashboard = () => {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  console.log("🎨 SuperAdmin: Rendering main dashboard, overview =", overview.length, "stats =", globalStats);
+
   return (
-    <AppLayout userType="super_admin" userName={userName}>
+    <AppLayout userType="super_admin" userName={name}>
       <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 md:space-y-6 animate-fade-in pb-20 md:pb-0">
 
         {/* ── Header bar ── */}

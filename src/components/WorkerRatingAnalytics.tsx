@@ -1,7 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Star, TrendingDown, TrendingUp, Minus, Calendar, BarChart3 } from "lucide-react";
+import { BarChart3, Calendar, Minus, Star, TrendingDown, TrendingUp } from "lucide-react";
 
 interface RatingTrend {
   currentPeriod: {
