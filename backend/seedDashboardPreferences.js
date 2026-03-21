@@ -57,7 +57,7 @@ const initializeDashboardPreferences = async () => {
           nameKey: 'customer.dashboard.intenseWashroom',
           subtitleKey: 'customer.dashboard.washroomDeepClean',
           badge: 'Sanitize',
-          path: '/customer/services/washroom',
+          path: '/customer/services/spot-clean',
           isActive: true,
           sortOrder: 4,
           isDefault: false
