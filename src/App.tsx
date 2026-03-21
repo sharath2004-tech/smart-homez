@@ -38,6 +38,7 @@ import SpotCleanPage from "./pages/customer/services/SpotCleanPage";
 import SubscriptionServicePage from "./pages/customer/services/SubscriptionServicePage";
 import ServicesPage from "./pages/customer/ServicesPage";
 import SubscriptionBookingPage from "./pages/customer/SubscriptionBookingPage";
+import InstaMaidCapabilities from "./pages/InstaMaidCapabilities";
 
 // Worker pages
 import WorkerDashboard from "./pages/worker/WorkerDashboard";
@@ -99,6 +100,7 @@ const App = () => (
         <Routes>
           {/* Public */}
           <Route path="/" element={<LandingPage />} />
+          <Route path="/insta-maid-capabilities" element={<InstaMaidCapabilities />} />
 
           {/* Auth */}
           <Route path="/login" element={<LoginPage />} />

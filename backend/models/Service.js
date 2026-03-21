@@ -192,6 +192,10 @@ const serviceSchema = new mongoose.Schema({
       default: true
     }
   }],
+
+  // Service capabilities and restrictions
+  dos: [String],        // What the service includes/does (e.g., "Dusting", "Floor cleaning")
+  donts: [String],      // What the service doesn't include (e.g., "Bathroom cleaning", "High ceiling areas")
   // Editable task checklist for instant_hourly services (multi-select shown to customers)
   taskOptions: [{
     id: { type: String, required: true },

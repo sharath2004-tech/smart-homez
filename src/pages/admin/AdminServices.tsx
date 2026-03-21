@@ -68,6 +68,8 @@ interface Service {
     sortOrder?: number;
     isActive?: boolean;
   }>;
+  dos?: string[];
+  donts?: string[];
 }
 
 interface UserProfile {
@@ -283,7 +285,9 @@ const AdminServices = () => {
     durationOptions: [],
     subscriptionOptions: { allowedFrequencies: ['daily', 'alt-days', '3-days', 'weekly'], requiresSameWorker: true, autoRenewal: true },
     sizeParameters: { enabled: false, sizeType: 'quantity', options: [] },
-    suggestedServices: []
+    suggestedServices: [],
+    dos: [],
+    donts: []
   });  const isSuperAdmin = profile?.role === 'super_admin';
 
   useEffect(() => {
@@ -455,6 +459,8 @@ const AdminServices = () => {
       originalPrice: (service as any).originalPrice || 0,
       taskOptions: (service as any).taskOptions || [],
       suggestedServices: service.suggestedServices || [],
+      dos: (service as any).dos || [],
+      donts: (service as any).donts || [],
     });
     setSelectedServiceType(service.serviceType || null);
     setEditingId(service._id!);
@@ -497,6 +503,8 @@ const AdminServices = () => {
       originalPrice: 0,
       taskOptions: [],
       suggestedServices: [],
+      dos: [],
+      donts: [],
     });
   };
 
@@ -2035,6 +2043,104 @@ const AdminServices = () => {
                     )}
                   </div>
                 )}
+
+                {/* Service Dos & Don'ts Section */}
+                <div className="space-y-3 p-4 bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground">✅ What This Service DOES Include</label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      List what customers can expect from this service (e.g., "Dusting", "Sweeping", "Floor cleaning")
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {(formData.dos || []).map((item, index) => (
+                      <div key={index} className="flex gap-2 items-center bg-white rounded-lg border border-green-100 p-2">
+                        <input
+                          type="text"
+                          value={item}
+                          onChange={(e) => {
+                            const dos = [...(formData.dos || [])];
+                            dos[index] = e.target.value;
+                            setFormData({ ...formData, dos });
+                          }}
+                          className="input-clean text-sm flex-1"
+                          placeholder="e.g., Dusting, Sweeping"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const dos = (formData.dos || []).filter((_, i) => i !== index);
+                            setFormData({ ...formData, dos });
+                          }}
+                          className="p-1.5 hover:bg-red-50 rounded transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData({
+                        ...formData,
+                        dos: [...(formData.dos || []), '']
+                      });
+                    }}
+                    className="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" /> Add Do Item
+                  </button>
+                </div>
+
+                {/* Don'ts Section */}
+                <div className="space-y-3 p-4 bg-gradient-to-br from-red-50 to-pink-50 border border-red-200 rounded-lg">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground">❌ What This Service DOESN'T Include</label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      List what this service excludes (e.g., "Bathroom cleaning", "High ceilings", "Washing clothes")
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {(formData.donts || []).map((item, index) => (
+                      <div key={index} className="flex gap-2 items-center bg-white rounded-lg border border-red-100 p-2">
+                        <input
+                          type="text"
+                          value={item}
+                          onChange={(e) => {
+                            const donts = [...(formData.donts || [])];
+                            donts[index] = e.target.value;
+                            setFormData({ ...formData, donts });
+                          }}
+                          className="input-clean text-sm flex-1"
+                          placeholder="e.g., Bathroom cleaning, High ceilings"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const donts = (formData.donts || []).filter((_, i) => i !== index);
+                            setFormData({ ...formData, donts });
+                          }}
+                          className="p-1.5 hover:bg-red-50 rounded transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData({
+                        ...formData,
+                        donts: [...(formData.donts || []), '']
+                      });
+                    }}
+                    className="text-xs px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" /> Add Don't Item
+                  </button>
+                </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 pt-4">
                   <button
