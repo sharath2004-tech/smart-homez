@@ -73,8 +73,11 @@ import BusinessExpenses from "./pages/shared/BusinessExpenses";
 
 // Super Admin pages
 import SuperAdminBookings from "./pages/superadmin/SuperAdminBookings";
+import SuperAdminCustomers from "./pages/superadmin/SuperAdminCustomers";
 import SuperAdminDashboard from "./pages/superadmin/SuperAdminDashboard";
+import SuperAdminDashboardPreferences from "./pages/superadmin/SuperAdminDashboardPreferences";
 import SuperAdminDeepCleaningConfig from "./pages/superadmin/SuperAdminDeepCleaningConfig";
+import SuperAdminExpenses from "./pages/superadmin/SuperAdminExpenses";
 import SuperAdminHeatmap from "./pages/superadmin/SuperAdminHeatmap";
 import SuperAdminHelpMessages from "./pages/superadmin/SuperAdminHelpMessages";
 import SuperAdminLeaves from "./pages/superadmin/SuperAdminLeaves";
@@ -85,6 +88,7 @@ import SuperAdminServiceAreas from "./pages/superadmin/SuperAdminServiceAreas";
 import SuperAdminServices from "./pages/superadmin/SuperAdminServices";
 import SuperAdminSettings from "./pages/superadmin/SuperAdminSettings";
 import SuperAdminSOS from "./pages/superadmin/SuperAdminSOS";
+import SuperAdminSubscriptionSections from "./pages/superadmin/SuperAdminSubscriptionSections";
 import SuperAdminWorkerRequests from "./pages/superadmin/SuperAdminWorkerRequests";
 import SuperAdminWorkers from "./pages/superadmin/SuperAdminWorkers";
 import SuperAdminWorkerSchedule from "./pages/superadmin/SuperAdminWorkerSchedule";
@@ -171,6 +175,10 @@ const App = () => (
           {/* Super Admin */}
           <Route path="/super-admin/dashboard" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminDashboard /></ProtectedRoute>} />
           <Route path="/super-admin/bookings" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminBookings /></ProtectedRoute>} />
+          <Route path="/super-admin/customers" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminCustomers /></ProtectedRoute>} />
+          <Route path="/super-admin/expenses" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminExpenses /></ProtectedRoute>} />
+          <Route path="/super-admin/subscription-sections" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminSubscriptionSections /></ProtectedRoute>} />
+          <Route path="/super-admin/dashboard-preferences" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminDashboardPreferences /></ProtectedRoute>} />
           <Route path="/super-admin/workers" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminWorkers /></ProtectedRoute>} />
           <Route path="/super-admin/worker-requests" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminWorkerRequests /></ProtectedRoute>} />
           <Route path="/super-admin/sos" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminSOS /></ProtectedRoute>} />

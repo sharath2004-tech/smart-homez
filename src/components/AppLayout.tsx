@@ -179,9 +179,9 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
   const superAdminNav = useMemo(() => [
     { to: "/super-admin/dashboard",          icon: LayoutDashboard, label: "Overview" },
     { to: "/super-admin/bookings",           icon: Calendar,        label: t('nav.bookings') },
-    { to: "/admin/customers",                icon: UserCircle,      label: t('nav.customers') },
-    { to: "/admin/expenses",                 icon: DollarSign,      label: "Expenses" },
-    { to: "/admin/subscription-sections",    icon: Grid3x3,         label: "Subscriptions" },
+    { to: "/super-admin/customers",          icon: UserCircle,      label: t('nav.customers') },
+    { to: "/super-admin/expenses",           icon: DollarSign,      label: "Expenses" },
+    { to: "/super-admin/subscription-sections", icon: Grid3x3,      label: "Subscriptions" },
     { to: "/super-admin/workers",            icon: User,            label: t('nav.workers') },
     { to: "/super-admin/worker-requests",    icon: ClipboardCheck,  label: "Worker Requests" },
     { to: "/super-admin/sos",                icon: AlertTriangle,   label: "SOS Alerts" },
@@ -219,7 +219,7 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
       items: [
         { to: "/super-admin/services", icon: Wrench, label: t('nav.services') },
         { to: "/super-admin/deep-cleaning-config", icon: Sparkles, label: "Deep Clean Config" },
-        { to: "/admin/dashboard-preferences", icon: Settings2, label: "Dashboard Preferences" },
+        { to: "/super-admin/dashboard-preferences", icon: Settings2, label: "Dashboard Preferences" },
       ]
     },
     {
@@ -243,9 +243,9 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
       defaultOpen: false,
       items: [
         { to: "/super-admin/bookings", icon: Calendar, label: t('nav.bookings') },
-        { to: "/admin/customers", icon: UserCircle, label: t('nav.customers') },
-        { to: "/admin/expenses", icon: DollarSign, label: "Expenses" },
-        { to: "/admin/subscription-sections", icon: Grid3x3, label: "Subscriptions" },
+        { to: "/super-admin/customers", icon: UserCircle, label: t('nav.customers') },
+        { to: "/super-admin/expenses", icon: DollarSign, label: "Expenses" },
+        { to: "/super-admin/subscription-sections", icon: Grid3x3, label: "Subscriptions" },
         { to: "/super-admin/sos", icon: AlertTriangle, label: "SOS Alerts" },
       ]
     },
