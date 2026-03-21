@@ -186,12 +186,12 @@ const AdminDashboard = () => {
               bg: "bg-primary-light" 
             },
           ].map((card) => (
-            <div key={card.label} className="card-elevated p-3 sm:p-4 md:p-5">
-              <div className={`w-9 h-9 sm:w-10 sm:h-10 ${card.bg} rounded-lg sm:rounded-xl flex items-center justify-center mb-2 sm:mb-3`}>
-                <card.icon className={`w-4 sm:w-5 h-4 sm:h-5 ${card.color}`} />
+            <div key={card.label} className="card-elevated p-2 sm:p-3">
+              <div className={`w-8 h-8 ${card.bg} rounded-lg flex items-center justify-center mb-2`}>
+                <card.icon className={`w-4 h-4 ${card.color}`} />
               </div>
               <p className="text-xs text-muted-foreground mb-1">{card.label}</p>
-              <p className="text-xl sm:text-2xl font-bold font-heading text-foreground">{card.value}</p>
+              <p className="text-lg sm:text-xl font-bold font-heading text-foreground">{card.value}</p>
               <p className={`text-xs font-medium mt-1 ${
                 typeof card.change === 'string' && card.change.startsWith('+') ? 'text-success' : 'text-muted-foreground'
               }`}>
@@ -233,8 +233,8 @@ const AdminDashboard = () => {
             { to: "/admin/settings", icon: Settings, label: "Settings", value: "Configure QR/UPI" },
             { to: "/admin/payments", icon: BarChart2, label: "Revenue", value: `₹${stats.todayRevenue.toLocaleString()} today` },
           ].map((item) => (
-            <Link key={item.to} to={item.to} className="card-elevated-hover p-3 sm:p-4 group">
-              <div className="w-8 h-8 sm:w-9 sm:h-9 bg-accent rounded-lg sm:rounded-xl flex items-center justify-center mb-2 sm:mb-3 group-hover:bg-primary transition-colors">
+            <Link key={item.to} to={item.to} className="card-elevated-hover p-2 sm:p-3 group">
+              <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center mb-2 group-hover:bg-primary transition-colors">
                 <item.icon className="w-4 h-4 text-accent-foreground group-hover:text-primary-foreground transition-colors" />
               </div>
               <p className="text-xs sm:text-sm font-semibold text-foreground">{item.label}</p>
@@ -252,9 +252,9 @@ const AdminDashboard = () => {
             </Link>
           </div>
           {recentBookings.length === 0 ? (
-            <div className="card-elevated p-12 text-center">
-              <Calendar className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-              <h3 className="text-lg font-bold text-foreground mb-2">No recent bookings</h3>
+            <div className="card-elevated p-8 text-center">
+              <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+              <h3 className="text-base font-bold text-foreground mb-2">No recent bookings</h3>
               <p className="text-sm text-muted-foreground">Bookings will appear here</p>
             </div>
           ) : (
@@ -294,7 +294,7 @@ const AdminDashboard = () => {
               {/* Mobile card view */}
               <div className="md:hidden space-y-3">
                 {recentBookings.map((b) => (
-                  <div key={b._id} className="card-elevated p-4 space-y-2">
+                  <div key={b._id} className="card-elevated p-3 space-y-2">
                     <div className="flex items-start justify-between">
                       <div>
                         <p className="text-xs text-muted-foreground">#{b._id.slice(-8)}</p>

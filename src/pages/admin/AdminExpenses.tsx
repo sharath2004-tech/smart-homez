@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
-import { businessExpensesAPI, bookingsAPI } from "@/lib/api";
-import { Calendar, DollarSign, Edit2, Plus, Search, Trash2, X } from "lucide-react";
+import { bookingsAPI, businessExpensesAPI } from "@/lib/api";
+import { DollarSign, Edit2, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -496,10 +496,10 @@ const AdminExpenses = () => {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Total */}
-          <div className="card-elevated p-5 bg-gradient-to-br from-primary/10 to-accent/10 border border-primary/20">
+          <div className="card-elevated p-3 bg-gradient-to-br from-primary/10 to-accent/10 border border-primary/20">
             <p className="text-sm text-muted-foreground font-medium mb-1">💰 Total Expenses</p>
-            <p className="text-3xl font-bold text-primary">₹{grandTotal.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground mt-2">{Object.values(summary).reduce((a, b) => a + b.count, 0)} total expenses</p>
+            <p className="text-2xl font-bold text-primary">₹{grandTotal.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground mt-1">{Object.values(summary).reduce((a, b) => a + b.count, 0)} total expenses</p>
           </div>
 
           {/* Category Breakdown */}
@@ -515,10 +515,10 @@ const AdminExpenses = () => {
             const color = colors[category] || { bg: 'from-gray-50 to-slate-50', text: 'text-gray-600' };
 
             return (
-              <div key={category} className={`card-elevated p-5 bg-gradient-to-br ${color.bg}`}>
+              <div key={category} className={`card-elevated p-3 bg-gradient-to-br ${color.bg}`}>
                 <p className="text-sm text-muted-foreground font-medium mb-1">{CATEGORY_ICONS[category]} {category.replace(/_/g, ' ').toUpperCase()}</p>
-                <p className={`text-2xl font-bold ${color.text}`}>₹{data.total.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground mt-2">{data.count} expense{data.count !== 1 ? 's' : ''}</p>
+                <p className={`text-xl font-bold ${color.text}`}>₹{data.total.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground mt-1">{data.count} expense{data.count !== 1 ? 's' : ''}</p>
               </div>
             );
           })}
@@ -563,9 +563,9 @@ const AdminExpenses = () => {
             <p className="text-muted-foreground mt-2">Loading expenses...</p>
           </div>
         ) : filteredExpenses.length === 0 ? (
-          <div className="card-elevated p-12 text-center">
-            <p className="text-3xl mb-2">📭</p>
-            <p className="text-lg font-medium text-foreground">No Expenses Found</p>
+          <div className="card-elevated p-8 text-center">
+            <p className="text-2xl mb-2">📭</p>
+            <p className="text-base font-medium text-foreground">No Expenses Found</p>
             <p className="text-muted-foreground mt-1">
               {filteredExpenses.length === expenses.length
                 ? "No expenses created yet. Click 'Add Expense' to get started."

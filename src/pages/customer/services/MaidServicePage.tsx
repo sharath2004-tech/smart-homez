@@ -21,6 +21,8 @@ interface Service {
     weekly: number;
     monthly: number;
   };
+  dos?: string[];
+  donts?: string[];
 }
 
 interface MaidBookingDetails {
@@ -29,7 +31,6 @@ interface MaidBookingDetails {
   startDate: string;
   endDate?: string; // For subscription
   preferredTimeSlot: string;
-  taskList: string[];
   workerGenderPreference: 'male' | 'female' | 'any';
   specialInstructions: string;
   bringSupplies: boolean;
@@ -49,7 +50,6 @@ const MaidServicePage = () => {
     startDate: '',
     endDate: '',
     preferredTimeSlot: '09:00',
-    taskList: [],
     workerGenderPreference: 'any',
     specialInstructions: '',
     bringSupplies: false
@@ -78,9 +78,6 @@ const MaidServicePage = () => {
           serviceData.service.name?.toLowerCase().includes('subscription')) {
         setMaidDetails(prev => ({ ...prev, bookingType: 'monthly' }));
       }
-
-      // Auto-select all tasks as they are admin-configured
-      setMaidDetails(prev => ({ ...prev, taskList: taskOptions }));
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load service details');
@@ -88,19 +85,6 @@ const MaidServicePage = () => {
       setLoading(false);
     }
   };
-
-  const taskOptions = [
-    'Sweeping and Mopping',
-    'Dusting',
-    'Kitchen Cleaning',
-    'Bathroom Cleaning',
-    'Dishwashing',
-    'Laundry',
-    'Utensil Cleaning',
-    'Organizing',
-    'Vacuuming',
-    'Balcony Cleaning'
-  ];
 
   const calculateTotalPrice = () => {
     if (!service) return 0;
@@ -191,7 +175,6 @@ const MaidServicePage = () => {
         bookingType: maidDetails.bookingType,
         serviceDetails: {
           hours: maidDetails.hours,
-          taskList: maidDetails.taskList,
           workerGenderPreference: maidDetails.workerGenderPreference,
           bringSupplies: maidDetails.bringSupplies,
           specialInstructions: maidDetails.specialInstructions,
@@ -393,21 +376,49 @@ const MaidServicePage = () => {
             </div>
           </div>
 
-          {/* Task Inclusion */}
+          {/* Service Information */}
+          {service && (service.dos?.length > 0 || service.donts?.length > 0) && (
           <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
-            <h2 className="text-xl font-bold mb-4">Service Includes</h2>
-            <div className="grid md:grid-cols-2 gap-3">
-              {taskOptions.map((task) => (
-                <div
-                  key={task}
-                  className="flex items-center gap-2 p-3 rounded-lg border border-green-200 bg-green-50"
-                >
-                  <span className="text-green-600">✓</span>
-                  <span className="text-sm text-green-800">{task}</span>
+            <h2 className="text-xl font-bold mb-4">Service Details</h2>
+            <div className="space-y-4">
+              {/* What's Included (Dos) */}
+              {service.dos && service.dos.length > 0 && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-green-600">✅</span>
+                    <h3 className="text-lg font-semibold text-green-800">Service Includes</h3>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-2">
+                    {service.dos.map((item, index) => (
+                      <div key={index} className="flex items-start gap-2">
+                        <span className="text-green-600 font-bold mt-1">•</span>
+                        <span className="text-sm text-green-800">{item}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
+              )}
+
+              {/* What's Excluded (Don'ts) */}
+              {service.donts && service.donts.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-red-600">❌</span>
+                    <h3 className="text-lg font-semibold text-red-800">Service Excludes</h3>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-2">
+                    {service.donts.map((item, index) => (
+                      <div key={index} className="flex items-start gap-2">
+                        <span className="text-red-600 font-bold mt-1">•</span>
+                        <span className="text-sm text-red-800">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+          )}
 
           {/* Preferences */}
           <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
@@ -467,10 +478,6 @@ const MaidServicePage = () => {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total Hours:</span>
                 <span className="font-semibold">{calculateTotalHours()} hours</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Service Includes:</span>
-                <span className="font-semibold">{maidDetails.taskList.length} tasks</span>
               </div>
               {maidDetails.bringSupplies && (
                 <div className="flex justify-between text-sm">

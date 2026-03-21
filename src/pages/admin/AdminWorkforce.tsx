@@ -189,66 +189,66 @@ const AdminWorkforce = () => {
 
         {/* Summary Cards - Enhanced with gradients */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-5">
-          <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-6 border border-slate-200 shadow-md">
-            <div className="flex items-center justify-between mb-3">
-              <Users className="w-8 h-8 text-slate-600" />
-              <div className="w-10 h-10 bg-slate-200/50 rounded-full"></div>
+          <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-4 border border-slate-200 shadow-md">
+            <div className="flex items-center justify-between mb-2">
+              <Users className="w-6 h-6 text-slate-600" />
+              <div className="w-8 h-8 bg-slate-200/50 rounded-full"></div>
             </div>
             <p className="text-sm font-medium text-slate-700 mb-1">Total Workers</p>
-            <p className="text-3xl font-bold text-slate-900">{summary.total}</p>
+            <p className="text-2xl font-bold text-slate-900">{summary.total}</p>
           </div>
-          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-6 border border-green-200 shadow-md">
-            <div className="flex items-center justify-between mb-3">
-              <UserCheck className="w-8 h-8 text-green-600" />
-              <div className="w-10 h-10 bg-green-200/50 rounded-full"></div>
+          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-4 border border-green-200 shadow-md">
+            <div className="flex items-center justify-between mb-2">
+              <UserCheck className="w-6 h-6 text-green-600" />
+              <div className="w-8 h-8 bg-green-200/50 rounded-full"></div>
             </div>
             <p className="text-sm font-medium text-green-700 mb-1">Available</p>
-            <p className="text-3xl font-bold text-green-900">{summary.free}</p>
+            <p className="text-2xl font-bold text-green-900">{summary.free}</p>
           </div>
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-6 border border-blue-200 shadow-md">
-            <div className="flex items-center justify-between mb-3">
-              <Clock className="w-8 h-8 text-blue-600" />
-              <div className="w-10 h-10 bg-blue-200/50 rounded-full"></div>
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-4 border border-blue-200 shadow-md">
+            <div className="flex items-center justify-between mb-2">
+              <Clock className="w-6 h-6 text-blue-600" />
+              <div className="w-8 h-8 bg-blue-200/50 rounded-full"></div>
             </div>
             <p className="text-sm font-medium text-blue-700 mb-1">Working</p>
-            <p className="text-3xl font-bold text-blue-900">{summary.working}</p>
+            <p className="text-2xl font-bold text-blue-900">{summary.working}</p>
           </div>
-          <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-6 border border-purple-200 shadow-md">
-            <div className="flex items-center justify-between mb-3">
-              <Calendar className="w-8 h-8 text-purple-600" />
-              <div className="w-10 h-10 bg-purple-200/50 rounded-full"></div>
+          <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-4 border border-purple-200 shadow-md">
+            <div className="flex items-center justify-between mb-2">
+              <Calendar className="w-6 h-6 text-purple-600" />
+              <div className="w-8 h-8 bg-purple-200/50 rounded-full"></div>
             </div>
             <p className="text-sm font-medium text-purple-700 mb-1">On Leave</p>
-            <p className="text-3xl font-bold text-purple-900">{summary.onLeave}</p>
+            <p className="text-2xl font-bold text-purple-900">{summary.onLeave}</p>
           </div>
-          <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 border border-gray-200 shadow-md">
-            <div className="flex items-center justify-between mb-3">
-              <UserX className="w-8 h-8 text-gray-600" />
-              <div className="w-10 h-10 bg-gray-200/50 rounded-full"></div>
+          <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-4 border border-gray-200 shadow-md">
+            <div className="flex items-center justify-between mb-2">
+              <UserX className="w-6 h-6 text-gray-600" />
+              <div className="w-8 h-8 bg-gray-200/50 rounded-full"></div>
             </div>
             <p className="text-sm font-medium text-gray-700 mb-1">Offline</p>
-            <p className="text-3xl font-bold text-gray-900">{summary.offline}</p>
+            <p className="text-2xl font-bold text-gray-900">{summary.offline}</p>
           </div>
         </div>
 
         {/* Unassigned Bookings Alert - Enhanced */}
         {unassignedBookings.length > 0 && (
           <div className="bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-200 rounded-2xl shadow-md overflow-hidden">
-            <div className="p-6 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
-                  <Clock className="w-6 h-6 text-orange-600" />
+            <div className="p-4 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-orange-600" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-foreground mb-1">⚠️ Unassigned Bookings</h3>
+                  <h3 className="text-base font-bold text-foreground mb-1">⚠️ Unassigned Bookings</h3>
                   <p className="text-sm text-muted-foreground">
                     <span className="font-semibold text-orange-600">{unassignedBookings.length}</span> booking(s) need worker assignment
                   </p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setShowAssignModal(true)}
-                className="px-6 py-3 font-semibold rounded-xl bg-gradient-to-r from-primary to-primary/90 text-white shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
+                className="px-4 py-2 font-semibold rounded-xl bg-gradient-to-r from-primary to-primary/90 text-white shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
               >
                 Assign Workers
               </button>
@@ -298,11 +298,11 @@ const AdminWorkforce = () => {
           ) : (
             filteredWorkers.map((worker) => (
               <div key={worker._id} className="bg-white rounded-2xl border-2 border-gray-100 shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden">
-                <div className="p-6 space-y-4">
+                <div className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-4 flex-1">
-                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0 shadow-md">
-                        <User className="w-7 h-7 text-white" />
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0 shadow-md">
+                        <User className="w-6 h-6 text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">

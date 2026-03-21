@@ -26,16 +26,23 @@ interface UserProfile {
   }[];
 }
 
-const TASK_OPTIONS = [
-  { id: "sweeping", label: "Sweeping & Mopping", icon: "🧹" },
-  { id: "dusting", label: "Dusting Surfaces", icon: "🪣" },
-  { id: "dishes", label: "Washing Dishes", icon: "🍽️" },
-  { id: "laundry", label: "Laundry (wash & fold)", icon: "👕" },
-  { id: "cooking", label: "Basic Cooking", icon: "🍳" },
-  { id: "toilets", label: "Cleaning Toilets", icon: "🚿" },
-  { id: "wiping", label: "Wiping Mirrors & Glass", icon: "🪟" },
-  { id: "trash", label: "Taking Out Trash", icon: "🗑️" },
-];
+interface Service {
+  _id: string;
+  name: string;
+  description: string;
+  category: string;
+  price: number;
+  originalPrice?: number;
+  duration: number;
+  addons?: Array<{
+    name: string;
+    price: number;
+    type: string;
+    isActive?: boolean;
+  }>;
+  dos?: string[];
+  donts?: string[];
+}
 
 const HOUR_OPTIONS = [1, 2, 3, 4, 6, 8];
 
@@ -74,18 +81,17 @@ const addMins = (time: string, mins: number) => {
 const InstaServicePage = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [service, setService] = useState<Service | null>(null);
   const [pricePerHour, setPricePerHour] = useState(DEFAULT_PRICE);
   const [mrpPerHour, setMrpPerHour] = useState(0);          // from service.originalPrice
   const [suppliesAddonPrice, setSuppliesAddonPrice] = useState(DEFAULT_SUPPLIES_PRICE);
   const [overtimeRate, setOvertimeRate] = useState(2.5);     // from Settings.booking.overtimeRate
   const [serviceId, setServiceId] = useState<string | null>(null);
-  const [taskOptions, setTaskOptions] = useState(TASK_OPTIONS);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   const [bookingMode, setBookingMode] = useState<"now" | "schedule">("now");
-  const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   const [hours, setHours] = useState(2);
   const [bookingDate, setBookingDate] = useState(new Date().toISOString().split("T")[0]);
   const [startTime, setStartTime] = useState(getNearestSlot());
@@ -133,6 +139,7 @@ const InstaServicePage = () => {
         const list = servicesData?.services || [];
         if (list.length > 0) {
           const svc = list[0];
+          setService(svc); // Store the service object for dos/don'ts
           setPricePerHour(svc.price || DEFAULT_PRICE);
           setServiceId(svc._id);
           // MRP from DB — falls back to computing 25% above if not set
@@ -140,18 +147,6 @@ const InstaServicePage = () => {
           // Supplies add-on from first active addon, fallback to default
           const suppliesAddon = svc.addons?.find((a: any) => a.isActive !== false);
           if (suppliesAddon?.price > 0) setSuppliesAddonPrice(suppliesAddon.price);
-          // Task options from DB, filter active only, fallback to hardcoded list
-          if (svc.taskOptions && svc.taskOptions.length > 0) {
-            const active = svc.taskOptions.filter((t: any) => t.isActive !== false);
-            if (active.length > 0) {
-              setTaskOptions(active);
-              // Auto-select all admin-configured tasks
-              setSelectedTasks(active.map((t: any) => t.id));
-            }
-          } else {
-            // Auto-select all default tasks if no admin configuration
-            setSelectedTasks(TASK_OPTIONS.map(t => t.id));
-          }
         } else {
           setNoServiceWarning(true);
         }
@@ -237,7 +232,7 @@ const InstaServicePage = () => {
         totalAmount,
         bookingType: "adhoc",
         preferences: { workerGenderPreference: genderPref, specialInstructions: notes },
-        serviceDetails: { hours, taskList: selectedTasks, bringSupplies },
+        serviceDetails: { hours, bringSupplies },
         ...(hasValidCoords && {
           location: {
             coordinates: coords,
@@ -374,27 +369,53 @@ const InstaServicePage = () => {
               </div>
             </div>
 
-            {/* Tasks */}
+            {/* Service Information */}
+            {service && (service.dos?.length > 0 || service.donts?.length > 0) && (
             <div>
               <h2 className="font-semibold font-heading text-foreground mb-1">
-                What the maid will do
+                Service Details
               </h2>
-              <p className="text-xs text-muted-foreground mb-3">Service includes these tasks</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {taskOptions.map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex items-center gap-2 p-3 rounded-xl border border-green-200 bg-green-50"
-                  >
-                    <span className="text-xl">{task.icon}</span>
-                    <span className="text-xs font-medium text-green-800 leading-snug">
-                      {task.label}
-                    </span>
-                    <span className="ml-auto text-green-600">✓</span>
+              <p className="text-xs text-muted-foreground mb-3">What's included and excluded</p>
+
+              <div className="space-y-3">
+                {/* What's Included (Dos) */}
+                {service.dos && service.dos.length > 0 && (
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-green-600">✅</span>
+                      <h3 className="text-sm font-semibold text-green-800">Service Includes</h3>
+                    </div>
+                    <div className="space-y-1">
+                      {service.dos.map((item, index) => (
+                        <div key={index} className="flex items-start gap-2">
+                          <span className="text-green-600 text-xs mt-1">•</span>
+                          <span className="text-xs text-green-800">{item}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
+                )}
+
+                {/* What's Excluded (Don'ts) */}
+                {service.donts && service.donts.length > 0 && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-red-600">❌</span>
+                      <h3 className="text-sm font-semibold text-red-800">Service Excludes</h3>
+                    </div>
+                    <div className="space-y-1">
+                      {service.donts.map((item, index) => (
+                        <div key={index} className="flex items-start gap-2">
+                          <span className="text-red-600 text-xs mt-1">•</span>
+                          <span className="text-xs text-red-800">{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+            )}
 
             <button
               onClick={() => setStep(2)}
@@ -656,21 +677,49 @@ const InstaServicePage = () => {
               )}
             </div>
 
+            {service && (service.dos?.length > 0 || service.donts?.length > 0) && (
             <div className="card-elevated p-4 rounded-2xl">
               <p className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-                <Briefcase className="w-4 h-4 text-primary" /> Service Includes
+                <Briefcase className="w-4 h-4 text-primary" /> Service Details
               </p>
-              <div className="flex flex-wrap gap-2">
-                {selectedTasks.map((t) => {
-                  const task = taskOptions.find((o) => o.id === t);
-                  return (
-                    <span key={t} className="badge-success text-xs">
-                      {task?.icon} {task?.label}
-                    </span>
-                  );
-                })}
+              <div className="space-y-2">
+                {service.dos && service.dos.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-green-700 mb-1">✅ Includes:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {service.dos.slice(0, 3).map((item, index) => (
+                        <span key={index} className="badge-success text-xs">
+                          {item}
+                        </span>
+                      ))}
+                      {service.dos.length > 3 && (
+                        <span className="text-xs text-muted-foreground">
+                          +{service.dos.length - 3} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {service.donts && service.donts.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-red-700 mb-1">❌ Excludes:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {service.donts.slice(0, 2).map((item, index) => (
+                        <span key={index} className="badge-destructive text-xs">
+                          {item}
+                        </span>
+                      ))}
+                      {service.donts.length > 2 && (
+                        <span className="text-xs text-muted-foreground">
+                          +{service.donts.length - 2} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+            )}
 
             <div className="card-elevated p-4 rounded-2xl space-y-2">
               <p className="text-sm font-semibold text-foreground">Price Breakdown</p>

@@ -550,23 +550,23 @@ const AdminServices = () => {
 
   // Service Card Component
   const ServiceCard = ({ service, handleEdit, handleDelete }: { service: Service; handleEdit: (service: Service) => void; handleDelete: (id: string) => void }) => (
-    <div className="card-elevated p-4 sm:p-5 md:p-6">
-      <div className="flex items-start justify-between gap-4">
+    <div className="card-elevated p-3 sm:p-4">
+      <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <h3 className="text-lg font-bold text-foreground">{service.name}</h3>
-            <span className={`text-xs px-2 py-1 rounded-full ${
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <h3 className="text-base font-bold text-foreground">{service.name}</h3>
+            <span className={`text-xs px-1.5 py-0.5 rounded-full ${
               service.isActive
                 ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
                 : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
             }`}>
               {service.isActive ? 'Active' : 'Inactive'}
             </span>
-            <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100 capitalize">
+            <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100 capitalize">
               {service.category}
             </span>
             {service.serviceType && (
-              <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
                 service.serviceType === 'monthly_subscription' ? 'bg-purple-100 text-purple-800' :
                 service.serviceType === 'instant_hourly' ? 'bg-blue-100 text-blue-800' :
                 service.serviceType?.startsWith('deep_cleaning') ? 'bg-green-100 text-green-800' :
@@ -576,23 +576,23 @@ const AdminServices = () => {
               </span>
             )}
             {service.isQuoteService && (
-              <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800 font-semibold">
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-100 text-green-800 font-semibold">
                 ✨ Deep Cleaning Cart
               </span>
             )}
           </div>
-          <p className="text-sm text-muted-foreground mb-4">{service.description}</p>
+          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{service.description}</p>
 
           {/* Pricing */}
           {service.serviceType === 'monthly_subscription' ? (
             service.durationOptions && service.durationOptions.length > 0 ? (
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-2">Monthly price per daily session hours:</p>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {service.durationOptions.map((d: any, i) => (
-                    <div key={i} className="p-2 bg-purple-50 border border-purple-200 rounded-lg text-center min-w-[60px]">
+                    <div key={i} className="p-1.5 bg-purple-50 border border-purple-200 rounded-lg text-center min-w-[50px]">
                       <div className="text-xs text-purple-600 font-medium">{d.hours}h/day</div>
-                      <div className="text-sm font-bold text-purple-800">₹{d.price}</div>
+                      <div className="text-xs font-bold text-purple-800">₹{d.price}</div>
                       <div className="text-xs text-purple-500">/mo</div>
                     </div>
                   ))}
@@ -604,47 +604,47 @@ const AdminServices = () => {
               </div>
             )
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="p-3 bg-muted rounded-lg">
-                <div className="text-xs text-muted-foreground mb-1">One Time</div>
-                <div className="text-lg font-bold text-foreground">₹{service.pricingPlans?.oneTime || service.price}</div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="p-2 bg-muted rounded-lg">
+                <div className="text-xs text-muted-foreground mb-0.5">One Time</div>
+                <div className="text-sm font-bold text-foreground">₹{service.pricingPlans?.oneTime || service.price}</div>
               </div>
-              <div className="p-3 bg-muted rounded-lg">
-                <div className="text-xs text-muted-foreground mb-1">Daily</div>
-                <div className="text-lg font-bold text-foreground">₹{service.pricingPlans?.daily || Math.round(service.price * 0.85)}</div>
+              <div className="p-2 bg-muted rounded-lg">
+                <div className="text-xs text-muted-foreground mb-0.5">Daily</div>
+                <div className="text-sm font-bold text-foreground">₹{service.pricingPlans?.daily || Math.round(service.price * 0.85)}</div>
               </div>
-              <div className="p-3 bg-muted rounded-lg">
-                <div className="text-xs text-muted-foreground mb-1">Weekly</div>
-                <div className="text-lg font-bold text-foreground">₹{service.pricingPlans?.weekly || Math.round(service.price * 0.75 * 7)}</div>
+              <div className="p-2 bg-muted rounded-lg">
+                <div className="text-xs text-muted-foreground mb-0.5">Weekly</div>
+                <div className="text-sm font-bold text-foreground">₹{service.pricingPlans?.weekly || Math.round(service.price * 0.75 * 7)}</div>
               </div>
-              <div className="p-3 bg-muted rounded-lg">
-                <div className="text-xs text-muted-foreground mb-1">Monthly</div>
-                <div className="text-lg font-bold text-foreground">₹{service.pricingPlans?.monthly || Math.round(service.price * 0.65 * 30)}</div>
+              <div className="p-2 bg-muted rounded-lg">
+                <div className="text-xs text-muted-foreground mb-0.5">Monthly</div>
+                <div className="text-sm font-bold text-foreground">₹{service.pricingPlans?.monthly || Math.round(service.price * 0.65 * 30)}</div>
               </div>
             </div>
           )}
 
-          <div className="mt-3 text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
-            <span>Duration: {service.duration} minutes</span>
+          <div className="mt-2 text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+            <span>Duration: {service.duration} min</span>
             {service.subscriptionPlans && service.subscriptionPlans.filter(p => p.isActive).length > 0 && (
-              <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded text-xs font-medium">
-                {service.subscriptionPlans.filter(p => p.isActive).length} subscription plan{service.subscriptionPlans.filter(p => p.isActive).length > 1 ? 's' : ''}
+              <span className="px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded text-xs font-medium">
+                {service.subscriptionPlans.filter(p => p.isActive).length} plan{service.subscriptionPlans.filter(p => p.isActive).length > 1 ? 's' : ''}
               </span>
             )}
             {service.additionalServiceOptions && service.additionalServiceOptions.length > 0 && (
-              <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-medium">
-                {service.additionalServiceOptions.length} additional option{service.additionalServiceOptions.length > 1 ? 's' : ''}
+              <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                {service.additionalServiceOptions.length} option{service.additionalServiceOptions.length > 1 ? 's' : ''}
               </span>
             )}
           </div>
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2">
-          <button onClick={() => handleEdit(service)} className="p-2 hover:bg-muted rounded-lg transition-colors">
+        <div className="flex gap-1">
+          <button onClick={() => handleEdit(service)} className="p-1.5 hover:bg-muted rounded-lg transition-colors">
             <Edit className="w-4 h-4 text-primary" />
           </button>
-          <button onClick={() => handleDelete(service._id!)} className="p-2 hover:bg-muted rounded-lg transition-colors">
+          <button onClick={() => handleDelete(service._id!)} className="p-1.5 hover:bg-muted rounded-lg transition-colors">
             <Trash2 className="w-4 h-4 text-destructive" />
           </button>
         </div>
@@ -930,7 +930,7 @@ const AdminServices = () => {
             })}
           </div>
         ) : (
-          <div className="grid gap-4">
+          <div className="grid gap-3">
             {filteredServices.map((service) => (
               <ServiceCard key={service._id} service={service} handleEdit={handleEdit} handleDelete={handleDelete} />
             ))}

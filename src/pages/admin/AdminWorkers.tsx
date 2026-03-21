@@ -645,8 +645,8 @@ const AdminWorkers = () => {
             {filtered.map((w) => {
               const status = w.workerProfile?.availability ? 'available' : 'offline';
               return (
-                <div key={w._id} className="card-elevated p-5">
-                  <div className="flex items-start gap-3 mb-4">
+                <div key={w._id} className="card-elevated p-3">
+                  <div className="flex items-start gap-3 mb-3">
                     <div className="w-12 h-12 bg-primary-light rounded-full flex items-center justify-center text-primary font-bold shrink-0">
                       {w.name.split(" ").map(n => n[0]).join("")}
                     </div>
