@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useAdminRole } from "@/hooks/useAdminRole";
 import { businessExpensesAPI, bookingsAPI } from "@/lib/api";
 import { Calendar, DollarSign, Edit2, Plus, Search, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -65,6 +66,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 };
 
 const AdminExpenses = () => {
+  const { role, name } = useAdminRole();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -224,7 +226,7 @@ const AdminExpenses = () => {
   );
 
   return (
-    <AppLayout userType="admin" userName="">
+    <AppLayout userType={role} userName={name}>
       <div className="space-y-6 p-6">
         {/* Header */}
         <div className="flex justify-between items-center">
