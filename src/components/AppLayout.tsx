@@ -2,7 +2,7 @@ import { api, settingsAPI } from "@/lib/api";
 import { AlertTriangle, BarChart3, Bell, Building, Calendar, ClipboardCheck, CreditCard, DollarSign, FileText, Grid3x3, HelpCircle, IndianRupee, KeyRound, LayoutDashboard, MapPin, MessageSquare, RefreshCw, Settings, Settings2, Sparkles, TrendingUp, User, UserCircle, Users, Wrench } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../styles/sidebar-enhancements.css";
 import { AppHeader } from "./AppHeader";
 import { CollapsibleSidebar } from "./CollapsibleSidebar";
