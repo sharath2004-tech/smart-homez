@@ -224,60 +224,7 @@ const AdminServices = () => {
       weekly: 2625,
       monthly: 9750
     },
-    subscriptionPlans: [
-      {
-        id: 'oneTime',
-        name: 'oneTime',
-        displayName: 'One-Time',
-        icon: '📅',
-        description: 'Single service',
-        price: 500,
-        discountPercentage: 0,
-        isActive: true,
-        requiresFixedWorker: false,
-        allowDaySelection: false,
-        sortOrder: 1
-      },
-      {
-        id: 'daily',
-        name: 'daily',
-        displayName: 'Daily',
-        icon: '🌅',
-        description: 'Every day',
-        price: 425,
-        discountPercentage: 15,
-        isActive: true,
-        requiresFixedWorker: true,
-        allowDaySelection: false,
-        sortOrder: 2
-      },
-      {
-        id: 'weekly',
-        name: 'weekly',
-        displayName: 'Weekly',
-        icon: '📆',
-        description: 'Select days',
-        price: 375,
-        discountPercentage: 25,
-        isActive: true,
-        requiresFixedWorker: true,
-        allowDaySelection: true,
-        sortOrder: 3
-      },
-      {
-        id: 'monthly',
-        name: 'monthly',
-        displayName: 'Monthly',
-        icon: '🗓️',
-        description: 'Once a month',
-        price: 325,
-        discountPercentage: 35,
-        isActive: true,
-        requiresFixedWorker: true,
-        allowDaySelection: false,
-        sortOrder: 4
-      }
-    ],
+    subscriptionPlans: [],
     duration: 60,
     isActive: true,
     isQuoteService: false,
@@ -408,6 +355,7 @@ const AdminServices = () => {
         };
         await servicesAPI.update(editingId, payload as unknown as Record<string, unknown>);
         toast.success('Service updated!');
+        fetchData();
       } else {
         const res = await servicesAPI.create({
           ...formData,
@@ -451,7 +399,7 @@ const AdminServices = () => {
       duration: service.duration,
       isActive: service.isActive,
       isQuoteService: service.isQuoteService ?? false,
-      subscriptionPlans: service.subscriptionPlans,
+      subscriptionPlans: service.subscriptionPlans || [],
       additionalServiceOptions: service.additionalServiceOptions,
       durationOptions: service.durationOptions || [],
       subscriptionOptions: service.subscriptionOptions || { allowedFrequencies: ['daily', 'alt-days', '3-days', 'weekly'], requiresSameWorker: true, autoRenewal: true },
@@ -503,6 +451,7 @@ const AdminServices = () => {
       originalPrice: 0,
       taskOptions: [],
       suggestedServices: [],
+      subscriptionPlans: [],
       dos: [],
       donts: [],
     });
