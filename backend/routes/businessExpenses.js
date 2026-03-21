@@ -22,7 +22,8 @@ router.post(
     body('title').notEmpty().withMessage('Title is required'),
     body('amount').isFloat({ min: 0 }).withMessage('Amount must be a positive number'),
     body('category').notEmpty().withMessage('Category is required'),
-    body('date').isISO8601().withMessage('Valid date is required')
+    body('date').isISO8601().withMessage('Valid date is required'),
+    body('type').optional().isIn(['project_expense', 'operational_expense']).withMessage('Invalid expense type')
   ],
   async (req, res) => {
     try {
@@ -31,7 +32,12 @@ router.post(
         return res.status(400).json({ error: { message: errors.array()[0].msg } });
       }
 
-      const { title, amount, category, customCategory, description, date, locationId } = req.body;
+      const { title, amount, category, customCategory, description, date, locationId, bookingId, type } = req.body;
+
+      // Validate that project expenses have a booking ID
+      if (type === 'project_expense' && !bookingId) {
+        return res.status(400).json({ error: { message: 'Booking ID is required for project expenses' } });
+      }
 
       const expense = new BusinessExpense({
         title,
@@ -41,6 +47,8 @@ router.post(
         description,
         date: new Date(date),
         location: locationId || null,
+        bookingId: bookingId || null,
+        type: type || 'operational_expense',
         createdBy: req.user._id,
         createdByRole: req.user.role
       });
@@ -48,6 +56,7 @@ router.post(
       await expense.save();
       await expense.populate('createdBy', 'name email');
       await expense.populate('location', 'apartmentName area city');
+      await expense.populate('bookingId', 'bookingId customerId');
 
       res.status(201).json({ success: true, expense });
     } catch (error) {
@@ -69,7 +78,7 @@ router.get(
   authorize('admin', 'super_admin'),
   async (req, res) => {
     try {
-      const { locationId, category, from, to, page = 1, limit = 50 } = req.query;
+      const { locationId, category, from, to, page = 1, limit = 50, bookingId } = req.query;
       const filter = {};
 
       if (req.user.role === 'admin') {
@@ -79,6 +88,7 @@ router.get(
 
       if (locationId) filter.location = locationId;
       if (category) filter.category = category;
+      if (bookingId) filter.bookingId = bookingId;
 
       if (from || to) {
         filter.date = {};
@@ -91,6 +101,7 @@ router.get(
       const expenses = await BusinessExpense.find(filter)
         .populate('createdBy', 'name email role')
         .populate('location', 'apartmentName area city')
+        .populate('bookingId', 'bookingId customerId')
         .sort({ date: -1 })
         .skip(skip)
         .limit(Number(limit));
@@ -112,6 +123,56 @@ router.get(
       });
     } catch (error) {
       console.error('Get expenses error:', error);
+      res.status(500).json({ error: { message: 'Server error' } });
+    }
+  }
+);
+
+/**
+ * Update a business expense (only creator or super_admin)
+ * PATCH /api/business-expenses/:id
+ */
+router.patch(
+  '/:id',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  [param('id').isMongoId().withMessage('Valid expense ID is required')],
+  async (req, res) => {
+    try {
+      const expense = await BusinessExpense.findById(req.params.id);
+      if (!expense) return res.status(404).json({ error: { message: 'Expense not found' } });
+
+      // Only the creator or a super_admin can update
+      if (req.user.role !== 'super_admin' && expense.createdBy.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ error: { message: 'Not authorized to update this expense' } });
+      }
+
+      const { title, amount, category, customCategory, description, date, locationId, bookingId, type } = req.body;
+
+      // Validate that project expenses have a booking ID
+      if (type === 'project_expense' && !bookingId) {
+        return res.status(400).json({ error: { message: 'Booking ID is required for project expenses' } });
+      }
+
+      // Update fields if provided
+      if (title) expense.title = title;
+      if (amount !== undefined) expense.amount = Number(amount);
+      if (category) expense.category = category;
+      if (customCategory !== undefined) expense.customCategory = category === 'other' ? customCategory : undefined;
+      if (description !== undefined) expense.description = description;
+      if (date) expense.date = new Date(date);
+      if (locationId !== undefined) expense.location = locationId || null;
+      if (bookingId !== undefined) expense.bookingId = bookingId || null;
+      if (type) expense.type = type;
+
+      await expense.save();
+      await expense.populate('createdBy', 'name email');
+      await expense.populate('location', 'apartmentName area city');
+      await expense.populate('bookingId', 'bookingId customerId');
+
+      res.json({ success: true, expense });
+    } catch (error) {
+      console.error('Update expense error:', error);
       res.status(500).json({ error: { message: 'Server error' } });
     }
   }

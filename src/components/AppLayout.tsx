@@ -1,5 +1,5 @@
 import { api, settingsAPI } from "@/lib/api";
-import { AlertTriangle, BarChart3, Bell, Calendar, ClipboardCheck, CreditCard, FileText, HelpCircle, IndianRupee, KeyRound, LayoutDashboard, MapPin, MessageSquare, RefreshCw, Settings, Sparkles, User, Users, Wrench } from "lucide-react";
+import { AlertTriangle, BarChart3, Bell, Calendar, ClipboardCheck, CreditCard, DollarSign, FileText, HelpCircle, IndianRupee, KeyRound, LayoutDashboard, MapPin, MessageSquare, RefreshCw, Settings, Sparkles, User, UserCircle, Users, Wrench } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -92,6 +92,8 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
   const adminNav = useMemo(() => [
     { to: "/admin/dashboard",          icon: LayoutDashboard, label: t('nav.dashboard') },
     { to: "/admin/bookings",           icon: Calendar,        label: t('nav.bookings') },
+    { to: "/admin/customers",          icon: UserCircle,      label: t('nav.customers') },
+    { to: "/admin/expenses",           icon: DollarSign,      label: "Expenses" },
     { to: "/admin/workers",            icon: User,            label: t('nav.workers') },
     { to: "/admin/worker-requests",    icon: ClipboardCheck,  label: "Worker Requests" },
     { to: "/admin/sos",                icon: AlertTriangle,   label: "SOS Alerts" },
@@ -110,6 +112,8 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
   const superAdminNav = useMemo(() => [
     { to: "/super-admin/dashboard",          icon: LayoutDashboard, label: "Overview" },
     { to: "/super-admin/bookings",           icon: Calendar,        label: t('nav.bookings') },
+    { to: "/admin/customers",                icon: UserCircle,      label: t('nav.customers') },
+    { to: "/admin/expenses",                 icon: DollarSign,      label: "Expenses" },
     { to: "/super-admin/workers",            icon: User,            label: t('nav.workers') },
     { to: "/super-admin/worker-requests",    icon: ClipboardCheck,  label: "Worker Requests" },
     { to: "/super-admin/sos",                icon: AlertTriangle,   label: "SOS Alerts" },

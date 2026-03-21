@@ -996,6 +996,29 @@ export const adminAPI = {
       method: 'POST',
       body: JSON.stringify({ bookingId, workerId })
     });
+  },
+
+  // Customer Management
+  getCustomers: async (params?: {
+    search?: string;
+    city?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, String(value));
+        }
+      });
+    }
+    const queryString = queryParams.toString();
+    return apiCall(`/admin/customers${queryString ? `?${queryString}` : ''}`);
+  },
+
+  getCustomerDetails: async (customerId: string) => {
+    return apiCall(`/admin/customers/${customerId}`);
   }
 };
 
@@ -1471,6 +1494,8 @@ export const businessExpensesAPI = {
     description?: string;
     date: string;
     locationId?: string;
+    bookingId?: string;
+    type?: string;
   }) => {
     return apiCall('/business-expenses', {
       method: 'POST',
@@ -1485,6 +1510,7 @@ export const businessExpensesAPI = {
     to?: string;
     page?: number;
     limit?: number;
+    bookingId?: string;
   }) => {
     const q = new URLSearchParams();
     if (params?.locationId) q.append('locationId', params.locationId);
@@ -1493,7 +1519,15 @@ export const businessExpensesAPI = {
     if (params?.to) q.append('to', params.to);
     if (params?.page) q.append('page', String(params.page));
     if (params?.limit) q.append('limit', String(params.limit));
+    if (params?.bookingId) q.append('bookingId', params.bookingId);
     return apiCall(`/business-expenses${q.toString() ? `?${q.toString()}` : ''}`);
+  },
+
+  update: async (id: string, data: Record<string, unknown>) => {
+    return apiCall(`/business-expenses/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    });
   },
 
   delete: async (id: string) => {

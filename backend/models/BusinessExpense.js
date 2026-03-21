@@ -45,6 +45,16 @@ const businessExpenseSchema = new mongoose.Schema({
     ref: 'Location',
     default: null
   },
+  bookingId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Booking',
+    default: null
+  },
+  type: {
+    type: String,
+    enum: ['project_expense', 'operational_expense'],
+    default: 'operational_expense'
+  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

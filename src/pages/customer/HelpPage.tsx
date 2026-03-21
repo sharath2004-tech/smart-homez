@@ -1,5 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { helpAPI } from "@/lib/api";
+import { SUPPORT_PHONE_NUMBER } from "@/lib/constants";
 import { CheckCircle, ChevronDown, ChevronUp, HelpCircle, Phone, Send } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -76,10 +77,10 @@ const HelpPage = ({ userType = "customer" }: HelpPageProps) => {
           <div>
             <p className="text-xs text-muted-foreground mb-0.5">{t('customer.help.customerSupport')}</p>
             <a
-              href="tel:+919999999999"
+              href={`tel:${SUPPORT_PHONE_NUMBER}`}
               className="text-xl font-bold text-foreground hover:text-primary transition-colors"
             >
-              +91 99999 99999
+              {SUPPORT_PHONE_NUMBER}
             </a>
             <p className="text-xs text-muted-foreground mt-0.5">{t('customer.help.supportHours')}</p>
           </div>

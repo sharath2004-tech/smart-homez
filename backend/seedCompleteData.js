@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import User from './models/User.js';
 import Location from './models/Location.js';
 import Service from './models/Service.js';
+import { SUPPORT_PHONE_NUMBER } from './config/constants.js';
 
 dotenv.config();
 
@@ -24,7 +25,7 @@ const seedDatabase = async () => {
       name: 'Super Admin',
       email: 'superadmin@healthyhomez.com',
       password: 'admin123',
-      phone: '+91 9999999999',
+      phone: SUPPORT_PHONE_NUMBER,
       role: 'super_admin',
       isActive: true,
       isVerified: true
