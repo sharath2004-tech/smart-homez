@@ -1630,6 +1630,36 @@ export const api = {
 };
 
 // Export all
+export const dashboardPreferencesAPI = {
+  getServices: async () => {
+    return apiCall('/dashboard-preferences');
+  },
+
+  getAdminConfig: async () => {
+    return apiCall('/dashboard-preferences/admin');
+  },
+
+  updateConfig: async (services: any[], maxServices?: number) => {
+    return apiCall('/dashboard-preferences', {
+      method: 'PUT',
+      body: JSON.stringify({ services, maxServices })
+    });
+  },
+
+  toggleService: async (serviceId: string) => {
+    return apiCall(`/dashboard-preferences/services/${serviceId}/toggle`, {
+      method: 'PATCH'
+    });
+  },
+
+  reorderServices: async (serviceIds: string[]) => {
+    return apiCall('/dashboard-preferences/reorder', {
+      method: 'PUT',
+      body: JSON.stringify({ serviceIds })
+    });
+  }
+};
+
 export default {
   auth: authAPI,
   services: servicesAPI,
@@ -1645,6 +1675,7 @@ export default {
   leaves: leavesAPI,
   reviews: reviewsAPI,
   reliability: reliabilityAPI,
-  reviewAnalytics: reviewAnalyticsAPI
+  reviewAnalytics: reviewAnalyticsAPI,
+  dashboardPreferences: dashboardPreferencesAPI
 };
 

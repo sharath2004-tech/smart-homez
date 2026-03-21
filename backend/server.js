@@ -40,11 +40,13 @@ import deepCleaningRoutes from './routes/deepCleaning.js';
 import businessExpensesRoutes from './routes/businessExpenses.js';
 import locationRequestsRoutes from './routes/locationRequests.js';
 import reliabilityRoutes from './routes/reliability.js';
+import dashboardPreferencesRoutes from './routes/dashboardPreferences.js';
 
 // Import utilities
 import { runBookingUpdates } from './utils/bookingStatusUpdater.js';
 import { runRenewalChecker } from './utils/subscriptionRenewalChecker.js';
 import monthlyReliabilityJob from './jobs/monthlyScoring.js';
+import initializeDashboardPreferences from './seedDashboardPreferences.js';
 
 // Import models for stats endpoint
 import Booking from './models/Booking.js';
@@ -220,6 +222,7 @@ app.use('/api/deep-cleaning', deepCleaningRoutes);
 app.use('/api/business-expenses', businessExpensesRoutes);
 app.use('/api/location-requests', locationRequestsRoutes);
 app.use('/api/reliability', reliabilityRoutes);
+app.use('/api/dashboard-preferences', dashboardPreferencesRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -260,6 +263,10 @@ app.listen(PORT, () => {
   // Start monthly reliability scoring job (runs 1st of each month)
   console.log('📊 Starting monthly reliability scoring job...');
   monthlyReliabilityJob.start();
+
+  // Initialize dashboard preferences
+  console.log('🎨 Initializing dashboard preferences...');
+  await initializeDashboardPreferences();
 });
 
 export default app;

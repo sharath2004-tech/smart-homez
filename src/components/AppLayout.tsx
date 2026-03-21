@@ -1,11 +1,12 @@
 import { api, settingsAPI } from "@/lib/api";
-import { AlertTriangle, BarChart3, Bell, Calendar, ClipboardCheck, CreditCard, DollarSign, FileText, Grid3x3, HelpCircle, IndianRupee, KeyRound, LayoutDashboard, MapPin, MessageSquare, RefreshCw, Settings, Sparkles, User, UserCircle, Users, Wrench } from "lucide-react";
+import { AlertTriangle, BarChart3, Bell, Calendar, ClipboardCheck, CreditCard, DollarSign, FileText, Grid3x3, HelpCircle, IndianRupee, KeyRound, LayoutDashboard, MapPin, MessageSquare, RefreshCw, Settings, Settings2, Sparkles, TrendingUp, User, UserCircle, Users, UserCheck, Wrench, Building } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AppHeader } from "./AppHeader";
 import { MobileSidebar } from "./MobileSidebar";
 import { PersistentSidebar } from "./PersistentSidebar";
+import { CollapsibleSidebar } from "./CollapsibleSidebar";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -106,8 +107,72 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
     { to: "/admin/help-messages",      icon: MessageSquare,   label: "Help Messages" },
     { to: "/admin/locations",          icon: MapPin,          label: t('nav.locations') },
     { to: "/admin/services",           icon: Wrench,          label: t('nav.services') },
+    { to: "/admin/dashboard-preferences", icon: Settings2,    label: "Dashboard Preferences" },
     { to: "/admin/settings",           icon: Settings,        label: t('nav.settings') },
     { to: "/change-password",          icon: KeyRound,        label: "Change Password" },
+  ], [t]);
+
+  // Admin Navigation Sections for Collapsible Sidebar
+  const adminNavSections = useMemo(() => [
+    {
+      id: 'overview',
+      title: 'Overview & Analytics',
+      icon: TrendingUp,
+      defaultOpen: true,
+      items: [
+        { to: "/admin/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },
+      ]
+    },
+    {
+      id: 'services',
+      title: 'Service Management',
+      icon: Wrench,
+      defaultOpen: false,
+      items: [
+        { to: "/admin/services", icon: Wrench, label: t('nav.services') },
+        { to: "/admin/dashboard-preferences", icon: Settings2, label: "Dashboard Preferences" },
+      ]
+    },
+    {
+      id: 'workers',
+      title: 'Worker Management',
+      icon: Users,
+      defaultOpen: false,
+      items: [
+        { to: "/admin/workers", icon: User, label: t('nav.workers') },
+        { to: "/admin/worker-requests", icon: ClipboardCheck, label: "Worker Requests" },
+        { to: "/admin/leaves", icon: Bell, label: t('nav.leaves') },
+        { to: "/admin/worker-schedule", icon: Calendar, label: t('nav.workerSchedule') },
+        { to: "/admin/workforce", icon: Users, label: t('nav.workforce') },
+        { to: "/admin/salary-settlements", icon: IndianRupee, label: "Salary Settlements" },
+      ]
+    },
+    {
+      id: 'business',
+      title: 'Business Operations',
+      icon: Calendar,
+      defaultOpen: false,
+      items: [
+        { to: "/admin/bookings", icon: Calendar, label: t('nav.bookings') },
+        { to: "/admin/customers", icon: UserCircle, label: t('nav.customers') },
+        { to: "/admin/expenses", icon: DollarSign, label: "Expenses" },
+        { to: "/admin/subscription-sections", icon: Grid3x3, label: "Subscriptions" },
+        { to: "/admin/sos", icon: AlertTriangle, label: "SOS Alerts" },
+      ]
+    },
+    {
+      id: 'system',
+      title: 'Location & Settings',
+      icon: Settings,
+      defaultOpen: false,
+      items: [
+        { to: "/admin/locations", icon: MapPin, label: t('nav.locations') },
+        { to: "/admin/settings", icon: Settings, label: t('nav.settings') },
+        { to: "/admin/quotes", icon: FileText, label: "Quote Requests" },
+        { to: "/admin/help-messages", icon: MessageSquare, label: "Help Messages" },
+        { to: "/change-password", icon: KeyRound, label: "Change Password" },
+      ]
+    }
   ], [t]);
 
   const superAdminNav = useMemo(() => [
@@ -131,6 +196,71 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
     { to: "/super-admin/heatmap",            icon: BarChart3,       label: "Worker Heatmap" },
     { to: "/super-admin/settings",           icon: Settings,        label: t('nav.settings') },
     { to: "/change-password",                icon: KeyRound,        label: "Change Password" },
+  ], [t]);
+
+  // Super Admin Navigation Sections for Collapsible Sidebar
+  const superAdminNavSections = useMemo(() => [
+    {
+      id: 'overview',
+      title: 'Overview & Analytics',
+      icon: TrendingUp,
+      defaultOpen: true,
+      items: [
+        { to: "/super-admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+        { to: "/super-admin/heatmap", icon: BarChart3, label: "Worker Heatmap" },
+      ]
+    },
+    {
+      id: 'services',
+      title: 'Service Management',
+      icon: Wrench,
+      defaultOpen: false,
+      items: [
+        { to: "/super-admin/services", icon: Wrench, label: t('nav.services') },
+        { to: "/super-admin/deep-cleaning-config", icon: Sparkles, label: "Deep Clean Config" },
+        { to: "/admin/dashboard-preferences", icon: Settings2, label: "Dashboard Preferences" },
+      ]
+    },
+    {
+      id: 'workers',
+      title: 'Worker Management',
+      icon: Users,
+      defaultOpen: false,
+      items: [
+        { to: "/super-admin/workers", icon: User, label: t('nav.workers') },
+        { to: "/super-admin/worker-requests", icon: ClipboardCheck, label: "Worker Requests" },
+        { to: "/super-admin/leaves", icon: Bell, label: t('nav.leaves') },
+        { to: "/super-admin/worker-schedule", icon: Calendar, label: t('nav.workerSchedule') },
+        { to: "/super-admin/workforce", icon: Users, label: t('nav.workforce') },
+        { to: "/super-admin/salary-settlements", icon: IndianRupee, label: "Salary Settlements" },
+      ]
+    },
+    {
+      id: 'business',
+      title: 'Business Operations',
+      icon: Calendar,
+      defaultOpen: false,
+      items: [
+        { to: "/super-admin/bookings", icon: Calendar, label: t('nav.bookings') },
+        { to: "/admin/customers", icon: UserCircle, label: t('nav.customers') },
+        { to: "/admin/expenses", icon: DollarSign, label: "Expenses" },
+        { to: "/admin/subscription-sections", icon: Grid3x3, label: "Subscriptions" },
+        { to: "/super-admin/sos", icon: AlertTriangle, label: "SOS Alerts" },
+      ]
+    },
+    {
+      id: 'system',
+      title: 'System & Settings',
+      icon: Building,
+      defaultOpen: false,
+      items: [
+        { to: "/super-admin/locations", icon: MapPin, label: t('nav.locations') },
+        { to: "/super-admin/settings", icon: Settings, label: t('nav.settings') },
+        { to: "/super-admin/quotes", icon: FileText, label: "Quote Requests" },
+        { to: "/super-admin/help-messages", icon: MessageSquare, label: "Help Messages" },
+        { to: "/change-password", icon: KeyRound, label: "Change Password" },
+      ]
+    }
   ], [t]);
 
   const navItems = useMemo(() =>
@@ -195,13 +325,43 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
           </div>
         </div>
 
-        {/* Persistent Sidebar Navigation */}
-        <PersistentSidebar
-          navItems={navItems}
-          notificationsPath={notificationsPath}
-          unreadCount={unreadCount}
-          onNotificationClick={handleNotificationClick}
-        />
+        {/* Navigation */}
+        {(userType === 'admin' || userType === 'super_admin') ? (
+          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-sidebar-border">
+            {/* Notifications */}
+            <div className="p-4 border-b border-sidebar-border">
+              <Link
+                to={notificationsPath}
+                className="flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors group"
+              >
+                <div className="flex items-center gap-3">
+                  <Bell className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
+                  <span>Notifications</span>
+                </div>
+                {unreadCount > 0 && (
+                  <span className="bg-destructive text-destructive-foreground text-xs font-bold px-2 py-1 rounded-full min-w-[20px] text-center">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </Link>
+            </div>
+
+            {/* Collapsible Sections */}
+            <div className="p-4">
+              <CollapsibleSidebar
+                sections={userType === 'admin' ? adminNavSections : superAdminNavSections}
+                storageKey={userType === 'admin' ? 'admin_sidebar' : 'super_admin_sidebar'}
+              />
+            </div>
+          </div>
+        ) : (
+          <PersistentSidebar
+            navItems={navItems}
+            notificationsPath={notificationsPath}
+            unreadCount={unreadCount}
+            onNotificationClick={handleNotificationClick}
+          />
+        )}
 
         {/* Super admin role preview */}
         {userType === 'super_admin' && (

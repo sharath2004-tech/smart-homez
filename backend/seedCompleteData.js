@@ -268,7 +268,7 @@ const seedDatabase = async () => {
         createdBy: superAdmin._id
       },
       {
-        name: 'Deep Cleaning',
+        name: 'Move In / Move Out Cleaning',
         category: 'cleaning',
         description: 'Thorough deep cleaning of entire house including hard-to-reach areas',
         price: 1500,

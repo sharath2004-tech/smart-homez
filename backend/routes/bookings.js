@@ -1249,7 +1249,7 @@ router.delete('/:id', authenticate, async (req, res) => {
       'BOOKING_CANCELLED',
       {
         bookingId: booking._id,
-        serviceName: booking.service?.name ?? 'Deep Cleaning',
+        serviceName: booking.service?.name ?? 'Move In / Move Out Cleaning',
         refundAmount: refundAmount > 0 ? refundAmount : null,
         reason: booking.cancellationReason
       }
@@ -1274,7 +1274,7 @@ router.delete('/:id', authenticate, async (req, res) => {
         userId: booking.worker,
         type: 'cancellation',
         title: '❌ Booking Cancelled',
-        message: `Customer cancelled booking for ${booking.service?.name ?? 'Deep Cleaning'}. ${refundReason}`,
+        message: `Customer cancelled booking for ${booking.service?.name ?? 'Move In / Move Out Cleaning'}. ${refundReason}`,
         priority: 'medium',
         data: {
           bookingId: booking._id
@@ -1512,7 +1512,7 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
         'SCHEDULE_CHANGE',
         {
           bookingId: booking._id,
-          serviceName: booking.service?.name ?? 'Deep Cleaning',
+          serviceName: booking.service?.name ?? 'Move In / Move Out Cleaning',
           newDate: formatDate(newScheduledDate),
           newTime: formatTime(newScheduledDate)
         }
@@ -1537,7 +1537,7 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
             userId: oldWorker._id,
             type: 'schedule-change',
             title: '📅 Booking Rescheduled',
-            message: `Customer rescheduled booking for ${booking.service?.name ?? 'Deep Cleaning'}. Booking reassigned to another worker.`,
+            message: `Customer rescheduled booking for ${booking.service?.name ?? 'Move In / Move Out Cleaning'}. Booking reassigned to another worker.`,
             priority: 'medium',
             data: { bookingId: booking._id }
           });
@@ -1550,7 +1550,7 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
           {
             bookingId: booking._id,
             workerName: newWorkerInfo.name,
-            serviceName: booking.service?.name ?? 'Deep Cleaning',
+            serviceName: booking.service?.name ?? 'Move In / Move Out Cleaning',
             date: formatDate(newScheduledDate),
             time: formatTime(newScheduledDate)
           }
@@ -1561,7 +1561,7 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
           userId: oldWorker._id,
           type: 'schedule-change',
           title: '📅 Booking Rescheduled',
-          message: `Customer rescheduled booking for ${booking.service?.name ?? 'Deep Cleaning'} to ${formatDate(newScheduledDate)} at ${formatTime(newScheduledDate)}.`,
+          message: `Customer rescheduled booking for ${booking.service?.name ?? 'Move In / Move Out Cleaning'} to ${formatDate(newScheduledDate)} at ${formatTime(newScheduledDate)}.`,
           priority: 'medium',
           data: { 
             bookingId: booking._id,

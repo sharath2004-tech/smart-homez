@@ -221,7 +221,7 @@
       "subtitle": "त्वरित सफाई से लेकर गहरे घरेलू रखरखाव तक, हमने सब कुछ कवर किया है।",
       "instaMaid": "तुरंत सहायक सेवा",
       "instaMaidDesc": "मांग पर, 15 मिनट में उपलब्ध",
-      "deepCleaning": "गहरी सफाई",
+      "deepCleaning": "मूव इन / मूव आउट सफाई",
       "deepCleaningDesc": "पूर्ण-घर पेशेवर सफाई",
       "kitchenCleaning": "रसोई सफाई",
       "kitchenCleaningDesc": "संपूर्ण रसोई स्वच्छता",
@@ -920,9 +920,11 @@
       "subscription": "सदस्यता",
       "recurringPlans": "आवर्ती योजनाएं",
       "save20": "20% बचाएं",
-      "deepCleaning": "गहरी सफाई",
+      "deepCleaning": "मूव इन / मूव आउट सफाई",
       "fullHomeClean": "पूरे घर की सफाई",
       "bestValue": "सर्वोत्तम मूल्य",
+      "intenseWashroom": "इंटेंस वॉशरूम सफाई",
+      "washroomDeepClean": "प्रोफेशनल वॉशरूम सैनिटाइजेशन",
       "serviceNotAvailable": "क्षमा करें, हम अभी तक इस क्षेत्र में सेवा नहीं देते। विस्तार होने पर सूचित करेंगे!"
     },
     "help": {

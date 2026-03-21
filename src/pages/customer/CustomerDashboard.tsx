@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { useGeolocation } from "@/hooks/useGeolocation";
-import { authAPI, bookingsAPI, locationsAPI } from "@/lib/api";
+import { authAPI, bookingsAPI, locationsAPI, dashboardPreferencesAPI } from "@/lib/api";
 import { motion } from "framer-motion";
 import { AlertCircle, ArrowRight, Bell, ChevronRight, Clock, MapPin, Settings, Star } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -44,14 +44,39 @@ const CustomerDashboard = () => {
   const [nearbyWorkersCount, setNearbyWorkersCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [serviceableStatus, setServiceableStatus] = useState<'available' | 'unavailable' | 'unknown'>('unknown');
+  const [quickServices, setQuickServices] = useState<any[]>([]);
   const { latitude, longitude, error: locationError } = useGeolocation();
 
-  // Only 3 service category cards
-  const quickServices = [
-    { icon: "⚡", name: t('customer.dashboard.instaAdhoc'), subtitle: t('customer.dashboard.instantBooking'), badge: t('customer.dashboard.onDemand'), path: "/customer/services/insta" },
-    { icon: "📅", name: t('customer.dashboard.subscription'), subtitle: t('customer.dashboard.recurringPlans'), badge: t('customer.dashboard.save20'), path: "/customer/services/subscription" },
-    { icon: "✨", name: t('customer.dashboard.deepCleaning'), subtitle: t('customer.dashboard.fullHomeClean'), badge: t('customer.dashboard.bestValue'), path: "/customer/services/deep-cleaning" },
-  ];
+  // Only 3 service category cards - now fetched dynamically
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const response = await dashboardPreferencesAPI.getServices();
+        const services = response.services || [];
+
+        // Map backend service configuration to frontend format
+        const mappedServices = services.map((service: any) => ({
+          icon: service.icon,
+          name: t(service.nameKey),
+          subtitle: t(service.subtitleKey),
+          badge: service.badge,
+          path: service.path
+        }));
+
+        setQuickServices(mappedServices);
+      } catch (error) {
+        console.error('Error fetching dashboard services:', error);
+        // Fallback to default services on error
+        setQuickServices([
+          { icon: "⚡", name: t('customer.dashboard.instaAdhoc'), subtitle: t('customer.dashboard.instantBooking'), badge: t('customer.dashboard.onDemand'), path: "/customer/services/insta" },
+          { icon: "✨", name: t('customer.dashboard.deepCleaning'), subtitle: t('customer.dashboard.fullHomeClean'), badge: t('customer.dashboard.bestValue'), path: "/customer/services/deep-cleaning" },
+          { icon: "📅", name: t('customer.dashboard.subscription'), subtitle: t('customer.dashboard.recurringPlans'), badge: t('customer.dashboard.save20'), path: "/customer/services/subscription" },
+          { icon: "🚿", name: t('customer.dashboard.intenseWashroom'), subtitle: t('customer.dashboard.washroomDeepClean'), badge: "Sanitize", path: "/customer/services/washroom" },
+        ]);
+      }
+    };
+    fetchServices();
+  }, [t]);
 
   useEffect(() => {
     const fetchCoreData = async () => {
@@ -227,7 +252,7 @@ const CustomerDashboard = () => {
                 🧹
               </div>
               <div className="flex-1">
-                <p className="font-semibold text-foreground text-sm">{ongoingBooking.service?.name ?? '✨ Deep Cleaning'}</p>
+                <p className="font-semibold text-foreground text-sm">{ongoingBooking.service?.name ?? '✨ Move In / Move Out Cleaning'}</p>
                 <p className="text-xs text-muted-foreground">{ongoingBooking.worker?.name || t('customer.dashboard.workerAssigned')}</p>
               </div>
               <Link to="/customer/bookings" className="btn-brand text-xs py-2 px-3 shrink-0">
@@ -288,7 +313,7 @@ const CustomerDashboard = () => {
                     {s.icon}
                   </motion.div>
                   <p className="text-xs font-semibold text-foreground leading-tight">{s.name}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5 leading-tight hidden sm:block">{s.subtitle}</p>
+                  <p className={`text-xs mt-0.5 leading-tight hidden sm:block ${s.name.includes('Move In') ? 'text-muted-foreground/70 font-light' : 'text-muted-foreground'}`}>{s.subtitle}</p>
                   {s.badge && <span className="badge-primary mt-1.5 text-xs inline-block">{s.badge}</span>}
                 </Link>
               </motion.div>
@@ -351,7 +376,7 @@ const CustomerDashboard = () => {
                     {(b.service?.name ?? '').toLowerCase().includes("deep") || b.bookingType === 'deep-cleaning-cart' ? "✨" : "🧹"}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-foreground text-sm">{b.service?.name ?? (b.bookingType === 'deep-cleaning-cart' ? '✨ Deep Cleaning' : 'Booking')}</p>
+                    <p className="font-semibold text-foreground text-sm">{b.service?.name ?? (b.bookingType === 'deep-cleaning-cart' ? '✨ Move In / Move Out Cleaning' : 'Booking')}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {b.worker?.name || t('customer.dashboard.workerWillBeAssigned')}
                     </p>
