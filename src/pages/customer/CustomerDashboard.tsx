@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { useGeolocation } from "@/hooks/useGeolocation";
-import { authAPI, bookingsAPI, dashboardPreferencesAPI, locationsAPI } from "@/lib/api";
+import { authAPI, bookingsAPI, dashboardPreferencesAPI, locationsAPI, servicesAPI } from "@/lib/api";
 import { motion } from "framer-motion";
 import { AlertCircle, ArrowRight, Bell, ChevronRight, Clock, MapPin, Settings, Star } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -45,7 +45,27 @@ const CustomerDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [serviceableStatus, setServiceableStatus] = useState<'available' | 'unavailable' | 'unknown'>('unknown');
   const [quickServices, setQuickServices] = useState<any[]>([]);
+  const [washroomServiceId, setWashroomServiceId] = useState<string | null>(null);
   const { latitude, longitude, error: locationError } = useGeolocation();
+
+  // Fetch washroom service ID
+  useEffect(() => {
+    const fetchWashroomService = async () => {
+      try {
+        const response = await servicesAPI.getAll({ search: 'washroom deep', isActive: true });
+        const washroomService = response.services?.find((s: any) => 
+          s.name.toLowerCase().includes('washroom') && 
+          s.name.toLowerCase().includes('deep')
+        );
+        if (washroomService) {
+          setWashroomServiceId(washroomService._id);
+        }
+      } catch (error) {
+        console.error('Error fetching washroom service:', error);
+      }
+    };
+    fetchWashroomService();
+  }, []);
 
   // Only 3 service category cards - now fetched dynamically
   useEffect(() => {
@@ -71,12 +91,12 @@ const CustomerDashboard = () => {
           { icon: "⚡", name: t('customer.dashboard.instaAdhoc'), subtitle: t('customer.dashboard.instantBooking'), badge: t('customer.dashboard.onDemand'), path: "/customer/services/insta" },
           { icon: "✨", name: t('customer.dashboard.deepCleaning'), subtitle: t('customer.dashboard.fullHomeClean'), badge: t('customer.dashboard.bestValue'), path: "/customer/services/deep-cleaning" },
           { icon: "📅", name: t('customer.dashboard.subscription'), subtitle: t('customer.dashboard.recurringPlans'), badge: t('customer.dashboard.save20'), path: "/customer/services/subscription" },
-          { icon: "🚿", name: t('customer.dashboard.intenseWashroom'), subtitle: t('customer.dashboard.washroomDeepClean'), badge: "Sanitize", path: "/customer/services/washroom" },
+          { icon: "🚿", name: t('customer.dashboard.intenseWashroom'), subtitle: t('customer.dashboard.washroomDeepClean'), badge: "Sanitize", path: washroomServiceId ? `/customer/book/${washroomServiceId}` : "/customer/services" },
         ]);
       }
     };
     fetchServices();
-  }, [t]);
+  }, [t, washroomServiceId]);
 
   useEffect(() => {
     const fetchCoreData = async () => {
