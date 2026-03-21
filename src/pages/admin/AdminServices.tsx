@@ -1458,7 +1458,7 @@ const AdminServices = () => {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const newPlans = formData.subscriptionPlans?.filter((_, i) => i !== index);
+                                    const newPlans = formData.subscriptionPlans?.filter((_, i) => i !== index) || [];
                                     setFormData({ ...formData, subscriptionPlans: newPlans });
                                   }}
                                   className="p-1.5 hover:bg-destructive/10 rounded transition-colors"
