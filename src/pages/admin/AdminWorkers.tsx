@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { adminAPI } from "@/lib/api";
-import { Archive, ArchiveRestore, CheckCircle, Edit, FileText, Loader2, MapPin, Plus, Search, Star, Upload, X } from "lucide-react";
+import { AlertTriangle, Archive, ArchiveRestore, CheckCircle, Clock, Edit, Eye, EyeOff, FileText, Info, Loader2, MapPin, Plus, Search, Star, Upload, X, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface Location {
@@ -55,6 +55,13 @@ interface Worker {
       aadhaarNumber?: string;
       uploadedAt?: string;
     };
+    workingTimeWindow?: {
+      enabled: boolean;
+      startTime?: string;
+      endTime?: string;
+      workingDays?: number[];
+      timezone?: string;
+    };
   };
   currentLocation?: {
     coordinates: [number, number]; // [lng, lat]
@@ -87,7 +94,7 @@ const specializationOptions = [
 ];
 
 const AdminWorkers = () => {
-  const { role, name } = useAdminRole();
+  const { role, name, isSuperAdmin } = useAdminRole();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [workers, setWorkers] = useState<Worker[]>([]);
@@ -105,6 +112,11 @@ const AdminWorkers = () => {
   // Edit worker state
   const [editWorker, setEditWorker] = useState<Worker | null>(null);
   const [updatingWorker, setUpdatingWorker] = useState(false);
+
+  // Credential management (superadmin only)
+  const [showCredentials, setShowCredentials] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
 
   const [workerForm, setWorkerForm] = useState({
     name: "",
@@ -254,7 +266,13 @@ const AdminWorkers = () => {
           accountStatus: editWorker.workerProfile.accountStatus || 'active',
           joinDate: editWorker.workerProfile.joinDate || null,
           resignedDate: editWorker.workerProfile.resignedDate || null,
-          bankDetails: editWorker.workerProfile.bankDetails || {}
+          bankDetails: editWorker.workerProfile.bankDetails || {},
+          workingTimeWindow: editWorker.workerProfile.workingTimeWindow || {
+            enabled: false,
+            startTime: "09:00",
+            endTime: "18:00",
+            workingDays: [1, 2, 3, 4, 5, 6]
+          }
         }));
       }
 
@@ -1211,6 +1229,137 @@ const AdminWorkers = () => {
                         </div>
                       </div>
 
+                      {/* Working Time Window */}
+                      <div className="border border-border rounded-xl p-4 space-y-4 bg-muted/30">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-primary" />
+                            <h3 className="text-sm font-semibold">Working Time Window</h3>
+                          </div>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={editWorker.workerProfile?.workingTimeWindow?.enabled || false}
+                              onChange={(e) => {
+                                const current = editWorker.workerProfile?.workingTimeWindow || {};
+                                setEditWorker({
+                                  ...editWorker,
+                                  workerProfile: {
+                                    ...editWorker.workerProfile!,
+                                    workingTimeWindow: {
+                                      ...current,
+                                      enabled: e.target.checked,
+                                      startTime: current.startTime || "09:00",
+                                      endTime: current.endTime || "18:00",
+                                      workingDays: current.workingDays || [1, 2, 3, 4, 5, 6]
+                                    }
+                                  }
+                                });
+                              }}
+                              className="rounded"
+                            />
+                            <span className="text-xs text-muted-foreground">Enable time restrictions</span>
+                          </label>
+                        </div>
+
+                        {editWorker.workerProfile?.workingTimeWindow?.enabled && (
+                          <>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium mb-1">Start Time</label>
+                                <input
+                                  type="time"
+                                  className="input-clean"
+                                  value={editWorker.workerProfile.workingTimeWindow?.startTime || "09:00"}
+                                  onChange={(e) => {
+                                    const current = editWorker.workerProfile?.workingTimeWindow || {};
+                                    setEditWorker({
+                                      ...editWorker,
+                                      workerProfile: {
+                                        ...editWorker.workerProfile!,
+                                        workingTimeWindow: { ...current, startTime: e.target.value }
+                                      }
+                                    });
+                                  }}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium mb-1">End Time</label>
+                                <input
+                                  type="time"
+                                  className="input-clean"
+                                  value={editWorker.workerProfile.workingTimeWindow?.endTime || "18:00"}
+                                  onChange={(e) => {
+                                    const current = editWorker.workerProfile?.workingTimeWindow || {};
+                                    setEditWorker({
+                                      ...editWorker,
+                                      workerProfile: {
+                                        ...editWorker.workerProfile!,
+                                        workingTimeWindow: { ...current, endTime: e.target.value }
+                                      }
+                                    });
+                                  }}
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium mb-2">Working Days</label>
+                              <div className="grid grid-cols-7 gap-2">
+                                {[
+                                  { label: "Sun", value: 0 },
+                                  { label: "Mon", value: 1 },
+                                  { label: "Tue", value: 2 },
+                                  { label: "Wed", value: 3 },
+                                  { label: "Thu", value: 4 },
+                                  { label: "Fri", value: 5 },
+                                  { label: "Sat", value: 6 }
+                                ].map((day) => {
+                                  const workingDays = editWorker.workerProfile?.workingTimeWindow?.workingDays || [];
+                                  const isSelected = workingDays.includes(day.value);
+                                  return (
+                                    <button
+                                      key={day.value}
+                                      type="button"
+                                      onClick={() => {
+                                        const current = editWorker.workerProfile?.workingTimeWindow || {};
+                                        const currentDays = current.workingDays || [];
+                                        const updated = isSelected
+                                          ? currentDays.filter(d => d !== day.value)
+                                          : [...currentDays, day.value];
+                                        setEditWorker({
+                                          ...editWorker,
+                                          workerProfile: {
+                                            ...editWorker.workerProfile!,
+                                            workingTimeWindow: { ...current, workingDays: updated }
+                                          }
+                                        });
+                                      }}
+                                      className={`text-xs px-2 py-2 rounded-lg border transition-colors ${
+                                        isSelected
+                                          ? 'bg-primary text-primary-foreground border-primary'
+                                          : 'bg-background border-border hover:bg-muted'
+                                      }`}
+                                    >
+                                      {day.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-2">
+                                Select the days when this worker is available for bookings
+                              </p>
+                            </div>
+                          </>
+                        )}
+
+                        {!editWorker.workerProfile?.workingTimeWindow?.enabled && (
+                          <p className="text-xs text-muted-foreground">
+                            When disabled, worker is available 24/7 for bookings
+                          </p>
+                        )}
+                      </div>
+
                       {/* Wage Configuration */}
                       <div>
                         <label className="block text-sm font-medium mb-2">Wage Type</label>
@@ -1366,78 +1515,249 @@ const AdminWorkers = () => {
                       </div>
                     </div>
 
+                    {/* Credentials Section (Super Admin Only) */}
+                    {isSuperAdmin && (
+                      <div className="border border-amber-200 bg-amber-50/50 rounded-xl p-4 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4 text-amber-600" />
+                            <h3 className="text-sm font-semibold text-amber-900">Worker Credentials (Super Admin Access)</h3>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setShowCredentials(!showCredentials)}
+                            className="text-xs text-amber-700 hover:text-amber-900 underline flex items-center gap-1"
+                          >
+                            {showCredentials ? (
+                              <>
+                                <EyeOff className="w-3 h-3" />
+                                Hide
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="w-3 h-3" />
+                                Show Credentials
+                              </>
+                            )}
+                          </button>
+                        </div>
+
+                        {showCredentials && (
+                          <div className="space-y-3 pt-2">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs font-medium text-amber-900 mb-1">Email</label>
+                                <div className="relative">
+                                  <input
+                                    type="text"
+                                    value={editWorker.email}
+                                    readOnly
+                                    className="input-clean bg-white text-sm font-mono"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(editWorker.email);
+                                      alert('Email copied to clipboard!');
+                                    }}
+                                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-amber-700 hover:text-amber-900"
+                                  >
+                                    Copy
+                                  </button>
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-amber-900 mb-1">Phone</label>
+                                <div className="relative">
+                                  <input
+                                    type="text"
+                                    value={editWorker.phone || 'Not provided'}
+                                    readOnly
+                                    className="input-clean bg-white text-sm font-mono"
+                                  />
+                                  {editWorker.phone && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(editWorker.phone || '');
+                                        alert('Phone copied to clipboard!');
+                                      }}
+                                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-amber-700 hover:text-amber-900"
+                                    >
+                                      Copy
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="pt-2 border-t border-amber-200">
+                              <p className="text-xs text-amber-800 mb-3">
+                                <Info className="w-3 h-3 inline mr-1" />
+                                Use these credentials for troubleshooting or account recovery
+                              </p>
+
+                              {tempPassword && (
+                                <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                  <p className="text-xs font-semibold text-green-900 mb-1">New Temporary Password Generated:</p>
+                                  <div className="flex items-center gap-2">
+                                    <code className="text-sm font-mono text-green-700 bg-white px-2 py-1 rounded">{tempPassword}</code>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(tempPassword);
+                                        alert('Password copied to clipboard!');
+                                      }}
+                                      className="text-xs text-green-700 hover:text-green-900 underline"
+                                    >
+                                      Copy
+                                    </button>
+                                  </div>
+                                  <p className="text-xs text-green-700 mt-2">Share this with the worker securely. They must change it on first login.</p>
+                                </div>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (confirm(`Generate a new temporary password for ${editWorker.name}? This will invalidate their current password.`)) {
+                                    setResettingPassword(true);
+                                    try {
+                                      // TODO: Add API endpoint for password reset
+                                      // For now, generate a random password
+                                      const newPass = Math.random().toString(36).slice(-8) + Math.random().toString(36).toUpperCase().slice(-4);
+                                      setTempPassword(newPass);
+                                      alert('⚠️ Password reset endpoint not yet implemented. In production, this would call the backend API.');
+                                    } catch (error) {
+                                      alert('Failed to reset password');
+                                    } finally {
+                                      setResettingPassword(false);
+                                    }
+                                  }
+                                }}
+                                disabled={resettingPassword}
+                                className="w-full py-2 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                              >
+                                {resettingPassword ? (
+                                  <>
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                    Resetting...
+                                  </>
+                                ) : (
+                                  <>
+                                    <AlertTriangle className="w-3 h-3" />
+                                    Reset Worker Password
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Documents */}
                     <div className="space-y-4">
                       <h3 className="text-sm font-bold text-foreground border-b pb-2">Documents</h3>
-                      {editWorker.workerProfile.documents && (
-                        <div className="space-y-3">
-                          <div>
-                            <label className="block text-sm font-medium mb-1">Aadhaar Number</label>
-                            <input
-                              type="text"
-                              className="input-clean"
-                              maxLength={14}
-                              value={editWorker.workerProfile.documents.aadhaarNumber || ''}
-                              onChange={(e) => {
-                                const val = e.target.value.replace(/[^\d\s]/g, '');
-                                setEditWorker({
-                                  ...editWorker,
-                                  workerProfile: {
-                                    ...editWorker.workerProfile!,
-                                    documents: { ...editWorker.workerProfile?.documents, aadhaarNumber: val }
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Aadhaar Number</label>
+                          <input
+                            type="text"
+                            className="input-clean"
+                            maxLength={14}
+                            value={editWorker.workerProfile?.documents?.aadhaarNumber || ''}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/[^\d\s]/g, '');
+                              setEditWorker({
+                                ...editWorker,
+                                workerProfile: {
+                                  ...editWorker.workerProfile!,
+                                  documents: {
+                                    ...editWorker.workerProfile?.documents,
+                                    aadhaarNumber: val
                                   }
-                                });
-                              }}
-                              placeholder="XXXX XXXX XXXX"
-                            />
+                                }
+                              });
+                            }}
+                            placeholder="XXXX XXXX XXXX"
+                          />
+                        </div>
+
+                        {/* Aadhaar Front */}
+                        {editWorker.workerProfile?.documents?.aadhaarFront ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <FileText className="w-4 h-4 text-green-600" />
+                            <span className="text-foreground">Aadhaar Front:</span>
+                            <a
+                              href={editWorker.workerProfile.documents.aadhaarFront}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline flex items-center gap-1"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              View Document
+                            </a>
                           </div>
-                          {editWorker.workerProfile.documents.aadhaarFront && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <FileText className="w-4 h-4" />
-                              <span>Aadhaar Front: Uploaded</span>
-                              <a
-                                href={editWorker.workerProfile.documents.aadhaarFront}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline"
-                              >
-                                View
-                              </a>
-                            </div>
-                          )}
-                          {editWorker.workerProfile.documents.aadhaarBack && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <FileText className="w-4 h-4" />
-                              <span>Aadhaar Back: Uploaded</span>
-                              <a
-                                href={editWorker.workerProfile.documents.aadhaarBack}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline"
-                              >
-                                View
-                              </a>
-                            </div>
-                          )}
-                          {editWorker.profileImage && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <FileText className="w-4 h-4" />
-                              <span>Profile Picture: Uploaded</span>
-                              <a
-                                href={editWorker.profileImage}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline"
-                              >
-                                View
-                              </a>
-                            </div>
-                          )}
+                        ) : (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <XCircle className="w-4 h-4" />
+                            <span>Aadhaar Front: Not uploaded</span>
+                          </div>
+                        )}
+
+                        {/* Aadhaar Back */}
+                        {editWorker.workerProfile?.documents?.aadhaarBack ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <FileText className="w-4 h-4 text-green-600" />
+                            <span className="text-foreground">Aadhaar Back:</span>
+                            <a
+                              href={editWorker.workerProfile.documents.aadhaarBack}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline flex items-center gap-1"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              View Document
+                            </a>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <XCircle className="w-4 h-4" />
+                            <span>Aadhaar Back: Not uploaded</span>
+                          </div>
+                        )}
+
+                        {/* Profile Picture */}
+                        {editWorker.profileImage ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <FileText className="w-4 h-4 text-green-600" />
+                            <span className="text-foreground">Profile Picture:</span>
+                            <a
+                              href={editWorker.profileImage}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline flex items-center gap-1"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              View Photo
+                            </a>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <XCircle className="w-4 h-4" />
+                            <span>Profile Picture: Not uploaded</span>
+                          </div>
+                        )}
+
+                        {/* Document Upload Info */}
+                        <div className="mt-3 p-3 bg-muted/50 rounded-lg">
                           <p className="text-xs text-muted-foreground">
-                            To update documents, use the document upload endpoint or contact support.
+                            <Info className="w-3.5 h-3.5 inline mr-1" />
+                            To update documents, use the document upload section below or contact system administrator.
                           </p>
                         </div>
-                      )}
+                      </div>
                     </div>
                   </>
                 )}

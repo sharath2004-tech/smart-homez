@@ -166,6 +166,8 @@ const AdminServices = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [serviceTypeFilter, setServiceTypeFilter] = useState<string | null>(null); // Filter by service type
+  const [groupByCategory, setGroupByCategory] = useState(false); // Group services by category
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showTypeSelector, setShowTypeSelector] = useState(false);
@@ -178,6 +180,7 @@ const AdminServices = () => {
     name: '',
     description: '',
     category: 'cleaning',
+    serviceType: undefined,
     price: 500,
     pricingPlans: {
       oneTime: 500,
@@ -358,6 +361,7 @@ const AdminServices = () => {
         // Strip UI-only _priceMode field before sending to backend
         const payload = {
           ...formData,
+          serviceType: selectedServiceType || formData.serviceType || 'other', // CRITICAL: Preserve serviceType on edit!
           durationOptions: (formData.durationOptions || []).map((tier: any) => {
             const { _priceMode, ...cleanTier } = tier;
             return cleanTier;
@@ -397,6 +401,7 @@ const AdminServices = () => {
       name: service.name,
       description: service.description,
       category: service.category,
+      serviceType: service.serviceType, // Preserve serviceType
       price: service.price,
       pricingPlans: service.pricingPlans || {
         oneTime: service.price,
@@ -439,6 +444,7 @@ const AdminServices = () => {
       name: '',
       description: '',
       category: 'cleaning',
+      serviceType: undefined, // Reset serviceType
       price: defaultPrice,
       pricingPlans: {
         oneTime: defaultPrice,
@@ -475,10 +481,16 @@ const AdminServices = () => {
     }));
   };
 
-  const filteredServices = services.filter(service => 
-    service.name.toLowerCase().includes(search.toLowerCase()) ||
-    service.category.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredServices = services.filter(service => {
+    // Search filter
+    const matchesSearch = service.name.toLowerCase().includes(search.toLowerCase()) ||
+                         service.category.toLowerCase().includes(search.toLowerCase());
+
+    // Service type filter
+    const matchesType = !serviceTypeFilter || service.serviceType === serviceTypeFilter;
+
+    return matchesSearch && matchesType;
+  });
 
   // Detect which core service types are already configured
   const configuredTypes = new Set(services.map(s => s.serviceType).filter(Boolean));
@@ -491,6 +503,110 @@ const AdminServices = () => {
   }));
   const missingCount = coverageItems.filter(c => !c.isConfigured).length;
 
+  // Service Card Component
+  const ServiceCard = ({ service, handleEdit, handleDelete }: { service: Service; handleEdit: (service: Service) => void; handleDelete: (id: string) => void }) => (
+    <div className="card-elevated p-4 sm:p-5 md:p-6">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-2">
+            <h3 className="text-lg font-bold text-foreground">{service.name}</h3>
+            <span className={`text-xs px-2 py-1 rounded-full ${
+              service.isActive
+                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
+                : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
+            }`}>
+              {service.isActive ? 'Active' : 'Inactive'}
+            </span>
+            <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100 capitalize">
+              {service.category}
+            </span>
+            {service.serviceType && (
+              <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                service.serviceType === 'monthly_subscription' ? 'bg-purple-100 text-purple-800' :
+                service.serviceType === 'instant_hourly' ? 'bg-blue-100 text-blue-800' :
+                service.serviceType?.startsWith('deep_cleaning') ? 'bg-green-100 text-green-800' :
+                'bg-gray-100 text-gray-600'
+              }`}>
+                {SERVICE_TYPE_CARDS.find(c => c.id === service.serviceType)?.label || service.serviceType.replace(/_/g, ' ')}
+              </span>
+            )}
+            {service.isQuoteService && (
+              <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800 font-semibold">
+                ✨ Deep Cleaning Cart
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">{service.description}</p>
+
+          {/* Pricing */}
+          {service.serviceType === 'monthly_subscription' ? (
+            service.durationOptions && service.durationOptions.length > 0 ? (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">Monthly price per daily session hours:</p>
+                <div className="flex flex-wrap gap-2">
+                  {service.durationOptions.map((d: any, i) => (
+                    <div key={i} className="p-2 bg-purple-50 border border-purple-200 rounded-lg text-center min-w-[60px]">
+                      <div className="text-xs text-purple-600 font-medium">{d.hours}h/day</div>
+                      <div className="text-sm font-bold text-purple-800">₹{d.price}</div>
+                      <div className="text-xs text-purple-500">/mo</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                <p className="text-xs text-purple-700 font-medium">⚠️ No hourly pricing tiers set</p>
+              </div>
+            )
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-3 bg-muted rounded-lg">
+                <div className="text-xs text-muted-foreground mb-1">One Time</div>
+                <div className="text-lg font-bold text-foreground">₹{service.pricingPlans?.oneTime || service.price}</div>
+              </div>
+              <div className="p-3 bg-muted rounded-lg">
+                <div className="text-xs text-muted-foreground mb-1">Daily</div>
+                <div className="text-lg font-bold text-foreground">₹{service.pricingPlans?.daily || Math.round(service.price * 0.85)}</div>
+              </div>
+              <div className="p-3 bg-muted rounded-lg">
+                <div className="text-xs text-muted-foreground mb-1">Weekly</div>
+                <div className="text-lg font-bold text-foreground">₹{service.pricingPlans?.weekly || Math.round(service.price * 0.75 * 7)}</div>
+              </div>
+              <div className="p-3 bg-muted rounded-lg">
+                <div className="text-xs text-muted-foreground mb-1">Monthly</div>
+                <div className="text-lg font-bold text-foreground">₹{service.pricingPlans?.monthly || Math.round(service.price * 0.65 * 30)}</div>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-3 text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+            <span>Duration: {service.duration} minutes</span>
+            {service.subscriptionPlans && service.subscriptionPlans.filter(p => p.isActive).length > 0 && (
+              <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded text-xs font-medium">
+                {service.subscriptionPlans.filter(p => p.isActive).length} subscription plan{service.subscriptionPlans.filter(p => p.isActive).length > 1 ? 's' : ''}
+              </span>
+            )}
+            {service.additionalServiceOptions && service.additionalServiceOptions.length > 0 && (
+              <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                {service.additionalServiceOptions.length} additional option{service.additionalServiceOptions.length > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2">
+          <button onClick={() => handleEdit(service)} className="p-2 hover:bg-muted rounded-lg transition-colors">
+            <Edit className="w-4 h-4 text-primary" />
+          </button>
+          <button onClick={() => handleDelete(service._id!)} className="p-2 hover:bg-muted rounded-lg transition-colors">
+            <Trash2 className="w-4 h-4 text-destructive" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <AppLayout userType={isSuperAdmin ? 'super_admin' : 'admin'} userName={profile?.name || 'Admin'}>
       <div className="space-y-6 pb-20 md:pb-0">
@@ -502,18 +618,34 @@ const AdminServices = () => {
               {isSuperAdmin ? 'Create services and review admin requests' : 'Request new services — super admin approval required'}
             </p>
           </div>
-          <button
-            onClick={() => {
-              resetForm();
-              setEditingId(null);
-              setSelectedServiceType(null);
-              setShowTypeSelector(true);
-            }}
-            className="btn-brand flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            {isSuperAdmin ? 'Create Service' : 'Request Service'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                resetForm();
+                setEditingId(null);
+                setSelectedServiceType('instant_hourly'); // Pre-select Quick Book
+                setShowTypeSelector(false);
+                setShowForm(true);
+              }}
+              className="btn-secondary flex items-center gap-2"
+              title="Quickly add a Quick Book service"
+            >
+              <Plus className="w-4 h-4" />
+              🧹 Quick Book Service
+            </button>
+            <button
+              onClick={() => {
+                resetForm();
+                setEditingId(null);
+                setSelectedServiceType(null);
+                setShowTypeSelector(true);
+              }}
+              className="btn-brand flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              {isSuperAdmin ? 'Create Service' : 'Request Service'}
+            </button>
+          </div>
         </div>
 
         {/* Service Coverage */}
@@ -643,130 +775,119 @@ const AdminServices = () => {
           />
         </div>
 
+        {/* Filter Tabs - Quick Book & Others */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setServiceTypeFilter(null)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              !serviceTypeFilter
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
+          >
+            All Services ({services.length})
+          </button>
+          <button
+            onClick={() => setServiceTypeFilter('instant_hourly')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+              serviceTypeFilter === 'instant_hourly'
+                ? 'bg-blue-600 text-white'
+                : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
+            }`}
+          >
+            🧹 Quick Book ({services.filter(s => s.serviceType === 'instant_hourly').length})
+          </button>
+          <button
+            onClick={() => setServiceTypeFilter('monthly_subscription')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+              serviceTypeFilter === 'monthly_subscription'
+                ? 'bg-purple-600 text-white'
+                : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200'
+            }`}
+          >
+            📆 Monthly Subscription ({services.filter(s => s.serviceType === 'monthly_subscription').length})
+          </button>
+          <button
+            onClick={() => setServiceTypeFilter('deep_cleaning_full_house')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+              serviceTypeFilter === 'deep_cleaning_full_house'
+                ? 'bg-green-600 text-white'
+                : 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
+            }`}
+          >
+            🏠 Deep Cleaning ({services.filter(s => s.serviceType?.startsWith('deep_cleaning')).length})
+          </button>
+          <button
+            onClick={() => setServiceTypeFilter('other')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              serviceTypeFilter === 'other'
+                ? 'bg-gray-600 text-white'
+                : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200'
+            }`}
+          >
+            Other ({services.filter(s => !s.serviceType || s.serviceType === 'other').length})
+          </button>
+
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setGroupByCategory(!groupByCategory)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                groupByCategory
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-background border border-border text-foreground hover:bg-muted'
+              }`}
+              title="Group services by category (sections)"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+              {groupByCategory ? 'Ungroup' : 'Group by Section'}
+            </button>
+          </div>
+        </div>
+
         {/* Services List */}
         {loading ? (
           <div className="text-center py-12">
             <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full mx-auto mb-3"></div>
             <p className="text-sm text-muted-foreground">Loading services...</p>
           </div>
+        ) : groupByCategory ? (
+          /* Grouped by Category (Sections) */
+          <div className="space-y-6">
+            {['cleaning', 'health', 'maintenance', 'consultation', 'therapy', 'other'].map((category) => {
+              const categoryServices = filteredServices.filter(s => s.category === category);
+              if (categoryServices.length === 0) return null;
+
+              const categoryIcons: Record<string, string> = {
+                cleaning: '🧹',
+                health: '🏥',
+                maintenance: '🔧',
+                consultation: '💬',
+                therapy: '🧘',
+                other: '📦'
+              };
+
+              return (
+                <div key={category} className="space-y-3">
+                  <div className="flex items-center gap-3 border-b border-border pb-2">
+                    <span className="text-2xl">{categoryIcons[category]}</span>
+                    <h3 className="text-lg font-bold text-foreground capitalize">{category}</h3>
+                    <span className="text-sm text-muted-foreground">({categoryServices.length} service{categoryServices.length !== 1 ? 's' : ''})</span>
+                  </div>
+                  <div className="grid gap-4">
+                    {categoryServices.map((service) => (
+                      <ServiceCard key={service._id} service={service} handleEdit={handleEdit} handleDelete={handleDelete} />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         ) : (
           <div className="grid gap-4">
             {filteredServices.map((service) => (
-              <div key={service._id} className="card-elevated p-4 sm:p-5 md:p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-bold text-foreground">{service.name}</h3>
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        service.isActive 
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
-                          : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
-                      }`}>
-                        {service.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                      <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100 capitalize">
-                        {service.category}
-                      </span>
-                      {service.serviceType && (
-                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                          service.serviceType === 'monthly_subscription' ? 'bg-purple-100 text-purple-800' :
-                          service.serviceType === 'instant_hourly' ? 'bg-blue-100 text-blue-800' :
-                          service.serviceType?.startsWith('deep_cleaning') ? 'bg-green-100 text-green-800' :
-                          'bg-gray-100 text-gray-600'
-                        }`}>
-                          {SERVICE_TYPE_CARDS.find(c => c.id === service.serviceType)?.label || service.serviceType.replace(/_/g, ' ')}
-                        </span>
-                      )}
-                      {service.isQuoteService && (
-                        <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800 font-semibold">
-                          ✨ Deep Cleaning Cart
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-4">{service.description}</p>
-                    
-                    {/* Pricing — subscription shows hourly tiers, others show plans */}
-                    {service.serviceType === 'monthly_subscription' ? (
-                      service.durationOptions && service.durationOptions.length > 0 ? (
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-2">Monthly price per daily session hours:</p>
-                          <div className="flex flex-wrap gap-2">
-                            {service.durationOptions.map((d, i) => (
-                              <div key={i} className="p-2 bg-purple-50 border border-purple-200 rounded-lg text-center min-w-[60px]">
-                                <div className="text-xs text-purple-600 font-medium">{d.hours}h/day</div>
-                                <div className="text-sm font-bold text-purple-800">₹{d.price}</div>
-                                <div className="text-xs text-purple-500">/mo</div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                          <p className="text-xs text-purple-700 font-medium">⚠️ No hourly pricing tiers set</p>
-                          <p className="text-xs text-purple-600 mt-0.5">Edit this service and add Duration Tiers so customers can see prices per session hours.</p>
-                        </div>
-                      )
-                    ) : (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <div className="p-3 bg-muted rounded-lg">
-                        <div className="text-xs text-muted-foreground mb-1">One Time</div>
-                        <div className="text-lg font-bold text-foreground">
-                          ₹{service.pricingPlans?.oneTime || service.price}
-                        </div>
-                      </div>
-                      <div className="p-3 bg-muted rounded-lg">
-                        <div className="text-xs text-muted-foreground mb-1">Daily</div>
-                        <div className="text-lg font-bold text-foreground">
-                          ₹{service.pricingPlans?.daily || Math.round(service.price * 0.85)}
-                        </div>
-                      </div>
-                      <div className="p-3 bg-muted rounded-lg">
-                        <div className="text-xs text-muted-foreground mb-1">Weekly</div>
-                        <div className="text-lg font-bold text-foreground">
-                          ₹{service.pricingPlans?.weekly || Math.round(service.price * 0.75 * 7)}
-                        </div>
-                      </div>
-                      <div className="p-3 bg-muted rounded-lg">
-                        <div className="text-xs text-muted-foreground mb-1">Monthly</div>
-                        <div className="text-lg font-bold text-foreground">
-                          ₹{service.pricingPlans?.monthly || Math.round(service.price * 0.65 * 30)}
-                        </div>
-                      </div>
-                    </div>
-                    )}
-
-                    <div className="mt-3 text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
-                      <span>Duration: {service.duration} minutes</span>
-                      {service.subscriptionPlans && service.subscriptionPlans.filter(p => p.isActive).length > 0 && (
-                        <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-100 rounded text-xs font-medium">
-                          {service.subscriptionPlans.filter(p => p.isActive).length} subscription plan{service.subscriptionPlans.filter(p => p.isActive).length > 1 ? 's' : ''}
-                        </span>
-                      )}
-                      {service.additionalServiceOptions && service.additionalServiceOptions.length > 0 && (
-                        <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 rounded text-xs font-medium">
-                          {service.additionalServiceOptions.length} additional option{service.additionalServiceOptions.length > 1 ? 's' : ''}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleEdit(service)}
-                      className="p-2 hover:bg-muted rounded-lg transition-colors"
-                    >
-                      <Edit className="w-4 h-4 text-primary" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(service._id!)}
-                      className="p-2 hover:bg-muted rounded-lg transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <ServiceCard key={service._id} service={service} handleEdit={handleEdit} handleDelete={handleDelete} />
             ))}
           </div>
         )}

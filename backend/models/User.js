@@ -270,6 +270,29 @@ const userSchema = new mongoose.Schema({
       type: Date,
       default: Date.now
     },
+    // Working time window - when worker is available for bookings
+    workingTimeWindow: {
+      enabled: {
+        type: Boolean,
+        default: false // If false, worker available 24/7
+      },
+      startTime: {
+        type: String, // Format: "HH:MM" (24-hour format, e.g., "09:00")
+        default: "09:00"
+      },
+      endTime: {
+        type: String, // Format: "HH:MM" (24-hour format, e.g., "18:00")
+        default: "18:00"
+      },
+      workingDays: {
+        type: [Number], // 0-6 (Sunday-Saturday). Empty array = all days
+        default: [1, 2, 3, 4, 5, 6] // Monday to Saturday
+      },
+      timezone: {
+        type: String,
+        default: "Asia/Kolkata"
+      }
+    },
     // Assignment priority factors
     onTimeArrivalRate: {
       type: Number,

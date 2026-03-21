@@ -48,6 +48,7 @@ const ProfilePage = () => {
     label: 'Home',
     blockNo: '',
     flatNo: '',
+    apartment: '',
     area: '',
     city: '',
     zipCode: ''
@@ -174,7 +175,7 @@ const ProfilePage = () => {
       });
 
       // Reset form
-      setNewAddress({ label: 'Home', blockNo: '', flatNo: '', area: '', city: '', zipCode: '' });
+      setNewAddress({ label: 'Home', blockNo: '', flatNo: '', apartment: '', area: '', city: '', zipCode: '' });
       setShowAddressForm(false);
       
       // Refresh profile
@@ -395,6 +396,13 @@ const ProfilePage = () => {
                   <option value="Office">Office</option>
                   <option value="Commercial Space">Commercial Space</option>
                 </select>
+                <input
+                  type="text"
+                  placeholder="Apartment Name"
+                  className="input-clean text-sm col-span-2"
+                  value={newAddress.apartment}
+                  onChange={(e) => setNewAddress({ ...newAddress, apartment: e.target.value })}
+                />
                 <input
                   type="text"
                   placeholder="Block no. (optional)"
