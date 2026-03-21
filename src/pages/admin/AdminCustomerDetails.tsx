@@ -73,7 +73,7 @@ interface CustomerDetails {
 }
 
 const AdminCustomerDetails = () => {
-  const { userType } = useAdminRole();
+  const { role, name } = useAdminRole();
   const { customerId } = useParams<{ customerId: string }>();
   const [customer, setCustomer] = useState<CustomerDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -129,7 +129,7 @@ const AdminCustomerDetails = () => {
 
   if (loading) {
     return (
-      <AppLayout userType={userType}>
+      <AppLayout userType={role} userName={name}>
         <div className="flex items-center justify-center min-h-screen">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
@@ -139,7 +139,7 @@ const AdminCustomerDetails = () => {
 
   if (error || !customer) {
     return (
-      <AppLayout userType={userType}>
+      <AppLayout userType={role} userName={name}>
         <div className="p-6">
           <Link to="/admin/customers" className="inline-flex items-center gap-2 text-primary hover:underline mb-4">
             <ArrowLeft className="h-4 w-4" />
@@ -154,7 +154,7 @@ const AdminCustomerDetails = () => {
   }
 
   return (
-    <AppLayout userType={userType}>
+    <AppLayout userType={role} userName={name}>
       <div className="p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">

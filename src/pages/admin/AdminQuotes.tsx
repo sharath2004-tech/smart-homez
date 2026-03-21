@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useAdminRole } from "@/hooks/useAdminRole";
 import { api } from "@/lib/api";
 import { Briefcase, Building2, Home, MapPin, Phone, RefreshCw, UtensilsCrossed } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -42,6 +43,7 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 const AdminQuotes = () => {
+  const { role, name } = useAdminRole();
   const [quotes, setQuotes] = useState<QuoteRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
@@ -83,7 +85,7 @@ const AdminQuotes = () => {
   };
 
   return (
-    <AppLayout userType="admin">
+    <AppLayout userType={role} userName={name}>
       <div className="max-w-5xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 pb-10">
         <div className="flex items-center justify-between">
           <div>

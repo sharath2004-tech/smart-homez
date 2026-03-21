@@ -31,7 +31,7 @@ interface Customer {
 }
 
 const AdminCustomers = () => {
-  const { userType } = useAdminRole();
+  const { role, name } = useAdminRole();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -113,7 +113,7 @@ const AdminCustomers = () => {
   };
 
   return (
-    <AppLayout userType={userType}>
+    <AppLayout userType={role} userName={name}>
       <div className="p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">

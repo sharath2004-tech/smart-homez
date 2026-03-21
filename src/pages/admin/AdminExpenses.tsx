@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useAdminRole } from "@/hooks/useAdminRole";
 import { businessExpensesAPI, bookingsAPI } from "@/lib/api";
 import { Calendar, DollarSign, Edit2, Plus, Search, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -65,6 +66,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 };
 
 const AdminExpenses = () => {
+  const { role, name } = useAdminRole();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -224,145 +226,193 @@ const AdminExpenses = () => {
   );
 
   return (
-    <AppLayout userType="admin" userName="">
-      <div className="space-y-6 p-6">
+    <AppLayout userType={role} userName={name}>
+      <div className="space-y-6 p-6 max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-            <DollarSign className="h-8 w-8 text-primary" />
-            Business Expenses
-          </h1>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground flex items-center gap-3 mb-2">
+              <DollarSign className="h-9 w-9 text-primary" />
+              Business Expenses
+            </h1>
+            <p className="text-muted-foreground">Track and manage all business expenses</p>
+          </div>
           <button
             onClick={() => {
               resetForm();
               setShowForm(true);
             }}
-            className="btn btn-primary flex items-center gap-2"
+            className="btn-brand flex items-center gap-2 px-4 py-2 rounded-lg"
           >
             <Plus className="h-5 w-5" />
-            New Expense
+            Add Expense
           </button>
         </div>
 
-        {/* Form */}
+        {/* Form Modal */}
         {showForm && (
-          <div className="bg-card border border-border rounded-lg p-6 space-y-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">
-                {editingId ? "Edit Expense" : "Create Expense"}
-              </h2>
-              <button
-                onClick={() => {
-                  setShowForm(false);
-                  resetForm();
-                }}
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Title *</label>
-                  <input
-                    type="text"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="input input-bordered w-full"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Amount *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.amount}
-                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                    className="input input-bordered w-full"
-                    required
-                  />
-                </div>
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-card border border-border rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-foreground">
+                  {editingId ? "✏️ Edit Expense" : "➕ New Expense"}
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowForm(false);
+                    resetForm();
+                  }}
+                  className="p-1 hover:bg-muted rounded-lg transition-colors"
+                >
+                  <X className="h-6 w-6" />
+                </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Category *</label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="select select-bordered w-full"
-                    required
-                  >
-                    {EXPENSE_CATEGORIES.map(cat => (
-                      <option key={cat} value={cat}>{cat.replace(/_/g, ' ')}</option>
-                    ))}
-                  </select>
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Title & Amount Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-foreground mb-2">
+                      Title <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.title}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                      className="input-clean w-full"
+                      placeholder="e.g., Cleaning supplies"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-foreground mb-2">
+                      Amount (₹) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.amount}
+                      onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                      className="input-clean w-full"
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
                 </div>
+
+                {/* Category & Date Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-foreground mb-2">
+                      Category <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      className="input-clean w-full"
+                      required
+                    >
+                      <option value="">Select category</option>
+                      {EXPENSE_CATEGORIES.map(cat => (
+                        <option key={cat} value={cat}>
+                          {CATEGORY_ICONS[cat]} {cat.replace(/_/g, ' ').toUpperCase()}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-foreground mb-2">
+                      Date <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.date}
+                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                      className="input-clean w-full"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Custom Category */}
                 {formData.category === 'other' && (
                   <div>
-                    <label className="block text-sm font-medium mb-1">Custom Category</label>
+                    <label className="block text-sm font-semibold text-foreground mb-2">
+                      Custom Category
+                    </label>
                     <input
                       type="text"
                       value={formData.customCategory}
                       onChange={(e) => setFormData({ ...formData, customCategory: e.target.value })}
-                      className="input input-bordered w-full"
+                      className="input-clean w-full"
                       placeholder="Enter custom category"
                     />
                   </div>
                 )}
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-2">Type *</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      value="operational_expense"
-                      checked={formData.type === 'operational_expense'}
-                      onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
-                      className="radio radio-primary"
-                    />
-                    <span>Operational Expense</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      value="project_expense"
-                      checked={formData.type === 'project_expense'}
-                      onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
-                      className="radio radio-primary"
-                    />
-                    <span>Project Expense</span>
-                  </label>
+                {/* Type Selection */}
+                <div className="space-y-3">
+                  <label className="block text-sm font-semibold text-foreground">Expense Type <span className="text-red-500">*</span></label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                      formData.type === 'operational_expense'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/50'
+                    }`}>
+                      <input
+                        type="radio"
+                        value="operational_expense"
+                        checked={formData.type === 'operational_expense'}
+                        onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
+                        className="mr-2"
+                      />
+                      <span className="font-medium">Operational</span>
+                      <p className="text-xs text-muted-foreground mt-1">General business expenses</p>
+                    </label>
+                    <label className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                      formData.type === 'project_expense'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/50'
+                    }`}>
+                      <input
+                        type="radio"
+                        value="project_expense"
+                        checked={formData.type === 'project_expense'}
+                        onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
+                        className="mr-2"
+                      />
+                      <span className="font-medium">Project-Based</span>
+                      <p className="text-xs text-muted-foreground mt-1">Linked to a booking</p>
+                    </label>
+                  </div>
                 </div>
-              </div>
 
-              {formData.type === 'project_expense' && (
-                <div>
-                  <label className="block text-sm font-medium mb-1">Booking ID *</label>
-                  <div className="space-y-2">
+                {/* Booking Selector for Project Expenses */}
+                {formData.type === 'project_expense' && (
+                  <div className="space-y-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <label className="block text-sm font-semibold text-blue-900 mb-2">
+                      Select Booking <span className="text-red-500">*</span>
+                    </label>
                     {bookings.length > 5 ? (
                       <>
                         <input
                           type="text"
-                          placeholder="Search by booking ID or customer ID..."
+                          placeholder="Search booking ID or customer..."
                           value={formData.bookingSearch}
                           onChange={(e) => setFormData({ ...formData, bookingSearch: e.target.value })}
-                          className="input input-bordered w-full"
+                          className="input-clean w-full"
                         />
-                        {formData.bookingSearch && (
+                        {formData.bookingSearch && filteredBookings.length > 0 && (
                           <select
                             value={formData.bookingId}
                             onChange={(e) => setFormData({ ...formData, bookingId: e.target.value })}
-                            className="select select-bordered w-full"
+                            className="input-clean w-full"
+                            required
                           >
                             <option value="">Select a booking</option>
                             {filteredBookings.map(booking => (
                               <option key={booking._id} value={booking._id}>
-                                {booking.bookingId} - {booking.customerId}
+                                {booking.bookingId} (Customer: {booking.customerId})
                               </option>
                             ))}
                           </select>
@@ -372,184 +422,215 @@ const AdminExpenses = () => {
                       <select
                         value={formData.bookingId}
                         onChange={(e) => setFormData({ ...formData, bookingId: e.target.value })}
-                        className="select select-bordered w-full"
+                        className="input-clean w-full"
                         required
                       >
                         <option value="">Select a booking</option>
                         {bookings.map(booking => (
                           <option key={booking._id} value={booking._id}>
-                            {booking.bookingId} - {booking.customerId}
+                            {booking.bookingId} (Customer: {booking.customerId})
                           </option>
                         ))}
                       </select>
                     )}
                   </div>
+                )}
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2">
+                    Description
+                  </label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="input-clean w-full resize-none"
+                    rows={3}
+                    placeholder="Optional notes about this expense..."
+                  />
                 </div>
-              )}
 
-              <div>
-                <label className="block text-sm font-medium mb-1">Date *</label>
-                <input
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  className="input input-bordered w-full"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="textarea textarea-bordered w-full"
-                  rows={3}
-                  placeholder="Optional description"
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="btn btn-primary flex-1"
-                >
-                  {submitting ? "Saving..." : editingId ? "Update Expense" : "Create Expense"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowForm(false);
-                    resetForm();
-                  }}
-                  className="btn btn-ghost flex-1"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+                {/* Buttons */}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="btn-brand flex-1 flex items-center justify-center gap-2"
+                  >
+                    {submitting ? "Saving..." : editingId ? "Update Expense" : "Create Expense"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForm(false);
+                      resetForm();
+                    }}
+                    className="btn-outline flex-1"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
 
-        {/* Stats */}
-        <div className="grid grid-cols-4 gap-4">
-          <div className="bg-card border border-border rounded-lg p-4">
-            <p className="text-sm text-muted-foreground">Total Expenses</p>
-            <p className="text-2xl font-bold">₹{grandTotal.toLocaleString()}</p>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Total */}
+          <div className="card-elevated p-5 bg-gradient-to-br from-primary/10 to-accent/10 border border-primary/20">
+            <p className="text-sm text-muted-foreground font-medium mb-1">💰 Total Expenses</p>
+            <p className="text-3xl font-bold text-primary">₹{grandTotal.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground mt-2">{Object.values(summary).reduce((a, b) => a + b.count, 0)} total expenses</p>
           </div>
-          {Object.entries(summary).slice(0, 3).map(([category, data]) => (
-            <div key={category} className="bg-card border border-border rounded-lg p-4">
-              <p className="text-sm text-muted-foreground capitalize">{category.replace(/_/g, ' ')}</p>
-              <p className="text-2xl font-bold">₹{data.total.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground">{data.count} expenses</p>
-            </div>
-          ))}
+
+          {/* Category Breakdown */}
+          {Object.entries(summary).slice(0, 3).map(([category, data]) => {
+            const colors: Record<string, { bg: string; text: string }> = {
+              deep_cleaning_material: { bg: 'from-blue-50 to-cyan-50', text: 'text-blue-600' },
+              equipment: { bg: 'from-orange-50 to-red-50', text: 'text-orange-600' },
+              utilities: { bg: 'from-yellow-50 to-amber-50', text: 'text-yellow-600' },
+              salary: { bg: 'from-green-50 to-emerald-50', text: 'text-green-600' },
+              rent: { bg: 'from-purple-50 to-pink-50', text: 'text-purple-600' },
+              marketing: { bg: 'from-indigo-50 to-blue-50', text: 'text-indigo-600' },
+            };
+            const color = colors[category] || { bg: 'from-gray-50 to-slate-50', text: 'text-gray-600' };
+
+            return (
+              <div key={category} className={`card-elevated p-5 bg-gradient-to-br ${color.bg}`}>
+                <p className="text-sm text-muted-foreground font-medium mb-1">{CATEGORY_ICONS[category]} {category.replace(/_/g, ' ').toUpperCase()}</p>
+                <p className={`text-2xl font-bold ${color.text}`}>₹{data.total.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground mt-2">{data.count} expense{data.count !== 1 ? 's' : ''}</p>
+              </div>
+            );
+          })}
         </div>
 
         {/* Filters */}
-        <div className="flex gap-4">
+        <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
             <input
               type="text"
-              placeholder="Search expenses..."
+              placeholder="🔍 Search expenses by title or description..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="input input-bordered w-full"
+              className="input-clean w-full"
             />
           </div>
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="select select-bordered"
+            className="input-clean w-full sm:w-48"
           >
-            <option value="">All Categories</option>
+            <option value="">📁 All Categories</option>
             {EXPENSE_CATEGORIES.map(cat => (
-              <option key={cat} value={cat}>{cat.replace(/_/g, ' ')}</option>
+              <option key={cat} value={cat}>{CATEGORY_ICONS[cat]} {cat.replace(/_/g, ' ')}</option>
             ))}
           </select>
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="select select-bordered"
+            className="input-clean w-full sm:w-48"
           >
-            <option value="">All Types</option>
-            <option value="operational_expense">Operational</option>
-            <option value="project_expense">Project</option>
+            <option value="">🏷️ All Types</option>
+            <option value="operational_expense">💼 Operational</option>
+            <option value="project_expense">📊 Project-Based</option>
           </select>
         </div>
 
-        {/* Table */}
+        {/* Expenses Table */}
         {loading ? (
-          <div className="text-center py-12">Loading expenses...</div>
+          <div className="text-center py-16">
+            <div className="inline-block animate-spin">⏳</div>
+            <p className="text-muted-foreground mt-2">Loading expenses...</p>
+          </div>
         ) : filteredExpenses.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            No expenses found
+          <div className="card-elevated p-12 text-center">
+            <p className="text-3xl mb-2">📭</p>
+            <p className="text-lg font-medium text-foreground">No Expenses Found</p>
+            <p className="text-muted-foreground mt-1">
+              {filteredExpenses.length === expenses.length
+                ? "No expenses created yet. Click 'Add Expense' to get started."
+                : "Try adjusting your filters"}
+            </p>
           </div>
         ) : (
-          <div className="overflow-x-auto bg-card border border-border rounded-lg">
+          <div className="card-elevated overflow-hidden border border-border">
             <table className="w-full">
-              <thead className="border-b border-border bg-muted">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold">Category</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold">Title</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold">Type</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold">Booking</th>
-                  <th className="px-6 py-3 text-right text-sm font-semibold">Amount</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold">Date</th>
-                  <th className="px-6 py-3 text-center text-sm font-semibold">Actions</th>
+              <thead>
+                <tr className="bg-muted/50 border-b border-border">
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Category</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Description</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Type</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Booking</th>
+                  <th className="px-6 py-3 text-right text-sm font-semibold text-foreground">Amount</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Date</th>
+                  <th className="px-6 py-3 text-center text-sm font-semibold text-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {filteredExpenses.map(expense => (
-                  <tr key={expense._id} className="hover:bg-muted/50">
-                    <td className="px-6 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">{CATEGORY_ICONS[expense.category] || '📝'}</span>
-                        <span className="text-sm">{expense.category.replace(/_/g, ' ')}</span>
+                  <tr key={expense._id} className="hover:bg-muted/30 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl">{CATEGORY_ICONS[expense.category] || '📝'}</span>
+                        <span className="text-sm font-medium text-foreground capitalize">
+                          {expense.category.replace(/_/g, ' ')}
+                        </span>
                       </div>
                     </td>
-                    <td className="px-6 py-3">
+                    <td className="px-6 py-4">
                       <div>
-                        <p className="font-medium">{expense.title}</p>
+                        <p className="font-medium text-foreground">{expense.title}</p>
                         {expense.description && (
-                          <p className="text-xs text-muted-foreground">{expense.description}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{expense.description}</p>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-3">
-                      <span className={`badge ${
-                        expense.type === 'project_expense' ? 'badge-primary' : 'badge-ghost'
+                    <td className="px-6 py-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold inline-block ${
+                        expense.type === 'project_expense'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-amber-100 text-amber-700'
                       }`}>
-                        {expense.type.replace(/_/g, ' ')}
+                        {expense.type === 'project_expense' ? '📊' : '💼'} {expense.type.replace(/_/g, ' ')}
                       </span>
                     </td>
-                    <td className="px-6 py-3">
+                    <td className="px-6 py-4">
                       {expense.bookingId ? (
-                        <a href={`/admin/bookings/${expense.bookingId._id}`} className="text-primary hover:underline text-sm">
+                        <a
+                          href={`/admin/bookings/${expense.bookingId._id}`}
+                          className="text-primary hover:underline font-medium text-sm"
+                        >
                           {expense.bookingId.bookingId}
                         </a>
                       ) : (
                         <span className="text-muted-foreground text-sm">—</span>
                       )}
                     </td>
-                    <td className="px-6 py-3 text-right font-medium">
-                      ₹{expense.amount.toLocaleString()}
+                    <td className="px-6 py-4 text-right">
+                      <p className="font-bold text-lg text-primary">₹{expense.amount.toLocaleString()}</p>
                     </td>
-                    <td className="px-6 py-3 text-sm">
-                      {new Date(expense.date).toLocaleDateString()}
+                    <td className="px-6 py-4 text-sm text-muted-foreground">
+                      {new Date(expense.date).toLocaleDateString('en-IN', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      })}
                     </td>
-                    <td className="px-6 py-3">
+                    <td className="px-6 py-4">
                       <div className="flex justify-center gap-2">
                         <button
                           onClick={() => handleEdit(expense)}
-                          className="btn btn-sm btn-ghost"
+                          className="p-2 rounded-lg hover:bg-blue-100 text-blue-600 transition-colors"
+                          title="Edit expense"
                         >
                           <Edit2 className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(expense._id)}
-                          className="btn btn-sm btn-ghost text-error"
+                          className="p-2 rounded-lg hover:bg-red-100 text-red-600 transition-colors"
+                          title="Delete expense"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>

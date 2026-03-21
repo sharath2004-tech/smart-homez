@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useAdminRole } from "@/hooks/useAdminRole";
 import { api } from "@/lib/api";
 import { AlertTriangle, CheckCircle, Clock, MapPin, Phone, RefreshCw, Shield, XCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -26,6 +27,7 @@ const PRIORITY_META: Record<string, { label: string; color: string; bg: string }
 };
 
 const AdminSOS = () => {
+  const { role, name } = useAdminRole();
   const [alerts, setAlerts] = useState<SOSAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [resolving, setResolving] = useState<string | null>(null);
@@ -81,7 +83,7 @@ const AdminSOS = () => {
   const activeCount = alerts.filter(a => a.status === 'active').length;
 
   return (
-    <AppLayout userType="admin" userName="Admin">
+    <AppLayout userType={role} userName={name}>
       <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
