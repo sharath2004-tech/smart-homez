@@ -46,6 +46,7 @@ router.get('/', async (req, res) => {
 
     const services = await Service.find(query)
       .populate('createdBy', 'name email')
+      .populate('suggestedServices.serviceId', 'name price duration serviceType')
       .limit(limit * 1)
       .skip((page - 1) * limit)
       .sort({ createdAt: -1 });
@@ -154,7 +155,8 @@ router.get('/by-location/:locationId', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const service = await Service.findById(req.params.id)
-      .populate('createdBy', 'name email');
+      .populate('createdBy', 'name email')
+      .populate('suggestedServices.serviceId', 'name price duration serviceType');
     
     if (!service) {
       return res.status(404).json({ 

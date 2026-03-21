@@ -34,6 +34,31 @@ const serviceSchema = new mongoose.Schema({
       'fixed_balcony_cleaning',   // Balcony cleaning
       'fixed_fridge_cleaning',    // Fridge deep cleaning
       'deep_cleaning_commercial', // Commercial/residential deep cleaning (custom quote)
+      // Kitchen appliances
+      'fixed_microwave_cleaning', // Microwave cleaning
+      'fixed_oven_cleaning',      // OTG/Oven cleaning
+      'fixed_stove_cleaning',     // Gas stove cleaning
+      'fixed_chimney_cleaning',   // Chimney cleaning
+      'fixed_kitchen_platform_cleaning', // Kitchen platform & tiles
+      'fixed_sink_cleaning',      // Sink cleaning
+      'kitchen_appliances_package', // Complete kitchen package
+      // Bathroom fixtures
+      'fixed_washbasin_cleaning', // Washbasin/faucet cleaning
+      'fixed_window_mesh_cleaning', // Window mesh cleaning
+      // Furniture
+      'fixed_dining_cleaning',    // Dining table & chairs
+      'fixed_cabinet_cleaning',   // Showcase cabinet
+      'fixed_utility_cleaning',   // Utility area
+      'fixed_cupboard_cleaning',  // Cupboards
+      // Bedroom
+      'bedroom_package',          // Complete bedroom package
+      'fixed_bed_cleaning',       // Bed cleaning
+      'fixed_mirror_cleaning',    // Mirror cleaning
+      // HVAC
+      'fixed_ac_indoor_cleaning', // AC indoor unit
+      'fixed_ac_outdoor_cleaning', // AC outdoor unit
+      // Doors
+      'fixed_door_cleaning',      // Glass door cleaning
       'other'                     // Custom services
     ],
     default: 'other'
@@ -147,6 +172,26 @@ const serviceSchema = new mongoose.Schema({
   },
   tags: [String],
   requirements: [String],
+  // Suggested services to cross-sell (admin can add related services customers might want)
+  suggestedServices: [{
+    serviceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Service',
+      required: true
+    },
+    displayText: {
+      type: String,
+      default: 'Customers also book'
+    },
+    sortOrder: {
+      type: Number,
+      default: 0
+    },
+    isActive: {
+      type: Boolean,
+      default: true
+    }
+  }],
   // Editable task checklist for instant_hourly services (multi-select shown to customers)
   taskOptions: [{
     id: { type: String, required: true },

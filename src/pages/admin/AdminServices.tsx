@@ -62,6 +62,12 @@ interface Service {
   };
   tags?: string[];
   taskOptions?: Array<{ id: string; label: string; icon: string; isActive: boolean }>;
+  suggestedServices?: Array<{
+    serviceId: string | { _id: string; name: string; price: number };
+    displayText?: string;
+    sortOrder?: number;
+    isActive?: boolean;
+  }>;
 }
 
 interface UserProfile {
@@ -82,6 +88,7 @@ interface ServiceRequest {
 }
 
 const MINI_SERVICE_TYPES = [
+  // Existing
   { id: 'deep_cleaning_kitchen',  label: 'Kitchen Deep Clean',  price: 399, duration: 45 },
   { id: 'deep_cleaning_bathroom', label: 'Bathroom Deep Clean', price: 249, duration: 30 },
   { id: 'fixed_sofa_cleaning',    label: 'Sofa Cleaning',       price: 499, duration: 60 },
@@ -90,6 +97,33 @@ const MINI_SERVICE_TYPES = [
   { id: 'fixed_fan_cleaning',     label: 'Fan Cleaning',        price: 149, duration: 20 },
   { id: 'fixed_balcony_cleaning', label: 'Balcony Cleaning',    price: 199, duration: 25 },
   { id: 'fixed_fridge_cleaning',  label: 'Fridge Deep Clean',   price: 249, duration: 40 },
+  // Kitchen Appliances (NEW)
+  { id: 'fixed_microwave_cleaning', label: 'Microwave Cleaning', price: 199, duration: 30 },
+  { id: 'fixed_oven_cleaning', label: 'OTG/Oven Cleaning', price: 399, duration: 40 },
+  { id: 'fixed_stove_cleaning', label: 'Gas Stove Cleaning', price: 99, duration: 15 },
+  { id: 'fixed_chimney_cleaning', label: 'Chimney Cleaning', price: 499, duration: 60 },
+  { id: 'fixed_kitchen_platform_cleaning', label: 'Kitchen Platform & Tiles', price: 399, duration: 45 },
+  { id: 'fixed_sink_cleaning', label: 'Sink Cleaning', price: 149, duration: 20 },
+  { id: 'kitchen_appliances_package', label: 'Kitchen Package (Complete)', price: 3199, duration: 180 },
+  // Bathroom Fixtures (NEW)
+  { id: 'fixed_washbasin_cleaning', label: 'Washbasin Cleaning', price: 69, duration: 15 },
+  { id: 'fixed_window_mesh_cleaning', label: 'Window Mesh Cleaning', price: 100, duration: 20 },
+  { id: 'fixed_washroom_basic', label: 'Basic Washroom Cleaning', price: 250, duration: 30 },
+  { id: 'fixed_washroom_deep', label: 'Deep Washroom Cleaning', price: 600, duration: 60 },
+  // Furniture (NEW)
+  { id: 'fixed_dining_cleaning', label: 'Dining Table & Chairs', price: 499, duration: 45 },
+  { id: 'fixed_cabinet_cleaning', label: 'Showcase Cabinet', price: 299, duration: 30 },
+  { id: 'fixed_utility_cleaning', label: 'Utility Area', price: 499, duration: 50 },
+  { id: 'fixed_cupboard_cleaning', label: 'Cupboards', price: 299, duration: 40 },
+  // Bedroom (NEW)
+  { id: 'bedroom_package', label: 'Complete Bedroom Package', price: 1599, duration: 120 },
+  { id: 'fixed_bed_cleaning', label: 'Bed Cleaning', price: 299, duration: 30 },
+  { id: 'fixed_mirror_cleaning', label: 'Mirror Cleaning', price: 79, duration: 10 },
+  // HVAC (NEW)
+  { id: 'fixed_ac_indoor_cleaning', label: 'AC Indoor Unit', price: 400, duration: 45 },
+  { id: 'fixed_ac_outdoor_cleaning', label: 'AC Outdoor Unit', price: 549, duration: 60 },
+  // Doors (NEW)
+  { id: 'fixed_door_cleaning', label: 'Glass Door', price: 349, duration: 30 },
 ];
 const MINI_SERVICE_IDS = new Set(MINI_SERVICE_TYPES.map(t => t.id));
 
@@ -248,7 +282,8 @@ const AdminServices = () => {
     additionalServiceOptions: [],
     durationOptions: [],
     subscriptionOptions: { allowedFrequencies: ['daily', 'alt-days', '3-days', 'weekly'], requiresSameWorker: true, autoRenewal: true },
-    sizeParameters: { enabled: false, sizeType: 'quantity', options: [] }
+    sizeParameters: { enabled: false, sizeType: 'quantity', options: [] },
+    suggestedServices: []
   });  const isSuperAdmin = profile?.role === 'super_admin';
 
   useEffect(() => {
@@ -419,6 +454,7 @@ const AdminServices = () => {
       sizeParameters: service.sizeParameters || { enabled: false, sizeType: 'quantity', options: [] },
       originalPrice: (service as any).originalPrice || 0,
       taskOptions: (service as any).taskOptions || [],
+      suggestedServices: service.suggestedServices || [],
     });
     setSelectedServiceType(service.serviceType || null);
     setEditingId(service._id!);
@@ -460,6 +496,7 @@ const AdminServices = () => {
       sizeParameters: { enabled: false, sizeType: 'quantity', options: [] },
       originalPrice: 0,
       taskOptions: [],
+      suggestedServices: [],
     });
   };
 
@@ -1922,6 +1959,82 @@ const AdminServices = () => {
                     <p className="text-xs text-muted-foreground">Customers will be taken to the cart-based deep cleaning booking instead of a fixed price.</p>
                   </div>
                 </div>
+
+                {/* Suggested Services Section */}
+                {editingId && (
+                  <div className="space-y-3 p-4 bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="block text-sm font-medium text-foreground">🎯 Suggested Services</label>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Recommend related services to customers (cross-selling)
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            suggestedServices: [
+                              ...(formData.suggestedServices || []),
+                              { serviceId: '', displayText: 'Customers also book', sortOrder: (formData.suggestedServices?.length || 0), isActive: true }
+                            ]
+                          });
+                        }}
+                        className="text-xs px-3 py-1.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center gap-1"
+                      >
+                        <Plus className="w-3 h-3" /> Add Suggestion
+                      </button>
+                    </div>
+
+                    {(formData.suggestedServices || []).length > 0 && (
+                      <div className="space-y-2">
+                        {(formData.suggestedServices || []).map((suggestion, index) => (
+                          <div key={index} className="grid grid-cols-12 gap-2 items-center bg-white rounded-lg border border-orange-100 p-2">
+                            <div className="col-span-10">
+                              <select
+                                value={typeof suggestion.serviceId === 'string' ? suggestion.serviceId : (suggestion.serviceId as any)?._id || ''}
+                                onChange={(e) => {
+                                  const suggestions = [...(formData.suggestedServices || [])];
+                                  suggestions[index] = { ...suggestions[index], serviceId: e.target.value };
+                                  setFormData({ ...formData, suggestedServices: suggestions });
+                                }}
+                                className="input-clean text-sm"
+                              >
+                                <option value="">Select a service...</option>
+                                {services
+                                  .filter(s => s._id !== editingId)
+                                  .map(service => (
+                                    <option key={service._id} value={service._id}>
+                                      {service.name} — ₹{service.price}
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
+                            <div className="col-span-2 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const suggestions = (formData.suggestedServices || []).filter((_, i) => i !== index);
+                                  setFormData({ ...formData, suggestedServices: suggestions });
+                                }}
+                                className="p-1.5 hover:bg-red-50 rounded transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {(formData.suggestedServices || []).length === 0 && (
+                      <div className="text-center py-4 text-sm text-muted-foreground">
+                        No suggested services yet. Click "Add Suggestion" to recommend related services.
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex flex-col sm:flex-row gap-3 pt-4">
                   <button
