@@ -947,6 +947,22 @@ export const adminAPI = {
     return data;
   },
 
+  getWorkerDetails: async (workerId: string) => {
+    return apiCall(`/admin/workers/${workerId}`);
+  },
+
+  updateWorker: async (workerId: string, formData: FormData) => {
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/admin/workers/${workerId}`, {
+      method: 'PUT',
+      headers: { ...(token && { Authorization: `Bearer ${token}` }) },
+      body: formData
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error?.message || data.message || 'Failed to update worker');
+    return data;
+  },
+
   // Worker approval requests
   getPendingWorkers: async () => {
     return apiCall('/admin/worker-requests');

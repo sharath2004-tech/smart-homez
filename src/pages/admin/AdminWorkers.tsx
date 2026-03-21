@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { adminAPI } from "@/lib/api";
-import { Archive, ArchiveRestore, CheckCircle, FileText, Loader2, MapPin, Plus, Search, Star, Upload, X, Edit } from "lucide-react";
+import { Archive, ArchiveRestore, CheckCircle, Edit, FileText, Loader2, MapPin, Plus, Search, Star, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface Location {
@@ -16,9 +16,14 @@ interface Worker {
   name: string;
   email: string;
   phone?: string;
+  gender?: string;
   dateOfBirth?: string;
+  religion?: string;
+  profileImage?: string;
   workerProfile?: {
     specialization: string[];
+    experience?: number;
+    languages?: string[];
     rating: number;
     completedJobs: number;
     totalEarnings: number;
@@ -30,11 +35,26 @@ interface Worker {
     reliabilityScore?: number;
     joinDate?: string;
     resignedDate?: string;
+    accountStatus?: string;
     assignedApartments: Array<{
+      locationId?: string;
       apartmentName: string;
       area: string;
       city: string;
     }>;
+    bankDetails?: {
+      accountHolderName?: string;
+      accountNumber?: string;
+      ifscCode?: string;
+      bankName?: string;
+      upiId?: string;
+    };
+    documents?: {
+      aadhaarFront?: string;
+      aadhaarBack?: string;
+      aadhaarNumber?: string;
+      uploadedAt?: string;
+    };
   };
   currentLocation?: {
     coordinates: [number, number]; // [lng, lat]
@@ -81,6 +101,10 @@ const AdminWorkers = () => {
   // Archive with resigned date state
   const [archiveWorkerData, setArchiveWorkerData] = useState<{ id: string; name: string } | null>(null);
   const [resignedDate, setResignedDate] = useState("");
+
+  // Edit worker state
+  const [editWorker, setEditWorker] = useState<Worker | null>(null);
+  const [updatingWorker, setUpdatingWorker] = useState(false);
 
   const [workerForm, setWorkerForm] = useState({
     name: "",
@@ -187,6 +211,67 @@ const AdminWorkers = () => {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to restore worker';
       alert(message);
+    }
+  };
+
+  const handleEditWorker = async (workerId: string) => {
+    try {
+      const response = await adminAPI.getWorkerDetails(workerId);
+      setEditWorker(response.worker);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load worker details';
+      alert(message);
+    }
+  };
+
+  const handleUpdateWorker = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editWorker) return;
+
+    setUpdatingWorker(true);
+    try {
+      const formData = new FormData();
+
+      // Basic fields
+      formData.append('name', editWorker.name);
+      formData.append('email', editWorker.email);
+      if (editWorker.phone) formData.append('phone', editWorker.phone);
+      if (editWorker.gender) formData.append('gender', editWorker.gender);
+      if (editWorker.dateOfBirth) formData.append('dateOfBirth', editWorker.dateOfBirth);
+      if (editWorker.religion) formData.append('religion', editWorker.religion);
+
+      // Worker profile as JSON
+      if (editWorker.workerProfile) {
+        formData.append('workerProfile', JSON.stringify({
+          specialization: editWorker.workerProfile.specialization,
+          experience: editWorker.workerProfile.experience || 0,
+          languages: editWorker.workerProfile.languages || [],
+          wageType: editWorker.workerProfile.wageType || 'hourly',
+          hourlyRate: editWorker.workerProfile.hourlyRate || 0,
+          dailyWage: editWorker.workerProfile.dailyWage || 0,
+          monthlyWage: editWorker.workerProfile.monthlyWage || 0,
+          availability: editWorker.workerProfile.isAvailable,
+          accountStatus: editWorker.workerProfile.accountStatus || 'active',
+          joinDate: editWorker.workerProfile.joinDate || null,
+          resignedDate: editWorker.workerProfile.resignedDate || null,
+          bankDetails: editWorker.workerProfile.bankDetails || {}
+        }));
+      }
+
+      // Aadhaar number
+      if (editWorker.workerProfile?.documents?.aadhaarNumber) {
+        formData.append('aadhaarNumber', editWorker.workerProfile.documents.aadhaarNumber);
+      }
+
+      await adminAPI.updateWorker(editWorker._id, formData);
+      alert('Worker updated successfully!');
+      setEditWorker(null);
+      fetchData();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update worker';
+      alert(message);
+    } finally {
+      setUpdatingWorker(false);
     }
   };
 
@@ -538,6 +623,14 @@ const AdminWorkers = () => {
                       </p>
                     </div>
                   ) : null}
+
+                  {/* Edit Button */}
+                  <button
+                    onClick={() => handleEditWorker(w._id)}
+                    className="w-full py-2 mb-2 border border-blue-300 rounded-xl text-sm font-medium text-blue-700 hover:bg-blue-50 transition-colors flex items-center justify-center gap-1"
+                  >
+                    <Edit className="w-3.5 h-3.5" /> Edit Worker
+                  </button>
 
                   {w.isArchived ? (
                     <button
@@ -951,6 +1044,424 @@ const AdminWorkers = () => {
                   Confirm Archive
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Worker Modal */}
+        {editWorker && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-background rounded-2xl max-w-3xl w-full p-6 my-8">
+              <form onSubmit={handleUpdateWorker} className="space-y-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                    <Edit className="w-5 h-5" />
+                    Edit Worker: {editWorker.name}
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setEditWorker(null)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Basic Information */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-bold text-foreground border-b pb-2">Basic Information</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Full Name *</label>
+                      <input
+                        type="text"
+                        required
+                        className="input-clean"
+                        value={editWorker.name}
+                        onChange={(e) => setEditWorker({ ...editWorker, name: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Email *</label>
+                      <input
+                        type="email"
+                        required
+                        className="input-clean"
+                        value={editWorker.email}
+                        onChange={(e) => setEditWorker({ ...editWorker, email: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Phone</label>
+                      <input
+                        type="tel"
+                        className="input-clean"
+                        value={editWorker.phone || ''}
+                        onChange={(e) => setEditWorker({ ...editWorker, phone: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Gender</label>
+                      <select
+                        className="input-clean"
+                        value={editWorker.gender || ''}
+                        onChange={(e) => setEditWorker({ ...editWorker, gender: e.target.value })}
+                      >
+                        <option value="">Select Gender</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Date of Birth</label>
+                      <input
+                        type="date"
+                        className="input-clean"
+                        value={editWorker.dateOfBirth?.split('T')[0] || ''}
+                        onChange={(e) => setEditWorker({ ...editWorker, dateOfBirth: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Religion</label>
+                      <input
+                        type="text"
+                        className="input-clean"
+                        value={editWorker.religion || ''}
+                        onChange={(e) => setEditWorker({ ...editWorker, religion: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Worker Profile */}
+                {editWorker.workerProfile && (
+                  <>
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold text-foreground border-b pb-2">Worker Profile</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Experience (years)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            className="input-clean"
+                            value={editWorker.workerProfile.experience || 0}
+                            onChange={(e) => setEditWorker({
+                              ...editWorker,
+                              workerProfile: { ...editWorker.workerProfile!, experience: parseInt(e.target.value) || 0 }
+                            })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Account Status</label>
+                          <select
+                            className="input-clean"
+                            value={editWorker.workerProfile.accountStatus || 'active'}
+                            onChange={(e) => setEditWorker({
+                              ...editWorker,
+                              workerProfile: { ...editWorker.workerProfile!, accountStatus: e.target.value }
+                            })}
+                          >
+                            <option value="active">Active</option>
+                            <option value="pending_review">Pending Review</option>
+                            <option value="rejected">Rejected</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Availability</label>
+                          <select
+                            className="input-clean"
+                            value={editWorker.workerProfile.isAvailable ? 'true' : 'false'}
+                            onChange={(e) => setEditWorker({
+                              ...editWorker,
+                              workerProfile: { ...editWorker.workerProfile!, isAvailable: e.target.value === 'true' }
+                            })}
+                          >
+                            <option value="true">Available</option>
+                            <option value="false">Offline</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Specializations */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Specializations *</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {specializationOptions.map((spec) => (
+                            <label key={spec} className="flex items-center gap-2 text-sm">
+                              <input
+                                type="checkbox"
+                                checked={editWorker.workerProfile?.specialization.includes(spec)}
+                                onChange={(e) => {
+                                  const current = editWorker.workerProfile?.specialization || [];
+                                  const updated = e.target.checked
+                                    ? [...current, spec]
+                                    : current.filter((s) => s !== spec);
+                                  setEditWorker({
+                                    ...editWorker,
+                                    workerProfile: { ...editWorker.workerProfile!, specialization: updated }
+                                  });
+                                }}
+                                className="rounded"
+                              />
+                              {spec}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Wage Configuration */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Wage Type</label>
+                        <div className="flex gap-4 mb-3">
+                          {(['hourly', 'daily', 'monthly'] as const).map((type) => (
+                            <label key={type} className="flex items-center gap-2 text-sm">
+                              <input
+                                type="radio"
+                                name="wageType"
+                                value={type}
+                                checked={editWorker.workerProfile?.wageType === type}
+                                onChange={(e) => setEditWorker({
+                                  ...editWorker,
+                                  workerProfile: { ...editWorker.workerProfile!, wageType: e.target.value }
+                                })}
+                              />
+                              {type.charAt(0).toUpperCase() + type.slice(1)}
+                            </label>
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          {editWorker.workerProfile.wageType === 'hourly' && (
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Hourly Rate (₹)</label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                className="input-clean"
+                                value={editWorker.workerProfile.hourlyRate || 0}
+                                onChange={(e) => setEditWorker({
+                                  ...editWorker,
+                                  workerProfile: { ...editWorker.workerProfile!, hourlyRate: parseFloat(e.target.value) || 0 }
+                                })}
+                              />
+                            </div>
+                          )}
+                          {editWorker.workerProfile.wageType === 'daily' && (
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Daily Wage (₹)</label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                className="input-clean"
+                                value={editWorker.workerProfile.dailyWage || 0}
+                                onChange={(e) => setEditWorker({
+                                  ...editWorker,
+                                  workerProfile: { ...editWorker.workerProfile!, dailyWage: parseFloat(e.target.value) || 0 }
+                                })}
+                              />
+                            </div>
+                          )}
+                          {editWorker.workerProfile.wageType === 'monthly' && (
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Monthly Wage (₹)</label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                className="input-clean"
+                                value={editWorker.workerProfile.monthlyWage || 0}
+                                onChange={(e) => setEditWorker({
+                                  ...editWorker,
+                                  workerProfile: { ...editWorker.workerProfile!, monthlyWage: parseFloat(e.target.value) || 0 }
+                                })}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bank Details */}
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold text-foreground border-b pb-2">Bank Details</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Account Holder Name</label>
+                          <input
+                            type="text"
+                            className="input-clean"
+                            value={editWorker.workerProfile.bankDetails?.accountHolderName || ''}
+                            onChange={(e) => setEditWorker({
+                              ...editWorker,
+                              workerProfile: {
+                                ...editWorker.workerProfile!,
+                                bankDetails: { ...editWorker.workerProfile?.bankDetails, accountHolderName: e.target.value }
+                              }
+                            })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Account Number</label>
+                          <input
+                            type="text"
+                            className="input-clean"
+                            value={editWorker.workerProfile.bankDetails?.accountNumber || ''}
+                            onChange={(e) => setEditWorker({
+                              ...editWorker,
+                              workerProfile: {
+                                ...editWorker.workerProfile!,
+                                bankDetails: { ...editWorker.workerProfile?.bankDetails, accountNumber: e.target.value }
+                              }
+                            })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">IFSC Code</label>
+                          <input
+                            type="text"
+                            className="input-clean"
+                            value={editWorker.workerProfile.bankDetails?.ifscCode || ''}
+                            onChange={(e) => setEditWorker({
+                              ...editWorker,
+                              workerProfile: {
+                                ...editWorker.workerProfile!,
+                                bankDetails: { ...editWorker.workerProfile?.bankDetails, ifscCode: e.target.value }
+                              }
+                            })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Bank Name</label>
+                          <input
+                            type="text"
+                            className="input-clean"
+                            value={editWorker.workerProfile.bankDetails?.bankName || ''}
+                            onChange={(e) => setEditWorker({
+                              ...editWorker,
+                              workerProfile: {
+                                ...editWorker.workerProfile!,
+                                bankDetails: { ...editWorker.workerProfile?.bankDetails, bankName: e.target.value }
+                              }
+                            })}
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-sm font-medium mb-1">UPI ID</label>
+                          <input
+                            type="text"
+                            className="input-clean"
+                            value={editWorker.workerProfile.bankDetails?.upiId || ''}
+                            onChange={(e) => setEditWorker({
+                              ...editWorker,
+                              workerProfile: {
+                                ...editWorker.workerProfile!,
+                                bankDetails: { ...editWorker.workerProfile?.bankDetails, upiId: e.target.value }
+                              }
+                            })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Documents */}
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold text-foreground border-b pb-2">Documents</h3>
+                      {editWorker.workerProfile.documents && (
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-sm font-medium mb-1">Aadhaar Number</label>
+                            <input
+                              type="text"
+                              className="input-clean"
+                              maxLength={14}
+                              value={editWorker.workerProfile.documents.aadhaarNumber || ''}
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/[^\d\s]/g, '');
+                                setEditWorker({
+                                  ...editWorker,
+                                  workerProfile: {
+                                    ...editWorker.workerProfile!,
+                                    documents: { ...editWorker.workerProfile?.documents, aadhaarNumber: val }
+                                  }
+                                });
+                              }}
+                              placeholder="XXXX XXXX XXXX"
+                            />
+                          </div>
+                          {editWorker.workerProfile.documents.aadhaarFront && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <FileText className="w-4 h-4" />
+                              <span>Aadhaar Front: Uploaded</span>
+                              <a
+                                href={editWorker.workerProfile.documents.aadhaarFront}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                              >
+                                View
+                              </a>
+                            </div>
+                          )}
+                          {editWorker.workerProfile.documents.aadhaarBack && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <FileText className="w-4 h-4" />
+                              <span>Aadhaar Back: Uploaded</span>
+                              <a
+                                href={editWorker.workerProfile.documents.aadhaarBack}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                              >
+                                View
+                              </a>
+                            </div>
+                          )}
+                          {editWorker.profileImage && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <FileText className="w-4 h-4" />
+                              <span>Profile Picture: Uploaded</span>
+                              <a
+                                href={editWorker.profileImage}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                              >
+                                View
+                              </a>
+                            </div>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            To update documents, use the document upload endpoint or contact support.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setEditWorker(null)}
+                    className="flex-1 py-2 border border-border rounded-xl text-sm"
+                    disabled={updatingWorker}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 btn-brand py-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    disabled={updatingWorker}
+                  >
+                    {updatingWorker && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {updatingWorker ? 'Updating...' : 'Update Worker'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

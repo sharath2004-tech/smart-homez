@@ -1007,6 +1007,152 @@ router.get('/workers', authenticate, authorize('admin', 'super_admin'), async (r
   }
 });
 
+// @route   GET /api/admin/workers/:workerId
+// @desc    Get complete worker details for viewing/editing
+// @access  Private/Admin/SuperAdmin
+router.get('/workers/:workerId', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { workerId } = req.params;
+
+    const worker = await User.findById(workerId).select('-password -passwordResetToken -passwordResetExpires -temporaryPassword');
+
+    if (!worker || worker.role !== 'worker') {
+      return res.status(404).json({
+        error: { message: 'Worker not found', status: 404 }
+      });
+    }
+
+    // Allow both admin and super_admin to view all worker details
+    console.log(`✅ ${req.user.role} ${req.user.name} viewing worker ${worker.name} (${workerId})`);
+
+    res.json({
+      success: true,
+      worker
+    });
+  } catch (error) {
+    console.error('Get worker details error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   PUT /api/admin/workers/:workerId
+// @desc    Update complete worker details (all fields including documents)
+// @access  Private/Admin/SuperAdmin
+router.put('/workers/:workerId',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  uploadWorkerFiles.fields([
+    { name: 'aadhaarFront', maxCount: 1 },
+    { name: 'aadhaarBack', maxCount: 1 },
+    { name: 'profilePicture', maxCount: 1 }
+  ]),
+  async (req, res) => {
+    try {
+      const { workerId } = req.params;
+      const files = req.files;
+
+      const worker = await User.findById(workerId);
+
+      if (!worker || worker.role !== 'worker') {
+        return res.status(404).json({
+          error: { message: 'Worker not found', status: 404 }
+        });
+      }
+
+      // Allow both admin and super_admin to update all worker details
+
+      // Parse the request body (form-data sends JSON as strings)
+      let updateData = {};
+
+      // Basic fields
+      if (req.body.name) updateData.name = req.body.name;
+      if (req.body.email) updateData.email = req.body.email;
+      if (req.body.phone) updateData.phone = req.body.phone;
+      if (req.body.gender) updateData.gender = req.body.gender;
+      if (req.body.dateOfBirth) updateData.dateOfBirth = new Date(req.body.dateOfBirth);
+      if (req.body.religion) updateData.religion = req.body.religion;
+      if (req.body.isActive !== undefined) updateData.isActive = req.body.isActive === 'true' || req.body.isActive === true;
+      if (req.body.isVerified !== undefined) updateData.isVerified = req.body.isVerified === 'true' || req.body.isVerified === true;
+
+      // Worker profile fields
+      if (req.body.workerProfile) {
+        const workerProfile = typeof req.body.workerProfile === 'string'
+          ? JSON.parse(req.body.workerProfile)
+          : req.body.workerProfile;
+
+        // Update each field individually to preserve existing data
+        if (workerProfile.specialization) updateData['workerProfile.specialization'] = workerProfile.specialization;
+        if (workerProfile.experience !== undefined) updateData['workerProfile.experience'] = Number(workerProfile.experience);
+        if (workerProfile.languages) updateData['workerProfile.languages'] = workerProfile.languages;
+        if (workerProfile.hourlyRate !== undefined) updateData['workerProfile.hourlyRate'] = Number(workerProfile.hourlyRate);
+        if (workerProfile.dailyWage !== undefined) updateData['workerProfile.dailyWage'] = Number(workerProfile.dailyWage);
+        if (workerProfile.monthlyWage !== undefined) updateData['workerProfile.monthlyWage'] = Number(workerProfile.monthlyWage);
+        if (workerProfile.wageType) updateData['workerProfile.wageType'] = workerProfile.wageType;
+        if (workerProfile.availability !== undefined) updateData['workerProfile.availability'] = workerProfile.availability;
+        if (workerProfile.accountStatus) updateData['workerProfile.accountStatus'] = workerProfile.accountStatus;
+        if (workerProfile.serviceRadius !== undefined) updateData['workerProfile.serviceRadius'] = Number(workerProfile.serviceRadius);
+        if (workerProfile.joinDate) updateData['workerProfile.joinDate'] = new Date(workerProfile.joinDate);
+        if (workerProfile.resignedDate) updateData['workerProfile.resignedDate'] = new Date(workerProfile.resignedDate);
+
+        // Bank details
+        if (workerProfile.bankDetails) {
+          if (workerProfile.bankDetails.accountHolderName) updateData['workerProfile.bankDetails.accountHolderName'] = workerProfile.bankDetails.accountHolderName;
+          if (workerProfile.bankDetails.accountNumber) updateData['workerProfile.bankDetails.accountNumber'] = workerProfile.bankDetails.accountNumber;
+          if (workerProfile.bankDetails.ifscCode) updateData['workerProfile.bankDetails.ifscCode'] = workerProfile.bankDetails.ifscCode;
+          if (workerProfile.bankDetails.bankName) updateData['workerProfile.bankDetails.bankName'] = workerProfile.bankDetails.bankName;
+          if (workerProfile.bankDetails.upiId) updateData['workerProfile.bankDetails.upiId'] = workerProfile.bankDetails.upiId;
+        }
+      }
+
+      // Handle file uploads
+      if (files) {
+        if (files.aadhaarFront && files.aadhaarFront[0]) {
+          updateData['workerProfile.documents.aadhaarFront'] = `/uploads/worker-docs/${files.aadhaarFront[0].filename}`;
+          updateData['workerProfile.documents.uploadedAt'] = new Date();
+        }
+        if (files.aadhaarBack && files.aadhaarBack[0]) {
+          updateData['workerProfile.documents.aadhaarBack'] = `/uploads/worker-docs/${files.aadhaarBack[0].filename}`;
+          updateData['workerProfile.documents.uploadedAt'] = new Date();
+        }
+        if (files.profilePicture && files.profilePicture[0]) {
+          updateData.profileImage = `/uploads/profile-pics/${files.profilePicture[0].filename}`;
+        }
+      }
+
+      // Aadhaar number (from form body)
+      if (req.body.aadhaarNumber) {
+        updateData['workerProfile.documents.aadhaarNumber'] = req.body.aadhaarNumber;
+      }
+
+      // Addresses
+      if (req.body.addresses) {
+        const addresses = typeof req.body.addresses === 'string'
+          ? JSON.parse(req.body.addresses)
+          : req.body.addresses;
+        updateData.addresses = addresses;
+      }
+
+      // Update worker
+      const updatedWorker = await User.findByIdAndUpdate(
+        workerId,
+        { $set: updateData },
+        { new: true, runValidators: true }
+      ).select('-password -passwordResetToken -passwordResetExpires -temporaryPassword');
+
+      console.log(`✅ Worker ${updatedWorker.name} (${workerId}) updated by ${req.user.role} ${req.user.name}`);
+
+      res.json({
+        success: true,
+        message: 'Worker updated successfully',
+        worker: updatedWorker
+      });
+    } catch (error) {
+      console.error('Update worker error:', error);
+      res.status(500).json({ error: { message: 'Server error', details: error.message, status: 500 } });
+    }
+  }
+);
+
 // @route   PATCH /api/admin/workers/:workerId/assign-location
 // @desc    Assign worker to apartment/location
 // @access  Private/Admin
@@ -2546,22 +2692,7 @@ router.patch('/workers/:id/documents',
         return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
       }
 
-      // Check if admin has permission to manage this worker's location
-      if (req.user.role === 'admin') {
-        const adminLocationIds = req.user.adminProfile.assignedLocations.map(
-          loc => loc.locationId.toString()
-        );
-        const workerLocationIds = worker.workerProfile.assignedApartments.map(
-          apt => apt.locationId.toString()
-        );
-        
-        const hasAccess = workerLocationIds.some(locId => adminLocationIds.includes(locId));
-        if (!hasAccess) {
-          return res.status(403).json({ 
-            error: { message: 'Cannot update documents for workers outside your assigned locations', status: 403 } 
-          });
-        }
-      }
+      // Location restriction removed - both admin and super_admin can update any worker's documents
 
       // Extract uploaded document paths
       const files = req.files || {};
@@ -2606,7 +2737,85 @@ router.patch('/workers/:id/documents',
         }
       });
     } catch (error) {
-      console.error('Update worker documents error:', error);
+      console.log('Update worker documents error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   PATCH /api/admin/workers/:id/profile
+// @desc    Update worker profile (all details) - Admin/Super Admin only
+// @access  Private/Admin/Super Admin
+router.patch('/workers/:id/profile',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const {
+        name,
+        email,
+        phone,
+        dateOfBirth,
+        specialization,
+        wageType,
+        hourlyRate,
+        dailyWage,
+        monthlyWage,
+        isAvailable,
+        addresses,
+        aadhaarNumber
+      } = req.body;
+
+      // Find the worker
+      const worker = await User.findOne({ _id: id, role: 'worker' });
+      if (!worker) {
+        return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
+      }
+
+      // Build update object
+      const updates = {};
+
+      // Basic fields
+      if (name !== undefined) updates.name = name;
+      if (email !== undefined) updates.email = email;
+      if (phone !== undefined) updates.phone = phone;
+      if (dateOfBirth !== undefined) updates.dateOfBirth = dateOfBirth;
+      if (addresses !== undefined) updates.addresses = addresses;
+
+      // Worker profile fields
+      if (specialization !== undefined) updates['workerProfile.specialization'] = specialization;
+      if (wageType !== undefined) updates['workerProfile.wageType'] = wageType;
+      if (hourlyRate !== undefined) updates['workerProfile.hourlyRate'] = hourlyRate;
+      if (dailyWage !== undefined) updates['workerProfile.dailyWage'] = dailyWage;
+      if (monthlyWage !== undefined) updates['workerProfile.monthlyWage'] = monthlyWage;
+      if (isAvailable !== undefined) updates['workerProfile.isAvailable'] = isAvailable;
+      if (aadhaarNumber !== undefined) updates['workerProfile.documents.aadhaarNumber'] = aadhaarNumber;
+
+      // Update worker
+      const updatedWorker = await User.findByIdAndUpdate(
+        id,
+        { $set: updates },
+        { new: true, runValidators: true }
+      ).select('-password');
+
+      console.log(`✅ Worker profile updated by ${req.user.role} ${req.user.name} for worker ${worker.name}`);
+
+      res.json({
+        success: true,
+        message: 'Worker profile updated successfully',
+        worker: updatedWorker
+      });
+    } catch (error) {
+      console.error('Update worker profile error:', error);
+
+      // Handle duplicate email error
+      if (error.code === 11000) {
+        return res.status(400).json({
+          error: { message: 'Email already exists', status: 400 }
+        });
+      }
+
       res.status(500).json({ error: { message: 'Server error', status: 500 } });
     }
   }
