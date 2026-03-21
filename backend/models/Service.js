@@ -496,86 +496,9 @@ serviceSchema.pre('save', function(next) {
     };
   }
 
-  // New subscriptionPlans — per-session price + total monthly bundle
-  if (!this.subscriptionPlans || this.subscriptionPlans.length === 0) {
-    this.subscriptionPlans = [
-      {
-        id: 'oneTime',
-        name: 'oneTime',
-        displayName: 'One-Time',
-        icon: '📅',
-        description: 'Single service, no commitment',
-        price: p,
-        discountPercentage: 0,
-        sessionsPerMonth: 1,
-        totalMonthlyPrice: p,
-        isActive: true,
-        requiresFixedWorker: false,
-        allowDaySelection: false,
-        sortOrder: 1
-      },
-      {
-        id: 'daily',
-        name: 'daily',
-        displayName: 'Daily',
-        icon: '🌅',
-        description: '6 days/week (~26 sessions/month)',
-        price: Math.round(p * 0.70),
-        discountPercentage: 30,
-        sessionsPerMonth: 26,
-        totalMonthlyPrice: Math.round(p * 0.70 * 26),
-        isActive: true,
-        requiresFixedWorker: true,
-        allowDaySelection: false,
-        sortOrder: 2
-      },
-      {
-        id: 'bi-weekly',
-        name: 'bi-weekly',
-        displayName: 'Bi-Weekly',
-        icon: '📆',
-        description: '2 days/week (~8 sessions/month)',
-        price: Math.round(p * 0.80),
-        discountPercentage: 20,
-        sessionsPerMonth: 8,
-        totalMonthlyPrice: Math.round(p * 0.80 * 8),
-        isActive: true,
-        requiresFixedWorker: true,
-        allowDaySelection: true,
-        sortOrder: 3
-      },
-      {
-        id: 'weekly',
-        name: 'weekly',
-        displayName: 'Weekly',
-        icon: '🗓️',
-        description: '1 day/week (~4 sessions/month)',
-        price: Math.round(p * 0.85),
-        discountPercentage: 15,
-        sessionsPerMonth: 4,
-        totalMonthlyPrice: Math.round(p * 0.85 * 4),
-        isActive: true,
-        requiresFixedWorker: true,
-        allowDaySelection: true,
-        sortOrder: 4
-      },
-      {
-        id: 'monthly',
-        name: 'monthly',
-        displayName: 'Monthly',
-        icon: '🗓️',
-        description: 'Once a month (1 session)',
-        price: Math.round(p * 0.95),
-        discountPercentage: 5,
-        sessionsPerMonth: 1,
-        totalMonthlyPrice: Math.round(p * 0.95),
-        isActive: true,
-        requiresFixedWorker: false,
-        allowDaySelection: false,
-        sortOrder: 5
-      }
-    ];
-  }
+  // No auto-generated subscription plans
+  // Admin must explicitly configure subscription plans through the UI
+  // This ensures only intentionally configured plans are displayed
 
   next();
 });
