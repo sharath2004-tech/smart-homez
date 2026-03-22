@@ -45,7 +45,6 @@ const CustomerDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [serviceableStatus, setServiceableStatus] = useState<'available' | 'unavailable' | 'unknown'>('unknown');
   const [quickServices, setQuickServices] = useState<any[]>([]);
-  const [washroomServiceId, setWashroomServiceId] = useState<string | null>(null);
   const [kitchenServiceId, setKitchenServiceId] = useState<string | null>(null);
   const [windowServiceId, setWindowServiceId] = useState<string | null>(null);
   const { latitude, longitude, error: locationError } = useGeolocation();
@@ -57,9 +56,6 @@ const CustomerDashboard = () => {
         const response = await servicesAPI.getAll({ isActive: true, limit: 50 });
         const list = response.services || [];
 
-        const washroom = list.find((s: any) =>
-          s.name.toLowerCase().includes('washroom') && s.name.toLowerCase().includes('deep')
-        );
         const kitchen = list.find((s: any) =>
           s.name.toLowerCase().includes('kitchen') &&
           (s.name.toLowerCase().includes('deep') || s.serviceType?.includes('kitchen'))
@@ -69,7 +65,6 @@ const CustomerDashboard = () => {
           (s.name.toLowerCase().includes('clean') || s.serviceType?.includes('window'))
         );
 
-        if (washroom) setWashroomServiceId(washroom._id);
         if (kitchen) setKitchenServiceId(kitchen._id);
         if (window) setWindowServiceId(window._id);
       } catch (error) {
@@ -104,7 +99,7 @@ const CustomerDashboard = () => {
       }
     };
     fetchServices();
-  }, [t, washroomServiceId]);
+  }, [t]);
 
   useEffect(() => {
     const fetchCoreData = async () => {
@@ -364,37 +359,33 @@ const CustomerDashboard = () => {
               </motion.div>
             ))}
 
-            {/* Kitchen Deep Clean — only if admin has created the service */}
-            {kitchenServiceId && (
-              <motion.div variants={itemVariants} whileHover="hover" whileTap="tap">
-                <Link
-                  to={`/customer/book/${kitchenServiceId}`}
-                  className="card-elevated-hover p-4 text-center group block flex flex-col items-center justify-center min-h-[130px]"
-                >
-                  <motion.div className="text-3xl mb-2" whileHover={{ scale: 1.15 }} transition={{ duration: 0.2, ease: "easeOut" }}>
-                    🍽️
-                  </motion.div>
-                  <p className="text-xs font-semibold text-foreground leading-tight">Kitchen Deep Clean</p>
-                  <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">Grease · Appliances · Tiles</p>
-                </Link>
-              </motion.div>
-            )}
+            {/* Kitchen Deep Clean — always visible; links to direct booking if service exists */}
+            <motion.div variants={itemVariants} whileHover="hover" whileTap="tap">
+              <Link
+                to={kitchenServiceId ? `/customer/book/${kitchenServiceId}` : `/customer/services/spot-clean`}
+                className="card-elevated-hover p-4 text-center group block flex flex-col items-center justify-center min-h-[130px]"
+              >
+                <motion.div className="text-3xl mb-2" whileHover={{ scale: 1.15 }} transition={{ duration: 0.2, ease: "easeOut" }}>
+                  🍽️
+                </motion.div>
+                <p className="text-xs font-semibold text-foreground leading-tight">Kitchen Deep Clean</p>
+                <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">Grease · Appliances · Tiles</p>
+              </Link>
+            </motion.div>
 
-            {/* Window Deep Cleaning — only if admin has created the service */}
-            {windowServiceId && (
-              <motion.div variants={itemVariants} whileHover="hover" whileTap="tap">
-                <Link
-                  to={`/customer/book/${windowServiceId}`}
-                  className="card-elevated-hover p-4 text-center group block flex flex-col items-center justify-center min-h-[130px]"
-                >
-                  <motion.div className="text-3xl mb-2" whileHover={{ scale: 1.15 }} transition={{ duration: 0.2, ease: "easeOut" }}>
-                    🪟
-                  </motion.div>
-                  <p className="text-xs font-semibold text-foreground leading-tight">Window Deep Cleaning</p>
-                  <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">Glass · Frames · Tracks</p>
-                </Link>
-              </motion.div>
-            )}
+            {/* Window Deep Cleaning — always visible; links to direct booking if service exists */}
+            <motion.div variants={itemVariants} whileHover="hover" whileTap="tap">
+              <Link
+                to={windowServiceId ? `/customer/book/${windowServiceId}` : `/customer/services/spot-clean`}
+                className="card-elevated-hover p-4 text-center group block flex flex-col items-center justify-center min-h-[130px]"
+              >
+                <motion.div className="text-3xl mb-2" whileHover={{ scale: 1.15 }} transition={{ duration: 0.2, ease: "easeOut" }}>
+                  🪟
+                </motion.div>
+                <p className="text-xs font-semibold text-foreground leading-tight">Window Deep Cleaning</p>
+                <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">Glass · Frames · Tracks</p>
+              </Link>
+            </motion.div>
           </motion.div>
         </motion.div>
 
