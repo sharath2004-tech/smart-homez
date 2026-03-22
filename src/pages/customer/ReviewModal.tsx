@@ -5,13 +5,15 @@ import { useTranslation } from 'react-i18next';
 
 interface ReviewModalProps {
   bookingId: string;
-  workerId: string;
-  workerName: string;
+  workers: Array<{
+    id: string;
+    name: string;
+  }>;
   onClose: () => void;
   onReviewSubmitted: () => void;
 }
 
-const ReviewModal = ({ bookingId, workerId, workerName, onClose, onReviewSubmitted }: ReviewModalProps) => {
+const ReviewModal = ({ bookingId, workers, onClose, onReviewSubmitted }: ReviewModalProps) => {
   const { t } = useTranslation();
   const [overallRating, setOverallRating] = useState(0);
   const [qualityRating, setQualityRating] = useState(0);
@@ -21,6 +23,15 @@ const ReviewModal = ({ bookingId, workerId, workerName, onClose, onReviewSubmitt
   const [comment, setComment] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const reviewWorkers = workers.filter((worker, index, self) =>
+    worker?.id && self.findIndex(candidate => candidate.id === worker.id) === index
+  );
+
+  const primaryWorkerName = reviewWorkers[0]?.name || 'the team';
+  const workerHeading = reviewWorkers.length <= 1
+    ? primaryWorkerName
+    : `${primaryWorkerName} + ${reviewWorkers.length - 1} more`;
 
   const handleSubmitReview = async () => {
     if (overallRating === 0) {
@@ -38,7 +49,7 @@ const ReviewModal = ({ bookingId, workerId, workerName, onClose, onReviewSubmitt
       // Create review using the proper API that updates worker stats
       await reviewsAPI.createReview({
         booking: bookingId,
-        worker: workerId,
+        workerIds: reviewWorkers.map(worker => worker.id),
         overallRating,
         categoryRatings: {
           quality: qualityRating,
@@ -93,7 +104,19 @@ const ReviewModal = ({ bookingId, workerId, workerName, onClose, onReviewSubmitt
             {/* Worker Info */}
             <div className="text-center">
               <p className="text-sm text-muted-foreground mb-2">{t('customer.review.howWasExperience')}</p>
-              <p className="text-xl font-bold text-foreground">{workerName}?</p>
+              <p className="text-xl font-bold text-foreground">{workerHeading}?</p>
+              {reviewWorkers.length > 1 && (
+                <div className="mt-3 flex flex-wrap justify-center gap-2">
+                  {reviewWorkers.map((worker) => (
+                    <span
+                      key={worker.id}
+                      className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
+                    >
+                      {worker.name}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Overall Rating */}

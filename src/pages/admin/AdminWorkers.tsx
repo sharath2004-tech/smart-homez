@@ -99,6 +99,32 @@ const specializationOptions = [
   "Carpet"
 ];
 
+const normalizeSpecializations = (items: string[] = []) => {
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+
+  for (const item of items) {
+    const value = item?.trim();
+    if (!value) continue;
+
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+
+    seen.add(key);
+    normalized.push(value);
+  }
+
+  return normalized;
+};
+
+const getSpecializationChoices = (selected: string[] = []) => {
+  const customSelected = normalizeSpecializations(selected).filter(
+    (item) => !specializationOptions.some((option) => option.toLowerCase() === item.toLowerCase())
+  );
+
+  return [...specializationOptions, ...customSelected];
+};
+
 const AdminWorkers = () => {
   const { role, name, isSuperAdmin } = useAdminRole();
   const [search, setSearch] = useState("");
@@ -110,6 +136,8 @@ const AdminWorkers = () => {
   const [showWorkerForm, setShowWorkerForm] = useState(false);
   const [creatingWorker, setCreatingWorker] = useState(false);
   const [credentialDelivery, setCredentialDelivery] = useState<"email" | "phone" | "both">("email");
+  const [customCreateSpecialization, setCustomCreateSpecialization] = useState("");
+  const [customEditSpecialization, setCustomEditSpecialization] = useState("");
 
   // Archive with resigned date state
   const [archiveWorkerData, setArchiveWorkerData] = useState<{ id: string; name: string } | null>(null);
@@ -363,8 +391,9 @@ const AdminWorkers = () => {
 
       // Worker profile as JSON
       if (editWorker.workerProfile) {
+        const normalizedSpecializations = normalizeSpecializations(editWorker.workerProfile.specialization || []);
         formData.append('workerProfile', JSON.stringify({
-          specialization: editWorker.workerProfile.specialization,
+          specialization: normalizedSpecializations,
           experience: editWorker.workerProfile.experience || 0,
           languages: editWorker.workerProfile.languages || [],
           wageType: editWorker.workerProfile.wageType || 'hourly',
@@ -493,7 +522,7 @@ const AdminWorkers = () => {
       if (workerForm.religion) formData.append('religion', workerForm.religion);
       if (workerForm.dateOfBirth) formData.append('dateOfBirth', workerForm.dateOfBirth);
       formData.append('experience', String(parseInt(workerForm.experience) || 0));
-      formData.append('specialization', JSON.stringify(workerForm.specialization));
+      formData.append('specialization', JSON.stringify(normalizeSpecializations(workerForm.specialization)));
       formData.append('assignedApartmentIds', JSON.stringify(workerForm.selectedLocations));
       if (workerForm.aadhaarNumber) formData.append('aadhaarNumber', workerForm.aadhaarNumber.replace(/\s/g, ''));
       formData.append('wageType', workerForm.wageType);
@@ -535,6 +564,7 @@ const AdminWorkers = () => {
         dailyWage: "",
         monthlyWage: "",
       });
+      setCustomCreateSpecialization("");
       setDocFiles({ profilePicture: null, aadhaarFront: null, aadhaarBack: null });
       fetchData();
     } catch (error) {
@@ -550,8 +580,33 @@ const AdminWorkers = () => {
       ...prev,
       specialization: prev.specialization.includes(spec)
         ? prev.specialization.filter(s => s !== spec)
-        : [...prev.specialization, spec]
+        : normalizeSpecializations([...prev.specialization, spec])
     }));
+  };
+
+  const addCreateSpecialization = () => {
+    const value = customCreateSpecialization.trim();
+    if (!value) return;
+
+    setWorkerForm(prev => ({
+      ...prev,
+      specialization: normalizeSpecializations([...prev.specialization, value])
+    }));
+    setCustomCreateSpecialization("");
+  };
+
+  const addEditSpecialization = () => {
+    const value = customEditSpecialization.trim();
+    if (!value || !editWorker?.workerProfile) return;
+
+    setEditWorker({
+      ...editWorker,
+      workerProfile: {
+        ...editWorker.workerProfile,
+        specialization: normalizeSpecializations([...(editWorker.workerProfile.specialization || []), value])
+      }
+    });
+    setCustomEditSpecialization("");
   };
 
   const toggleLocation = (locationId: string) => {
@@ -1003,7 +1058,7 @@ const AdminWorkers = () => {
                 <div>
                   <label className="block text-sm font-medium mb-2">Specialization</label>
                   <div className="flex flex-wrap gap-2">
-                    {specializationOptions.map(spec => (
+                    {getSpecializationChoices(workerForm.specialization).map(spec => (
                       <button
                         key={spec}
                         type="button"
@@ -1018,6 +1073,28 @@ const AdminWorkers = () => {
                         {spec}
                       </button>
                     ))}
+                  </div>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <input
+                      type="text"
+                      className="input-clean"
+                      placeholder="Add custom skill or specialization"
+                      value={customCreateSpecialization}
+                      onChange={(e) => setCustomCreateSpecialization(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addCreateSpecialization();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={addCreateSpecialization}
+                      className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
+                    >
+                      Add Skill
+                    </button>
                   </div>
                 </div>
 
@@ -1371,7 +1448,7 @@ const AdminWorkers = () => {
                       <div>
                         <label className="block text-sm font-medium mb-2">Specializations *</label>
                         <div className="grid grid-cols-2 gap-2">
-                          {specializationOptions.map((spec) => (
+                          {getSpecializationChoices(editWorker.workerProfile?.specialization || []).map((spec) => (
                             <label key={spec} className="flex items-center gap-2 text-sm">
                               <input
                                 type="checkbox"
@@ -1379,7 +1456,7 @@ const AdminWorkers = () => {
                                 onChange={(e) => {
                                   const current = editWorker.workerProfile?.specialization || [];
                                   const updated = e.target.checked
-                                    ? [...current, spec]
+                                    ? normalizeSpecializations([...current, spec])
                                     : current.filter((s) => s !== spec);
                                   setEditWorker({
                                     ...editWorker,
@@ -1391,6 +1468,28 @@ const AdminWorkers = () => {
                               {spec}
                             </label>
                           ))}
+                        </div>
+                        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                          <input
+                            type="text"
+                            className="input-clean"
+                            placeholder="Add custom skill or specialization"
+                            value={customEditSpecialization}
+                            onChange={(e) => setCustomEditSpecialization(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                addEditSpecialization();
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={addEditSpecialization}
+                            className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
+                          >
+                            Add Skill
+                          </button>
                         </div>
                       </div>
 

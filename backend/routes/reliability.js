@@ -43,16 +43,23 @@ router.get('/worker/:workerId', authenticate, [
       reliabilityScoring.getWorkerReliabilityHistory(workerId, 12)
     ]);
 
+    const latestAvailableScore = currentScore || history?.[0] || null;
+    const latestScoreLabel = latestAvailableScore
+      ? `${String((latestAvailableScore.month ?? 0) + 1).padStart(2, '0')}/${latestAvailableScore.year}`
+      : null;
+
     res.json({
       worker: {
         id: workerId,
         name: worker.name,
         currentReliabilityScore: worker.workerProfile?.reliabilityScore || 100
       },
-      currentMonthScore: currentScore,
+      currentMonthScore: latestAvailableScore,
+      currentMonthLabel: latestScoreLabel,
+      hasCurrentMonthScore: Boolean(currentScore),
       history,
       scoringRules: {
-        baseScore: 10,
+        baseScore: 15,
         maxScore: 20,
         leaveBonus: '+2 points if ≤4 leaves OR no leaves in month',
         uninformedLeavePenalty: '-1 point per leave applied <24 hours'

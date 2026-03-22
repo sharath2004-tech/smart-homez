@@ -24,6 +24,11 @@ interface Worker {
   };
 }
 
+interface SupportStaffMember {
+  worker?: Worker | null;
+  name?: string;
+}
+
 interface Service {
   _id: string;
   name: string;
@@ -60,6 +65,7 @@ interface Booking {
   bookingType?: string;
   cartItems?: { name: string; qty?: number; totalPrice: number }[];
   worker?: Worker;
+  supportStaff?: SupportStaffMember[];
   customer: {
     _id: string;
     name: string;
@@ -457,6 +463,15 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
 
   if (!booking) return null;
 
+  const assignedReviewWorkers = [
+    booking.worker ? { id: booking.worker._id, name: booking.worker.name } : null,
+    ...((booking.supportStaff || [])
+      .map(member => member.worker?._id ? {
+        id: member.worker._id,
+        name: member.worker.name || member.name || 'Support Staff'
+      } : null))
+  ].filter((worker): worker is { id: string; name: string } => Boolean(worker));
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[90vh]">
@@ -582,6 +597,24 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                       <MessageCircle className="w-4 h-4 text-primary" />
                       <span className="text-sm font-medium">Chat with Worker</span>
                     </button>
+                  )}
+                  {booking.supportStaff && booking.supportStaff.length > 0 && (
+                    <div className="rounded-lg border border-border bg-background p-3">
+                      <p className="text-xs font-semibold text-muted-foreground mb-2">Deep cleaning team</p>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                          Team Head: {booking.worker.name}
+                        </span>
+                        {booking.supportStaff.map((member, index) => (
+                          <span
+                            key={`${member.worker?._id || member.name || 'support'}-${index}`}
+                            className="inline-flex items-center rounded-full bg-muted px-3 py-1 text-xs font-medium text-foreground"
+                          >
+                            {member.worker?.name || member.name || 'Support Staff'}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -885,11 +918,10 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
         </div>
 
       {/* Review Modal */}
-      {showReviewModal && booking.worker && (
+      {showReviewModal && assignedReviewWorkers.length > 0 && (
         <ReviewModal
           bookingId={bookingId}
-          workerId={typeof booking.worker === 'string' ? booking.worker : booking.worker._id}
-          workerName={booking.worker.name}
+          workers={assignedReviewWorkers}
           onClose={() => setShowReviewModal(false)}
           onReviewSubmitted={() => {
             setShowReviewModal(false);

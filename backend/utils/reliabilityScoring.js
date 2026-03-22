@@ -5,7 +5,7 @@ import User from '../models/User.js';
  * Reliability Scoring Service
  *
  * Scoring Logic:
- * - Base Score: 10/20 points (starting point)
+ * - Base Score: 15/20 points (starting point)
  * - Leave Bonus: +2 points if ≤4 leaves OR no leaves in month
  * - Uninformed Leave Penalty: -1 point per leave applied <24 hours
  * - Final Score: 0-20 range (converted to 0-100 for worker profile)
@@ -41,7 +41,7 @@ class ReliabilityScoring {
       const informedLeaves = totalLeaves - uninformedLeaves;
 
       // Scoring logic
-      const baseScore = 10; // Base 10/20 points
+      const baseScore = 15; // Base 15/20 points
       let leaveBonus = 0;
       let leavePenalties = 0;
 

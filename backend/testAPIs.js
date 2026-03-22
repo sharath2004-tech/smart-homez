@@ -70,7 +70,7 @@ async function testAPIs() {
 
     console.log('6️⃣ Scoring Rules:');
     console.log('🏆 Range: 0-20 points (converted to 0-100% in UI)');
-    console.log('🎯 Base Score: 10 points');
+    console.log('🎯 Base Score: 15 points');
     console.log('✅ Leave Bonus: +2 points if ≤4 leaves OR no leaves per month');
     console.log('❌ Uninformed Leave Penalty: -1 point per leave applied <24 hours');
     console.log('🎨 Color Coding: Green (16-20), Yellow (11-15), Red (0-10)\n');

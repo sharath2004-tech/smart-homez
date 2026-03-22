@@ -162,12 +162,50 @@ export function WorkerRatingAnalytics({
           </div>
         )}
 
+        {(latestWeek || latestMonth) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <div className="text-xs font-medium text-blue-800">Last 1 Week</div>
+              {latestWeek ? (
+                <>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                    <span className="text-lg font-bold text-blue-900">{latestWeek.averageRating.toFixed(1)}</span>
+                    <span className="text-xs text-blue-700">/ 5</span>
+                  </div>
+                  <div className="text-xs text-blue-700">{latestWeek.reviewCount} review{latestWeek.reviewCount === 1 ? '' : 's'}</div>
+                </>
+              ) : (
+                <div className="mt-2 text-xs text-blue-700">No reviews in the last week</div>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-purple-200 bg-purple-50 p-3">
+              <div className="text-xs font-medium text-purple-800">Last 1 Month</div>
+              {latestMonth ? (
+                <>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                    <span className="text-lg font-bold text-purple-900">{latestMonth.averageRating.toFixed(1)}</span>
+                    <span className="text-xs text-purple-700">/ 5</span>
+                  </div>
+                  <div className="text-xs text-purple-700">
+                    {latestMonth.reviewCount} review{latestMonth.reviewCount === 1 ? '' : 's'} · {latestMonth.satisfactionRate}% satisfied
+                  </div>
+                </>
+              ) : (
+                <div className="mt-2 text-xs text-purple-700">No reviews in the last month</div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Category Breakdown */}
         {latestMonth && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-muted-foreground" />
-              <h4 className="text-sm font-medium">Category Ratings (This Month)</h4>
+              <h4 className="text-sm font-medium">Category Ratings (Last 1 Month)</h4>
             </div>
 
             <div className="space-y-2">

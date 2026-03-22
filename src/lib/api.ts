@@ -1310,7 +1310,8 @@ export const reviewsAPI = {
   // Submit a review for a completed booking
   createReview: async (reviewData: {
     booking: string;
-    worker: string;
+    worker?: string;
+    workerIds?: string[];
     overallRating: number;
     categoryRatings: {
       quality: number;

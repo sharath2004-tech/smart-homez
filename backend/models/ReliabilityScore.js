@@ -20,9 +20,9 @@ const reliabilityScoreSchema = new mongoose.Schema({
   scoreBreakdown: {
     baseScore: {
       type: Number,
-      default: 10,
+      default: 15,
       min: 0,
-      max: 10
+      max: 20
     },
     leaveBonus: {
       type: Number,
@@ -37,7 +37,7 @@ const reliabilityScoreSchema = new mongoose.Schema({
     },
     finalScore: {
       type: Number,
-      default: 10,
+      default: 15,
       min: 0,
       max: 20
     }

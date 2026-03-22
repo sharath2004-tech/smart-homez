@@ -5,6 +5,8 @@ import { AlertTriangle, CheckCircle, Clock, TrendingDown, TrendingUp } from "luc
 
 interface ReliabilityScoreData {
   currentMonthScore?: {
+    month?: number;
+    year?: number;
     scoreBreakdown: {
       finalScore: number;
       baseScore: number;
@@ -17,6 +19,8 @@ interface ReliabilityScoreData {
       informedLeaves: number;
     };
   };
+  currentMonthLabel?: string | null;
+  hasCurrentMonthScore?: boolean;
   history?: Array<{
     month: number;
     year: number;
@@ -136,17 +140,17 @@ export function ReliabilityScoreCard({
           </div>
         )}
 
-        {/* Current Month Details */}
+        {/* Latest Score Details */}
         {data?.currentMonthScore && (
           <div className="mt-4 p-3 bg-gray-50 rounded-lg space-y-2">
             <h4 className="text-xs font-medium text-muted-foreground mb-2">
-              This Month Breakdown
+              {data.hasCurrentMonthScore ? 'This Month Breakdown' : `Latest Score Breakdown${data.currentMonthLabel ? ` (${data.currentMonthLabel})` : ''}`}
             </h4>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
                 <span className="text-muted-foreground">Base Score:</span>
                 <span className="font-semibold ml-1">
-                  {data.currentMonthScore.scoreBreakdown.baseScore}/10
+                  {data.currentMonthScore.scoreBreakdown.baseScore}/20
                 </span>
               </div>
               <div>
@@ -186,7 +190,7 @@ export function ReliabilityScoreCard({
         <div className="mt-4 p-3 bg-blue-50 rounded-lg">
           <h4 className="text-xs font-medium text-blue-900 mb-2">Scoring Rules</h4>
           <ul className="text-xs text-blue-800 space-y-1">
-            <li>• Base: 10 points</li>
+            <li>• Base: 15 points</li>
             <li>• +2 if ≤4 leaves per month</li>
             <li>• -1 per uninformed leave (&lt;24hrs)</li>
             <li>• Max: 20 points</li>
