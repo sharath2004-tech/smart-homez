@@ -28,6 +28,26 @@ const categorySchema = new mongoose.Schema({
   sortOrder:{ type: Number, default: 0 }
 }, { _id: false });
 
+const pageContentSchema = new mongoose.Schema({
+  heroBadge:            { type: String, default: 'Professional home care' },
+  heroTitle:            { type: String, default: 'Deep Cleaning Services' },
+  heroSubtitle:         { type: String, default: 'Choose the right deep cleaning service for your home, move-in, move-out, kitchen, bathroom and more.' },
+  categoriesTitle:      { type: String, default: 'Choose a deep cleaning service' },
+  categoriesSubtitle:   { type: String, default: 'Pick a category, enter your requirements and get the final amount based on your home details.' },
+  miniServicesTitle:    { type: String, default: 'Popular mini services' },
+  miniServicesSubtitle: { type: String, default: 'Add-on services for specific areas and appliances.' }
+}, { _id: false });
+
+const DEFAULT_PAGE_CONTENT = {
+  heroBadge: 'Professional home care',
+  heroTitle: 'Deep Cleaning Services',
+  heroSubtitle: 'Choose the right deep cleaning service for your home, move-in, move-out, kitchen, bathroom and more.',
+  categoriesTitle: 'Choose a deep cleaning service',
+  categoriesSubtitle: 'Pick a category, enter your requirements and get the final amount based on your home details.',
+  miniServicesTitle: 'Popular mini services',
+  miniServicesSubtitle: 'Add-on services for specific areas and appliances.'
+};
+
 const DEFAULT_CATEGORIES = [
   { id: 'fullhouse',        label: 'Full Home Deep Cleaning',    emoji: '🏡', isActive: true, sortOrder: 1 },
   { id: 'bathroom',         label: 'Bathroom Cleaning',          emoji: '🚿', isActive: true, sortOrder: 2 },
@@ -45,6 +65,7 @@ const DEFAULT_CATEGORIES = [
 const deepCleaningConfigSchema = new mongoose.Schema({
   minimumCartValue: { type: Number, default: 500 },
   categories:       { type: [categorySchema], default: DEFAULT_CATEGORIES },
+  pageContent:      { type: pageContentSchema, default: DEFAULT_PAGE_CONTENT },
   items:            [itemSchema],
   updatedBy:        { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
 }, { timestamps: true });

@@ -27,10 +27,20 @@ const DEFAULT_CATEGORIES = [
   { id: 'furniture',        label: 'Furniture',                  emoji: '🪑', isActive: true, sortOrder: 11 },
 ];
 
+const DEFAULT_PAGE_CONTENT = {
+  heroBadge: 'Professional home care',
+  heroTitle: 'Deep Cleaning Services',
+  heroSubtitle: 'Choose the right deep cleaning service for your home, move-in, move-out, kitchen, bathroom and more.',
+  categoriesTitle: 'Choose a deep cleaning service',
+  categoriesSubtitle: 'Pick a category, enter your requirements and get the final amount based on your home details.',
+  miniServicesTitle: 'Popular mini services',
+  miniServicesSubtitle: 'Add-on services for specific areas and appliances.',
+};
+
 async function ensureConfig() {
   const existing = await DeepCleaningConfig.findOne();
   if (!existing) {
-    return DeepCleaningConfig.create({ minimumCartValue: 500, categories: DEFAULT_CATEGORIES, items: DEFAULT_ITEMS });
+    return DeepCleaningConfig.create({ minimumCartValue: 500, categories: DEFAULT_CATEGORIES, pageContent: DEFAULT_PAGE_CONTENT, items: DEFAULT_ITEMS });
   }
 
   let dirty = false;
@@ -38,6 +48,18 @@ async function ensureConfig() {
   // Migrate: add default categories if missing
   if (!existing.categories || existing.categories.length === 0) {
     existing.categories = DEFAULT_CATEGORIES;
+    dirty = true;
+  }
+
+  if (!existing.pageContent) {
+    existing.pageContent = DEFAULT_PAGE_CONTENT;
+    dirty = true;
+  }
+
+  const existingItemIds = new Set((existing.items || []).map(item => item.id));
+  const missingItems = DEFAULT_ITEMS.filter(item => !existingItemIds.has(item.id));
+  if (missingItems.length > 0) {
+    existing.items = [...(existing.items || []), ...missingItems];
     dirty = true;
   }
 
@@ -92,8 +114,64 @@ const DEFAULT_ITEMS = [
     price: 8, unit: 'sqft', icon: '🏠', sortOrder: 10 },
   { id: 'fullhouse_furnished', category: 'fullhouse', name: 'Full House Deep Clean — Furnished',
     description: 'Fully furnished flat with all belongings, per sq ft', pricingType: 'per_sqft',
-    price: 12, unit: 'sqft', icon: '🏡', sortOrder: 11 }
+    price: 12, unit: 'sqft', icon: '🏡', sortOrder: 11 },
+  { id: 'move_in_out_empty', category: 'move_in_out', name: 'Move-in Cleaning — Empty Home',
+    description: 'For vacant homes before shifting in. Enter your home area and get the final amount instantly.', pricingType: 'per_sqft',
+    price: 8, unit: 'sqft', icon: '📦', sortOrder: 12 },
+  { id: 'move_in_out_furnished', category: 'move_in_out', name: 'Move-out Cleaning — Furnished Home',
+    description: 'For occupied or recently vacated homes with furniture and belongings.', pricingType: 'per_sqft',
+    price: 12, unit: 'sqft', icon: '🏠', sortOrder: 13 }
 ];
+
+const buildDeepCleaningSnapshot = (source = {}) => ({
+  items: source.items || [],
+  categories: source.categories || [],
+  pageContent: { ...DEFAULT_PAGE_CONTENT, ...(source.pageContent || {}) },
+  minimumCartValue: Number(source.minimumCartValue ?? 0),
+});
+
+const buildVerifiedCartItems = (cartItems, config) => {
+  let calculatedTotal = 0;
+
+  const verifiedCartItems = (cartItems || []).map(item => {
+    const configItem = config.items.find(i => i.id === item.itemId);
+    if (!configItem) return null;
+
+    let totalPrice = 0;
+    const qty = Math.max(1, Number(item.qty) || 1);
+    const areaValue = item.areaValue != null ? Math.max(0, Number(item.areaValue) || 0) : null;
+
+    if (configItem.pricingType === 'per_sqft') {
+      totalPrice = configItem.price * (areaValue || 0);
+    } else if (configItem.pricingType === 'tiered') {
+      const tier = configItem.tiers?.find(t => t.label === item.selectedTier);
+      totalPrice = tier ? tier.price * qty : 0;
+    } else {
+      totalPrice = configItem.price * qty;
+    }
+
+    calculatedTotal += totalPrice;
+
+    return {
+      itemId: configItem.id,
+      name: configItem.pricingType === 'per_sqft' && areaValue
+        ? `${configItem.name} (${areaValue} ${configItem.unit || 'sqft'})`
+        : configItem.name,
+      category: configItem.category,
+      qty,
+      unitPrice: configItem.price,
+      totalPrice,
+      selectedTier: configItem.pricingType === 'tiered'
+        ? (item.selectedTier || null)
+        : configItem.pricingType === 'per_sqft' && areaValue
+          ? `${areaValue} ${configItem.unit || 'sqft'}`
+          : item.selectedTier || null,
+      areaValue,
+    };
+  }).filter(Boolean);
+
+  return { verifiedCartItems, calculatedTotal };
+};
 
 // ─── GET /api/deep-cleaning/config  (public — customers & admins) ───────────
 router.get('/config', async (req, res) => {
@@ -108,13 +186,14 @@ router.get('/config', async (req, res) => {
 // ─── PUT /api/deep-cleaning/config  (super admin only) ───────────────────────
 router.put('/config', authenticate, authorize('super_admin'), async (req, res) => {
   try {
-    const { items, minimumCartValue, categories } = req.body;
+    const { items, minimumCartValue, categories, pageContent } = req.body;
     let config = await DeepCleaningConfig.findOne();
     if (!config) config = new DeepCleaningConfig();
 
     if (items !== undefined) config.items = items;
     if (minimumCartValue !== undefined) config.minimumCartValue = Number(minimumCartValue);
     if (categories !== undefined) config.categories = categories;
+    if (pageContent !== undefined) config.pageContent = { ...DEFAULT_PAGE_CONTENT, ...pageContent };
     config.updatedBy = req.user._id;
 
     await config.save();
@@ -161,11 +240,7 @@ router.post('/change-requests', authenticate, authorize('admin'), async (req, re
     const request = await DeepCleaningChangeRequest.create({
       title: title.trim(),
       requestNote,
-      proposedConfig: {
-        items: proposedConfig.items,
-        categories: proposedConfig.categories,
-        minimumCartValue: Number(proposedConfig.minimumCartValue ?? 0),
-      },
+      proposedConfig: buildDeepCleaningSnapshot(proposedConfig),
       requestedBy: req.user._id,
     });
 
@@ -206,6 +281,7 @@ router.post('/change-requests/:id/review', authenticate, authorize('super_admin'
 
       config.items = request.proposedConfig.items;
       config.categories = request.proposedConfig.categories;
+      config.pageContent = { ...DEFAULT_PAGE_CONTENT, ...(request.proposedConfig.pageContent || {}) };
       config.minimumCartValue = Number(request.proposedConfig.minimumCartValue ?? 0);
       config.updatedBy = req.user._id;
       await config.save();
@@ -228,6 +304,34 @@ router.post('/change-requests/:id/review', authenticate, authorize('super_admin'
   }
 });
 
+// ─── POST /api/deep-cleaning/estimate  (customers only) ─────────────────────
+router.post('/estimate', authenticate, authorize('customer'), async (req, res) => {
+  try {
+    const { cartItems } = req.body;
+
+    if (!Array.isArray(cartItems) || cartItems.length === 0) {
+      return res.status(400).json({ error: { message: 'Cart items are required', status: 400 } });
+    }
+
+    const config = await ensureConfig();
+    const { verifiedCartItems, calculatedTotal } = buildVerifiedCartItems(cartItems, config);
+
+    if (verifiedCartItems.length === 0) {
+      return res.status(400).json({ error: { message: 'No valid items in cart', status: 400 } });
+    }
+
+    res.json({
+      success: true,
+      verifiedCartItems,
+      totalAmount: calculatedTotal,
+      minimumCartValue: config.minimumCartValue,
+    });
+  } catch (err) {
+    console.error('Deep cleaning estimate error:', err);
+    res.status(500).json({ error: { message: err.message, status: 500 } });
+  }
+});
+
 // ─── POST /api/deep-cleaning/booking  (customers only) ───────────────────────
 router.post('/booking', authenticate, authorize('customer'), async (req, res) => {
   try {
@@ -244,36 +348,7 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
     const config = await ensureConfig();
 
     // ── Server-side price recalculation (never trust client amounts) ──────────
-    let calculatedTotal = 0;
-    const verifiedCartItems = cartItems.map(item => {
-      const configItem = config.items.find(i => i.id === item.itemId);
-      if (!configItem) return null; // skip unknown items
-
-      let totalPrice = 0;
-      const qty = Math.max(1, Number(item.qty) || 1);
-
-      if (configItem.pricingType === 'per_sqft') {
-        const sqft = Math.max(0, Number(item.selectedTier) || 0);
-        totalPrice = configItem.price * sqft;
-      } else if (configItem.pricingType === 'tiered') {
-        const tier = configItem.tiers?.find(t => t.label === item.selectedTier);
-        totalPrice = tier ? tier.price * qty : 0;
-      } else {
-        // per_unit or fixed
-        totalPrice = configItem.price * qty;
-      }
-
-      calculatedTotal += totalPrice;
-      return {
-        itemId:       item.itemId,
-        name:         configItem.name,
-        category:     configItem.category,
-        qty,
-        unitPrice:    configItem.price,
-        totalPrice,
-        selectedTier: item.selectedTier || null
-      };
-    }).filter(Boolean);
+    const { verifiedCartItems, calculatedTotal } = buildVerifiedCartItems(cartItems, config);
 
     if (verifiedCartItems.length === 0) {
       return res.status(400).json({ error: { message: 'No valid items in cart', status: 400 } });

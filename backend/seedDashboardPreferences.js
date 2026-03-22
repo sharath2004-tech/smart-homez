@@ -35,7 +35,7 @@ const initializeDashboardPreferences = async () => {
           nameKey: 'customer.dashboard.deepCleaning',
           subtitleKey: 'customer.dashboard.fullHomeClean',
           badge: 'Best value',
-          path: '/customer/services/deep-cleaning',
+          path: '/customer/deep-cleaning',
           isActive: true,
           sortOrder: 2,
           isDefault: true

@@ -30,6 +30,15 @@ export interface DeepCleaningConfig {
   items: ConfigItem[];
   minimumCartValue: number;
   categories?: DeepCleaningCategory[];
+  pageContent?: {
+    heroBadge?: string;
+    heroTitle?: string;
+    heroSubtitle?: string;
+    categoriesTitle?: string;
+    categoriesSubtitle?: string;
+    miniServicesTitle?: string;
+    miniServicesSubtitle?: string;
+  };
 }
 
 export interface UserProfile {
@@ -71,7 +80,7 @@ export const CATEGORY_META: Record<
     description: "Degreasing, appliance detailing, chimney cleaning and more.",
     highlights: ["Grease removal", "Appliance detailing", "Chimney options"],
     mode: "customize",
-    headline: "Kitchen deep-cleaning templates built around grease, appliances and high-touch areas.",
+    headline: "Kitchen deep cleaning built around grease, appliances and high-touch areas.",
     inclusionsTitle: "Popular kitchen tasks",
     idealFor: ["Heavy grease build-up", "Appliance refresh before guests", "Monthly kitchen maintenance"],
   },
@@ -100,12 +109,12 @@ export const CATEGORY_META: Record<
     idealFor: ["Dusty balconies", "Track and frame cleanup", "Utility-area detailing"],
   },
   move_in_out: {
-    description: "Best for handovers, empty flats and pre-move/post-move cleaning jobs.",
-    highlights: ["Handover-ready", "Vacant-home cleaning", "Quote-based jobs"],
-    mode: "quote",
-    headline: "Move-in and move-out cleaning flows for vacant homes, rentals and handovers.",
+    description: "Best for handovers, empty flats and pre-move/post-move home cleaning.",
+    highlights: ["Area-based estimate", "Vacant-home cleaning", "Shift-ready service"],
+    mode: "customize",
+    headline: "Move-in and move-out cleaning with instant amount calculation after you enter your home area.",
     inclusionsTitle: "Usually covered",
-    idealFor: ["Tenant handover", "Pre-possession cleanup", "Vacant homes needing a custom scope"],
+    idealFor: ["Tenant handover", "Pre-possession cleanup", "Move-in preparation before shifting"],
   },
   office: {
     description: "Commercial and office deep-cleaning requests handled through custom quotes.",
@@ -166,5 +175,5 @@ export const getCategoryAction = (categoryId: string) => {
   if (mode === "quote") {
     return { href: "/deep-cleaning-quote", label: "Get custom quote" };
   }
-  return { href: `/customer/deep-cleaning/customize?category=${encodeURIComponent(categoryId)}`, label: "Customize service" };
+  return { href: `/customer/deep-cleaning/customize?category=${encodeURIComponent(categoryId)}`, label: "Continue" };
 };

@@ -387,7 +387,8 @@ const bookingSchema = new mongoose.Schema({
     qty:          { type: Number, default: 1 },
     unitPrice:    { type: Number, default: 0 },
     totalPrice:   { type: Number, default: 0 },
-    selectedTier: { type: String, default: null }
+    selectedTier: { type: String, default: null },
+    areaValue:    { type: Number, default: null }
   }],
   notes: {
     type: String,

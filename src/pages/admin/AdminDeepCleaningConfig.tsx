@@ -8,6 +8,15 @@ import { toast } from "sonner";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Tier { label: string; price: number; }
+interface PageContent {
+  heroBadge: string;
+  heroTitle: string;
+  heroSubtitle: string;
+  categoriesTitle: string;
+  categoriesSubtitle: string;
+  miniServicesTitle: string;
+  miniServicesSubtitle: string;
+}
 interface ConfigItem {
   id: string; category: string; name: string; description: string;
   pricingType: "fixed" | "per_unit" | "per_sqft" | "tiered";
@@ -17,7 +26,7 @@ interface ConfigItem {
 interface DeepCleaningCategory {
   id: string; label: string; emoji: string; isActive: boolean; sortOrder: number;
 }
-interface Config { items: ConfigItem[]; minimumCartValue: number; categories?: DeepCleaningCategory[]; }
+interface Config { items: ConfigItem[]; minimumCartValue: number; categories?: DeepCleaningCategory[]; pageContent?: PageContent; }
 interface ChangeRequestUser { name?: string; email?: string; role?: string; }
 interface ChangeRequest {
   _id: string;
@@ -64,6 +73,16 @@ const BLANK_CATEGORY: DeepCleaningCategory = {
   id: "", label: "", emoji: "✨", isActive: true, sortOrder: 99,
 };
 
+const DEFAULT_PAGE_CONTENT: PageContent = {
+  heroBadge: "Professional home care",
+  heroTitle: "Deep Cleaning Services",
+  heroSubtitle: "Choose the right deep cleaning service for your home, move-in, move-out, kitchen, bathroom and more.",
+  categoriesTitle: "Choose a deep cleaning service",
+  categoriesSubtitle: "Pick a category, enter your requirements and get the final amount based on your home details.",
+  miniServicesTitle: "Popular mini services",
+  miniServicesSubtitle: "Add-on services for specific areas and appliances.",
+};
+
 const getSortedCategories = (categories?: DeepCleaningCategory[]) =>
   (categories?.length ? categories : FALLBACK_CATEGORIES)
     .map(category => ({ ...category }))
@@ -73,6 +92,7 @@ const getSnapshot = (items: ConfigItem[], minimumCartValue: number, categories: 
   items,
   minimumCartValue,
   categories: getSortedCategories(categories),
+  pageContent: DEFAULT_PAGE_CONTENT,
 });
 
 const statusClasses: Record<ChangeRequest["status"], string> = {
@@ -123,6 +143,7 @@ export default function AdminDeepCleaningConfig() {
         const initialConfig = {
           ...configRes.config,
           categories: getSortedCategories(configRes.config.categories),
+          pageContent: { ...DEFAULT_PAGE_CONTENT, ...(configRes.config.pageContent || {}) },
         };
 
         setLiveConfig(initialConfig);
@@ -134,7 +155,7 @@ export default function AdminDeepCleaningConfig() {
         setHasDraftChanges(false);
       } catch (error) {
         console.error(error);
-        toast.error(error instanceof Error ? error.message : "Failed to load deep-cleaning template");
+          toast.error(error instanceof Error ? error.message : "Failed to load deep-cleaning customer page");
       } finally {
         setLoading(false);
         setLoadingRequests(false);
@@ -148,6 +169,7 @@ export default function AdminDeepCleaningConfig() {
     const normalized = {
       ...nextConfig,
       categories: getSortedCategories(nextConfig.categories),
+      pageContent: { ...DEFAULT_PAGE_CONTENT, ...(nextConfig.pageContent || {}) },
     };
 
     setConfig(normalized);
@@ -181,7 +203,10 @@ export default function AdminDeepCleaningConfig() {
   };
 
   const saveAll = async (nextItems: ConfigItem[], nextMin = minCart, nextCats = categories) => {
-    const snapshot = getSnapshot(nextItems, nextMin, nextCats);
+    const snapshot = {
+      ...getSnapshot(nextItems, nextMin, nextCats),
+      pageContent: config?.pageContent || DEFAULT_PAGE_CONTENT,
+    };
 
     if (!isSuperAdmin) {
       applyConfigState(snapshot);
@@ -195,10 +220,10 @@ export default function AdminDeepCleaningConfig() {
       applyConfigState(res.config, { updateLive: true, clearDraft: true });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-      toast.success("Deep-cleaning template published");
+      toast.success("Deep-cleaning customer page published");
     } catch (e) {
       console.error(e);
-      toast.error(e instanceof Error ? e.message : "Failed to save template");
+      toast.error(e instanceof Error ? e.message : "Failed to save customer page");
     }
     finally { setSaving(false); }
   };
@@ -214,14 +239,17 @@ export default function AdminDeepCleaningConfig() {
   const submitChangeRequest = async () => {
     if (!config) return;
 
-    const title = requestTitle.trim() || `Deep cleaning template update · ${new Date().toLocaleDateString("en-IN")}`;
+    const title = requestTitle.trim() || `Deep cleaning page update · ${new Date().toLocaleDateString("en-IN")}`;
 
     setSubmittingRequest(true);
     try {
       await api.post("/deep-cleaning/change-requests", {
         title,
         requestNote,
-        proposedConfig: getSnapshot(config.items, minCart, categories),
+        proposedConfig: {
+          ...getSnapshot(config.items, minCart, categories),
+          pageContent: config.pageContent || DEFAULT_PAGE_CONTENT,
+        },
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -358,6 +386,23 @@ export default function AdminDeepCleaningConfig() {
   const catItems = (config?.items ?? []).filter(i => i.category === activeCategory)
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
+  const updatePageContent = (field: keyof PageContent, value: string) => {
+    if (!config) return;
+
+    const nextConfig: Config = {
+      ...config,
+      pageContent: {
+        ...(config.pageContent || DEFAULT_PAGE_CONTENT),
+        [field]: value,
+      },
+    };
+
+    applyConfigState(nextConfig);
+    if (!isSuperAdmin) {
+      setHasDraftChanges(true);
+    }
+  };
+
   const activeCatLabel = categories.find(c => c.id === activeCategory)?.label ?? activeCategory;
   const pendingRequestCount = useMemo(() => requests.filter(req => req.status === "pending").length, [requests]);
 
@@ -377,11 +422,11 @@ export default function AdminDeepCleaningConfig() {
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl font-bold font-heading text-foreground">Deep Cleaning Template</h1>
+            <h1 className="text-2xl font-bold font-heading text-foreground">Deep Cleaning Customer Page</h1>
             <p className="text-sm text-muted-foreground mt-0.5">
               {isSuperAdmin
-                ? "Publish live deep-cleaning categories, items and pricing"
-                : "Build a draft and submit it for super-admin approval"}
+                ? "Publish the live customer page, categories and pricing rules"
+                : "Edit the customer page draft and submit it for super-admin approval"}
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -411,7 +456,7 @@ export default function AdminDeepCleaningConfig() {
               <div>
                 <h2 className="text-sm font-semibold text-amber-900">Draft change request</h2>
                 <p className="text-sm text-amber-800 mt-1">
-                  Your edits stay local until you submit them. A super admin can then approve and publish the proposed template snapshot.
+                  Your edits stay local until you submit them. A super admin can then approve and publish the proposed customer page snapshot.
                 </p>
               </div>
             </div>
@@ -471,7 +516,7 @@ export default function AdminDeepCleaningConfig() {
             <div>
               <h2 className="text-base font-semibold text-foreground">{isSuperAdmin ? "Change requests" : "My submitted requests"}</h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {isSuperAdmin ? "Approve or reject pending admin template proposals." : "Track review status for your template proposals."}
+                {isSuperAdmin ? "Approve or reject pending admin customer-page proposals." : "Track review status for your customer-page proposals."}
               </p>
             </div>
             <button
@@ -563,6 +608,51 @@ export default function AdminDeepCleaningConfig() {
               ))}
             </div>
           )}
+        </div>
+
+        <div className="bg-card border border-border rounded-2xl p-4 space-y-4">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">Customer page content</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Edit the copy shown on `/customer/deep-cleaning`.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="label-clean">Hero badge</label>
+              <input value={config?.pageContent?.heroBadge || ""} onChange={e => updatePageContent("heroBadge", e.target.value)} className="input-clean text-sm" />
+            </div>
+            <div>
+              <label className="label-clean">Hero title</label>
+              <input value={config?.pageContent?.heroTitle || ""} onChange={e => updatePageContent("heroTitle", e.target.value)} className="input-clean text-sm" />
+            </div>
+          </div>
+
+          <div>
+            <label className="label-clean">Hero subtitle</label>
+            <textarea value={config?.pageContent?.heroSubtitle || ""} onChange={e => updatePageContent("heroSubtitle", e.target.value)} rows={3} className="input-clean min-h-[84px] text-sm" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="label-clean">Categories title</label>
+              <input value={config?.pageContent?.categoriesTitle || ""} onChange={e => updatePageContent("categoriesTitle", e.target.value)} className="input-clean text-sm" />
+            </div>
+            <div>
+              <label className="label-clean">Mini services title</label>
+              <input value={config?.pageContent?.miniServicesTitle || ""} onChange={e => updatePageContent("miniServicesTitle", e.target.value)} className="input-clean text-sm" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="label-clean">Categories subtitle</label>
+              <textarea value={config?.pageContent?.categoriesSubtitle || ""} onChange={e => updatePageContent("categoriesSubtitle", e.target.value)} rows={3} className="input-clean min-h-[84px] text-sm" />
+            </div>
+            <div>
+              <label className="label-clean">Mini services subtitle</label>
+              <textarea value={config?.pageContent?.miniServicesSubtitle || ""} onChange={e => updatePageContent("miniServicesSubtitle", e.target.value)} rows={3} className="input-clean min-h-[84px] text-sm" />
+            </div>
+          </div>
         </div>
 
         {/* Min cart value */}

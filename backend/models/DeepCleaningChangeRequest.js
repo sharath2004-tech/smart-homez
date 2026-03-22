@@ -28,6 +28,16 @@ const categorySchema = new mongoose.Schema({
   sortOrder: { type: Number, default: 0 }
 }, { _id: false });
 
+const pageContentSchema = new mongoose.Schema({
+  heroBadge: { type: String, default: '' },
+  heroTitle: { type: String, default: '' },
+  heroSubtitle: { type: String, default: '' },
+  categoriesTitle: { type: String, default: '' },
+  categoriesSubtitle: { type: String, default: '' },
+  miniServicesTitle: { type: String, default: '' },
+  miniServicesSubtitle: { type: String, default: '' }
+}, { _id: false });
+
 const deepCleaningChangeRequestSchema = new mongoose.Schema({
   title:        { type: String, required: true, trim: true },
   requestNote:  { type: String, default: '', trim: true },
@@ -35,6 +45,7 @@ const deepCleaningChangeRequestSchema = new mongoose.Schema({
   proposedConfig: {
     minimumCartValue: { type: Number, required: true, min: 0 },
     categories:       { type: [categorySchema], default: [] },
+    pageContent:      { type: pageContentSchema, default: {} },
     items:            { type: [itemSchema], default: [] }
   },
   requestedBy:  { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },

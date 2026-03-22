@@ -28,7 +28,7 @@ interface DeepCleaningConfig { items: ConfigItem[]; minimumCartValue: number; ca
 
 interface CartEntry {
   itemId: string; name: string; category: string;
-  qty: number; unitPrice: number; totalPrice: number; selectedTier?: string;
+  qty: number; unitPrice: number; totalPrice: number; selectedTier?: string; areaValue?: number | null;
 }
 type UserProfile = {
   name?: string;
@@ -117,7 +117,7 @@ export default function DeepCleaningPage() {
   const cartCount  = useMemo(() => Object.values(cart).reduce((s, e) => s + e.qty, 0), [cart]);
   const minValue   = config?.minimumCartValue ?? 500;
   const belowMin   = cartTotal > 0 && cartTotal < minValue;
-  const categories = (config?.categories ?? []) // Only show admin-configured categories
+  const categories = (config?.categories ?? [])
     .filter(c => c.isActive)
     .sort((a, b) => a.sortOrder - b.sortOrder);
   const today      = new Date().toISOString().split("T")[0];
@@ -158,9 +158,30 @@ export default function DeepCleaningPage() {
   const applySqft = (item: ConfigItem) => {
     const sqft = parseFloat(sqftValues[item.id] ?? "0");
     if (!sqft || sqft <= 0) return;
-    const total = Math.round(sqft * item.price);
-    setCart(prev => ({ ...prev, [item.id]: { itemId: item.id, name: `${item.name} (${sqft} sqft)`, category: item.category, qty: 1, unitPrice: item.price, totalPrice: total, selectedTier: `${sqft} sqft` } }));
-    pulse(item.id);
+
+    api.post("/deep-cleaning/estimate", {
+      cartItems: [{ itemId: item.id, qty: 1, areaValue: sqft }],
+    }).then((res) => {
+      const calculated = res.verifiedCartItems?.[0];
+      if (!calculated) return;
+
+      setCart(prev => ({
+        ...prev,
+        [item.id]: {
+          itemId: calculated.itemId,
+          name: calculated.name,
+          category: calculated.category,
+          qty: calculated.qty,
+          unitPrice: calculated.unitPrice,
+          totalPrice: calculated.totalPrice,
+          selectedTier: calculated.selectedTier || undefined,
+          areaValue: calculated.areaValue,
+        }
+      }));
+      pulse(item.id);
+    }).catch((err) => {
+      console.error(err);
+    });
   };
   const removeSqft = (item: ConfigItem) => {
     setCart(prev => { const { [item.id]: _, ...r } = prev; return r; });
@@ -222,8 +243,8 @@ export default function DeepCleaningPage() {
               transition={{ type: "spring", delay: 0.2 }} className="text-4xl mb-3 inline-block">
               ✨
             </motion.div>
-            <h1 className="text-2xl font-bold text-white mb-1">Deep Cleaning Custom Builder</h1>
-            <p className="text-white/70 text-sm">Pick any items and build your own package from the admin-configured template.</p>
+            <h1 className="text-2xl font-bold text-white mb-1">Deep Cleaning Booking</h1>
+            <p className="text-white/70 text-sm">Choose the services you need, enter your home details and continue to book.</p>
             <div className="mt-3 inline-flex items-center gap-1.5 bg-white/15 text-white text-xs font-medium px-3 py-1.5 rounded-full">
               <ShoppingCart className="w-3 h-3" /> Min cart ₹{minValue}
             </div>
@@ -576,23 +597,23 @@ function ItemCard({ item, idx, cart, sqftValues, tierSelects, pulsedItem,
           {/* ── per_sqft ──────────────────────────────────────────────────── */}
           {item.pricingType === "per_sqft" && (
             <div className="mt-3">
-              <p className="text-xs text-muted-foreground mb-2">Enter your flat's area in sq ft</p>
+              <p className="text-xs text-muted-foreground mb-2">Enter your home area and we will calculate the amount for you.</p>
               {!inCart ? (
                 <div className="flex gap-2">
-                  <input type="number" placeholder="Enter sq ft" min="1"
+                  <input type="number" placeholder={`Enter area in ${item.unit || 'sqft'}`} min="1"
                     value={sqftValues[item.id] ?? ""}
                     onChange={e => onSqftChange(item.id, e.target.value)}
                     className="input-clean flex-1 text-sm py-1.5 h-9" />
                   <motion.button whileTap={{ scale: 0.9 }} onClick={() => onApplySqft(item)}
                     disabled={!sqftValues[item.id] || Number(sqftValues[item.id]) <= 0}
                     className="text-xs font-semibold bg-primary text-primary-foreground px-4 rounded-xl disabled:opacity-40">
-                    Add
+                    Show amount
                   </motion.button>
                 </div>
               ) : (
                 <div className="flex items-center justify-between bg-green-100 rounded-xl px-3 py-2">
                   <span className="text-sm font-semibold text-green-800">
-                    {entry.selectedTier} sq ft → ₹{entry.totalPrice.toLocaleString("en-IN")}
+                    {entry.selectedTier} → ₹{entry.totalPrice.toLocaleString("en-IN")}
                   </span>
                   <motion.button whileTap={{ scale: 0.9 }} onClick={() => onRemoveSqft(item)}
                     className="text-xs text-red-500 hover:text-red-700 font-semibold ml-2">

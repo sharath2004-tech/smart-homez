@@ -53,7 +53,7 @@ const priceLabel = (item: ConfigItem) => {
   }
 
   if (item.pricingType === "per_sqft") {
-    return `₹${item.price.toLocaleString("en-IN")} / sqft`;
+    return "Enter area for instant amount";
   }
 
   return `₹${item.price.toLocaleString("en-IN")}`;
@@ -155,10 +155,10 @@ const DeepCleaningCategoryPage = () => {
                 <ClipboardList className="h-4 w-4" /> {categoryItems.length} configured services
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5">
-                <Sparkles className="h-4 w-4" /> {startingPrice ? `Starting from ₹${startingPrice.toLocaleString("en-IN")}` : "Custom pricing available"}
+                <Sparkles className="h-4 w-4" /> {categoryItems.every((item) => item.pricingType === "per_sqft") ? "Enter area for amount" : startingPrice ? `Starting from ₹${startingPrice.toLocaleString("en-IN")}` : "Custom pricing available"}
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5">
-                <ShieldCheck className="h-4 w-4" /> Admin-managed template
+                <ShieldCheck className="h-4 w-4" /> Easy home booking flow
               </span>
             </div>
 
@@ -181,7 +181,7 @@ const DeepCleaningCategoryPage = () => {
             <div>
               <h2 className="text-xl font-bold text-foreground">{meta?.inclusionsTitle || "What this includes"}</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                These are the active services currently configured by admin for this category.
+                See the active services available in this category and continue with booking.
               </p>
             </div>
 
@@ -233,11 +233,11 @@ const DeepCleaningCategoryPage = () => {
             </div>
 
             <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
-              <h2 className="text-lg font-bold text-foreground">How this template works</h2>
+              <h2 className="text-lg font-bold text-foreground">How this works</h2>
               <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-                <p>1. Pick this category to understand the scope and currently configured services.</p>
-                <p>2. Continue into the matching booking flow — packaged, custom builder, or quote request.</p>
-                <p>3. Admin and super admin can keep refining the underlying config without changing this page structure.</p>
+                <p>1. Pick this category to understand what is covered.</p>
+                <p>2. Continue to booking, enter your home details, and get the final amount.</p>
+                <p>3. For commercial or custom jobs, request a quote and our team will contact you.</p>
               </div>
               <Link
                 to={primaryAction.href}
