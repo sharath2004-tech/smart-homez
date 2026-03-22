@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
-import { bookingsAPI, businessExpensesAPI } from "@/lib/api";
-import { DollarSign, Edit2, Plus, Trash2, X } from "lucide-react";
+import { adminAPI, bookingsAPI, businessExpensesAPI } from "@/lib/api";
+import { DollarSign, Edit2, Plus, Trash2, X, TrendingUp, TrendingDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -92,9 +92,28 @@ const AdminExpenses = () => {
   const [summary, setSummary] = useState<Record<string, { total: number; count: number }>>({});
   const [grandTotal, setGrandTotal] = useState(0);
 
+  // Profit stats state
+  const [profitStats, setProfitStats] = useState({
+    totalRevenue: 0,
+    revenueCount: 0,
+    totalExpenses: 0,
+    expensesCount: 0,
+    totalWages: 0,
+    wagesCount: 0,
+    totalProfit: 0,
+    profitMargin: 0,
+    dateRange: {
+      from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      to: new Date().toISOString().split('T')[0]
+    }
+  });
+  const [loadingProfit, setLoadingProfit] = useState(false);
+
   useEffect(() => {
     fetchExpenses();
     fetchBookings();
+    fetchProfitStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchExpenses = async () => {
@@ -102,7 +121,7 @@ const AdminExpenses = () => {
       setLoading(true);
       const data = await businessExpensesAPI.getAll();
       setExpenses(data.expenses || []);
-      setSummary(data.summary.reduce((acc: Record<string, any>, item: any) => {
+      setSummary(data.summary.reduce((acc: Record<string, { total: number; count: number }>, item: { _id: string; total: number; count: number }) => {
         acc[item._id] = { total: item.total, count: item.count };
         return acc;
       }, {}));
@@ -122,6 +141,38 @@ const AdminExpenses = () => {
     } catch (error) {
       console.error("Failed to load bookings");
     }
+  };
+
+  const fetchProfitStats = async (from?: string, to?: string) => {
+    try {
+      setLoadingProfit(true);
+      const data = await adminAPI.getProfitStats(
+        from || profitStats.dateRange.from,
+        to || profitStats.dateRange.to
+      );
+      if (data.success) {
+        setProfitStats({
+          ...data.profitStats,
+          dateRange: {
+            from: from || profitStats.dateRange.from,
+            to: to || profitStats.dateRange.to
+          }
+        });
+      }
+    } catch (error) {
+      toast.error("Failed to load profit statistics");
+      console.error(error);
+    } finally {
+      setLoadingProfit(false);
+    }
+  };
+
+  const handleDateRangeChange = (from: string, to: string) => {
+    setProfitStats({
+      ...profitStats,
+      dateRange: { from, to }
+    });
+    fetchProfitStats(from, to);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -370,7 +421,7 @@ const AdminExpenses = () => {
                         type="radio"
                         value="operational_expense"
                         checked={formData.type === 'operational_expense'}
-                        onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
+                        onChange={(e) => setFormData({ ...formData, type: e.target.value as 'operational_expense' | 'project_expense' })}
                         className="mr-2"
                       />
                       <span className="font-medium">Operational</span>
@@ -385,7 +436,7 @@ const AdminExpenses = () => {
                         type="radio"
                         value="project_expense"
                         checked={formData.type === 'project_expense'}
-                        onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
+                        onChange={(e) => setFormData({ ...formData, type: e.target.value as 'operational_expense' | 'project_expense' })}
                         className="mr-2"
                       />
                       <span className="font-medium">Project-Based</span>
@@ -492,6 +543,104 @@ const AdminExpenses = () => {
             </div>
           </div>
         )}
+
+        {/* Total Profit Section */}
+        <div className="card-elevated p-6 border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-accent/5">
+          <div className="flex justify-between items-start mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-foreground flex items-center gap-3 mb-2">
+                <TrendingUp className="h-7 w-7 text-primary" />
+                Total Profit & System Overview
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Revenue, expenses, wages, and overall profit calculation
+              </p>
+            </div>
+            <div className="flex gap-3 items-center">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">From</label>
+                  <input
+                    type="date"
+                    value={profitStats.dateRange.from}
+                    onChange={(e) => handleDateRangeChange(e.target.value, profitStats.dateRange.to)}
+                    className="input-clean text-sm py-1 px-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">To</label>
+                  <input
+                    type="date"
+                    value={profitStats.dateRange.to}
+                    onChange={(e) => handleDateRangeChange(profitStats.dateRange.from, e.target.value)}
+                    className="input-clean text-sm py-1 px-2"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {loadingProfit ? (
+            <div className="text-center py-8">
+              <div className="inline-block animate-spin">⏳</div>
+              <p className="text-muted-foreground mt-2">Loading profit statistics...</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Total Revenue */}
+              <div className="card-elevated p-4 bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200">
+                <p className="text-sm font-medium text-green-700 mb-1">💰 Total Revenue</p>
+                <p className="text-3xl font-bold text-green-600">₹{profitStats.totalRevenue.toLocaleString()}</p>
+                <p className="text-xs text-green-600 mt-1">{profitStats.revenueCount} completed bookings</p>
+              </div>
+
+              {/* Total Expenses */}
+              <div className="card-elevated p-4 bg-gradient-to-br from-orange-50 to-red-50 border border-orange-200">
+                <p className="text-sm font-medium text-orange-700 mb-1">📊 Total Expenses</p>
+                <p className="text-3xl font-bold text-orange-600">₹{profitStats.totalExpenses.toLocaleString()}</p>
+                <p className="text-xs text-orange-600 mt-1">{profitStats.expensesCount} expenses recorded</p>
+              </div>
+
+              {/* Total Wages */}
+              <div className="card-elevated p-4 bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200">
+                <p className="text-sm font-medium text-blue-700 mb-1">👥 Total Wages Paid</p>
+                <p className="text-3xl font-bold text-blue-600">₹{profitStats.totalWages.toLocaleString()}</p>
+                <p className="text-xs text-blue-600 mt-1">{profitStats.wagesCount} payments made</p>
+              </div>
+
+              {/* Overall Profit */}
+              <div className={`card-elevated p-4 border-2 ${
+                profitStats.totalProfit >= 0
+                  ? 'bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-300'
+                  : 'bg-gradient-to-br from-red-50 to-rose-50 border-red-300'
+              }`}>
+                <div className="flex items-center gap-2 mb-1">
+                  <p className={`text-sm font-medium ${profitStats.totalProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                    {profitStats.totalProfit >= 0 ? '✅ Overall Profit' : '⚠️ Overall Loss'}
+                  </p>
+                  {profitStats.totalProfit >= 0 ? (
+                    <TrendingUp className="h-4 w-4 text-emerald-600" />
+                  ) : (
+                    <TrendingDown className="h-4 w-4 text-red-600" />
+                  )}
+                </div>
+                <p className={`text-3xl font-bold ${profitStats.totalProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  ₹{profitStats.totalProfit.toLocaleString()}
+                </p>
+                <p className={`text-xs mt-1 ${profitStats.totalProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {profitStats.profitMargin}% profit margin
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Profit Formula Explanation */}
+          <div className="mt-4 p-3 bg-muted/30 rounded-lg border border-border">
+            <p className="text-xs text-muted-foreground text-center">
+              <span className="font-semibold">Profit Formula:</span> Total Profit = Revenue (₹{profitStats.totalRevenue.toLocaleString()}) - Expenses (₹{profitStats.totalExpenses.toLocaleString()}) - Wages (₹{profitStats.totalWages.toLocaleString()})
+            </p>
+          </div>
+        </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

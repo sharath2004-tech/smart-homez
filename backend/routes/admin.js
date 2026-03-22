@@ -4,12 +4,14 @@ import twilio from 'twilio';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { uploadAdminDoc, uploadWorkerFiles } from '../middleware/upload.js';
 import Booking from '../models/Booking.js';
+import BusinessExpense from '../models/BusinessExpense.js';
 import Location from '../models/Location.js';
 import Notification from '../models/Notification.js';
 import ServiceArea from '../models/ServiceArea.js';
 import Settings from '../models/Settings.js';
 import User from '../models/User.js';
 import WorkerEarnings from '../models/WorkerEarnings.js';
+import WorkerSalaryRequest from '../models/WorkerSalaryRequest.js';
 import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/emailService.js';
 
 // Send temporary password via SMS (plain message, not Twilio Verify)
@@ -1463,6 +1465,127 @@ router.get('/dashboard-stats', authenticate, authorize('admin', 'super_admin'), 
     });
   } catch (error) {
     console.error('Get admin dashboard stats error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   GET /api/admin/profit-stats
+// @desc    Get profit statistics (revenue - expenses - wages)
+// @access  Private/Admin
+router.get('/profit-stats', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    // Parse date range from query params
+    let fromDate = req.query.from ? new Date(req.query.from) : null;
+    let toDate = req.query.to ? new Date(req.query.to) : null;
+
+    // Default to last 30 days if no dates provided
+    if (!fromDate || !toDate) {
+      toDate = new Date();
+      toDate.setHours(23, 59, 59, 999);
+      fromDate = new Date();
+      fromDate.setDate(fromDate.getDate() - 30);
+      fromDate.setHours(0, 0, 0, 0);
+    }
+
+    // Build location filter
+    let locationFilter = {};
+    if (req.user.role === 'admin') {
+      const adminLocationIds = (req.user.adminProfile?.assignedLocations || [])
+        .map(loc => loc.locationId).filter(Boolean);
+      if (adminLocationIds.length > 0) {
+        locationFilter = { 'location.locationId': { $in: adminLocationIds } };
+      }
+    } else if (req.query.locationId) {
+      locationFilter = { 'location.locationId': req.query.locationId };
+    }
+
+    // 1. Calculate Total Revenue (from completed bookings)
+    const revenueResult = await Booking.aggregate([
+      {
+        $match: {
+          ...locationFilter,
+          status: 'completed',
+          completedAt: { $gte: fromDate, $lte: toDate }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$totalAmount' },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const totalRevenue = revenueResult[0]?.total || 0;
+    const revenueCount = revenueResult[0]?.count || 0;
+
+    // 2. Calculate Total Expenses (from business expenses)
+    const expensesResult = await BusinessExpense.aggregate([
+      {
+        $match: {
+          date: { $gte: fromDate, $lte: toDate }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$amount' },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const totalExpenses = expensesResult[0]?.total || 0;
+    const expensesCount = expensesResult[0]?.count || 0;
+
+    // 3. Calculate Total Wages Paid (from paid salary requests)
+    const wagesResult = await WorkerSalaryRequest.aggregate([
+      {
+        $match: {
+          status: 'paid',
+          paidAt: { $gte: fromDate, $lte: toDate }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$requestedAmount' },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const totalWages = wagesResult[0]?.total || 0;
+    const wagesCount = wagesResult[0]?.count || 0;
+
+    // 4. Calculate Overall Profit
+    const totalProfit = totalRevenue - totalExpenses - totalWages;
+
+    // Calculate profit margin percentage
+    const profitMargin = totalRevenue > 0
+      ? ((totalProfit / totalRevenue) * 100).toFixed(2)
+      : 0;
+
+    res.json({
+      success: true,
+      profitStats: {
+        totalRevenue,
+        revenueCount,
+        totalExpenses,
+        expensesCount,
+        totalWages,
+        wagesCount,
+        totalProfit,
+        profitMargin,
+        dateRange: {
+          from: fromDate,
+          to: toDate
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get profit stats error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
   }
 });
