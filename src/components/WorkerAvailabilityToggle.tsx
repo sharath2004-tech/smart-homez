@@ -2,9 +2,11 @@ import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { authAPI } from '@/lib/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 export default function WorkerAvailabilityToggle() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const { data: profile, isLoading } = useQuery({
@@ -64,12 +66,12 @@ export default function WorkerAvailabilityToggle() {
         <div>
           <h3 className="font-semibold text-lg flex items-center gap-2">
             <span className={`w-3 h-3 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
-            Availability Status
+            {t('worker.dashboard.availability')}
           </h3>
           <p className={`text-sm ${isOnline ? 'text-green-600 dark:text-green-400 font-medium' : 'text-gray-600 dark:text-gray-400'}`}>
             {isOnline 
-              ? '🟢 You are online and accepting orders' 
-              : '🔴 You are offline - No orders will be assigned'}
+              ? `🟢 ${t('worker.dashboard.online')}`
+              : `🔴 ${t('worker.dashboard.offline')} - No orders will be assigned`}
           </p>
         </div>
         <Switch

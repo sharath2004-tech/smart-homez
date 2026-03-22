@@ -39,6 +39,11 @@ interface Service {
     type: string;
     isActive?: boolean;
   }>;
+  durationOptions?: Array<{
+    hours: number;
+    price: number;
+    originalPrice?: number;
+  }>;
   dos?: string[];
   donts?: string[];
 }
@@ -83,6 +88,12 @@ const addMins = (time: string, mins: number) => {
   const [h, m] = time.split(":").map(Number);
   const total = h * 60 + m + mins;
   return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+};
+
+const normalizeGender = (value: string | null | undefined): "male" | "female" | null => {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "male" || normalized === "female" ? normalized : null;
 };
 
 const InstaServicePage = () => {
@@ -131,7 +142,7 @@ const InstaServicePage = () => {
       for (const r of rawBookedRanges) {
         if (!r.workerId) continue;
         // Skip workers who don't match the selected gender preference
-        if (genderPref !== 'any' && r.workerGender && r.workerGender !== genderPref) continue;
+        if (genderPref !== 'any' && normalizeGender(r.workerGender) !== genderPref) continue;
         const [rsh, rsm] = r.startTime.split(":").map(Number);
         const [reh, rem] = r.endTime.split(":").map(Number);
         const rStart = rsh * 60 + rsm;
@@ -150,6 +161,12 @@ const InstaServicePage = () => {
   const discountPct = mrpTotal > totalAmount && mrpTotal > 0
     ? Math.round((1 - totalAmount / mrpTotal) * 100)
     : 0;
+  const genderCounts = {
+    any: workerCounts.total,
+    female: workerCounts.female,
+    male: workerCounts.male,
+  } as const;
+  const activeWorkers = genderCounts[genderPref];
 
   const availableSlots = (() => {
     const today = new Date().toISOString().split("T")[0];
@@ -162,6 +179,34 @@ const InstaServicePage = () => {
     }
     return generatedTimeSlots;
   })();
+
+  useEffect(() => {
+    if (!slotsLoaded || genderPref === "any") return;
+    if (genderCounts[genderPref] === 0 && genderCounts.any > 0) {
+      setGenderPref("any");
+    }
+  }, [genderCounts, genderPref, slotsLoaded]);
+
+  useEffect(() => {
+    if (!slotsLoaded || availableSlots.length === 0) return;
+
+    const selectedSlotStillAvailable = availableSlots.some((slot) => {
+      if (slot !== startTime) return false;
+      const freeWorkers = Math.max(0, activeWorkers - (busyWorkersBySlot[slot] ?? 0));
+      return freeWorkers > 0;
+    });
+
+    if (selectedSlotStillAvailable) return;
+
+    const firstAvailableSlot = availableSlots.find((slot) => {
+      const freeWorkers = Math.max(0, activeWorkers - (busyWorkersBySlot[slot] ?? 0));
+      return freeWorkers > 0;
+    });
+
+    if (firstAvailableSlot && firstAvailableSlot !== startTime) {
+      setStartTime(firstAvailableSlot);
+    }
+  }, [activeWorkers, availableSlots, busyWorkersBySlot, slotsLoaded, startTime]);
 
   useEffect(() => {
     const init = async () => {
@@ -557,14 +602,19 @@ const InstaServicePage = () => {
               </label>
               <div className="flex gap-2">
                 {(["any", "female", "male"] as const).map((g) => {
-                  const count = g === 'any' ? workerCounts.total : g === 'male' ? workerCounts.male : workerCounts.female;
+                  const count = genderCounts[g];
                   const label = g === "any" ? "Any" : g === "female" ? "👩 Female" : "👨 Male";
+                  const disabled = slotsLoaded && count === 0;
                   return (
                     <button
                       key={g}
-                      onClick={() => setGenderPref(g)}
+                      type="button"
+                      onClick={() => !disabled && setGenderPref(g)}
+                      disabled={disabled}
                       className={`flex-1 py-2 rounded-xl border-2 text-sm font-medium transition-all ${
-                        genderPref === g
+                        disabled
+                          ? "border-muted bg-muted/40 text-muted-foreground cursor-not-allowed"
+                          : genderPref === g
                           ? "border-primary bg-primary/10 text-primary"
                           : "border-border hover:border-primary/40"
                       }`}
@@ -585,6 +635,11 @@ const InstaServicePage = () => {
                   );
                 })}
               </div>
+              {slotsLoaded && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Showing <span className="font-semibold text-foreground">{activeWorkers}</span> matching worker{activeWorkers === 1 ? "" : "s"} for the selected preference.
+                </p>
+              )}
             </div>
 
             {/* Time slots */}
@@ -601,7 +656,6 @@ const InstaServicePage = () => {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     {availableSlots.map((t) => {
                       const busy = busyWorkersBySlot[t] ?? 0;
-                      const activeWorkers = genderPref === 'male' ? workerCounts.male : genderPref === 'female' ? workerCounts.female : workerCounts.total;
                       const free = slotsLoaded ? Math.max(0, activeWorkers - busy) : null;
                       const fullyBooked = slotsLoaded && free !== null && free <= 0;
                       const limited = free !== null && free === 1;

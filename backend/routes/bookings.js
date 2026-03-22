@@ -351,17 +351,24 @@ router.get('/booked-slots', authenticate, async (req, res) => {
       'workerProfile.availability': true
     };
 
-    // Filter by assigned location
-    if (targetLocationId) {
-      workerQuery['workerProfile.assignedApartments.locationId'] = targetLocationId;
-    }
+    let serviceDoc = null;
 
     // Filter by service specialization — only show specialists for this service
     if (serviceId) {
-      const svcDoc = await Service.findById(serviceId).select('category').lean();
-      if (svcDoc?.category) {
-        workerQuery['workerProfile.specialization'] = { $in: [svcDoc.category] };
+      serviceDoc = await Service.findById(serviceId)
+        .select('category availableInAllLocations')
+        .lean();
+      if (serviceDoc?.category) {
+        workerQuery['workerProfile.specialization'] = { $in: [serviceDoc.category] };
       }
+    }
+
+    const useLocationScopedWorkers = Boolean(targetLocationId) && !serviceDoc?.availableInAllLocations;
+
+    // Filter by assigned location unless the service is configured to be
+    // available across all locations / worker pools.
+    if (useLocationScopedWorkers) {
+      workerQuery['workerProfile.assignedApartments.locationId'] = targetLocationId;
     }
 
     // Filter by gender preference
@@ -371,9 +378,20 @@ router.get('/booked-slots', authenticate, async (req, res) => {
     }
 
     // ── Fetch workers (include gender for breakdown) ──────────────────────────
-    const workers = await User.find(workerQuery)
+    let workers = await User.find(workerQuery)
       .select('_id gender workerProfile.leaves')
       .lean();
+
+    // Graceful fallback: if no workers are found for the resolved location,
+    // broaden the pool to all active matching workers so the customer does not
+    // see a misleading 0 when worker assignments are incomplete.
+    if (workers.length === 0 && useLocationScopedWorkers) {
+      const fallbackWorkerQuery = { ...workerQuery };
+      delete fallbackWorkerQuery['workerProfile.assignedApartments.locationId'];
+      workers = await User.find(fallbackWorkerQuery)
+        .select('_id gender workerProfile.leaves')
+        .lean();
+    }
 
     // Remove workers on approved leave for this date
     const availableWorkers = workers.filter(worker => {
@@ -388,8 +406,16 @@ router.get('/booked-slots', authenticate, async (req, res) => {
 
     // Filter bookedRanges to only the available workers so the frontend
     // slot availability count matches the worker pool (important for gender filter)
+    const normalizeGender = (genderValue) => {
+      if (typeof genderValue !== 'string') return null;
+      const normalized = genderValue.trim().toLowerCase();
+      return ['male', 'female'].includes(normalized) ? normalized : null;
+    };
+
     const availableWorkerIdSet = new Set(availableWorkers.map(w => w._id.toString()));
-    const workerGenderMap = new Map(availableWorkers.map(w => [w._id.toString(), w.gender || null]));
+    const workerGenderMap = new Map(
+      availableWorkers.map(w => [w._id.toString(), normalizeGender(w.gender)])
+    );
     const bookedRanges = bookings
       .filter(b => b.worker && availableWorkerIdSet.has(b.worker.toString()))
       .map(b => ({
@@ -400,8 +426,8 @@ router.get('/booked-slots', authenticate, async (req, res) => {
       }));
 
     const totalWorkers = availableWorkers.length;
-    const maleWorkers = availableWorkers.filter(w => w.gender === 'male').length;
-    const femaleWorkers = availableWorkers.filter(w => w.gender === 'female').length;
+    const maleWorkers = availableWorkers.filter(w => normalizeGender(w.gender) === 'male').length;
+    const femaleWorkers = availableWorkers.filter(w => normalizeGender(w.gender) === 'female').length;
 
     res.json({
       success: true,
