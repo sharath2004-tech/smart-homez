@@ -10,6 +10,7 @@ interface Expense {
   title: string;
   amount: number;
   category: string;
+  customCategory?: string;
   description?: string;
   date: string;
   type: 'project_expense' | 'operational_expense';
@@ -324,6 +325,37 @@ const AdminExpenses = () => {
       return false;
     }
   });
+
+  const formatCategoryLabel = (category: string, customCategory?: string) => {
+    if (category === 'other' && customCategory?.trim()) {
+      return customCategory.trim();
+    }
+    return category.replace(/_/g, ' ');
+  };
+
+  const superAdminExpenseDetails = useMemo(() => {
+    const projectExpenses = expenses.filter(expense => expense.type === 'project_expense');
+    const operationalExpenses = expenses.filter(expense => expense.type === 'operational_expense');
+    const averageExpense = expenses.length > 0 ? grandTotal / expenses.length : 0;
+    const highestExpense = expenses.reduce<Expense | null>((highest, expense) => {
+      if (!highest || expense.amount > highest.amount) {
+        return expense;
+      }
+      return highest;
+    }, null);
+
+    const topCategoryEntry = Object.entries(summary).sort(([, a], [, b]) => b.total - a.total)[0] || null;
+
+    return {
+      projectTotal: projectExpenses.reduce((sum, expense) => sum + expense.amount, 0),
+      projectCount: projectExpenses.length,
+      operationalTotal: operationalExpenses.reduce((sum, expense) => sum + expense.amount, 0),
+      operationalCount: operationalExpenses.length,
+      averageExpense,
+      highestExpense,
+      topCategoryEntry,
+    };
+  }, [expenses, grandTotal, summary]);
 
   return (
     <AppLayout userType={role} userName={name}>
@@ -683,6 +715,46 @@ const AdminExpenses = () => {
               <span className="font-semibold">Profit Formula:</span> Total Profit = Revenue (₹{profitStats.totalRevenue.toLocaleString()}) - Expenses (₹{profitStats.totalExpenses.toLocaleString()}) - Wages (₹{profitStats.totalWages.toLocaleString()})
             </p>
           </div>
+
+          <div className="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Operational Details</p>
+              <p className="mt-2 text-2xl font-bold text-blue-800">₹{superAdminExpenseDetails.operationalTotal.toLocaleString()}</p>
+              <p className="mt-1 text-sm text-blue-700">{superAdminExpenseDetails.operationalCount} operational expenses</p>
+            </div>
+
+            <div className="rounded-xl border border-purple-200 bg-purple-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-purple-700">Project Details</p>
+              <p className="mt-2 text-2xl font-bold text-purple-800">₹{superAdminExpenseDetails.projectTotal.toLocaleString()}</p>
+              <p className="mt-1 text-sm text-purple-700">{superAdminExpenseDetails.projectCount} booking-linked expenses</p>
+            </div>
+
+            <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Top Expense Category</p>
+              <p className="mt-2 text-lg font-bold text-amber-800 break-words">
+                {superAdminExpenseDetails.topCategoryEntry
+                  ? formatCategoryLabel(superAdminExpenseDetails.topCategoryEntry[0])
+                  : 'No category yet'}
+              </p>
+              <p className="mt-1 text-sm text-amber-700">
+                {superAdminExpenseDetails.topCategoryEntry
+                  ? `₹${superAdminExpenseDetails.topCategoryEntry[1].total.toLocaleString()} across ${superAdminExpenseDetails.topCategoryEntry[1].count} entries`
+                  : 'Add expenses to see category insights'}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Largest Recorded Expense</p>
+              <p className="mt-2 text-2xl font-bold text-emerald-800">
+                ₹{superAdminExpenseDetails.highestExpense?.amount.toLocaleString() || 0}
+              </p>
+              <p className="mt-1 text-sm text-emerald-700 break-words">
+                {superAdminExpenseDetails.highestExpense
+                  ? `${superAdminExpenseDetails.highestExpense.title} · Avg ₹${Math.round(superAdminExpenseDetails.averageExpense).toLocaleString()}`
+                  : 'No expense data yet'}
+              </p>
+            </div>
+          </div>
         </div>
         )}
 
@@ -776,6 +848,9 @@ const AdminExpenses = () => {
                   <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Description</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Type</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Booking</th>
+                  {role === 'super_admin' && (
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Created By</th>
+                  )}
                   <th className="px-6 py-3 text-right text-sm font-semibold text-foreground">Amount</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Date</th>
                   <th className="px-6 py-3 text-center text-sm font-semibold text-foreground">Actions</th>
@@ -788,7 +863,7 @@ const AdminExpenses = () => {
                       <div className="flex items-center gap-3">
                         <span className="text-xl">{CATEGORY_ICONS[expense.category] || '📝'}</span>
                         <span className="text-sm font-medium text-foreground capitalize">
-                          {expense.category.replace(/_/g, ' ')}
+                          {formatCategoryLabel(expense.category, expense.customCategory)}
                         </span>
                       </div>
                     </td>
@@ -811,16 +886,27 @@ const AdminExpenses = () => {
                     </td>
                     <td className="px-6 py-4">
                       {expense.bookingId ? (
-                        <a
-                          href={`/admin/bookings/${expense.bookingId._id}`}
-                          className="text-primary hover:underline font-medium text-sm"
-                        >
-                          {expense.bookingId.bookingId}
-                        </a>
+                        <div className="space-y-1">
+                          <a
+                            href={`/admin/bookings/${expense.bookingId._id}`}
+                            className="text-primary hover:underline font-medium text-sm"
+                          >
+                            {expense.bookingId.bookingId}
+                          </a>
+                          <p className="text-xs text-muted-foreground">Linked project expense</p>
+                        </div>
                       ) : (
                         <span className="text-muted-foreground text-sm">—</span>
                       )}
                     </td>
+                    {role === 'super_admin' && (
+                      <td className="px-6 py-4">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{expense.createdBy?.name || 'Unknown'}</p>
+                          <p className="text-xs text-muted-foreground break-all">{expense.createdBy?.email || '—'}</p>
+                        </div>
+                      </td>
+                    )}
                     <td className="px-6 py-4 text-right">
                       <p className="font-bold text-lg text-primary">₹{expense.amount.toLocaleString()}</p>
                     </td>
