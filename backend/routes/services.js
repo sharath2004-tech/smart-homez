@@ -347,7 +347,12 @@ const handleServiceUpdate = async (req, res) => {
       timeSlotRestrictions, cancellationPolicy, specialInstructionsTemplate,
       taskOptions,
       // Workforce & wage fields
-      defaultWorkerCount, workerWage
+      defaultWorkerCount, workerWage,
+      // Radius & break settings
+      workerSearchRadiusKm, allowBreakRequests,
+      // Service capabilities
+      suggestedServices, dos, donts,
+      displayOrder, serviceCategory
     } = req.body;
 
     // Admins cannot directly edit pricing — they must submit a price change request
@@ -415,6 +420,13 @@ const handleServiceUpdate = async (req, res) => {
     if ('taskOptions' in req.body) updateData.taskOptions = taskOptions;
     if ('defaultWorkerCount' in req.body) updateData.defaultWorkerCount = defaultWorkerCount;
     if ('workerWage' in req.body) updateData.workerWage = workerWage;
+    if ('workerSearchRadiusKm' in req.body) updateData.workerSearchRadiusKm = workerSearchRadiusKm;
+    if ('allowBreakRequests' in req.body) updateData.allowBreakRequests = allowBreakRequests;
+    if ('suggestedServices' in req.body) updateData.suggestedServices = suggestedServices;
+    if ('dos' in req.body) updateData.dos = dos;
+    if ('donts' in req.body) updateData.donts = donts;
+    if ('displayOrder' in req.body) updateData.displayOrder = displayOrder;
+    if ('serviceCategory' in req.body) updateData.serviceCategory = serviceCategory;
 
     const service = await Service.findByIdAndUpdate(
       req.params.id,

@@ -418,7 +418,7 @@ const AdminServices = () => {
       workerSearchRadiusKm: (service as any).workerSearchRadiusKm ?? 10,
       serviceCategory: (service as any).serviceCategory ?? 'other',
       displayOrder: (service as any).displayOrder ?? 0,
-      allowBreakRequests: (service as any).allowBreakRequests !== false,
+      allowBreakRequests: (service as any).allowBreakRequests === true,
     });
     setEditingId(service._id!);
     setShowForm(true);
@@ -468,7 +468,7 @@ const AdminServices = () => {
       workerSearchRadiusKm: 10,
       serviceCategory: 'other',
       displayOrder: 0,
-      allowBreakRequests: true,
+      allowBreakRequests: false,
     });
   };
 
@@ -1795,7 +1795,7 @@ const AdminServices = () => {
                   <input
                     type="checkbox"
                     id="allowBreakRequests"
-                    checked={formData.allowBreakRequests !== false}
+                    checked={formData.allowBreakRequests === true}
                     onChange={(e) => setFormData({ ...formData, allowBreakRequests: e.target.checked })}
                     className="w-4 h-4 accent-primary"
                   />

@@ -519,7 +519,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
               </div>
 
               {/* Break Request Section */}
-              {!task.isOnBreak && task.service?.allowBreakRequests !== false && (
+              {!task.isOnBreak && task.service?.allowBreakRequests === true && (
                 <div className="card-elevated p-4">
                   {!showBreakForm ? (
                     <button

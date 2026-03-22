@@ -344,12 +344,6 @@ router.get('/booked-slots', authenticate, async (req, res) => {
       worker: { $ne: null }
     }).select('worker startTime endTime').lean();
 
-    const bookedRanges = bookings.map(b => ({
-      workerId: b.worker ? b.worker.toString() : null,
-      startTime: b.startTime,
-      endTime: b.endTime
-    }));
-
     // ── Build worker query ────────────────────────────────────────────────────
     const workerQuery = {
       role: 'worker',
@@ -391,6 +385,17 @@ router.get('/booked-slots', authenticate, async (req, res) => {
         return leaveDate.getTime() === bookingDate.getTime();
       });
     });
+
+    // Filter bookedRanges to only the available workers so the frontend
+    // slot availability count matches the worker pool (important for gender filter)
+    const availableWorkerIdSet = new Set(availableWorkers.map(w => w._id.toString()));
+    const bookedRanges = bookings
+      .filter(b => b.worker && availableWorkerIdSet.has(b.worker.toString()))
+      .map(b => ({
+        workerId: b.worker.toString(),
+        startTime: b.startTime,
+        endTime: b.endTime
+      }));
 
     const totalWorkers = availableWorkers.length;
     const maleWorkers = availableWorkers.filter(w => w.gender === 'male').length;
