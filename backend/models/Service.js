@@ -479,6 +479,12 @@ const serviceSchema = new mongoose.Schema({
     refundPolicy: String
   },
   
+  // Break request feature configuration
+  allowBreakRequests: {
+    type: Boolean,
+    default: true
+  },
+  
   // Special instructions template
   specialInstructionsTemplate: {
     enabled: Boolean,

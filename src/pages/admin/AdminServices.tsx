@@ -78,6 +78,7 @@ interface Service {
   workerSearchRadiusKm?: number;
   serviceCategory?: string;
   displayOrder?: number;
+  allowBreakRequests?: boolean;
 }
 
 interface UserProfile {
@@ -417,6 +418,7 @@ const AdminServices = () => {
       workerSearchRadiusKm: (service as any).workerSearchRadiusKm ?? 10,
       serviceCategory: (service as any).serviceCategory ?? 'other',
       displayOrder: (service as any).displayOrder ?? 0,
+      allowBreakRequests: (service as any).allowBreakRequests !== false,
     });
     setEditingId(service._id!);
     setShowForm(true);
@@ -466,6 +468,7 @@ const AdminServices = () => {
       workerSearchRadiusKm: 10,
       serviceCategory: 'other',
       displayOrder: 0,
+      allowBreakRequests: true,
     });
   };
 
@@ -1785,6 +1788,22 @@ const AdminServices = () => {
                       Deep Cleaning Cart Service ✨
                     </label>
                     <p className="text-xs text-muted-foreground">Customers will be taken to the cart-based deep cleaning booking instead of a fixed price.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="allowBreakRequests"
+                    checked={formData.allowBreakRequests !== false}
+                    onChange={(e) => setFormData({ ...formData, allowBreakRequests: e.target.checked })}
+                    className="w-4 h-4 accent-primary"
+                  />
+                  <div>
+                    <label htmlFor="allowBreakRequests" className="text-sm font-medium text-foreground cursor-pointer">
+                      Allow Break Requests ☕
+                    </label>
+                    <p className="text-xs text-muted-foreground">Workers can request breaks during in-progress bookings for this service.</p>
                   </div>
                 </div>
 

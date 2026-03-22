@@ -27,6 +27,7 @@ interface Task {
     description?: string;
     price: number;
     duration: number;
+    allowBreakRequests?: boolean;
   };
   bookingType?: string;
   cartItems?: { name: string; qty?: number; totalPrice: number }[];
@@ -518,7 +519,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
               </div>
 
               {/* Break Request Section */}
-              {!task.isOnBreak && (
+              {!task.isOnBreak && task.service?.allowBreakRequests !== false && (
                 <div className="card-elevated p-4">
                   {!showBreakForm ? (
                     <button

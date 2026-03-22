@@ -28,6 +28,7 @@ interface Service {
   _id: string;
   name: string;
   category: string;
+  allowBreakRequests?: boolean;
 }
 
 interface Location {
@@ -671,7 +672,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                 </div>
 
                 {/* Break Management Section */}
-                {booking.breakRequests && booking.breakRequests.length > 0 && (
+                {booking.service?.allowBreakRequests !== false && booking.breakRequests && booking.breakRequests.length > 0 && (
                   <div className="bg-amber-50 border-2 border-amber-200 p-4 rounded-xl space-y-3">
                     <h4 className="font-semibold text-amber-800 flex items-center gap-2">
                       <Coffee className="w-5 h-5" />

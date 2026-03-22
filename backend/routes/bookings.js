@@ -187,7 +187,7 @@ router.get('/available-orders', authenticate, authorize('worker'), async (req, r
       ]
     })
       .populate('customer', 'name email phone')
-      .populate('service', 'name description price duration')
+      .populate('service', 'name description price duration allowBreakRequests')
       .populate('location.locationId', 'apartmentName area city')
       .sort({ bookingDate: 1, startTime: 1 })
       .limit(20);
@@ -276,7 +276,7 @@ router.post('/:id/accept-order', authenticate, authorize('worker'), async (req, 
     const updatedBooking = await Booking.findById(booking._id)
       .populate('customer', 'name email phone')
       .populate('worker', 'name email phone gender religion workerProfile profileImage')
-      .populate('service', 'name description price duration')
+      .populate('service', 'name description price duration allowBreakRequests')
       .populate('location.locationId', 'apartmentName area city');
 
     res.json({ 
@@ -423,7 +423,7 @@ router.get('/:id', authenticate, async (req, res) => {
       .populate('customer', 'name email phone')
       .populate('worker', 'name email phone gender religion workerProfile profileImage')
       .populate('supportStaff.worker', 'name email phone')
-      .populate('service', 'name description price duration');
+      .populate('service', 'name description price duration allowBreakRequests');
 
     if (!booking) {
       return res.status(404).json({
@@ -991,13 +991,13 @@ router.post('/',
             .populate('customer', 'name email phone')
             .populate('worker', 'name email phone gender religion workerProfile profileImage')
             .populate('backupWorkers.worker', 'name email phone workerProfile profileImage')
-            .populate('service', 'name description price duration');
+            .populate('service', 'name description price duration allowBreakRequests');
         } catch (assignError) {
           console.error('Worker assignment error:', assignError);
           // Booking created but no worker assigned yet - will need manual assignment
           populatedBooking = await Booking.findById(booking._id)
             .populate('customer', 'name email phone')
-            .populate('service', 'name description price duration');
+            .populate('service', 'name description price duration allowBreakRequests');
         }
       } else {
         // Manual worker selection or auto-assign disabled
@@ -1012,7 +1012,7 @@ router.post('/',
           .populate('customer', 'name email phone')
           .populate('worker', 'name email phone gender religion workerProfile profileImage')
           .populate('backupWorkers.worker', 'name email phone workerProfile profileImage')
-          .populate('service', 'name description price duration');
+          .populate('service', 'name description price duration allowBreakRequests');
       }
 
       res.status(201).json({ 
@@ -1182,7 +1182,7 @@ router.put('/:id', authenticate, async (req, res) => {
     const updatedBooking = await Booking.findById(booking._id)
       .populate('customer', 'name email phone')
       .populate('worker', 'name email phone gender religion workerProfile profileImage')
-      .populate('service', 'name description price duration');
+      .populate('service', 'name description price duration allowBreakRequests');
 
     res.json({ message: 'Booking updated successfully', booking: updatedBooking });
   } catch (error) {
@@ -1925,13 +1925,18 @@ router.patch('/:id/team-head', authenticate, authorize('admin', 'super_admin'), 
 router.post('/:id/break-request', authenticate, authorize('worker', 'admin', 'super_admin'), async (req, res) => {
   try {
     const { reason } = req.body;
-    const booking = await Booking.findById(req.params.id).populate('worker', 'name');
+    const booking = await Booking.findById(req.params.id).populate('worker', 'name').populate('service', 'name allowBreakRequests');
     if (!booking) {
       return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
     }
 
     if (booking.status !== 'in-progress') {
       return res.status(400).json({ error: { message: 'Break can only be requested for in-progress bookings', status: 400 } });
+    }
+
+    // Check if service allows break requests
+    if (booking.service && booking.service.allowBreakRequests === false) {
+      return res.status(403).json({ error: { message: 'Break requests are not allowed for this service', status: 403 } });
     }
 
     if (booking.isOnBreak) {
