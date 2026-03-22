@@ -389,10 +389,12 @@ router.get('/booked-slots', authenticate, async (req, res) => {
     // Filter bookedRanges to only the available workers so the frontend
     // slot availability count matches the worker pool (important for gender filter)
     const availableWorkerIdSet = new Set(availableWorkers.map(w => w._id.toString()));
+    const workerGenderMap = new Map(availableWorkers.map(w => [w._id.toString(), w.gender || null]));
     const bookedRanges = bookings
       .filter(b => b.worker && availableWorkerIdSet.has(b.worker.toString()))
       .map(b => ({
         workerId: b.worker.toString(),
+        workerGender: workerGenderMap.get(b.worker.toString()) ?? null,
         startTime: b.startTime,
         endTime: b.endTime
       }));
