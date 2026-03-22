@@ -107,12 +107,9 @@ const InstaServicePage = () => {
   const [notes, setNotes] = useState("");
   const [noServiceWarning, setNoServiceWarning] = useState(false);
 
-  // Slot availability: map of startTime → number of workers busy during that slot
-  const [busyWorkersBySlot, setBusyWorkersBySlot] = useState<Record<string, number>>({});
-  const [totalWorkers, setTotalWorkers] = useState(0);
-  const [maleWorkers, setMaleWorkers] = useState(0);
-  const [femaleWorkers, setFemaleWorkers] = useState(0);
-  // Base worker counts (always from 'any'-gender fetch) — shown on gender buttons
+  // Slot availability: raw booked ranges with worker gender info
+  const [rawBookedRanges, setRawBookedRanges] = useState<Array<{ workerId: string | null; workerGender: string | null; startTime: string; endTime: string }>>([]);
+  // Worker counts (always from full/unfiltered fetch) — used for slot badges and gender buttons
   const [workerCounts, setWorkerCounts] = useState({ total: 0, male: 0, female: 0 });
   const [businessHours, setBusinessHours] = useState({ openTime: '07:00', closeTime: '19:00', slotDurationMinutes: 30 });
 
@@ -121,6 +118,31 @@ const InstaServicePage = () => {
     () => generateTimeSlots(businessHours.openTime, businessHours.closeTime, businessHours.slotDurationMinutes),
     [businessHours]
   );
+
+  // Busy worker count per slot, filtered by current gender preference — updates instantly on gender change
+  const busyWorkersBySlot = useMemo(() => {
+    const busy: Record<string, number> = {};
+    for (const slot of generatedTimeSlots) {
+      const [sh, sm] = slot.split(":").map(Number);
+      const slotStartMins = sh * 60 + sm;
+      const slotEndMins = slotStartMins + hours * 60;
+      const workersBusy = new Set<string>();
+      for (const r of rawBookedRanges) {
+        if (!r.workerId) continue;
+        // Skip workers who don't match the selected gender preference
+        if (genderPref !== 'any' && r.workerGender && r.workerGender !== genderPref) continue;
+        const [rsh, rsm] = r.startTime.split(":").map(Number);
+        const [reh, rem] = r.endTime.split(":").map(Number);
+        const rStart = rsh * 60 + rsm;
+        const rEnd = reh * 60 + rem;
+        if (rStart < slotEndMins && rEnd > slotStartMins) {
+          workersBusy.add(r.workerId);
+        }
+      }
+      busy[slot] = workersBusy.size;
+    }
+    return busy;
+  }, [rawBookedRanges, genderPref, hours, generatedTimeSlots]);
 
   const totalAmount = selectedDurationTotal ?? hours * pricePerHour;
   const mrpTotal = selectedDurationMrp ?? hours * mrpPerHour;
@@ -174,7 +196,8 @@ const InstaServicePage = () => {
     init();
   }, []);
 
-  // Fetch booked-slots whenever the date, hours, or gender preference changes
+  // Fetch booked-slots whenever the date or serviceId changes.
+  // Gender preference is applied locally via the busyWorkersBySlot useMemo — no extra API call needed.
   useEffect(() => {
     const fetchSlots = async () => {
       try {
@@ -193,25 +216,22 @@ const InstaServicePage = () => {
           }
         }
 
+        // Always fetch without a gender filter so we get all workers' ranges with
+        // gender info — gender filtering is done locally in the busyWorkersBySlot useMemo
         const data = await bookingsAPI.getBookedSlots(
           bookingDate,
           location,
-          { gender: genderPref, service: serviceId || undefined }
+          { service: serviceId || undefined }
         );
-        const ranges: { workerId: string | null; startTime: string; endTime: string }[] =
+        const ranges: { workerId: string | null; workerGender: string | null; startTime: string; endTime: string }[] =
           data.bookedRanges || [];
 
-        setTotalWorkers(data.totalWorkers || 0);
-        setMaleWorkers(data.maleWorkers || 0);
-        setFemaleWorkers(data.femaleWorkers || 0);
-        // Persist the full gender breakdown from the unfiltered fetch for button labels
-        if (!genderPref || genderPref === 'any') {
-          setWorkerCounts({
-            total: data.totalWorkers || 0,
-            male: data.maleWorkers || 0,
-            female: data.femaleWorkers || 0,
-          });
-        }
+        // Update worker counts (all-gender totals for slot badges and gender buttons)
+        setWorkerCounts({
+          total: data.totalWorkers || 0,
+          male: data.maleWorkers || 0,
+          female: data.femaleWorkers || 0,
+        });
 
         // Update time slots from admin-configured business hours
         if (data.openTime || data.closeTime) {
@@ -222,37 +242,14 @@ const InstaServicePage = () => {
           });
         }
 
-        // Compute busy count per slot using the freshly received business hours
-        const slots = generateTimeSlots(
-          data.openTime || '07:00',
-          data.closeTime || '19:00',
-          data.slotDurationMinutes || 30
-        );
-        const busy: Record<string, number> = {};
-        for (const slot of slots) {
-          const [sh, sm] = slot.split(":").map(Number);
-          const slotStartMins = sh * 60 + sm;
-          const slotEndMins = slotStartMins + hours * 60;
-          const workersBusy = new Set<string>();
-          for (const r of ranges) {
-            if (!r.workerId) continue;
-            const [rsh, rsm] = r.startTime.split(":").map(Number);
-            const [reh, rem] = r.endTime.split(":").map(Number);
-            const rStart = rsh * 60 + rsm;
-            const rEnd = reh * 60 + rem;
-            if (rStart < slotEndMins && rEnd > slotStartMins) {
-              workersBusy.add(r.workerId);
-            }
-          }
-          busy[slot] = workersBusy.size;
-        }
-        setBusyWorkersBySlot(busy);
+        // Store raw ranges; gender-specific busy counts are derived via useMemo
+        setRawBookedRanges(ranges);
       } catch {
         // non-critical — continue without availability info
       }
     };
     fetchSlots();
-  }, [bookingDate, hours, genderPref, serviceId]);
+  }, [bookingDate, serviceId]);
 
   const handleBook = async () => {
     if (!serviceId) {
@@ -551,6 +548,39 @@ const InstaServicePage = () => {
               </div>
             )}
 
+            {/* Gender preference — placed before time slots so slots reflect the selection */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2 flex items-center gap-1">
+                <User className="w-4 h-4" /> Worker Gender Preference
+              </label>
+              <div className="flex gap-2">
+                {(["any", "female", "male"] as const).map((g) => {
+                  const count = g === 'any' ? workerCounts.total : g === 'male' ? workerCounts.male : workerCounts.female;
+                  const label = g === "any" ? "Any" : g === "female" ? "👩 Female" : "👨 Male";
+                  return (
+                    <button
+                      key={g}
+                      onClick={() => setGenderPref(g)}
+                      className={`flex-1 py-2 rounded-xl border-2 text-sm font-medium transition-all ${
+                        genderPref === g
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border hover:border-primary/40"
+                      }`}
+                    >
+                      {label}
+                      {count > 0 && (
+                        <span className={`ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full ${
+                          genderPref === g ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
+                        }`}>
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Time slots */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-2 flex items-center gap-1">
@@ -565,7 +595,7 @@ const InstaServicePage = () => {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     {availableSlots.map((t) => {
                       const busy = busyWorkersBySlot[t] ?? 0;
-                      const activeWorkers = genderPref === 'male' ? maleWorkers : genderPref === 'female' ? femaleWorkers : totalWorkers;
+                      const activeWorkers = genderPref === 'male' ? workerCounts.male : genderPref === 'female' ? workerCounts.female : workerCounts.total;
                       const free = activeWorkers > 0 ? activeWorkers - busy : null;
                       const fullyBooked = free !== null && free <= 0;
                       const limited = free !== null && free === 1;
@@ -598,7 +628,7 @@ const InstaServicePage = () => {
                       );
                     })}
                   </div>
-                  {(totalWorkers > 0 || maleWorkers > 0 || femaleWorkers > 0) && (
+                  {workerCounts.total > 0 && (
                     <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Available</span>
                       <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> 1 left</span>
@@ -607,39 +637,6 @@ const InstaServicePage = () => {
                   )}
                 </>
               )}
-            </div>
-
-            {/* Gender preference */}
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2 flex items-center gap-1">
-                <User className="w-4 h-4" /> Worker Gender Preference
-              </label>
-              <div className="flex gap-2">
-                {(["any", "female", "male"] as const).map((g) => {
-                  const count = g === 'any' ? workerCounts.total : g === 'male' ? workerCounts.male : workerCounts.female;
-                  const label = g === "any" ? "Any" : g === "female" ? "👩 Female" : "👨 Male";
-                  return (
-                    <button
-                      key={g}
-                      onClick={() => setGenderPref(g)}
-                      className={`flex-1 py-2 rounded-xl border-2 text-sm font-medium transition-all ${
-                        genderPref === g
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border hover:border-primary/40"
-                      }`}
-                    >
-                      {label}
-                      {count > 0 && (
-                        <span className={`ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full ${
-                          genderPref === g ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
-                        }`}>
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
             </div>
 
             {/* Notes */}
