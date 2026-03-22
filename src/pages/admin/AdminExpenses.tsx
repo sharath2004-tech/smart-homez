@@ -647,7 +647,8 @@ const AdminExpenses = () => {
         </div>
         )}
 
-        {/* Stats Cards */}
+        {/* Stats Cards - Only visible to super_admin */}
+        {role === 'super_admin' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Total */}
           <div className="card-elevated p-3 bg-gradient-to-br from-primary/10 to-accent/10 border border-primary/20">
@@ -677,6 +678,7 @@ const AdminExpenses = () => {
             );
           })}
         </div>
+        )}
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3">
