@@ -87,6 +87,19 @@ interface WageDetailItem {
     area?: string;
     city?: string;
   } | null;
+  bookingBreakdown: Array<{
+    bookingMongoId: string;
+    bookingId?: string | null;
+    bookingDate?: string | null;
+    serviceName: string;
+    minutesWorked: number;
+    allocatedAmount: number;
+    location?: {
+      apartmentName?: string;
+      area?: string;
+      city?: string;
+    } | null;
+  }>;
 }
 
 interface ProfitStatsState {
@@ -462,6 +475,11 @@ const AdminExpenses = () => {
   const getBookingDisplayId = (expense: Expense) => {
     if (!expense.bookingId) return '—';
     return expense.bookingId.bookingId || `BK-${expense.bookingId._id.slice(-6).toUpperCase()}`;
+  };
+
+  const getWageBookingDisplayId = (booking: WageDetailItem['bookingBreakdown'][number]) => {
+    if (booking.bookingId) return booking.bookingId;
+    return `BK-${booking.bookingMongoId.slice(-6).toUpperCase()}`;
   };
 
   const superAdminExpenseDetails = useMemo(() => {
@@ -959,6 +977,47 @@ const AdminExpenses = () => {
                         <p><span className="font-medium text-foreground">Location:</span> {formatLocationLabel(wage.location)}</p>
                       )}
                     </div>
+
+                    {wage.bookingBreakdown.length > 0 && (
+                      <div className="rounded-xl border border-blue-100 bg-slate-50/90 overflow-hidden">
+                        <div className="flex items-center justify-between gap-2 border-b border-blue-100 px-3 py-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-700">Booking / service breakdown</p>
+                          <p className="text-[11px] text-muted-foreground">{wage.bookingBreakdown.length} item{wage.bookingBreakdown.length !== 1 ? 's' : ''}</p>
+                        </div>
+                        <div className="divide-y divide-blue-100">
+                          {wage.bookingBreakdown.map((booking) => (
+                            <div key={`${wage._id}-${booking.bookingMongoId}`} className="grid grid-cols-1 gap-2 px-3 py-2 text-xs md:grid-cols-[minmax(0,1.5fr)_auto_auto] md:items-start md:gap-3">
+                              <div className="min-w-0">
+                                <p className="font-semibold text-foreground break-words">{getWageBookingDisplayId(booking)} · {booking.serviceName}</p>
+                                <div className="mt-1 space-y-0.5 text-muted-foreground">
+                                  {booking.bookingDate && (
+                                    <p>
+                                      Date:{' '}
+                                      {new Date(booking.bookingDate).toLocaleDateString('en-IN', {
+                                        day: 'numeric',
+                                        month: 'short',
+                                        year: 'numeric'
+                                      })}
+                                    </p>
+                                  )}
+                                  {formatLocationLabel(booking.location) && (
+                                    <p className="break-words">Location: {formatLocationLabel(booking.location)}</p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="rounded-md bg-white px-2 py-1 text-left md:text-center">
+                                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Worked</p>
+                                <p className="font-semibold text-foreground">{formatMinutes(booking.minutesWorked)}</p>
+                              </div>
+                              <div className="rounded-md bg-white px-2 py-1 text-left md:text-right">
+                                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Wage</p>
+                                <p className="font-semibold text-blue-700">₹{booking.allocatedAmount.toLocaleString()}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

@@ -1737,6 +1737,7 @@ router.get('/profit-stats', authenticate, authorize('super_admin'), async (req, 
 
         const requestMinutes = request.totalMinutesWorked || bookingsWithMinutes.reduce((sum, item) => sum + item.minutesWorked, 0);
         const matchedMinutes = matchedBookings.reduce((sum, item) => sum + item.minutesWorked, 0);
+        const relevantBookings = locationIdStr ? matchedBookings : bookingsWithMinutes;
 
         let allocatedAmount = request.requestedAmount || 0;
         let allocatedMinutes = request.totalMinutesWorked || 0;
@@ -1773,6 +1774,39 @@ router.get('/profit-stats', authenticate, authorize('super_admin'), async (req, 
                 }
               : null;
 
+        const relevantMinutes = relevantBookings.reduce((sum, item) => sum + item.minutesWorked, 0);
+        let runningAllocatedAmount = 0;
+        const bookingBreakdown = relevantBookings.map(({ booking, minutesWorked }, index) => {
+          const bookingCount = relevantBookings.length || 1;
+          let bookingAllocatedAmount = 0;
+
+          if (index === relevantBookings.length - 1) {
+            bookingAllocatedAmount = Number((allocatedAmount - runningAllocatedAmount).toFixed(2));
+          } else if (relevantMinutes > 0) {
+            bookingAllocatedAmount = Number(((allocatedAmount * minutesWorked) / relevantMinutes).toFixed(2));
+          } else {
+            bookingAllocatedAmount = Number((allocatedAmount / bookingCount).toFixed(2));
+          }
+
+          runningAllocatedAmount += bookingAllocatedAmount;
+
+          return {
+            bookingMongoId: booking._id,
+            bookingId: booking.bookingId || null,
+            bookingDate: booking.bookingDate || null,
+            serviceName: booking.service?.name || 'Service',
+            minutesWorked,
+            allocatedAmount: bookingAllocatedAmount,
+            location: booking.location
+              ? {
+                  apartmentName: booking.location.apartmentName,
+                  area: booking.location.area,
+                  city: booking.location.city
+                }
+              : null
+          };
+        });
+
         return {
           _id: request._id,
           worker: request.worker
@@ -1795,7 +1829,8 @@ router.get('/profit-stats', authenticate, authorize('super_admin'), async (req, 
           hourlyRate: request.hourlyRate || 0,
           periodFrom: request.periodFrom,
           periodTo: request.periodTo,
-          location: locationSource
+          location: locationSource,
+          bookingBreakdown
         };
       })
       .filter((request) => request && request.amount > 0)
