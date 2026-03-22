@@ -729,6 +729,7 @@ router.post('/workers',
         password: temporaryPassword, // Will be hashed by pre-save hook
         temporaryPassword: temporaryPassword, // Store plain text for reference (not hashed)
         isFirstLogin: true, // Force password change on first login
+        hasCustomPassword: false,
         phone,
         gender: gender || 'prefer_not_to_say',
         religion: religion || undefined,

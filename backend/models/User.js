@@ -108,6 +108,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false // Only true for admin-created workers with temporary passwords
   },
+  hasCustomPassword: {
+    type: Boolean,
+    default: true
+  },
   // Address with geolocation support
   addresses: [{
     label: {

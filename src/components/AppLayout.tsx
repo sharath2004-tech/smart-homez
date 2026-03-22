@@ -22,13 +22,30 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
   const [mobileOpen, setMobileOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  const storedUser = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem('user') || '{}') as {
+        name?: string;
+        needsPasswordSetup?: boolean;
+        isFirstLogin?: boolean;
+        hasCustomPassword?: boolean;
+      };
+    } catch {
+      return {};
+    }
+  }, []);
+
   // Resolve display name: prop > localStorage cached user > "User"
   const resolvedName = useMemo(() =>
     userName ?? (() => {
-      try { return (JSON.parse(localStorage.getItem('user') || '{}') as { name?: string })?.name; }
-      catch { return undefined; }
+      return storedUser?.name;
     })() ?? "User"
-  , [userName]);
+  , [userName, storedUser]);
+
+  const passwordMenuLabel = useMemo(() => {
+    const needsSetup = storedUser.needsPasswordSetup ?? storedUser.isFirstLogin ?? storedUser.hasCustomPassword === false;
+    return needsSetup ? 'Add Password' : 'Change Password';
+  }, [storedUser]);
 
   useEffect(() => {
     api.get('/notifications')
@@ -77,8 +94,8 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
     { to: "/customer/payments", icon: CreditCard, label: t('nav.payments') },
     { to: "/customer/profile", icon: User, label: t('nav.profile') },
     { to: "/customer/help", icon: HelpCircle, label: "Help" },
-    { to: "/change-password", icon: KeyRound, label: "Change Password" },
-  ], [t]);
+    { to: "/change-password", icon: KeyRound, label: passwordMenuLabel },
+  ], [t, passwordMenuLabel]);
 
   const workerNav = useMemo(() => [
     { to: "/worker/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },
@@ -88,8 +105,8 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
     { to: "/worker/leaves", icon: Bell, label: t('nav.myLeaves') },
     { to: "/worker/profile", icon: User, label: t('nav.profile') },
     { to: "/worker/help", icon: HelpCircle, label: "Help" },
-    { to: "/change-password", icon: KeyRound, label: "Change Password" },
-  ], [t]);
+    { to: "/change-password", icon: KeyRound, label: passwordMenuLabel },
+  ], [t, passwordMenuLabel]);
 
   const adminNav = useMemo(() => [
     { to: "/admin/dashboard",          icon: LayoutDashboard, label: t('nav.dashboard') },
@@ -110,8 +127,8 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
     { to: "/admin/services",           icon: Wrench,          label: t('nav.services') },
     { to: "/admin/dashboard-preferences", icon: Settings2,    label: "Dashboard Preferences" },
     { to: "/admin/settings",           icon: Settings,        label: t('nav.settings') },
-    { to: "/change-password",          icon: KeyRound,        label: "Change Password" },
-  ], [t]);
+    { to: "/change-password",          icon: KeyRound,        label: passwordMenuLabel },
+  ], [t, passwordMenuLabel]);
 
   // Admin Navigation Sections for Collapsible Sidebar
   const adminNavSections = useMemo(() => [
@@ -171,10 +188,10 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
         { to: "/admin/settings", icon: Settings, label: t('nav.settings') },
         { to: "/admin/quotes", icon: FileText, label: "Quote Requests" },
         { to: "/admin/help-messages", icon: MessageSquare, label: "Help Messages" },
-        { to: "/change-password", icon: KeyRound, label: "Change Password" },
+        { to: "/change-password", icon: KeyRound, label: passwordMenuLabel },
       ]
     }
-  ], [t]);
+  ], [t, passwordMenuLabel]);
 
   const superAdminNav = useMemo(() => [
     { to: "/super-admin/dashboard",          icon: LayoutDashboard, label: "Overview" },
@@ -196,8 +213,8 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
     { to: "/super-admin/services",           icon: Wrench,          label: t('nav.services') },
     { to: "/super-admin/heatmap",            icon: BarChart3,       label: "Worker Heatmap" },
     { to: "/super-admin/settings",           icon: Settings,        label: t('nav.settings') },
-    { to: "/change-password",                icon: KeyRound,        label: "Change Password" },
-  ], [t]);
+    { to: "/change-password",                icon: KeyRound,        label: passwordMenuLabel },
+  ], [t, passwordMenuLabel]);
 
   // Super Admin Navigation Sections for Collapsible Sidebar
   const superAdminNavSections = useMemo(() => [
@@ -259,10 +276,10 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
         { to: "/super-admin/settings", icon: Settings, label: t('nav.settings') },
         { to: "/super-admin/quotes", icon: FileText, label: "Quote Requests" },
         { to: "/super-admin/help-messages", icon: MessageSquare, label: "Help Messages" },
-        { to: "/change-password", icon: KeyRound, label: "Change Password" },
+        { to: "/change-password", icon: KeyRound, label: passwordMenuLabel },
       ]
     }
-  ], [t]);
+  ], [t, passwordMenuLabel]);
 
   const navItems = useMemo(() =>
     userType === "admin" ? adminNav

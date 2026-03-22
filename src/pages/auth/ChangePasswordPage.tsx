@@ -31,7 +31,13 @@ const ChangePasswordPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
-  const [profile, setProfile] = useState<{ role: string; name?: string } | null>(null);
+  const [profile, setProfile] = useState<{
+    role: string;
+    name?: string;
+    isFirstLogin?: boolean;
+    needsPasswordSetup?: boolean;
+    hasCustomPassword?: boolean;
+  } | null>(null);
   
   const [form, setForm] = useState({
     currentPassword: "",
@@ -53,17 +59,36 @@ const ChangePasswordPage = () => {
       }
       
       const data = await authAPI.getProfile();
-      setProfile(data.user || data);
+      const nextProfile = data.user || data;
+      setProfile(nextProfile);
+      localStorage.setItem('user', JSON.stringify({
+        ...(JSON.parse(localStorage.getItem('user') || '{}')),
+        ...nextProfile
+      }));
     } catch (error) {
       console.error('Error fetching profile:', error);
       navigate('/login');
     }
   };
 
+  const needsPasswordSetup = Boolean(profile?.needsPasswordSetup || profile?.isFirstLogin || profile?.hasCustomPassword === false);
+  const pageTitle = needsPasswordSetup ? 'Add Password' : 'Change Your Password';
+  const pageSubtitle = needsPasswordSetup
+    ? 'Create a password for your account so you can use password login anytime.'
+    : "Create a strong password that you'll remember";
+  const submitLabel = needsPasswordSetup ? 'Add Password' : 'Change Password';
+  const submitLoadingLabel = needsPasswordSetup ? 'Adding Password...' : 'Changing Password...';
+  const successTitle = needsPasswordSetup ? 'Password Added!' : 'Password Changed!';
+  const successMessage = needsPasswordSetup
+    ? 'Your password has been added successfully. Redirecting to your dashboard...'
+    : 'Your password has been updated successfully. Redirecting to your dashboard...';
+
   const redirectToDashboard = (role: string) => {
     if (role === 'worker') {
       navigate('/worker/dashboard');
-    } else if (role === 'admin' || role === 'super_admin') {
+    } else if (role === 'super_admin') {
+      navigate('/super-admin/dashboard');
+    } else if (role === 'admin') {
       navigate('/admin/dashboard');
     } else {
       navigate('/customer/dashboard');
@@ -88,7 +113,7 @@ const ChangePasswordPage = () => {
     }
 
     // Check if new password is different from current
-    if (form.currentPassword === form.newPassword) {
+    if (!needsPasswordSetup && form.currentPassword === form.newPassword) {
       setError("New password must be different from current password");
       return;
     }
@@ -96,7 +121,13 @@ const ChangePasswordPage = () => {
     setIsLoading(true);
 
     try {
-      await authAPI.changePassword(form.currentPassword, form.newPassword);
+      await authAPI.changePassword(needsPasswordSetup ? "" : form.currentPassword, form.newPassword);
+      localStorage.setItem('user', JSON.stringify({
+        ...(JSON.parse(localStorage.getItem('user') || '{}')),
+        isFirstLogin: false,
+        hasCustomPassword: true,
+        needsPasswordSetup: false
+      }));
       setSuccess(true);
       
       // Redirect after 2 seconds
@@ -116,9 +147,9 @@ const ChangePasswordPage = () => {
           <div className="w-20 h-20 bg-success-light rounded-full flex items-center justify-center mx-auto mb-6">
             <Check className="w-10 h-10 text-success" />
           </div>
-          <h2 className="text-3xl font-bold font-heading text-foreground mb-3">Password Changed!</h2>
+          <h2 className="text-3xl font-bold font-heading text-foreground mb-3">{successTitle}</h2>
           <p className="text-muted-foreground mb-8">
-            Your password has been updated successfully. Redirecting to your dashboard...
+            {successMessage}
           </p>
         </div>
       </div>
@@ -138,10 +169,12 @@ const ChangePasswordPage = () => {
           </Link>
           <div>
             <h1 className="text-3xl font-bold font-heading mb-4 leading-tight">
-              Secure Your Account
+              {needsPasswordSetup ? 'Add a Password' : 'Secure Your Account'}
             </h1>
             <p className="text-primary-foreground/70 leading-relaxed">
-              For your security, please change your temporary password to a new, strong password that only you know.
+              {needsPasswordSetup
+                ? 'Set a strong password for your account so you can sign in with email and password whenever you need.'
+                : 'For your security, please change your temporary password to a new, strong password that only you know.'}
             </p>
           </div>
         </div>
@@ -157,14 +190,14 @@ const ChangePasswordPage = () => {
             <span className="text-lg font-bold font-heading text-foreground">Healthy Homez</span>
           </div>
 
-          {profile?.isFirstLogin && (
+          {needsPasswordSetup && (
           <div className="mb-6 p-4 bg-warning/10 border border-warning/20 rounded-xl">
             <div className="flex items-start gap-3">
               <Lock className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
               <div>
-                <h3 className="font-semibold text-warning mb-1">First Time Login</h3>
+                <h3 className="font-semibold text-warning mb-1">Add Password</h3>
                 <p className="text-sm text-muted-foreground">
-                  You're logging in with a temporary password. Please change it now to secure your account.
+                  Your account needs a personal password. Add one now to secure your account and use password login later.
                 </p>
               </div>
             </div>
@@ -172,10 +205,10 @@ const ChangePasswordPage = () => {
           )}
 
           <h2 className="text-2xl font-bold font-heading text-foreground mb-1">
-            Change Your Password
+            {pageTitle}
           </h2>
           <p className="text-muted-foreground mb-6">
-            Create a strong password that you'll remember
+            {pageSubtitle}
           </p>
 
           {error && (
@@ -185,13 +218,14 @@ const ChangePasswordPage = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {!needsPasswordSetup && (
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Current Password (Temporary)</label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Current Password</label>
               <div className="relative">
                 <input 
                   type={showCurrentPassword ? "text" : "password"} 
                   className="input-clean pr-12" 
-                  placeholder="Enter your temporary password" 
+                  placeholder="Enter your current password" 
                   value={form.currentPassword} 
                   onChange={(e) => setForm({ ...form, currentPassword: e.target.value })} 
                   required 
@@ -205,14 +239,15 @@ const ChangePasswordPage = () => {
                 </button>
               </div>
             </div>
+            )}
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">New Password</label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">{needsPasswordSetup ? 'Password' : 'New Password'}</label>
               <div className="relative">
                 <input 
                   type={showNewPassword ? "text" : "password"} 
                   className="input-clean pr-12" 
-                  placeholder="Create a strong password" 
+                  placeholder={needsPasswordSetup ? 'Create your password' : 'Create a strong password'} 
                   value={form.newPassword} 
                   onChange={(e) => setForm({ ...form, newPassword: e.target.value })} 
                   required 
@@ -232,12 +267,12 @@ const ChangePasswordPage = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Confirm New Password</label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">{needsPasswordSetup ? 'Confirm Password' : 'Confirm New Password'}</label>
               <div className="relative">
                 <input 
                   type={showConfirmPassword ? "text" : "password"} 
                   className="input-clean pr-12" 
-                  placeholder="Re-enter your new password" 
+                  placeholder={needsPasswordSetup ? 'Re-enter your password' : 'Re-enter your new password'} 
                   value={form.confirmPassword} 
                   onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} 
                   required 
@@ -260,10 +295,10 @@ const ChangePasswordPage = () => {
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Changing Password...
+                  <Loader2 className="w-4 h-4 animate-spin" /> {submitLoadingLabel}
                 </>
               ) : (
-                'Change Password'
+                submitLabel
               )}
             </button>
           </form>

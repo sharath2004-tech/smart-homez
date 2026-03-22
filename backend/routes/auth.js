@@ -45,6 +45,14 @@ function normalizeIndianPhone(phone) {
 
 const router = express.Router();
 
+const getPasswordSetupState = (user) => {
+  const hasCustomPassword = user?.hasCustomPassword !== false;
+  return {
+    hasCustomPassword,
+    needsPasswordSetup: Boolean(user?.isFirstLogin || !hasCustomPassword)
+  };
+};
+
 // Rate limiter for sensitive auth endpoints (OTP / password reset)
 const sensitiveAuthLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -297,9 +305,10 @@ router.post('/login',
           name: user.name,
           email: user.email,
           role: user.role,
-          isFirstLogin: user.isFirstLogin
+          isFirstLogin: user.isFirstLogin,
+          ...getPasswordSetupState(user)
         },
-        requirePasswordChange: user.isFirstLogin
+        requirePasswordChange: getPasswordSetupState(user).needsPasswordSetup
       });
     } catch (error) {
       console.error('Login error:', error);
@@ -313,7 +322,7 @@ router.post('/login',
 // @access  Private
 router.get('/me', authenticate, async (req, res) => {
   try {
-    res.json({ user: req.user });
+    res.json({ user: { ...req.user.toObject(), ...getPasswordSetupState(req.user) } });
   } catch (error) {
     console.error('Get user error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
@@ -379,7 +388,7 @@ router.patch('/me', authenticate,
 router.post('/change-password',
   authenticate,
   [
-    body('currentPassword').notEmpty().withMessage('Current password is required'),
+    body('currentPassword').optional().isString(),
     body('newPassword')
       .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
       .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter')
@@ -404,18 +413,28 @@ router.post('/change-password',
         });
       }
 
-      // Verify current password
-      const isMatch = await user.comparePassword(currentPassword);
-      if (!isMatch) {
-        return res.status(401).json({ 
-          error: { message: 'Current password is incorrect', status: 401 } 
-        });
+      const { needsPasswordSetup } = getPasswordSetupState(user);
+
+      if (!needsPasswordSetup) {
+        if (!currentPassword) {
+          return res.status(400).json({ 
+            error: { message: 'Current password is required', status: 400 } 
+          });
+        }
+
+        const isMatch = await user.comparePassword(currentPassword);
+        if (!isMatch) {
+          return res.status(401).json({ 
+            error: { message: 'Current password is incorrect', status: 401 } 
+          });
+        }
       }
 
-      // Update password and clear first login flag
+      // Update password and clear setup flags
       user.password = newPassword;
       user.temporaryPassword = undefined;
       user.isFirstLogin = false;
+      user.hasCustomPassword = true;
       await user.save();
 
       // Send confirmation email
@@ -427,7 +446,7 @@ router.post('/change-password',
       }
 
       res.json({
-        message: 'Password changed successfully',
+        message: needsPasswordSetup ? 'Password added successfully' : 'Password changed successfully',
         success: true
       });
     } catch (error) {
@@ -521,6 +540,7 @@ router.post('/reset-password',
       user.passwordResetToken = undefined;
       user.passwordResetExpires = undefined;
       user.isFirstLogin = false;
+      user.hasCustomPassword = true;
       await user.save();
 
       try {
@@ -622,6 +642,7 @@ router.post('/reset-password-email-otp',
       user.passwordResetToken = undefined;
       user.passwordResetExpires = undefined;
       user.isFirstLogin = false;
+      user.hasCustomPassword = true;
       await user.save();
 
       try {
@@ -717,6 +738,7 @@ router.post('/reset-password-phone',
 
       user.password = newPassword;
       user.isFirstLogin = false;
+      user.hasCustomPassword = true;
       await user.save();
 
       try { await sendPasswordChangeConfirmation(user.email, user.name); } catch {}
@@ -1168,6 +1190,7 @@ router.post('/google', async (req, res) => {
         },
         // Generate random password (OAuth users don't need it)
         password: crypto.randomBytes(32).toString('hex'),
+        hasCustomPassword: false,
         isFirstLogin: false
       });
 
@@ -1225,7 +1248,9 @@ router.post('/google', async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        profileImage: user.profileImage
+        profileImage: user.profileImage,
+        isFirstLogin: user.isFirstLogin,
+        ...getPasswordSetupState(user)
       }
     });
   } catch (error) {
