@@ -106,6 +106,7 @@ const AdminLocations = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [showLocationForm, setShowLocationForm] = useState(false);
   const [showAdminForm, setShowAdminForm] = useState(false);
+  const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [cityFilter, setCityFilter] = useState("");
   const [activeTab, setActiveTab] = useState<'locations' | 'admins' | 'request' | 'location-requests'>('locations');
   const [geocoding, setGeocoding] = useState(false);
@@ -190,6 +191,18 @@ const AdminLocations = () => {
   const handleCloseLocationForm = () => {
     setShowLocationForm(false);
     setShowMap(false);
+    setEditingLocation(null);
+    setLocationForm({
+      apartmentName: "",
+      building: "",
+      area: "",
+      city: "",
+      state: "Maharashtra",
+      zipCode: "",
+      latitude: "",
+      longitude: "",
+      maxServiceRadius: "500"
+    });
     if (mapInstance.current) {
       mapInstance.current.remove();
       mapInstance.current = null;
@@ -210,6 +223,25 @@ const AdminLocations = () => {
       const message = error instanceof Error ? error.message : 'Failed to delete location';
       alert(message);
     }
+  };
+
+  const handleOpenEditLocation = (location: Location) => {
+    const [longitude, latitude] = location.location?.coordinates || [];
+
+    setEditingLocation(location);
+    setShowLocationForm(true);
+    setShowMap(false);
+    setLocationForm({
+      apartmentName: location.apartmentName || "",
+      building: location.building || "",
+      area: location.area || "",
+      city: location.city || "",
+      state: location.state || "Maharashtra",
+      zipCode: location.zipCode || "",
+      latitude: typeof latitude === 'number' ? latitude.toString() : "",
+      longitude: typeof longitude === 'number' ? longitude.toString() : "",
+      maxServiceRadius: location.maxServiceRadius?.toString() || "500"
+    });
   };
 
   const handleDeleteAdmin = async (adminId: string, adminName: string) => {
@@ -443,7 +475,7 @@ const AdminLocations = () => {
   const handleCreateLocation = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await adminAPI.createLocation({
+      const payload = {
         apartmentName: locationForm.apartmentName,
         building: locationForm.building || undefined,
         area: locationForm.area,
@@ -452,29 +484,24 @@ const AdminLocations = () => {
         zipCode: locationForm.zipCode || undefined,
         coordinates: [parseFloat(locationForm.longitude), parseFloat(locationForm.latitude)],
         maxServiceRadius: parseInt(locationForm.maxServiceRadius)
-      });
-      alert('Location created successfully!');
-      setShowLocationForm(false);
-      setShowMap(false);
-      if (mapInstance.current) {
-        mapInstance.current.remove();
-        mapInstance.current = null;
-        markerRef.current = null;
+      };
+
+      if (editingLocation) {
+        await adminAPI.updateLocation(editingLocation._id, payload);
+        alert('Location updated successfully!');
+      } else {
+        await adminAPI.createLocation(payload);
+        alert('Location created successfully!');
       }
-      setLocationForm({
-        apartmentName: "",
-        building: "",
-        area: "",
-        city: "",
-        state: "Maharashtra",
-        zipCode: "",
-        latitude: "",
-        longitude: "",
-        maxServiceRadius: "500"
-      });
+
+      handleCloseLocationForm();
       fetchData();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create location';
+      const message = error instanceof Error
+        ? error.message
+        : editingLocation
+          ? 'Failed to update location'
+          : 'Failed to create location';
       alert(message);
     }
   };
@@ -746,7 +773,10 @@ const AdminLocations = () => {
                 <UserPlus className="w-4 h-4" /> Add Admin
               </button>
               <button 
-                onClick={() => setShowLocationForm(true)}
+                onClick={() => {
+                  setEditingLocation(null);
+                  setShowLocationForm(true);
+                }}
                 className="flex items-center gap-2 btn-brand text-sm py-2.5 px-4"
               >
                 <Plus className="w-4 h-4" /> Add Location
@@ -835,15 +865,24 @@ const AdminLocations = () => {
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {locations.map((location) => (
                   <div key={location._id} className="card-elevated p-5 relative overflow-hidden">
-                    {/* Delete button for super admin */}
+                    {/* Action buttons for super admin */}
                     {isSuperAdmin && (
-                      <button
-                        onClick={() => handleDeleteLocation(location._id, location.apartmentName)}
-                        className="absolute top-3 right-3 w-7 h-7 rounded-lg bg-destructive/10 hover:bg-destructive/20 flex items-center justify-center text-destructive transition-colors"
-                        title="Delete location"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      <div className="absolute top-3 right-3 flex gap-1">
+                        <button
+                          onClick={() => handleOpenEditLocation(location)}
+                          className="w-7 h-7 rounded-lg bg-primary/10 hover:bg-primary/20 flex items-center justify-center text-primary transition-colors"
+                          title="Edit location"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteLocation(location._id, location.apartmentName)}
+                          className="w-7 h-7 rounded-lg bg-destructive/10 hover:bg-destructive/20 flex items-center justify-center text-destructive transition-colors"
+                          title="Delete location"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     )}
                     
                     <div className="flex items-start gap-3 mb-4">
@@ -1003,7 +1042,7 @@ const AdminLocations = () => {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-background rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold">Add New Location</h2>
+                <h2 className="text-xl font-bold">{editingLocation ? 'Edit Location' : 'Add New Location'}</h2>
                 <button onClick={handleCloseLocationForm} className="text-muted-foreground hover:text-foreground">
                   <X className="w-5 h-5" />
                 </button>
@@ -1199,7 +1238,7 @@ const AdminLocations = () => {
                     Cancel
                   </button>
                   <button type="submit" className="w-full sm:flex-1 btn-brand py-2">
-                    Create Location
+                    {editingLocation ? 'Save Changes' : 'Create Location'}
                   </button>
                 </div>
               </form>

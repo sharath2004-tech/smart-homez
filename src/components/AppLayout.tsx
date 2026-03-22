@@ -209,7 +209,7 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
     { to: "/super-admin/salary-settlements", icon: IndianRupee,     label: "Salary Settlements" },
     { to: "/super-admin/quotes",             icon: FileText,        label: "Quote Requests" },
     { to: "/super-admin/help-messages",      icon: MessageSquare,   label: "Help Messages" },
-    { to: "/super-admin/locations",          icon: MapPin,          label: t('nav.locations') },
+    { to: "/super-admin/locations",          icon: MapPin,          label: "Locations & Admins" },
     { to: "/super-admin/services",           icon: Wrench,          label: t('nav.services') },
     { to: "/super-admin/heatmap",            icon: BarChart3,       label: "Worker Heatmap" },
     { to: "/super-admin/settings",           icon: Settings,        label: t('nav.settings') },
@@ -272,7 +272,7 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
       icon: Building,
       defaultOpen: false,
       items: [
-        { to: "/super-admin/locations", icon: MapPin, label: t('nav.locations') },
+        { to: "/super-admin/locations", icon: MapPin, label: "Locations & Admins" },
         { to: "/super-admin/settings", icon: Settings, label: t('nav.settings') },
         { to: "/super-admin/quotes", icon: FileText, label: "Quote Requests" },
         { to: "/super-admin/help-messages", icon: MessageSquare, label: "Help Messages" },
