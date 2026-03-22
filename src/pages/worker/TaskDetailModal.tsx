@@ -130,8 +130,9 @@ const getBreakDurationSeconds = (
 };
 
 const getScheduledDurationSeconds = (bookingDate: string, startTime: string, endTime: string) => {
-  const scheduledStart = new Date(`${bookingDate}T${startTime}`).getTime();
-  let scheduledEnd = new Date(`${bookingDate}T${endTime}`).getTime();
+  const bookingDay = bookingDate.includes('T') ? bookingDate.split('T')[0] : bookingDate;
+  const scheduledStart = new Date(`${bookingDay}T${startTime}`).getTime();
+  let scheduledEnd = new Date(`${bookingDay}T${endTime}`).getTime();
 
   if (!Number.isFinite(scheduledStart) || !Number.isFinite(scheduledEnd)) {
     return 0;
