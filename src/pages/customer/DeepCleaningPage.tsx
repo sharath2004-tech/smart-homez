@@ -1,9 +1,11 @@
 import AppLayout from "@/components/AppLayout";
-import { api, authAPI } from "@/lib/api";
+import LocationSelector, { type LocationData } from "@/components/LocationSelector";
+import { api, authAPI, serviceAreasAPI } from "@/lib/api";
 import { AnimatePresence, motion } from "framer-motion";
 import { Calendar, CheckCircle, Clock, MapPin, Minus, Plus, ShoppingCart, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface ConfigItem {
@@ -32,7 +34,31 @@ interface CartEntry {
 }
 type UserProfile = {
   name?: string;
-  customerProfile?: { addresses?: { isDefault: boolean; apartment?: string; area?: string; city?: string }[] };
+  addresses?: AddressEntry[];
+  customerProfile?: { addresses?: AddressEntry[] };
+};
+
+type AddressEntry = {
+  isDefault: boolean;
+  apartment?: string;
+  area?: string;
+  city?: string;
+  street?: string;
+  zipCode?: string;
+  state?: string;
+  location?: { coordinates?: [number, number] };
+};
+
+type AvailabilityState = {
+  available: boolean;
+  message: string;
+  serviceId?: string | null;
+  serviceLocation?: {
+    id: string;
+    name: string;
+    area?: string;
+    city?: string;
+  } | null;
 };
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -89,7 +115,14 @@ export default function DeepCleaningPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [booking, setBooking] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
+  const [showLocationSelector, setShowLocationSelector] = useState(false);
+  const [availability, setAvailability] = useState<AvailabilityState | null>(null);
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
+  const [requestingService, setRequestingService] = useState(false);
   const prevCat = useRef("bathroom");
+
+  const customerAddresses = profile?.addresses ?? profile?.customerProfile?.addresses ?? [];
 
   useEffect(() => {
     Promise.all([
@@ -113,16 +146,79 @@ export default function DeepCleaningPage() {
     }).finally(() => setLoading(false));
   }, [searchParams]);
 
+  useEffect(() => {
+    const savedLocation = localStorage.getItem("userLocation");
+    if (!savedLocation) return;
+
+    try {
+      const parsed = JSON.parse(savedLocation) as LocationData;
+      if (Number.isFinite(parsed.lat) && Number.isFinite(parsed.lng)) {
+        setSelectedLocation(parsed);
+      }
+    } catch (error) {
+      console.error("Failed to parse saved location", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedLocation || !customerAddresses.length) return;
+
+    const defaultAddress = customerAddresses.find((address) => address.isDefault) || customerAddresses[0];
+    const coordinates = defaultAddress?.location?.coordinates;
+    if (!coordinates || coordinates.length < 2) return;
+
+    setSelectedLocation({
+      lat: Number(coordinates[1]),
+      lng: Number(coordinates[0]),
+      address: defaultAddress.street,
+      area: defaultAddress.area,
+      city: defaultAddress.city,
+      zipCode: defaultAddress.zipCode,
+      isAvailable: true,
+    });
+  }, [customerAddresses, selectedLocation]);
+
+  const refreshAvailability = useCallback(async (location: LocationData | null) => {
+    if (!location) {
+      setAvailability(null);
+      return;
+    }
+
+    try {
+      setCheckingAvailability(true);
+      const response = await api.post("/deep-cleaning/availability", {
+        customerLocation: location,
+      });
+
+      setAvailability({
+        available: Boolean(response.available),
+        message: response.message || "",
+        serviceId: response.serviceId || null,
+        serviceLocation: response.serviceLocation || null,
+      });
+    } catch (error) {
+      console.error(error);
+      setAvailability(null);
+      toast.error(error instanceof Error ? error.message : "Failed to check deep-cleaning availability.");
+    } finally {
+      setCheckingAvailability(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshAvailability(selectedLocation);
+  }, [refreshAvailability, selectedLocation]);
+
   const cartTotal  = useMemo(() => Object.values(cart).reduce((s, e) => s + e.totalPrice, 0), [cart]);
   const cartCount  = useMemo(() => Object.values(cart).reduce((s, e) => s + e.qty, 0), [cart]);
   const minValue   = config?.minimumCartValue ?? 500;
   const belowMin   = cartTotal > 0 && cartTotal < minValue;
+  const canScheduleBooking = Boolean(selectedLocation) && Boolean(availability?.available) && !checkingAvailability && !belowMin;
   const categories = (config?.categories ?? [])
     .filter(c => c.isActive)
     .sort((a, b) => a.sortOrder - b.sortOrder);
   const today      = new Date().toISOString().split("T")[0];
-  const defaultAddr = profile?.customerProfile?.addresses?.find(a => a.isDefault)
-    ?? profile?.customerProfile?.addresses?.[0];
+  const defaultAddr = customerAddresses.find(a => a.isDefault) ?? customerAddresses[0];
 
   const pulse = (id: string) => { setPulsedItem(id); setTimeout(() => setPulsedItem(null), 600); };
 
@@ -190,13 +286,74 @@ export default function DeepCleaningPage() {
 
   const handleBook = async () => {
     if (!bookingDate || !bookingTime || booking) return;
+
+    if (!selectedLocation) {
+      toast.error("Select your location before booking.");
+      setShowLocationSelector(true);
+      return;
+    }
+
+    if (availability?.available === false) {
+      toast.error("Deep cleaning is not available in your selected area yet. Please request service instead.");
+      return;
+    }
+
     setBooking(true);
     try {
-      await api.post("/deep-cleaning/booking", { cartItems: Object.values(cart), totalAmount: cartTotal, bookingDate, startTime: bookingTime });
+      await api.post("/deep-cleaning/booking", {
+        cartItems: Object.values(cart),
+        totalAmount: cartTotal,
+        bookingDate,
+        startTime: bookingTime,
+        customerLocation: selectedLocation,
+      });
       setSuccess(true);
       setTimeout(() => navigate("/customer/bookings"), 2200);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Failed to create booking.");
+    }
     finally { setBooking(false); }
+  };
+
+  const handleLocationConfirmed = async (location: LocationData) => {
+    setSelectedLocation(location);
+    setShowLocationSelector(false);
+    localStorage.setItem("userLocation", JSON.stringify(location));
+  };
+
+  const handleRequestService = async () => {
+    if (!selectedLocation) {
+      toast.error("Select your location first.");
+      setShowLocationSelector(true);
+      return;
+    }
+
+    if (!availability?.serviceId) {
+      toast.error("Deep-cleaning service is not configured yet.");
+      return;
+    }
+
+    try {
+      setRequestingService(true);
+      const response = await serviceAreasAPI.requestUnavailableService({
+        serviceId: availability.serviceId,
+        latitude: selectedLocation.lat,
+        longitude: selectedLocation.lng,
+        address: selectedLocation.address,
+        area: selectedLocation.area,
+        city: selectedLocation.city,
+        zipCode: selectedLocation.zipCode,
+        serviceAreaId: selectedLocation.serviceAreaId,
+      });
+
+      toast.success(response.message || "Service request sent to the super admin.");
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "Failed to submit service request.");
+    } finally {
+      setRequestingService(false);
+    }
   };
 
   const handleCategoryChange = (id: string) => { prevCat.current = activeCategory; setActiveCategory(id); };
@@ -250,6 +407,85 @@ export default function DeepCleaningPage() {
             </div>
           </div>
         </motion.div>
+
+        <div className={`mb-6 rounded-2xl border p-4 ${
+          !selectedLocation
+            ? "border-amber-200 bg-amber-50"
+            : checkingAvailability
+              ? "border-slate-200 bg-slate-50"
+              : availability?.available
+                ? "border-green-200 bg-green-50"
+                : "border-orange-200 bg-orange-50"
+        }`}>
+          {!selectedLocation ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Check service coverage before booking</p>
+                <p className="text-xs text-muted-foreground mt-1">Select your location to see whether deep cleaning is available in your area.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLocationSelector(true)}
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+              >
+                Select location
+              </button>
+            </div>
+          ) : checkingAvailability ? (
+            <div className="flex items-center gap-3 text-sm text-foreground">
+              <motion.div
+                className="h-4 w-4 rounded-full border-2 border-primary border-t-transparent"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}
+              />
+              Checking whether deep cleaning is available in this location...
+            </div>
+          ) : availability?.available ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-green-800">Deep cleaning is available in your area</p>
+                <p className="text-xs text-green-700 mt-1">
+                  {[selectedLocation.area, selectedLocation.city].filter(Boolean).join(", ") || selectedLocation.address || "Selected location"}
+                  {availability.serviceLocation?.name ? ` · Covered by ${availability.serviceLocation.name}` : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLocationSelector(true)}
+                className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-green-800 border border-green-200"
+              >
+                Change location
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-orange-900">Deep cleaning is not available in this area yet</p>
+                <p className="text-xs text-orange-800 mt-1">{availability?.message || "You can request service for this location and the super admin will see it in the demand map."}</p>
+                <p className="text-xs text-orange-700 mt-1">
+                  {[selectedLocation.address, selectedLocation.area, selectedLocation.city].filter(Boolean).join(", ") || "Selected location saved"}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowLocationSelector(true)}
+                  className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-orange-900 border border-orange-200"
+                >
+                  Change location
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRequestService}
+                  disabled={requestingService}
+                  className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {requestingService ? "Sending..." : "Request service"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* ── Category Tabs ─────────────────────────────────────────────────── */}
         <div className="flex gap-2 overflow-x-auto pb-1 mb-1 scrollbar-hide">
@@ -338,10 +574,28 @@ export default function DeepCleaningPage() {
                     <AnimatedTotal value={cartTotal} />
                   </div>
                 </div>
-                <motion.button whileTap={{ scale: 0.95 }} disabled={belowMin}
-                  onClick={() => setShowModal(true)}
+                <motion.button whileTap={{ scale: 0.95 }} disabled={checkingAvailability || (availability?.available ? !canScheduleBooking : requestingService)}
+                  onClick={() => {
+                    if (!selectedLocation) {
+                      setShowLocationSelector(true);
+                      return;
+                    }
+
+                    if (availability?.available) {
+                      setShowModal(true);
+                      return;
+                    }
+
+                    handleRequestService();
+                  }}
                   className="btn-brand px-6 py-3 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed">
-                  Schedule & Book →
+                  {!selectedLocation
+                    ? "Select location →"
+                    : availability?.available
+                      ? "Schedule & Book →"
+                      : requestingService
+                        ? "Sending request..."
+                        : "Request service →"}
                 </motion.button>
               </div>
             </div>
@@ -422,12 +676,19 @@ export default function DeepCleaningPage() {
                   </div>
 
                   {/* Address */}
-                  {defaultAddr && (
+                  {(selectedLocation || defaultAddr) && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       className="mb-5 flex items-start gap-2 p-3 bg-muted rounded-xl">
                       <MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                       <span className="text-sm text-muted-foreground">
-                        {[defaultAddr.apartment, defaultAddr.area, defaultAddr.city].filter(Boolean).join(", ")}
+                        {[
+                          selectedLocation?.address,
+                          selectedLocation?.area,
+                          selectedLocation?.city,
+                          defaultAddr?.apartment,
+                          defaultAddr?.area,
+                          defaultAddr?.city,
+                        ].filter(Boolean).slice(0, 3).join(", ")}
                       </span>
                     </motion.div>
                   )}
@@ -450,6 +711,17 @@ export default function DeepCleaningPage() {
           </>
         )}
       </AnimatePresence>
+
+      {showLocationSelector && (
+        <LocationSelector
+          onLocationConfirmed={handleLocationConfirmed}
+          onClose={() => setShowLocationSelector(false)}
+          showCloseButton={true}
+          defaultLocation={selectedLocation ? { lat: selectedLocation.lat, lng: selectedLocation.lng } : undefined}
+          allowUnavailableConfirmation={true}
+          unavailableConfirmLabel="Use this location to request service"
+        />
+      )}
     </AppLayout>
   );
 }

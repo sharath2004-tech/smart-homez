@@ -48,6 +48,8 @@ interface RequestAnalytics {
   recentRequests: {
     _id: string;
     serviceName: string;
+    customerName?: string;
+    address?: string;
     area?: string;
     city?: string;
     requestCount: number;
@@ -606,10 +608,13 @@ const AdminServiceAreas = () => {
                           </span>
                         </div>
                         <p className="text-muted-foreground">
-                          {[request.area, request.city].filter(Boolean).join(', ') || 'Location saved'}
+                          {request.requestedBy?.name || request.customerName || 'Customer'}
                         </p>
                         <p className="text-muted-foreground">
-                          {request.requestedBy?.name || 'Customer'} • {new Date(request.lastRequestedAt).toLocaleString()}
+                          {request.address || [request.area, request.city].filter(Boolean).join(', ') || 'Location saved'}
+                        </p>
+                        <p className="text-muted-foreground">
+                          {new Date(request.lastRequestedAt).toLocaleString()}
                         </p>
                       </div>
                     ))

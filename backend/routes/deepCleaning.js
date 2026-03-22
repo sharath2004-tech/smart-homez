@@ -173,6 +173,78 @@ const buildVerifiedCartItems = (cartItems, config) => {
   return { verifiedCartItems, calculatedTotal };
 };
 
+const getDeepCleaningService = async () => {
+  const directMatch = await Service.findOne({
+    serviceCategory: 'deep_cleaning',
+    isActive: true,
+  })
+    .select('_id name serviceType workerSearchRadiusKm')
+    .sort({ displayOrder: 1, createdAt: 1 })
+    .lean();
+
+  if (directMatch) {
+    return directMatch;
+  }
+
+  return Service.findOne({
+    isActive: true,
+    $or: [
+      { serviceType: { $regex: '^deep_cleaning', $options: 'i' } },
+      { name: { $regex: 'deep cleaning|move in|move out', $options: 'i' } },
+    ],
+  })
+    .select('_id name serviceType workerSearchRadiusKm')
+    .sort({ createdAt: 1 })
+    .lean();
+};
+
+const getCustomerAddressContext = (customer) => {
+  const defaultAddress = customer?.addresses?.find(a => a.isDefault)
+    || customer?.addresses?.[0]
+    || null;
+
+  return {
+    defaultAddress,
+    savedCoordinates: defaultAddress?.location?.coordinates || customer?.currentLocation?.coordinates || null,
+  };
+};
+
+const normalizeCustomerLocationInput = (customerLocation = {}) => {
+  const latitude = Number(customerLocation?.lat ?? customerLocation?.latitude);
+  const longitude = Number(customerLocation?.lng ?? customerLocation?.longitude);
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return null;
+  }
+
+  return {
+    latitude,
+    longitude,
+    address: customerLocation?.address || '',
+    area: customerLocation?.area || '',
+    city: customerLocation?.city || '',
+    state: customerLocation?.state || '',
+    zipCode: customerLocation?.zipCode || '',
+    serviceAreaId: customerLocation?.serviceAreaId || null,
+  };
+};
+
+const findCoveringLocation = async ({ longitude, latitude, maxDistance }) => {
+  if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
+    return null;
+  }
+
+  return Location.findOne({
+    location: {
+      $near: {
+        $geometry: { type: 'Point', coordinates: [longitude, latitude] },
+        $maxDistance: maxDistance,
+      },
+    },
+    isActive: true,
+  }).lean();
+};
+
 // ─── GET /api/deep-cleaning/config  (public — customers & admins) ───────────
 router.get('/config', async (req, res) => {
   try {
@@ -332,10 +404,79 @@ router.post('/estimate', authenticate, authorize('customer'), async (req, res) =
   }
 });
 
+// ─── POST /api/deep-cleaning/availability  (customers only) ─────────────────
+router.post('/availability', authenticate, authorize('customer'), async (req, res) => {
+  try {
+    const deepCleaningService = await getDeepCleaningService();
+
+    if (!deepCleaningService) {
+      return res.status(404).json({ error: { message: 'Deep cleaning service is not configured', status: 404 } });
+    }
+
+    const customer = await User.findById(req.user._id)
+      .select('addresses currentLocation name')
+      .lean();
+
+    const providedLocation = normalizeCustomerLocationInput(req.body?.customerLocation || req.body);
+    const { defaultAddress, savedCoordinates } = getCustomerAddressContext(customer);
+
+    const latitude = providedLocation?.latitude ?? (savedCoordinates ? Number(savedCoordinates[1]) : null);
+    const longitude = providedLocation?.longitude ?? (savedCoordinates ? Number(savedCoordinates[0]) : null);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return res.status(400).json({
+        error: {
+          message: 'Select your location before checking deep-cleaning availability',
+          status: 400,
+        },
+      });
+    }
+
+    const serviceRadiusKm = Number(deepCleaningService.workerSearchRadiusKm || 50);
+    const coveringLocation = await findCoveringLocation({
+      longitude,
+      latitude,
+      maxDistance: serviceRadiusKm * 1000,
+    });
+
+    res.json({
+      success: true,
+      serviceId: deepCleaningService._id,
+      serviceName: deepCleaningService.name,
+      available: Boolean(coveringLocation),
+      radiusKm: serviceRadiusKm,
+      location: {
+        lat: latitude,
+        lng: longitude,
+        address: providedLocation?.address || defaultAddress?.street || '',
+        area: providedLocation?.area || defaultAddress?.area || '',
+        city: providedLocation?.city || defaultAddress?.city || '',
+        state: providedLocation?.state || defaultAddress?.state || '',
+        zipCode: providedLocation?.zipCode || defaultAddress?.zipCode || '',
+        serviceAreaId: providedLocation?.serviceAreaId || coveringLocation?._id || null,
+      },
+      serviceLocation: coveringLocation
+        ? {
+            id: coveringLocation._id,
+            name: coveringLocation.apartmentName,
+            area: coveringLocation.area,
+            city: coveringLocation.city,
+          }
+        : null,
+      message: coveringLocation
+        ? 'Deep cleaning is available in your selected area.'
+        : 'Deep cleaning is not available in your selected area yet. You can request service for this location.',
+    });
+  } catch (err) {
+    console.error('Deep cleaning availability error:', err);
+    res.status(500).json({ error: { message: err.message, status: 500 } });
+  }
+});
+
 // ─── POST /api/deep-cleaning/booking  (customers only) ───────────────────────
 router.post('/booking', authenticate, authorize('customer'), async (req, res) => {
   try {
-    const { cartItems, bookingDate, startTime, address } = req.body;
+    const { cartItems, bookingDate, startTime, address, customerLocation } = req.body;
 
     if (!cartItems?.length) {
       return res.status(400).json({ error: { message: 'Cart is empty', status: 400 } });
@@ -370,40 +511,49 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
       .select('addresses currentLocation name')
       .lean();
 
-    const defaultAddress = customer?.addresses?.find(a => a.isDefault)
-      || customer?.addresses?.[0];
-
-    // Resolve coordinates from saved address or current location
-    const coords = defaultAddress?.location?.coordinates || customer?.currentLocation?.coordinates;
-    const [customerLng, customerLat] = coords || [null, null];
+    const { defaultAddress, savedCoordinates } = getCustomerAddressContext(customer);
+    const requestedLocation = normalizeCustomerLocationInput(customerLocation);
 
     // Fetch deep cleaning service radius configured by admin (serviceCategory: deep_cleaning)
-    const deepCleanServiceDoc = await Service.findOne({
-      serviceCategory: 'deep_cleaning',
-      isActive: true
-    }).select('workerSearchRadiusKm').lean();
+    const deepCleanServiceDoc = await getDeepCleaningService();
     const deepCleanRadiusMeters = (deepCleanServiceDoc?.workerSearchRadiusKm || 50) * 1000;
 
-    // $near lookup to resolve the Location doc (needed for admin region filter + worker assignment)
-    let nearbyLocation = null;
-    if (customerLng != null && customerLat != null) {
-      nearbyLocation = await Location.findOne({
-        location: {
-          $near: {
-            $geometry: { type: 'Point', coordinates: [customerLng, customerLat] },
-            $maxDistance: deepCleanRadiusMeters // from admin-configured service radius
-          }
+    const customerLng = requestedLocation?.longitude ?? (savedCoordinates ? Number(savedCoordinates[0]) : null);
+    const customerLat = requestedLocation?.latitude ?? (savedCoordinates ? Number(savedCoordinates[1]) : null);
+
+    if (!Number.isFinite(customerLng) || !Number.isFinite(customerLat)) {
+      return res.status(400).json({
+        error: {
+          message: 'Select your location before booking deep cleaning',
+          status: 400,
         },
-        isActive: true
+      });
+    }
+
+    // $near lookup to resolve the Location doc (needed for admin region filter + worker assignment)
+    const nearbyLocation = await findCoveringLocation({
+      longitude: customerLng,
+      latitude: customerLat,
+      maxDistance: deepCleanRadiusMeters,
+    });
+
+    if (!nearbyLocation) {
+      return res.status(403).json({
+        error: {
+          message: 'Deep cleaning is not available in your selected location. Please request service for this area.',
+          status: 403,
+        },
+        serviceUnavailable: true,
+        serviceId: deepCleanServiceDoc?._id || null,
       });
     }
 
     const locationData = address || {
-      locationId:    nearbyLocation?._id || null,
+      locationId:    requestedLocation?.serviceAreaId || nearbyLocation?._id || null,
       apartmentName: defaultAddress?.apartment  || nearbyLocation?.apartmentName || '',
-      area:          defaultAddress?.area        || nearbyLocation?.area || '',
-      city:          defaultAddress?.city        || nearbyLocation?.city || '',
-      address:       defaultAddress?.street      || ''
+      area:          requestedLocation?.area     || defaultAddress?.area || nearbyLocation?.area || '',
+      city:          requestedLocation?.city     || defaultAddress?.city || nearbyLocation?.city || '',
+      address:       requestedLocation?.address  || defaultAddress?.street || ''
     };
 
     const notesSummary = verifiedCartItems

@@ -42,9 +42,18 @@ interface Props {
   onClose?: () => void;
   defaultLocation?: { lat: number; lng: number };
   showCloseButton?: boolean;
+  allowUnavailableConfirmation?: boolean;
+  unavailableConfirmLabel?: string;
 }
 
-const LocationSelector = ({ onLocationConfirmed, onClose, defaultLocation, showCloseButton = false }: Props) => {
+const LocationSelector = ({
+  onLocationConfirmed,
+  onClose,
+  defaultLocation,
+  showCloseButton = false,
+  allowUnavailableConfirmation = false,
+  unavailableConfirmLabel = "Use this location",
+}: Props) => {
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -320,6 +329,24 @@ const LocationSelector = ({ onLocationConfirmed, onClose, defaultLocation, showC
     onLocationConfirmed(locationData);
   };
 
+  const handleConfirmUnavailableLocation = () => {
+    if (!selectedLocation || !availabilityInfo) {
+      alert("Please select a location on the map first.");
+      return;
+    }
+
+    onLocationConfirmed({
+      lat: selectedLocation.lat,
+      lng: selectedLocation.lng,
+      address: availabilityInfo.address,
+      area: availabilityInfo.area,
+      city: availabilityInfo.city,
+      zipCode: availabilityInfo.zipCode,
+      isAvailable: false,
+      serviceAreaId: availabilityInfo.serviceArea?.id,
+    });
+  };
+
   return (
     <div className="fixed inset-0 bg-background z-50 flex flex-col">
       {/* Header */}
@@ -434,10 +461,10 @@ const LocationSelector = ({ onLocationConfirmed, onClose, defaultLocation, showC
                 </div>
               </div>
               <button
-                onClick={() => alert("We'll notify you when we expand to your area!")}
+                onClick={allowUnavailableConfirmation ? handleConfirmUnavailableLocation : () => alert("We'll notify you when we expand to your area!")}
                 className="w-full bg-muted text-foreground py-3 rounded-lg text-sm font-medium hover:bg-border transition-colors"
               >
-                Notify Me When Available
+                {allowUnavailableConfirmation ? unavailableConfirmLabel : "Notify Me When Available"}
               </button>
             </>
           )}
