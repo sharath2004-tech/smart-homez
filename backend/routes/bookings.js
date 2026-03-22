@@ -319,6 +319,7 @@ router.get('/booked-slots', authenticate, async (req, res) => {
 
     // ── Resolve nearest Location from coordinates ─────────────────────────────
     let targetLocationId = locationId;
+    let targetLocation = null;
     if (!targetLocationId && lng && lat) {
       const customerLng = parseFloat(lng);
       const customerLat = parseFloat(lat);
@@ -332,9 +333,18 @@ router.get('/booked-slots', authenticate, async (req, res) => {
           },
           isActive: true,
           isServiceAvailable: true
-        });
-        if (nearbyLocation) targetLocationId = nearbyLocation._id.toString();
+        }).select('_id assignedWorkers').lean();
+        if (nearbyLocation) {
+          targetLocation = nearbyLocation;
+          targetLocationId = nearbyLocation._id.toString();
+        }
       }
+    }
+
+    if (!targetLocation && targetLocationId) {
+      targetLocation = await Location.findById(targetLocationId)
+        .select('_id assignedWorkers')
+        .lean();
     }
 
     // ── Booked ranges for this date ───────────────────────────────────────────
@@ -356,19 +366,28 @@ router.get('/booked-slots', authenticate, async (req, res) => {
     // Filter by service specialization — only show specialists for this service
     if (serviceId) {
       serviceDoc = await Service.findById(serviceId)
-        .select('category availableInAllLocations')
+        .select('category')
         .lean();
       if (serviceDoc?.category) {
         workerQuery['workerProfile.specialization'] = { $in: [serviceDoc.category] };
       }
     }
 
-    const useLocationScopedWorkers = Boolean(targetLocationId) && !serviceDoc?.availableInAllLocations;
+    // Region-only worker visibility: count only workers mapped to the resolved
+    // location, never all workers from other regions.
+    if (targetLocationId) {
+      const locationAssignedWorkerIds = (targetLocation?.assignedWorkers || [])
+        .map(entry => entry?.worker?.toString())
+        .filter(Boolean);
 
-    // Filter by assigned location unless the service is configured to be
-    // available across all locations / worker pools.
-    if (useLocationScopedWorkers) {
-      workerQuery['workerProfile.assignedApartments.locationId'] = targetLocationId;
+      if (locationAssignedWorkerIds.length > 0) {
+        workerQuery.$or = [
+          { _id: { $in: locationAssignedWorkerIds } },
+          { 'workerProfile.assignedApartments.locationId': targetLocationId }
+        ];
+      } else {
+        workerQuery['workerProfile.assignedApartments.locationId'] = targetLocationId;
+      }
     }
 
     // Filter by gender preference
@@ -391,24 +410,6 @@ router.get('/booked-slots', authenticate, async (req, res) => {
       workers = await User.find(fallbackWithoutSpecialization)
         .select('_id gender workerProfile.leaves')
         .lean();
-    }
-
-    // Graceful fallback: if no workers are found for the resolved location,
-    // broaden the pool to all active matching workers so the customer does not
-    // see a misleading 0 when worker assignments are incomplete.
-    if (workers.length === 0 && useLocationScopedWorkers) {
-      const fallbackWorkerQuery = { ...workerQuery };
-      delete fallbackWorkerQuery['workerProfile.assignedApartments.locationId'];
-      workers = await User.find(fallbackWorkerQuery)
-        .select('_id gender workerProfile.leaves')
-        .lean();
-
-      if (workers.length === 0 && fallbackWorkerQuery['workerProfile.specialization']) {
-        delete fallbackWorkerQuery['workerProfile.specialization'];
-        workers = await User.find(fallbackWorkerQuery)
-          .select('_id gender workerProfile.leaves')
-          .lean();
-      }
     }
 
     // Remove workers on approved leave for this date
