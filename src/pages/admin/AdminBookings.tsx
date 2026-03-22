@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import BookingOrderPrint from "@/components/BookingOrderPrint";
 import { useAdminRole } from "@/hooks/useAdminRole";
-import { bookingsAPI, superAdminAPI } from "@/lib/api";
+import { adminAPI, bookingsAPI, superAdminAPI } from "@/lib/api";
 import ExcelJS from "exceljs";
 import html2pdf from "html2pdf.js";
 import { CheckCircle, Coffee, Crown, Download, Eye, MapPin, Printer, Search, Users, Wallet, X } from "lucide-react";
@@ -91,6 +91,8 @@ const AdminBookings = () => {
   const [allWorkers, setAllWorkers] = useState<{ _id: string; name: string; email: string }[]>([]);
   const [workerSearch, setWorkerSearch] = useState('');
   const [teamActionLoading, setTeamActionLoading] = useState(false);
+  const [workersLoading, setWorkersLoading] = useState(false);
+  const [workerListError, setWorkerListError] = useState<string | null>(null);
 
   // Print state
   const [showPrintModal, setShowPrintModal] = useState(false);
@@ -216,11 +218,23 @@ const AdminBookings = () => {
   const openManageTeam = async (booking: Booking) => {
     setSelectedTeamBooking(booking);
     setWorkerSearch('');
+    setWorkerListError(null);
     if (allWorkers.length === 0) {
       try {
-        const res = await superAdminAPI.getWorkers();
+        setWorkersLoading(true);
+        const res = isSuperAdmin
+          ? await superAdminAPI.getWorkers(selectedLocation || undefined)
+          : await adminAPI.getWorkers();
         setAllWorkers(res.workers || []);
-      } catch (e) { console.error(e); }
+        if (res.noRegionAssigned) {
+          setWorkerListError('No region is assigned to this admin, so workers cannot be loaded yet.');
+        }
+      } catch (e) {
+        console.error(e);
+        setWorkerListError((e as Error).message || 'Failed to load workers');
+      } finally {
+        setWorkersLoading(false);
+      }
     }
   };
 
@@ -779,7 +793,14 @@ const AdminBookings = () => {
                     />
                   </div>
                   <div className="max-h-48 overflow-y-auto space-y-1 border border-border rounded-xl p-2">
-                    {allWorkers
+                    {workersLoading && (
+                      <p className="text-sm text-muted-foreground text-center py-4">Loading workers...</p>
+                    )}
+                    {!workersLoading && workerListError && (
+                      <p className="text-sm text-red-600 text-center py-4">{workerListError}</p>
+                    )}
+                    {!workersLoading && !workerListError &&
+                      allWorkers
                       .filter(w => {
                         const alreadyTeamHead = selectedTeamBooking.worker?._id === w._id;
                         const alreadySupport = selectedTeamBooking.supportStaff?.some(s => s.worker._id === w._id);
@@ -813,7 +834,7 @@ const AdminBookings = () => {
                           </div>
                         </div>
                       ))}
-                    {allWorkers.filter(w => {
+                    {!workersLoading && !workerListError && allWorkers.filter(w => {
                       const alreadyTeamHead = selectedTeamBooking.worker?._id === w._id;
                       const alreadySupport = selectedTeamBooking.supportStaff?.some(s => s.worker._id === w._id);
                       const matchSearch = w.name.toLowerCase().includes(workerSearch.toLowerCase());
