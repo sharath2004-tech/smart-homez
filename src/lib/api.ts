@@ -1525,6 +1525,40 @@ export const helpAPI = {
   }
 };
 
+// ====== Expense Categories API ======
+export const expenseCategoriesAPI = {
+  getAll: async () => {
+    return apiCall('/expense-categories');
+  },
+
+  create: async (data: {
+    name: string;
+    icon?: string;
+    color?: string;
+  }) => {
+    return apiCall('/expense-categories', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  update: async (id: string, data: {
+    name?: string;
+    icon?: string;
+    color?: string;
+    isActive?: boolean;
+  }) => {
+    return apiCall(`/expense-categories/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiCall(`/expense-categories/${id}`, { method: 'DELETE' });
+  }
+};
+
 // ====== Business Expenses API ======
 export const businessExpensesAPI = {
   create: async (data: {

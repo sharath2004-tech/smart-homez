@@ -12,24 +12,9 @@ const businessExpenseSchema = new mongoose.Schema({
     min: 0
   },
   category: {
-    type: String,
-    required: [true, 'Category is required'],
-    enum: [
-      'deep_cleaning_material',
-      'equipment',
-      'utilities',
-      'salary',
-      'rent',
-      'marketing',
-      'transport',
-      'training',
-      'maintenance',
-      'other'
-    ]
-  },
-  customCategory: {
-    type: String,
-    trim: true
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ExpenseCategory',
+    required: [true, 'Category is required']
   },
   description: {
     type: String,
