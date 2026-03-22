@@ -105,6 +105,16 @@ const AdminServiceAreas = () => {
     color: "#10b981"
   });
 
+  const updateSelectedLocation = (location: { lat: number; lng: number } | null) => {
+    setSelectedLocation(location);
+    if (!location) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      coordinates: location,
+    }));
+  };
+
   const getRequestCoordinates = (request: RequestAnalytics['recentRequests'][number]) => {
     const coordinates = request.location?.coordinates;
     if (!coordinates || coordinates.length !== 2) return null;
@@ -141,11 +151,7 @@ const AdminServiceAreas = () => {
     // Add click handler for adding new service areas
     map.on("click", (e: L.LeafletMouseEvent) => {
       if (isAddingNewRef.current) {
-        setSelectedLocation({ lat: e.latlng.lat, lng: e.latlng.lng });
-        setFormData(prev => ({
-          ...prev,
-          coordinates: { lat: e.latlng.lat, lng: e.latlng.lng }
-        }));
+        updateSelectedLocation({ lat: e.latlng.lat, lng: e.latlng.lng });
       } else if (roleRef.current === 'super_admin') {
         setAnalyticsCenter({ lat: e.latlng.lat, lng: e.latlng.lng });
       }
@@ -354,7 +360,7 @@ const AdminServiceAreas = () => {
   const handleStartAdding = () => {
     setIsAddingNew(true);
     setEditingId(null);
-    setSelectedLocation(null);
+    updateSelectedLocation(null);
     setFormData({
       name: "",
       description: "",
@@ -368,7 +374,7 @@ const AdminServiceAreas = () => {
 
   const handleCancelAdding = () => {
     setIsAddingNew(false);
-    setSelectedLocation(null);
+    updateSelectedLocation(null);
     setEditingId(null);
   };
 
@@ -415,7 +421,7 @@ const AdminServiceAreas = () => {
   const handleEditArea = (area: ServiceArea) => {
     setIsAddingNew(true);
     setEditingId(area._id || null);
-    setSelectedLocation(area.coordinates);
+    updateSelectedLocation(area.coordinates);
     setFormData(area);
     
     // Pan map to area
@@ -475,6 +481,37 @@ const AdminServiceAreas = () => {
     mapRef.current.setView([coordinates.lat, coordinates.lng], Math.max(mapRef.current.getZoom(), 13));
     const markerEntry = markersRef.current.get(`request-${request._id}`);
     markerEntry?.marker.openPopup();
+  };
+
+  const handleCoordinateInputChange = (field: 'lat' | 'lng', value: string) => {
+    const numericValue = Number(value);
+
+    setFormData((prev) => ({
+      ...prev,
+      coordinates: {
+        ...prev.coordinates,
+        [field]: value === '' ? prev.coordinates[field] : numericValue,
+      },
+    }));
+
+    if (value === '' || Number.isNaN(numericValue)) {
+      return;
+    }
+
+    const nextLocation = {
+      lat: field === 'lat' ? numericValue : (selectedLocation?.lat ?? formData.coordinates.lat),
+      lng: field === 'lng' ? numericValue : (selectedLocation?.lng ?? formData.coordinates.lng),
+    };
+
+    if (nextLocation.lat < -90 || nextLocation.lat > 90 || nextLocation.lng < -180 || nextLocation.lng > 180) {
+      return;
+    }
+
+    setSelectedLocation(nextLocation);
+
+    if (mapRef.current) {
+      mapRef.current.setView([nextLocation.lat, nextLocation.lng], Math.max(mapRef.current.getZoom(), 12));
+    }
   };
 
   return (
@@ -749,6 +786,44 @@ const AdminServiceAreas = () => {
                   <p className="text-xs text-muted-foreground mt-1">
                     Coverage area: ~{(Math.PI * formData.radiusKm * formData.radiusKm).toFixed(1)} km²
                   </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Increase or decrease this radius to expand or shrink the service region.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                      Latitude
+                    </label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      min="-90"
+                      max="90"
+                      value={selectedLocation?.lat ?? formData.coordinates.lat}
+                      onChange={(e) => handleCoordinateInputChange('lat', e.target.value)}
+                      className="input-clean"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                      Longitude
+                    </label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      min="-180"
+                      max="180"
+                      value={selectedLocation?.lng ?? formData.coordinates.lng}
+                      onChange={(e) => handleCoordinateInputChange('lng', e.target.value)}
+                      className="input-clean"
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+                  Click on the map or edit the coordinates above to move the service region center.
                 </div>
 
                 <div>
@@ -854,6 +929,13 @@ const AdminServiceAreas = () => {
                         }`}
                       >
                         {area.isActive ? '✅ Active' : '❌ Inactive'}
+                      </button>
+
+                      <button
+                        onClick={() => handleEditArea(area)}
+                        className="mt-2 w-full py-1.5 px-3 rounded text-xs font-medium bg-primary/10 text-primary hover:bg-primary/15 transition-colors"
+                      >
+                        ✏️ Edit location / region
                       </button>
                     </div>
                   ))
