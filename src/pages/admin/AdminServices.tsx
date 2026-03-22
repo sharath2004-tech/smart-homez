@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { authAPI, servicesAPI, superAdminAPI } from "@/lib/api";
-import { AlertTriangle, CheckCircle, ChevronRight, Clock, Edit, Info, Plus, Save, Search, Trash2, X, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle, Clock, Edit, Info, Plus, Save, Search, Trash2, X, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -75,6 +75,9 @@ interface Service {
     type: 'per_hour' | 'per_session';
     rate: number;
   };
+  workerSearchRadiusKm?: number;
+  serviceCategory?: string;
+  displayOrder?: number;
 }
 
 interface UserProfile {
@@ -149,6 +152,8 @@ const SERVICE_TYPE_CARDS = [
       category: 'cleaning',
       price: 149,
       duration: 60,
+      workerSearchRadiusKm: 0.5,
+      serviceCategory: 'instant_services',
     }
   },
   {
@@ -166,6 +171,8 @@ const SERVICE_TYPE_CARDS = [
       price: 2999,
       duration: 240,
       isQuoteService: true,
+      workerSearchRadiusKm: 30,
+      serviceCategory: 'deep_cleaning',
     }
   },
   {
@@ -182,6 +189,8 @@ const SERVICE_TYPE_CARDS = [
       category: 'cleaning',
       price: 499,
       duration: 60,
+      workerSearchRadiusKm: 2,
+      serviceCategory: 'subscription_services',
     }
   },
   {
@@ -198,6 +207,8 @@ const SERVICE_TYPE_CARDS = [
       category: 'cleaning',
       price: 399,
       duration: 45,
+      workerSearchRadiusKm: 5,
+      serviceCategory: 'spot_cleaning',
     }
   }
 ];
@@ -211,8 +222,7 @@ const AdminServices = () => {
   const [groupByCategory, setGroupByCategory] = useState(false); // Group services by category
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [showTypeSelector, setShowTypeSelector] = useState(false);
-  const [selectedServiceType, setSelectedServiceType] = useState<string | null>(null);
+  const [selectedServiceType, setSelectedServiceType] = useState<string>('other');
   const [pendingRequests, setPendingRequests] = useState<ServiceRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [rejectModalId, setRejectModalId] = useState<string | null>(null);
@@ -241,7 +251,10 @@ const AdminServices = () => {
     dos: [],
     donts: [],
     defaultWorkerCount: 1,
-    workerWage: { type: 'per_hour', rate: 0 }
+    workerWage: { type: 'per_hour', rate: 0 },
+    workerSearchRadiusKm: 10,
+    serviceCategory: 'other',
+    displayOrder: 0,
   });  const isSuperAdmin = profile?.role === 'super_admin';
 
   useEffect(() => {
@@ -305,28 +318,13 @@ const AdminServices = () => {
     }
   };
 
-  const handleTypeSelect = (typeCard: typeof SERVICE_TYPE_CARDS[0]) => {
-    const p = typeCard.defaults;
-    const basePrice = p.price;
-    setSelectedServiceType(typeCard.id);
-    setFormData(prev => ({
-      ...prev,
-      name: p.name,
-      description: p.description,
-      category: p.category,
-      price: basePrice,
-      duration: p.duration,
-      pricingPlans: {
-        oneTime: basePrice,
-        daily: Math.round(basePrice * 0.85),
-        weekly: Math.round(basePrice * 0.75 * 7),
-        monthly: Math.round(basePrice * 0.65 * 30)
-      },
-      // For subscription type, keep existing default plans; otherwise clear
-      subscriptionPlans: typeCard.id === 'monthly_subscription' ? prev.subscriptionPlans : [],
-      isQuoteService: (p as typeof p & { isQuoteService?: boolean }).isQuoteService ?? false,
-    }));
-    setShowTypeSelector(false);
+  // Opens the create form pre-set to a service type (from the Coverage Checklist)
+  // No values are auto-filled — super admin configures everything manually
+  const handleTypeSelect = (typeId: string) => {
+    resetForm();
+    setSelectedServiceType(typeId);
+    setFormData(prev => ({ ...prev, serviceType: typeId }));
+    setEditingId(null);
     setShowForm(true);
   };
 
@@ -354,7 +352,7 @@ const AdminServices = () => {
         // Strip UI-only _priceMode field before sending to backend
         const payload = {
           ...formData,
-          serviceType: selectedServiceType || formData.serviceType || 'other', // CRITICAL: Preserve serviceType on edit!
+          serviceType: formData.serviceType || 'other',
           durationOptions: (formData.durationOptions || []).map((tier: any) => {
             const { _priceMode, ...cleanTier } = tier;
             return cleanTier;
@@ -364,11 +362,12 @@ const AdminServices = () => {
         toast.success('Service updated!');
         fetchData();
       } else {
+        const serviceType = formData.serviceType || 'other';
         const res = await servicesAPI.create({
           ...formData,
-          serviceType: selectedServiceType || 'other',
-          serviceTypeName: SERVICE_TYPE_CARDS.find(c => c.id === selectedServiceType)?.label || formData.name,
-          ...(MINI_SERVICE_IDS.has(selectedServiceType ?? '') && {
+          serviceType,
+          serviceTypeName: SERVICE_TYPE_CARDS.find(c => c.id === serviceType)?.label || formData.name,
+          ...(MINI_SERVICE_IDS.has(serviceType) && {
             tags: ['mini-service', 'spot-clean']
           })
         });
@@ -382,7 +381,7 @@ const AdminServices = () => {
 
       setShowForm(false);
       setEditingId(null);
-      setSelectedServiceType(null);
+      setSelectedServiceType('other');
       resetForm();
     } catch (error) {
       console.error('Error saving service:', error);
@@ -418,8 +417,11 @@ const AdminServices = () => {
       donts: (service as any).donts || [],
       defaultWorkerCount: (service as any).defaultWorkerCount ?? 1,
       workerWage: (service as any).workerWage || { type: 'per_hour', rate: 0 },
+      workerSearchRadiusKm: (service as any).workerSearchRadiusKm ?? 10,
+      serviceCategory: (service as any).serviceCategory ?? 'other',
+      displayOrder: (service as any).displayOrder ?? 0,
     });
-    setSelectedServiceType(service.serviceType || null);
+    setSelectedServiceType(service.serviceType || 'other');
     setEditingId(service._id!);
     setShowForm(true);
   };
@@ -465,6 +467,9 @@ const AdminServices = () => {
       donts: [],
       defaultWorkerCount: 1,
       workerWage: { type: 'per_hour', rate: 0 },
+      workerSearchRadiusKm: 10,
+      serviceCategory: 'other',
+      displayOrder: 0,
     });
   };
 
@@ -543,6 +548,13 @@ const AdminServices = () => {
             {service.isQuoteService && (
               <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-100 text-green-800 font-semibold">
                 ✨ Deep Cleaning Cart
+              </span>
+            )}
+            {(service as any).workerSearchRadiusKm != null && (
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-800 font-medium">
+                📍 {(service as any).workerSearchRadiusKm < 1
+                  ? `${Math.round((service as any).workerSearchRadiusKm * 1000)}m`
+                  : `${(service as any).workerSearchRadiusKm}km`} radius
               </span>
             )}
           </div>
@@ -629,22 +641,8 @@ const AdminServices = () => {
               onClick={() => {
                 resetForm();
                 setEditingId(null);
-                setSelectedServiceType('instant_hourly'); // Pre-select Quick Book
-                setShowTypeSelector(false);
+                setSelectedServiceType('other');
                 setShowForm(true);
-              }}
-              className="btn-secondary flex items-center gap-2"
-              title="Quickly add a Quick Book service"
-            >
-              <Plus className="w-4 h-4" />
-              🧹 Quick Book Service
-            </button>
-            <button
-              onClick={() => {
-                resetForm();
-                setEditingId(null);
-                setSelectedServiceType(null);
-                setShowTypeSelector(true);
               }}
               className="btn-brand flex items-center gap-2"
             >
@@ -703,7 +701,7 @@ const AdminServices = () => {
                   </button>
                 ) : (
                   <button
-                    onClick={() => handleTypeSelect(item)}
+                    onClick={() => handleTypeSelect(item.id)}
                     className="text-xs px-2 py-1 rounded-md bg-amber-600 hover:bg-amber-700 text-white font-medium shrink-0"
                   >
                     Setup
@@ -898,55 +896,6 @@ const AdminServices = () => {
           </div>
         )}
 
-        {/* Service Type Selector Modal */}
-        {showTypeSelector && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-            <div className="bg-card rounded-2xl max-w-2xl w-full shadow-2xl">
-              <div className="p-6 border-b border-border flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-bold text-foreground">Choose Service Type</h2>
-                  <p className="text-sm text-muted-foreground mt-0.5">Select the type of service you want to {isSuperAdmin ? 'create' : 'request'}</p>
-                </div>
-                <button onClick={() => setShowTypeSelector(false)} className="p-2 hover:bg-muted rounded-lg">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="p-6 grid gap-4">
-                {SERVICE_TYPE_CARDS.map((card) => (
-                  <button
-                    key={card.id}
-                    onClick={() => handleTypeSelect(card)}
-                    className={`w-full text-left p-5 rounded-xl border-2 bg-gradient-to-r ${card.color} hover:scale-[1.01] transition-all group`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <span className="text-4xl">{card.emoji}</span>
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-bold text-foreground text-lg">{card.label}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${card.badge}`}>{card.id.replace('_', ' ')}</span>
-                          </div>
-                          <p className="text-sm font-medium text-foreground/80">{card.tagline}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">{card.description}</p>
-                        </div>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
-                    </div>
-                  </button>
-                ))}
-              </div>
-              {!isSuperAdmin && (
-                <div className="px-6 pb-6">
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2 text-sm text-amber-800">
-                    <Info className="w-4 h-4 mt-0.5 shrink-0" />
-                    <span>Your service request will be sent to the <strong>Super Admin</strong> for approval before going live.</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Add/Edit Form Modal */}
         {showForm && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -954,13 +903,11 @@ const AdminServices = () => {
               <div className="sticky top-0 bg-card border-b border-border p-3 sm:p-4 md:p-5 flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-bold text-foreground">
-                    {editingId ? 'Edit Service' : SERVICE_TYPE_CARDS.find(c => c.id === selectedServiceType)?.label || 'New Service'}
+                    {editingId ? 'Edit Service' : 'Create Service'}
                   </h2>
-                  {!editingId && selectedServiceType && (
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                      {SERVICE_TYPE_CARDS.find(c => c.id === selectedServiceType)?.tagline}
-                    </p>
-                  )}
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    {editingId ? 'Update all service settings below' : 'Configure all settings — nothing is pre-filled'}
+                  </p>
                 </div>
                 <button
                   onClick={() => {
@@ -995,39 +942,6 @@ const AdminServices = () => {
                   />
                 </div>
 
-                {/* Mini-service subtype selector */}
-                {MINI_SERVICE_IDS.has(selectedServiceType ?? '') && (
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Service Sub-type *
-                    </label>
-                    <select
-                      value={selectedServiceType ?? ''}
-                      onChange={(e) => {
-                        const chosen = MINI_SERVICE_TYPES.find(t => t.id === e.target.value);
-                        if (!chosen) return;
-                        setSelectedServiceType(chosen.id);
-                        setFormData(prev => ({
-                          ...prev,
-                          price: chosen.price,
-                          duration: chosen.duration,
-                          pricingPlans: {
-                            oneTime: chosen.price,
-                            daily: Math.round(chosen.price * 0.85),
-                            weekly: Math.round(chosen.price * 0.75 * 7),
-                            monthly: Math.round(chosen.price * 0.65 * 30)
-                          }
-                        }));
-                      }}
-                      className="input-clean"
-                    >
-                      {MINI_SERVICE_TYPES.map(t => (
-                        <option key={t.id} value={t.id}>{t.label} — ₹{t.price}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
                     Description *
@@ -1039,6 +953,80 @@ const AdminServices = () => {
                     rows={3}
                     required
                   />
+                </div>
+
+                {/* Service Type — full dropdown, admin picks manually */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Service Type *
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">determines pricing model & worker matching</span>
+                  </label>
+                  <select
+                    value={formData.serviceType || 'other'}
+                    onChange={(e) => {
+                      const t = e.target.value;
+                      setSelectedServiceType(t);
+                      setFormData(prev => ({ ...prev, serviceType: t }));
+                    }}
+                    className="input-clean"
+                    required
+                  >
+                    <optgroup label="⚡ Instant / On-Demand">
+                      <option value="instant_hourly">Insta Maid — Hourly on-demand</option>
+                    </optgroup>
+                    <optgroup label="🔄 Subscription">
+                      <option value="monthly_subscription">Monthly Subscription — Recurring visits</option>
+                    </optgroup>
+                    <optgroup label="🏠 Deep Cleaning">
+                      <option value="deep_cleaning_full_house">Full House Deep Clean</option>
+                      <option value="deep_cleaning_room">Room Deep Clean</option>
+                      <option value="deep_cleaning_kitchen">Kitchen Deep Clean</option>
+                      <option value="deep_cleaning_bathroom">Bathroom Deep Clean</option>
+                      <option value="deep_cleaning_commercial">Commercial / Office Deep Clean</option>
+                    </optgroup>
+                    <optgroup label="🧽 Spot / Single-Item Clean">
+                      <option value="fixed_sofa_cleaning">Sofa Cleaning</option>
+                      <option value="fixed_carpet_cleaning">Carpet Cleaning</option>
+                      <option value="fixed_window_cleaning">Window Cleaning</option>
+                      <option value="fixed_fan_cleaning">Fan Cleaning</option>
+                      <option value="fixed_balcony_cleaning">Balcony Cleaning</option>
+                      <option value="fixed_door_cleaning">Glass Door Cleaning</option>
+                    </optgroup>
+                    <optgroup label="🚿 Bathroom / Washroom">
+                      <option value="fixed_washroom_basic">Washroom Basic Clean</option>
+                      <option value="fixed_washroom_deep">Washroom Deep Clean</option>
+                      <option value="fixed_washbasin_cleaning">Washbasin Cleaning</option>
+                    </optgroup>
+                    <optgroup label="🍳 Kitchen Appliances">
+                      <option value="fixed_fridge_cleaning">Fridge Deep Clean</option>
+                      <option value="fixed_microwave_cleaning">Microwave Cleaning</option>
+                      <option value="fixed_oven_cleaning">OTG / Oven Cleaning</option>
+                      <option value="fixed_stove_cleaning">Gas Stove Cleaning</option>
+                      <option value="fixed_chimney_cleaning">Chimney Cleaning</option>
+                      <option value="fixed_kitchen_platform_cleaning">Kitchen Platform & Tiles</option>
+                      <option value="fixed_sink_cleaning">Sink Cleaning</option>
+                      <option value="kitchen_appliances_package">Kitchen Package (Full)</option>
+                    </optgroup>
+                    <optgroup label="🛋️ Furniture">
+                      <option value="fixed_dining_cleaning">Dining Table & Chairs</option>
+                      <option value="fixed_cabinet_cleaning">Showcase Cabinet</option>
+                      <option value="fixed_cupboard_cleaning">Cupboards</option>
+                      <option value="fixed_utility_cleaning">Utility Area</option>
+                      <option value="fixed_bed_cleaning">Bed Cleaning</option>
+                      <option value="fixed_mirror_cleaning">Mirror Cleaning</option>
+                      <option value="bedroom_package">Bedroom Package (Full)</option>
+                    </optgroup>
+                    <optgroup label="❄️ HVAC / AC">
+                      <option value="fixed_ac_indoor_cleaning">AC Indoor Unit</option>
+                      <option value="fixed_ac_outdoor_cleaning">AC Outdoor Unit</option>
+                    </optgroup>
+                    <optgroup label="🪟 Windows">
+                      <option value="fixed_window_mesh_cleaning">Window Mesh Cleaning</option>
+                    </optgroup>
+                    <optgroup label="📦 Other">
+                      <option value="other">Other / Custom</option>
+                    </optgroup>
+                  </select>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1080,9 +1068,6 @@ const AdminServices = () => {
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
                     Base Price (₹) *
-                    {selectedServiceType === 'instant_hourly' && (
-                      <span className="ml-2 text-xs font-normal text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">per hour — shown to customers</span>
-                    )}
                   </label>
                   <input
                     type="number"
@@ -1098,43 +1083,30 @@ const AdminServices = () => {
                   </p>
                 </div>
 
-                {/* MRP / Original Price — for Insta service only */}
-                {selectedServiceType === 'instant_hourly' && (
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      MRP / Original Price (₹)
-                      <span className="ml-2 text-xs font-normal text-muted-foreground">shown as strikethrough</span>
-                    </label>
-                    <input
-                      type="number"
-                      value={(formData as any).originalPrice || ''}
-                      onChange={(e) => setFormData({ ...formData, originalPrice: Number(e.target.value) } as any)}
-                      className="input-clean"
-                      min="0"
-                      step="10"
-                      placeholder="e.g. 190"
-                    />
-                    {(formData as any).originalPrice > formData.price && (
-                      <p className="text-xs text-green-600 mt-1 font-medium">
-                        {Math.round((1 - formData.price / (formData as any).originalPrice) * 100)}% discount shown to customers
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-1">Leave 0 to hide the strikethrough price.</p>
-                  </div>
-                )}
+                {/* MRP / Original Price */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    MRP / Original Price (₹)
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">displayed as strikethrough to customers</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={(formData as any).originalPrice || ''}
+                    onChange={(e) => setFormData({ ...formData, originalPrice: Number(e.target.value) } as any)}
+                    className="input-clean"
+                    min="0"
+                    step="10"
+                    placeholder="e.g. 190"
+                  />
+                  {(formData as any).originalPrice > formData.price && (
+                    <p className="text-xs text-green-600 mt-1 font-medium">
+                      {Math.round((1 - formData.price / (formData as any).originalPrice) * 100)}% discount shown to customers
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">Leave 0 to hide the strikethrough price.</p>
+                </div>
 
-                {/* Subscription Plans Section — hidden for monthly_subscription (uses Duration Tiers instead) */}
-                {selectedServiceType === 'monthly_subscription' ? (
-                  <div className="p-4 bg-purple-50 border border-purple-300 rounded-lg space-y-1">
-                    <p className="text-sm font-semibold text-purple-900">📅 Pricing for Subscription Plans</p>
-                    <p className="text-xs text-purple-700">
-                      For subscription services, customer-facing pricing is set via <strong>Session Hours Pricing (Duration Tiers)</strong> below — e.g. 1h/day → ₹3500/mo, 2h/day → ₹5500/mo.
-                    </p>
-                    <p className="text-xs text-purple-600 mt-1">
-                      The "Subscription Plans" frequency tiers (Daily/Weekly/Monthly) are not used on the subscription booking page.
-                    </p>
-                  </div>
-                ) : (
+                {/* Subscription Plans Section */}
                 <div className="space-y-3 p-4 bg-gradient-to-br from-primary/5 to-accent/5 rounded-lg border-2 border-primary/20">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1252,7 +1224,7 @@ const AdminServices = () => {
                     </div>
                   </div>
                   
-                  {selectedServiceType !== 'monthly_subscription' && formData.subscriptionPlans && formData.subscriptionPlans.length > 0 && (
+                  {formData.subscriptionPlans && formData.subscriptionPlans.length > 0 && (
                     <div className="space-y-3 mt-3">
                       {[...(formData.subscriptionPlans || [])].sort((a, b) => a.sortOrder - b.sortOrder).map((plan, index) => (
                         <div key={plan.id} className="p-4 bg-background rounded-lg border-2 border-border hover:border-primary/50 transition-colors">
@@ -1434,100 +1406,6 @@ const AdminServices = () => {
                     </div>
                   )}
                 </div>
-                )}
-
-                {/* Task Options — editable checklist shown on Insta Maid booking page */}
-                {selectedServiceType === 'instant_hourly' && (
-                  <div className="space-y-3 p-4 bg-amber-50/60 border border-amber-200 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="block text-sm font-medium text-foreground">Task Options</label>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Tasks customers can select on the Insta Maid booking page
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newTask = { id: `task-${Date.now()}`, label: '', icon: '🧹', isActive: true };
-                          setFormData({ ...formData, taskOptions: [...((formData as any).taskOptions || []), newTask] } as any);
-                        }}
-                        className="text-xs px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors flex items-center gap-1"
-                      >
-                        <Plus className="w-3 h-3" /> Add Task
-                      </button>
-                    </div>
-
-                    {((formData as any).taskOptions || []).length === 0 && (
-                      <p className="text-xs text-muted-foreground italic">No tasks configured — customers will see the default built-in list.</p>
-                    )}
-
-                    {((formData as any).taskOptions || []).length > 0 && (
-                      <div className="space-y-2">
-                        {((formData as any).taskOptions as Array<{ id: string; label: string; icon: string; isActive: boolean }>).map((task, index) => (
-                          <div key={task.id} className="grid grid-cols-12 gap-2 p-2 bg-white rounded-lg border border-amber-100 items-center">
-                            {/* Icon */}
-                            <div className="col-span-2">
-                              <input
-                                type="text"
-                                value={task.icon}
-                                onChange={(e) => {
-                                  const updated = [...(formData as any).taskOptions];
-                                  updated[index] = { ...updated[index], icon: e.target.value };
-                                  setFormData({ ...formData, taskOptions: updated } as any);
-                                }}
-                                className="input-clean text-center text-lg"
-                                placeholder="🧹"
-                                maxLength={2}
-                              />
-                            </div>
-                            {/* Label */}
-                            <div className="col-span-7">
-                              <input
-                                type="text"
-                                value={task.label}
-                                onChange={(e) => {
-                                  const updated = [...(formData as any).taskOptions];
-                                  updated[index] = { ...updated[index], label: e.target.value };
-                                  setFormData({ ...formData, taskOptions: updated } as any);
-                                }}
-                                className="input-clean"
-                                placeholder="e.g. Sweeping & Mopping"
-                              />
-                            </div>
-                            {/* Active toggle */}
-                            <div className="col-span-2 flex justify-center">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const updated = [...(formData as any).taskOptions];
-                                  updated[index] = { ...updated[index], isActive: !updated[index].isActive };
-                                  setFormData({ ...formData, taskOptions: updated } as any);
-                                }}
-                                className={`text-xs px-2 py-1 rounded-full font-medium transition-colors ${task.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
-                              >
-                                {task.isActive ? 'ON' : 'OFF'}
-                              </button>
-                            </div>
-                            {/* Delete */}
-                            <div className="col-span-1 flex justify-center">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const updated = (formData as any).taskOptions.filter((_: unknown, i: number) => i !== index);
-                                  setFormData({ ...formData, taskOptions: updated } as any);
-                                }}
-                                className="p-1.5 hover:bg-destructive/10 rounded-lg transition-colors"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {/* Additional Services Section */}
                 <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
@@ -1618,33 +1496,24 @@ const AdminServices = () => {
                   )}
                 </div>
 
-                {/* ── Duration Tiers: required for subscription, optional for others ── */}
-                {(isSuperAdmin || selectedServiceType === 'monthly_subscription') && (
-                  <div className={`space-y-3 p-4 rounded-lg border ${
-                    selectedServiceType === 'monthly_subscription'
-                      ? 'bg-purple-50/60 border-purple-300'
-                      : 'bg-blue-50/50 border-blue-200'
-                  }`}>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="block text-sm font-medium text-foreground">
-                          {selectedServiceType === 'monthly_subscription'
-                            ? '📅 Session Hours Pricing (required for subscription)'
-                            : 'Duration Tiers (Hourly Pricing)'}
-                        </label>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {selectedServiceType === 'monthly_subscription'
-                            ? 'Set monthly price for each daily session length — e.g. 1h → ₹3500/mo, 1.5h → ₹4500/mo'
-                            : 'e.g. 1 hr → ₹200, 1.5 hr → ₹300, 2 hr → ₹400'}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setFormData({ ...formData, durationOptions: [...(formData.durationOptions || []), { hours: 1, price: 0, originalPrice: 0, isDefault: false, _priceMode: 'month' } as any] })}
-                        className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1"
-                      >
-                        <Plus className="w-3 h-3" /> Add Tier
-                      </button>
+                {/* ── Duration / Time Tiers: hourly pricing for any service ── */}
+                <div className="space-y-3 p-4 rounded-lg border bg-blue-50/50 border-blue-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground">
+                        ⏱ Duration Tiers (Time-Based Pricing)
+                      </label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        e.g. 1 hr → ₹200, 1.5 hr → ₹300 · For subscription: 1h/day → ₹3500/mo
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, durationOptions: [...(formData.durationOptions || []), { hours: 1, price: 0, originalPrice: 0, isDefault: false, _priceMode: 'month' } as any] })}
+                      className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" /> Add Tier
+                    </button>
                     </div>
 
                     {(formData.durationOptions || []).length > 0 && (
@@ -1745,11 +1614,9 @@ const AdminServices = () => {
                       </div>
                     )}
                   </div>
-                )}
 
-                {/* ── Subscription Booking Options (super admin + monthly_subscription) ── */}
-                {selectedServiceType === 'monthly_subscription' && (
-                  <div className="space-y-3 p-4 bg-purple-50/60 border border-purple-300 rounded-lg">
+                {/* ── Subscription Booking Options ── */}
+                <div className="space-y-3 p-4 bg-purple-50/60 border border-purple-300 rounded-lg">
                     <div>
                       <label className="block text-sm font-medium text-foreground">🔄 Subscription Booking Options</label>
                       <p className="text-xs text-muted-foreground mt-0.5">Controls which frequencies & settings customers can choose on the booking page</p>
@@ -1818,7 +1685,6 @@ const AdminServices = () => {
                       </label>
                     </div>
                   </div>
-                )}
 
 
                 {isSuperAdmin && (
@@ -2101,6 +1967,102 @@ const AdminServices = () => {
                   >
                     <Plus className="w-3 h-3" /> Add Don't Item
                   </button>
+                </div>
+
+                {/* Service Category & Worker Radius Section */}
+                <div className="space-y-4 p-4 bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-lg">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground">📍 Location & Category Settings</label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Control how far workers are searched and how this service is grouped
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Service Category */}
+                    <div>
+                      <label className="block text-xs font-medium text-foreground mb-1">Service Category</label>
+                      <select
+                        value={formData.serviceCategory ?? 'other'}
+                        onChange={(e) => setFormData({ ...formData, serviceCategory: e.target.value })}
+                        className="input-clean text-sm w-full"
+                      >
+                        <option value="instant_services">⚡ Instant Services (On-Demand)</option>
+                        <option value="subscription_services">🔄 Subscription Services</option>
+                        <option value="deep_cleaning">🏠 Deep Cleaning</option>
+                        <option value="spot_cleaning">🧽 Spot / Mini Cleaning</option>
+                        <option value="kitchen_services">🍳 Kitchen Services</option>
+                        <option value="bathroom_services">🚿 Bathroom Services</option>
+                        <option value="furniture_services">🛋️ Furniture Services</option>
+                        <option value="hvac_services">❄️ HVAC / AC Services</option>
+                        <option value="other">📦 Other</option>
+                      </select>
+                    </div>
+                    {/* Display Order */}
+                    <div>
+                      <label className="block text-xs font-medium text-foreground mb-1">Display Order</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={formData.displayOrder ?? 0}
+                        onChange={(e) => setFormData({ ...formData, displayOrder: Math.max(0, parseInt(e.target.value) || 0) })}
+                        className="input-clean text-sm w-full"
+                        placeholder="0"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Lower number = shown first</p>
+                    </div>
+                  </div>
+                  {/* Worker Search Radius Slider */}
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-2">
+                      Worker Search Radius:&nbsp;
+                      <span className="text-orange-700 font-bold">
+                        {(formData.workerSearchRadiusKm ?? 10) < 1
+                          ? `${Math.round((formData.workerSearchRadiusKm ?? 10) * 1000)} m`
+                          : `${formData.workerSearchRadiusKm ?? 10} km`}
+                      </span>
+                    </label>
+                    <input
+                      type="range"
+                      min={0.1}
+                      max={50}
+                      step={0.1}
+                      value={formData.workerSearchRadiusKm ?? 10}
+                      onChange={(e) => setFormData({ ...formData, workerSearchRadiusKm: parseFloat(e.target.value) })}
+                      className="w-full accent-orange-500"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                      <span>100 m</span>
+                      <span>5 km</span>
+                      <span>10 km</span>
+                      <span>30 km</span>
+                      <span>50 km</span>
+                    </div>
+                    {/* Quick presets */}
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {[
+                        { label: '⚡ Insta (500m)', value: 0.5 },
+                        { label: '🔄 Subscription (2km)', value: 2 },
+                        { label: '🧽 Spot Clean (5km)', value: 5 },
+                        { label: '🏠 Deep Clean (30km)', value: 30 },
+                      ].map(preset => (
+                        <button
+                          key={preset.value}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, workerSearchRadiusKm: preset.value })}
+                          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                            formData.workerSearchRadiusKm === preset.value
+                              ? 'bg-orange-500 text-white border-orange-500'
+                              : 'bg-white text-orange-700 border-orange-300 hover:bg-orange-50'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Workers within this radius will be considered for this service when a booking is placed.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Workforce & Wages Section */}

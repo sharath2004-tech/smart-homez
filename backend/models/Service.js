@@ -15,6 +15,35 @@ const serviceSchema = new mongoose.Schema({
     required: [true, 'Category is required'],
     enum: ['health', 'cleaning', 'maintenance', 'consultation', 'therapy', 'other']
   },
+  // Broad service category for grouping in dashboards and filtering
+  serviceCategory: {
+    type: String,
+    enum: [
+      'instant_services',       // On-demand (Insta Maid)
+      'subscription_services',  // Recurring/monthly plans
+      'deep_cleaning',          // Full-house or move-in/out cleaning
+      'spot_cleaning',          // Single-item or room spot cleans
+      'kitchen_services',       // Kitchen appliances & fixtures
+      'bathroom_services',      // Bathroom & washroom
+      'furniture_services',     // Sofa, bed, cabinets
+      'hvac_services',          // AC units
+      'other'
+    ],
+    default: 'other'
+  },
+  // Radius (km) used when finding workers for this service
+  // Smaller radius = faster on-demand; larger radius = scheduled/advance booking
+  workerSearchRadiusKm: {
+    type: Number,
+    default: 10,
+    min: 0.1,
+    max: 100
+  },
+  // Used to control display order in customer-facing service lists
+  displayOrder: {
+    type: Number,
+    default: 0
+  },
   // Number of workers typically required for this service (set by super admin)
   defaultWorkerCount: {
     type: Number,

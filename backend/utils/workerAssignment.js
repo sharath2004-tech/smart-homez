@@ -53,8 +53,8 @@ const calculateWorkerScore = (worker, booking, distance = null) => {
 
   // 3. Distance score (0-20 points) - closer is better
   if (distance !== null) {
-    // Workers within 5km get full points, beyond that decreases linearly
-    const maxDistance = 10; // km
+    // Score scales with the service's own radius so scoring is fair across all service types
+    const maxDistance = booking?.service?.workerSearchRadiusKm || 10;
     const distanceScore = Math.max(0, 1 - (distance / maxDistance));
     score += distanceScore * weights.distance;
   }
@@ -87,6 +87,9 @@ const calculateWorkerScore = (worker, booking, distance = null) => {
 export const findBestWorkers = async (bookingDetails, count = 3) => {
   try {
     const { service, bookingDate, location } = bookingDetails;
+    // Use per-service radius if configured; default fallback is 50km
+    const serviceRadiusKm = service?.workerSearchRadiusKm || 50;
+    console.log(`📏 Service radius: ${serviceRadiusKm}km (service: ${service?.name || 'unknown'})`);
 
     // Build query for available workers
     const query = {
@@ -189,11 +192,11 @@ export const findBestWorkers = async (bookingDetails, count = 3) => {
           return true; // Include workers without location data
         }
         
-        const maxRadius = 50; // Increased from 10km to 50km for better availability
+        const maxRadius = serviceRadiusKm;
         const isWithinRadius = distance <= maxRadius;
         
         if (!isWithinRadius) {
-          console.log(`❌ Worker ${worker.name} too far: ${distance.toFixed(2)}km (max ${maxRadius}km)`);
+          console.log(`❌ Worker ${worker.name} too far: ${distance.toFixed(2)}km (max ${serviceRadiusKm}km)`);
         } else {
           console.log(`✅ Worker ${worker.name} within range: ${distance.toFixed(2)}km`);
         }
