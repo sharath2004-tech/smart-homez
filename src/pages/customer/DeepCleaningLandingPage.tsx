@@ -5,9 +5,9 @@ import { ArrowRight, CheckCircle2, Layers3, ShieldCheck, Sparkles } from "lucide
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-    CATEGORY_META,
     type DeepCleaningConfig,
     type UserProfile,
+  getCategoryMeta,
     getCategoryAction,
     getStartingPrice
 } from "./deepCleaningTemplate";
@@ -108,7 +108,7 @@ const DeepCleaningLandingPage = () => {
         <section className="space-y-4">
           <div className="flex items-end justify-between gap-3 flex-wrap">
             <div>
-              <h2 className="text-xl font-bold text-foreground">Choose a deep cleaning type</h2>
+              <h2 className="text-xl font-bold text-foreground">{config?.pageContent?.categoriesTitle || "Choose a deep cleaning type"}</h2>
               <p className="text-sm text-muted-foreground mt-1">{config?.pageContent?.categoriesSubtitle || "Pick a category, enter your requirements and get the final amount based on your home details."}</p>
             </div>
             <Link to="/customer/deep-cleaning/customize" className="text-sm font-semibold text-primary hover:underline">
@@ -126,8 +126,8 @@ const DeepCleaningLandingPage = () => {
                 const categoryItems = (config?.items || [])
                   .filter((item) => item.isActive && item.category === category.id)
                   .sort((a, b) => a.sortOrder - b.sortOrder);
-                const meta = CATEGORY_META[category.id];
-                const action = getCategoryAction(category.id);
+                const meta = getCategoryMeta(category);
+                const action = getCategoryAction(category);
                 const previewItems = categoryItems.slice(0, 3);
 
                 return (
@@ -144,7 +144,7 @@ const DeepCleaningLandingPage = () => {
                         <h3 className="mt-3 text-lg font-bold text-foreground leading-tight">{category.label}</h3>
                       </div>
                       <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
-                        {CATEGORY_META[category.id]?.mode === "quote" ? "Quote" : CATEGORY_META[category.id]?.mode === "package" ? "Package" : "Custom"}
+                        {meta.mode === "quote" ? "Quote" : meta.mode === "package" ? "Package" : "Custom"}
                       </span>
                     </div>
 

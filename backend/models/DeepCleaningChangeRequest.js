@@ -25,7 +25,17 @@ const categorySchema = new mongoose.Schema({
   label:     { type: String, required: true },
   emoji:     { type: String, default: '✨' },
   isActive:  { type: Boolean, default: true },
-  sortOrder: { type: Number, default: 0 }
+  sortOrder: { type: Number, default: 0 },
+  description: { type: String, default: '' },
+  highlights: { type: [String], default: [] },
+  mode: { type: String, enum: ['package', 'customize', 'quote'], default: 'customize' },
+  headline: { type: String, default: '' },
+  inclusionsTitle: { type: String, default: '' },
+  idealFor: { type: [String], default: [] },
+  howItWorksTitle: { type: String, default: 'How this works' },
+  howItWorksSteps: { type: [String], default: [] },
+  primaryActionLabel: { type: String, default: '' },
+  secondaryActionLabel: { type: String, default: '' }
 }, { _id: false });
 
 const pageContentSchema = new mongoose.Schema({

@@ -5,41 +5,46 @@ import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardList, ShieldCheck, Sparkl
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import {
-    CATEGORY_META,
     type ConfigItem,
     type DeepCleaningConfig,
+    type DeepCleaningCategory,
     type UserProfile,
+    getCategoryMeta,
     getStartingPrice
 } from "./deepCleaningTemplate";
 
-const getPrimaryAction = (categoryId: string) => {
-  const mode = CATEGORY_META[categoryId]?.mode || "customize";
+const getPrimaryAction = (category: DeepCleaningCategory | null) => {
+  const categoryId = category?.id || "";
+  const meta = getCategoryMeta(category);
+  const mode = meta.mode || "customize";
 
   if (mode === "package") {
-    return { href: "/customer/services/deep-cleaning", label: "Continue to packages" };
+    return { href: "/customer/services/deep-cleaning", label: meta.primaryActionLabel || "Continue to packages" };
   }
   if (mode === "quote") {
-    return { href: "/deep-cleaning-quote", label: "Request custom quote" };
+    return { href: "/deep-cleaning-quote", label: meta.primaryActionLabel || "Request custom quote" };
   }
   return {
     href: `/customer/deep-cleaning/customize?category=${encodeURIComponent(categoryId)}`,
-    label: "Open custom builder",
+    label: meta.primaryActionLabel || "Open custom builder",
   };
 };
 
-const getSecondaryAction = (categoryId: string) => {
-  const mode = CATEGORY_META[categoryId]?.mode || "customize";
+const getSecondaryAction = (category: DeepCleaningCategory | null) => {
+  const categoryId = category?.id || "";
+  const meta = getCategoryMeta(category);
+  const mode = meta.mode || "customize";
 
   if (mode === "package") {
     return {
       href: `/customer/deep-cleaning/customize?category=${encodeURIComponent(categoryId)}`,
-      label: "Prefer custom selection?",
+      label: meta.secondaryActionLabel || "Prefer custom selection?",
     };
   }
   if (mode === "quote") {
-    return { href: "/customer/deep-cleaning", label: "Browse all deep-cleaning types" };
+    return { href: "/customer/deep-cleaning", label: meta.secondaryActionLabel || "Browse all deep-cleaning types" };
   }
-  return { href: "/customer/services/deep-cleaning", label: "See full-home packages" };
+  return { href: "/customer/services/deep-cleaning", label: meta.secondaryActionLabel || "See full-home packages" };
 };
 
 const priceLabel = (item: ConfigItem) => {
@@ -95,7 +100,7 @@ const DeepCleaningCategoryPage = () => {
     [config, categoryId]
   );
 
-  const meta = CATEGORY_META[categoryId];
+  const meta = getCategoryMeta(category);
   const startingPrice = getStartingPrice(categoryItems);
 
   if (!loading && !category) {
@@ -116,9 +121,8 @@ const DeepCleaningCategoryPage = () => {
     );
   }
 
-  const primaryAction = getPrimaryAction(categoryId);
-  const secondaryAction = getSecondaryAction(categoryId);
-  const previewItems = categoryItems.slice(0, 6);
+  const primaryAction = getPrimaryAction(category);
+  const secondaryAction = getSecondaryAction(category);
 
   return (
     <AppLayout userType="customer" userName={profile?.name || "Guest"}>
@@ -185,13 +189,13 @@ const DeepCleaningCategoryPage = () => {
               </p>
             </div>
 
-            {previewItems.length === 0 ? (
+            {categoryItems.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center text-muted-foreground">
                 This category is live, but no active services are configured yet.
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {previewItems.map((item, index) => (
+                {categoryItems.map((item, index) => (
                   <motion.div
                     key={item.id}
                     initial={{ opacity: 0, y: 16 }}
@@ -233,11 +237,11 @@ const DeepCleaningCategoryPage = () => {
             </div>
 
             <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
-              <h2 className="text-lg font-bold text-foreground">How this works</h2>
+              <h2 className="text-lg font-bold text-foreground">{meta?.howItWorksTitle || "How this works"}</h2>
               <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-                <p>1. Pick this category to understand what is covered.</p>
-                <p>2. Continue to booking, enter your home details, and get the final amount.</p>
-                <p>3. For commercial or custom jobs, request a quote and our team will contact you.</p>
+                {(meta?.howItWorksSteps || []).map((step, index) => (
+                  <p key={`${index}-${step}`}>{index + 1}. {step}</p>
+                ))}
               </div>
               <Link
                 to={primaryAction.href}
