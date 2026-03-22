@@ -111,6 +111,7 @@ const InstaServicePage = () => {
   const [rawBookedRanges, setRawBookedRanges] = useState<Array<{ workerId: string | null; workerGender: string | null; startTime: string; endTime: string }>>([]);
   // Worker counts (always from full/unfiltered fetch) — used for slot badges and gender buttons
   const [workerCounts, setWorkerCounts] = useState({ total: 0, male: 0, female: 0 });
+  const [slotsLoaded, setSlotsLoaded] = useState(false);
   const [businessHours, setBusinessHours] = useState({ openTime: '07:00', closeTime: '19:00', slotDurationMinutes: 30 });
 
   // Dynamic time slots from admin-configured business hours
@@ -244,6 +245,7 @@ const InstaServicePage = () => {
 
         // Store raw ranges; gender-specific busy counts are derived via useMemo
         setRawBookedRanges(ranges);
+        setSlotsLoaded(true);
       } catch {
         // non-critical — continue without availability info
       }
@@ -568,9 +570,13 @@ const InstaServicePage = () => {
                       }`}
                     >
                       {label}
-                      {count > 0 && (
+                      {slotsLoaded && (
                         <span className={`ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full ${
-                          genderPref === g ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
+                          count === 0
+                            ? 'bg-muted text-muted-foreground'
+                            : genderPref === g
+                            ? 'bg-primary/20 text-primary'
+                            : 'bg-muted text-muted-foreground'
                         }`}>
                           {count}
                         </span>
@@ -596,8 +602,8 @@ const InstaServicePage = () => {
                     {availableSlots.map((t) => {
                       const busy = busyWorkersBySlot[t] ?? 0;
                       const activeWorkers = genderPref === 'male' ? workerCounts.male : genderPref === 'female' ? workerCounts.female : workerCounts.total;
-                      const free = activeWorkers > 0 ? activeWorkers - busy : null;
-                      const fullyBooked = free !== null && free <= 0;
+                      const free = slotsLoaded ? Math.max(0, activeWorkers - busy) : null;
+                      const fullyBooked = slotsLoaded && free !== null && free <= 0;
                       const limited = free !== null && free === 1;
                       return (
                         <button
@@ -628,7 +634,7 @@ const InstaServicePage = () => {
                       );
                     })}
                   </div>
-                  {workerCounts.total > 0 && (
+                  {slotsLoaded && (
                     <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Available</span>
                       <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> 1 left</span>
