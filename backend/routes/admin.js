@@ -1471,8 +1471,8 @@ router.get('/dashboard-stats', authenticate, authorize('admin', 'super_admin'), 
 
 // @route   GET /api/admin/profit-stats
 // @desc    Get profit statistics (revenue - expenses - wages)
-// @access  Private/Admin
-router.get('/profit-stats', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+// @access  Private/Super Admin Only
+router.get('/profit-stats', authenticate, authorize('super_admin'), async (req, res) => {
   try {
     // Parse date range from query params
     let fromDate = req.query.from ? new Date(req.query.from) : null;
@@ -1487,15 +1487,9 @@ router.get('/profit-stats', authenticate, authorize('admin', 'super_admin'), asy
       fromDate.setHours(0, 0, 0, 0);
     }
 
-    // Build location filter
+    // Build location filter (optional for super_admin)
     let locationFilter = {};
-    if (req.user.role === 'admin') {
-      const adminLocationIds = (req.user.adminProfile?.assignedLocations || [])
-        .map(loc => loc.locationId).filter(Boolean);
-      if (adminLocationIds.length > 0) {
-        locationFilter = { 'location.locationId': { $in: adminLocationIds } };
-      }
-    } else if (req.query.locationId) {
+    if (req.query.locationId) {
       locationFilter = { 'location.locationId': req.query.locationId };
     }
 
