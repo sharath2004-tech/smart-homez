@@ -317,6 +317,7 @@ router.get('/booked-slots', authenticate, async (req, res) => {
       const customerLat = parseFloat(lat);
       
       if (!isNaN(customerLng) && !isNaN(customerLat)) {
+        // Use a broad pre-filter (50km) — just finding the nearest Location doc for the slot check
         const nearbyLocation = await Location.findOne({
           location: {
             $near: {
@@ -324,7 +325,7 @@ router.get('/booked-slots', authenticate, async (req, res) => {
                 type: 'Point',
                 coordinates: [customerLng, customerLat]
               },
-              $maxDistance: 5000 // 5km radius
+              $maxDistance: 50000 // 50km broad pre-filter to find nearest Location
             }
           },
           isActive: true,
@@ -637,7 +638,13 @@ router.post('/',
         customerLat = location.coordinates[1];
       }
 
-      console.log(`🔍 Searching for service location near: [${customerLng}, ${customerLat}]`);
+      // Fetch service radius — use admin-configured workerSearchRadiusKm as the search perimeter
+      const serviceDoc = service
+        ? await Service.findById(service).select('workerSearchRadiusKm').lean()
+        : null;
+      const serviceRadiusMeters = (serviceDoc?.workerSearchRadiusKm || 50) * 1000;
+
+      console.log(`🔍 Searching for service location near: [${customerLng}, ${customerLat}] (radius: ${serviceRadiusMeters / 1000}km)`);
       const nearbyLocation = await Location.findOne({
         location: {
           $near: {
@@ -645,7 +652,7 @@ router.post('/',
               type: 'Point',
               coordinates: [customerLng, customerLat]
             },
-            $maxDistance: 5000 // 5km radius
+            $maxDistance: serviceRadiusMeters // from service.workerSearchRadiusKm (admin-configured)
           }
         },
         isActive: true,
@@ -669,7 +676,11 @@ router.post('/',
       {
         const locLng = nearbyLocation.location.coordinates[0];
         const locLat = nearbyLocation.location.coordinates[1];
-        const serviceRadiusM = nearbyLocation.maxServiceRadius || 500;
+        // Effective radius = larger of: location's maxServiceRadius (admin set per location)
+        //                              OR service's workerSearchRadiusKm (admin set per service)
+        // e.g. Insta Maid location=500m, service=500m → 500m
+        //      Deep Clean  location=500m, service=30000m → 30000m
+        const serviceRadiusM = Math.max(nearbyLocation.maxServiceRadius || 500, serviceRadiusMeters);
         const R = 6371000; // Earth radius in metres
         const φ1 = customerLat * Math.PI / 180;
         const φ2 = locLat * Math.PI / 180;
@@ -932,7 +943,7 @@ router.post('/',
               startTime: bookingData.startTime,
               endTime: bookingData.endTime,
               location: bookingData.location,
-              radius: 5000, // 5km radius
+              radius: serviceRadiusMeters, // from service.workerSearchRadiusKm (admin-configured)
               genderPreference: bookingData.preferences?.workerGenderPreference || 'any',
               religionPreference: bookingData.preferences?.religionPreference
             }, Booking);

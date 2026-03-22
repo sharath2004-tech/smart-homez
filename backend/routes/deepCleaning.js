@@ -3,6 +3,7 @@ import { authenticate, authorize } from '../middleware/auth.js';
 import Booking from '../models/Booking.js';
 import DeepCleaningConfig from '../models/DeepCleaningConfig.js';
 import Location from '../models/Location.js';
+import Service from '../models/Service.js';
 import User from '../models/User.js';
 import { assignWorkersWithBackup } from '../utils/advancedWorkerAssignment.js';
 import notificationService from '../utils/notificationService.js';
@@ -196,6 +197,13 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
     const coords = defaultAddress?.location?.coordinates || customer?.currentLocation?.coordinates;
     const [customerLng, customerLat] = coords || [null, null];
 
+    // Fetch deep cleaning service radius configured by admin (serviceCategory: deep_cleaning)
+    const deepCleanServiceDoc = await Service.findOne({
+      serviceCategory: 'deep_cleaning',
+      isActive: true
+    }).select('workerSearchRadiusKm').lean();
+    const deepCleanRadiusMeters = (deepCleanServiceDoc?.workerSearchRadiusKm || 50) * 1000;
+
     // $near lookup to resolve the Location doc (needed for admin region filter + worker assignment)
     let nearbyLocation = null;
     if (customerLng != null && customerLat != null) {
@@ -203,7 +211,7 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
         location: {
           $near: {
             $geometry: { type: 'Point', coordinates: [customerLng, customerLat] },
-            $maxDistance: 5000
+            $maxDistance: deepCleanRadiusMeters // from admin-configured service radius
           }
         },
         isActive: true
@@ -286,7 +294,7 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
           startTime:   booking.startTime,
           endTime:     booking.endTime,
           location:    locationData,
-          radius:      5000
+          radius:      deepCleanRadiusMeters
         }, Booking);
         if (fallbackResult.success) {
           booking.worker           = fallbackResult.worker._id;
