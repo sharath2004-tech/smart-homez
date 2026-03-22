@@ -815,6 +815,14 @@ export const adminAPI = {
     return apiCall(`/admin/dashboard-stats${params}`);
   },
 
+  getProfitStats: async (from?: string, to?: string, locationId?: string) => {
+    const params = new URLSearchParams();
+    if (from) params.append('from', from);
+    if (to) params.append('to', to);
+    if (locationId) params.append('locationId', locationId);
+    return apiCall(`/admin/profit-stats${params.toString() ? `?${params.toString()}` : ''}`);
+  },
+
   getRecentBookings: async (limit?: number, locationId?: string) => {
     const params = new URLSearchParams();
     if (limit) params.append('limit', limit.toString());
