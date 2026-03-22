@@ -86,13 +86,9 @@ const CustomerDashboard = () => {
         setQuickServices(mappedServices);
       } catch (error) {
         console.error('Error fetching dashboard services:', error);
-        // Fallback to default services on error
-        setQuickServices([
-          { icon: "⚡", name: t('customer.dashboard.instaAdhoc'), subtitle: t('customer.dashboard.instantBooking'), badge: t('customer.dashboard.onDemand'), path: "/customer/services/insta" },
-          { icon: "✨", name: t('customer.dashboard.deepCleaning'), subtitle: t('customer.dashboard.fullHomeClean'), badge: t('customer.dashboard.bestValue'), path: "/customer/services/deep-cleaning" },
-          { icon: "📅", name: t('customer.dashboard.subscription'), subtitle: t('customer.dashboard.recurringPlans'), badge: t('customer.dashboard.save20'), path: "/customer/services/subscription" },
-          { icon: "🚿", name: t('customer.dashboard.intenseWashroom'), subtitle: t('customer.dashboard.washroomDeepClean'), badge: "Sanitize", path: washroomServiceId ? `/customer/book/${washroomServiceId}` : "/customer/services" },
-        ]);
+        // REMOVED: Hardcoded fallback services. Show error state or empty state instead.
+        // Admin must configure services via backend for them to appear to customers.
+        setQuickServices([]);
       }
     };
     fetchServices();

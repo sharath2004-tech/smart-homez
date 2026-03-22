@@ -27,18 +27,18 @@ interface UserProfile {
   }[];
 }
 
-const SERVICE_META: Record<string, { icon: string; unit: string; unitLabel: string; includes: string[] }> = {
-  kitchen:  { icon: "🍳", unit: "kitchen",  unitLabel: "Kitchen",   includes: ["Oven & stove top", "Countertops & sink", "Fridge exterior", "Cabinet fronts", "Floor scrub"] },
-  bathroom: { icon: "🚿", unit: "bathroom", unitLabel: "Bathroom",  includes: ["Toilet deep scrub", "Basin & mirror", "Shower / tub tiles", "Floor & drain", "Mould removal"] },
-  sofa:     { icon: "🛋️", unit: "sofa",     unitLabel: "Sofa",      includes: ["Steam clean", "Stain treatment", "Allergen removal", "Odour neutraliser", "Fabric/leather safe"] },
-  carpet:   { icon: "🪣", unit: "carpet",   unitLabel: "Carpet",    includes: ["Deep vacuum", "Steam extraction", "Stain removal", "Pet hair removal", "Deodorising"] },
-  window:   { icon: "🪟", unit: "window",   unitLabel: "Set",       includes: ["Inside glass", "Outside glass", "Frame wipe-down", "Streak-free finish", "Fly screen dust-off"] },
-  fan:      { icon: "🌀", unit: "fan",      unitLabel: "Fan",       includes: ["Blade cleaning", "Motor cover wipe", "Ceiling area clean", "Dust disposal"] },
-  balcony:  { icon: "🌿", unit: "balcony",  unitLabel: "Balcony",   includes: ["Floor scrub", "Grill / railing wipe", "Ceiling cobwebs", "Drain clearing"] },
-  fridge:   { icon: "❄️", unit: "fridge",   unitLabel: "Fridge",    includes: ["Interior shelves", "Drawer cleaning", "Door seal scrub", "Coil dust removal", "Odour treatment"] },
+const SERVICE_META: Record<string, { icon: string; unit: string; unitLabel: string }> = {
+  kitchen:  { icon: "🍳", unit: "kitchen",  unitLabel: "Kitchen"   },
+  bathroom: { icon: "🚿", unit: "bathroom", unitLabel: "Bathroom"  },
+  sofa:     { icon: "🛋️", unit: "sofa",     unitLabel: "Sofa"      },
+  carpet:   { icon: "🪣", unit: "carpet",   unitLabel: "Carpet"    },
+  window:   { icon: "🪟", unit: "window",   unitLabel: "Set"       },
+  fan:      { icon: "🌀", unit: "fan",      unitLabel: "Fan"       },
+  balcony:  { icon: "🌿", unit: "balcony",  unitLabel: "Balcony"   },
+  fridge:   { icon: "❄️", unit: "fridge",   unitLabel: "Fridge"    },
 };
 
-const TIME_SLOTS = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"];
+const TIME_SLOTS: string[] = []; // replaced — use admin business hours via state below
 
 const getMeta = (name: string, tags: string[] = []) => {
   const n = name.toLowerCase();
@@ -60,20 +60,39 @@ const MiniCleanServicePage = () => {
   const [bookingDate, setBookingDate] = useState("");
   const [startTime, setStartTime] = useState("09:00");
   const [specialInstructions, setSpecialInstructions] = useState("");
+  const [timeSlots, setTimeSlots] = useState<string[]>([]);
 
   useEffect(() => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    setBookingDate(tomorrow.toISOString().split("T")[0]);
+    const tomorrowStr = tomorrow.toISOString().split("T")[0];
+    setBookingDate(tomorrowStr);
 
     const fetchData = async () => {
       try {
-        const [svcData, profileData] = await Promise.all([
+        const [svcData, profileData, slotsData] = await Promise.all([
           servicesAPI.getById(id!),
           authAPI.getProfile(),
+          bookingsAPI.getBookedSlots(tomorrowStr, null),
         ]);
         setService(svcData.service);
         setProfile(profileData.user || profileData);
+
+        // Build time slots from admin business hours
+        const open = slotsData.openTime || "08:00";
+        const close = slotsData.closeTime || "18:00";
+        const step = slotsData.slotDurationMinutes || 60;
+        const slots: string[] = [];
+        const [oh, om] = open.split(":").map(Number);
+        const [ch, cm] = close.split(":").map(Number);
+        let cur = oh * 60 + om;
+        const end = ch * 60 + cm;
+        while (cur < end) {
+          slots.push(`${String(Math.floor(cur / 60)).padStart(2, "0")}:${String(cur % 60).padStart(2, "0")}`);
+          cur += step;
+        }
+        setTimeSlots(slots);
+        if (slots.length > 0) setStartTime(slots[0]);
       } catch {
         toast.error("Failed to load service");
         navigate("/customer/services");
@@ -183,12 +202,12 @@ const MiniCleanServicePage = () => {
           </div>
         </motion.div>
 
-        {/* What's included */}
-        {meta.includes.length > 0 && (
+        {/* What's included — from admin-configured service dos */}
+        {service.dos && service.dos.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
             <h3 className="font-semibold text-foreground mb-2">What's included</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-              {meta.includes.map((item) => (
+              {service.dos.map((item) => (
                 <div key={item} className="flex items-center gap-2 text-sm text-foreground">
                   <span className="w-4 h-4 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-[10px] font-bold shrink-0">✓</span>
                   {item}
@@ -246,7 +265,7 @@ const MiniCleanServicePage = () => {
                 onChange={(e) => setStartTime(e.target.value)}
                 className="w-full rounded-xl border border-input bg-card px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
-                {TIME_SLOTS.map((t) => (
+                {timeSlots.map((t) => (
                   <option key={t} value={t}>{t}</option>
                 ))}
               </select>

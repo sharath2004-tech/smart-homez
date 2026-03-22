@@ -145,16 +145,10 @@ const CleaningServicePage = () => {
     );
   };
 
-  // Use service's additional options or fall back to defaults
+  // Only use admin-configured additional options — no hardcoded fallbacks
   const additionalServiceOptions = service?.additionalServiceOptions && service.additionalServiceOptions.length > 0
     ? service.additionalServiceOptions
-    : [
-        { value: 'carpet', label: 'Carpet/Rug Cleaning', price: 300 },
-        { value: 'windows', label: 'Window Cleaning', price: 200 },
-        { value: 'balcony', label: 'Balcony Cleaning', price: 150 },
-        { value: 'appliances', label: 'Appliance Deep Clean', price: 400 },
-        { value: 'sanitization', label: 'Sanitization Service', price: 500 }
-      ];
+    : [];
 
   // Use service's subscription plans only if configured by admin
   const subscriptionPlans = service?.subscriptionPlans && service.subscriptionPlans.length > 0

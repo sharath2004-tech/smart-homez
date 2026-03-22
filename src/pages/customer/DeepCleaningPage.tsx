@@ -23,20 +23,9 @@ interface ConfigItem {
 interface DeepCleaningCategory { id: string; label: string; emoji: string; isActive: boolean; sortOrder: number; }
 interface DeepCleaningConfig { items: ConfigItem[]; minimumCartValue: number; categories?: DeepCleaningCategory[]; }
 
-// Fallback if backend doesn't return categories (old DB records)
-const FALLBACK_CATEGORIES: DeepCleaningCategory[] = [
-  { id: "fullhouse",        label: "Full Home Deep Cleaning",    emoji: "🏡", isActive: true, sortOrder: 1 },
-  { id: "bathroom",         label: "Bathroom Cleaning",          emoji: "🚿", isActive: true, sortOrder: 2 },
-  { id: "kitchen",          label: "Kitchen Cleaning",           emoji: "🍳", isActive: true, sortOrder: 3 },
-  { id: "sofa_upholstery",  label: "Sofa & Upholstery",         emoji: "🛋️", isActive: true, sortOrder: 4 },
-  { id: "mattress",         label: "Mattress Cleaning",          emoji: "🛏️", isActive: true, sortOrder: 5 },
-  { id: "balcony_window",   label: "Balcony & Window",           emoji: "🪟", isActive: true, sortOrder: 6 },
-  { id: "move_in_out",      label: "Move-in / Move-out",         emoji: "📦", isActive: true, sortOrder: 7 },
-  { id: "office",           label: "Office Deep Cleaning",       emoji: "🏢", isActive: true, sortOrder: 8 },
-  { id: "post_construction",label: "Post-Construction Cleaning", emoji: "🏗️", isActive: true, sortOrder: 9 },
-  { id: "appliances",       label: "Appliances",                 emoji: "💨", isActive: true, sortOrder: 10 },
-  { id: "furniture",        label: "Furniture",                  emoji: "🪑", isActive: true, sortOrder: 11 },
-];
+// REMOVED: Fallback categories hardcoding. Categories must be managed by admin via backend configuration
+// If backend doesn't return categories, show empty state or error instead of hardcoded fallback
+
 interface CartEntry {
   itemId: string; name: string; category: string;
   qty: number; unitPrice: number; totalPrice: number; selectedTier?: string;
@@ -108,8 +97,8 @@ export default function DeepCleaningPage() {
     ]).then(([cfg, prof]) => {
       setConfig(cfg.config);
       setProfile(prof?.user || prof);
-      // Set active category to first active category from config
-      const cats = (cfg.config?.categories ?? FALLBACK_CATEGORIES)
+      // Set active category to first active category from config (ONLY from backend, no fallback)
+      const cats = (cfg.config?.categories ?? [])
         .filter((c: DeepCleaningCategory) => c.isActive)
         .sort((a: DeepCleaningCategory, b: DeepCleaningCategory) => a.sortOrder - b.sortOrder);
       if (cats.length > 0) {
@@ -123,7 +112,7 @@ export default function DeepCleaningPage() {
   const cartCount  = useMemo(() => Object.values(cart).reduce((s, e) => s + e.qty, 0), [cart]);
   const minValue   = config?.minimumCartValue ?? 500;
   const belowMin   = cartTotal > 0 && cartTotal < minValue;
-  const categories = (config?.categories ?? FALLBACK_CATEGORIES)
+  const categories = (config?.categories ?? []) // Only show admin-configured categories
     .filter(c => c.isActive)
     .sort((a, b) => a.sortOrder - b.sortOrder);
   const today      = new Date().toISOString().split("T")[0];

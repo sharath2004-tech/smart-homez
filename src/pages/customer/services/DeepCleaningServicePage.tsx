@@ -13,6 +13,21 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
+interface SizeOption {
+  label: string;
+  price: number;
+  duration: number;
+  workersRequired?: number;
+}
+
+interface AddonOption {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  icon?: string;
+}
+
 interface Service {
   _id: string;
   name: string;
@@ -20,6 +35,13 @@ interface Service {
   price: number;
   duration: number;
   serviceType: string;
+  sizeParameters?: {
+    enabled: boolean;
+    sizes: SizeOption[];
+  };
+  addons?: AddonOption[];
+  dos?: string[];
+  donts?: string[];
 }
 
 interface UserProfile {
@@ -33,37 +55,32 @@ interface UserProfile {
   }[];
 }
 
-const PACKAGES = [
-  { id: "1BHK", label: "1 BHK", rooms: 1, baths: 1, basePrice: 1499, duration: "3-4 hrs", icon: "🏠", badge: "Most Booked", badgeColor: "bg-orange-100 text-orange-700" },
-  { id: "2BHK", label: "2 BHK", rooms: 2, baths: 1, basePrice: 2299, duration: "5-6 hrs", icon: "🏡", badge: "Popular", badgeColor: "bg-blue-100 text-blue-700" },
-  { id: "3BHK", label: "3 BHK", rooms: 3, baths: 2, basePrice: 3199, duration: "6-8 hrs", icon: "🏘️", badge: "Best for Families", badgeColor: "bg-purple-100 text-purple-700" },
-  { id: "4BHK", label: "4 BHK", rooms: 4, baths: 3, basePrice: 4299, duration: "8-10 hrs", icon: "🏰", badge: null, badgeColor: "" },
-  { id: "villa", label: "Villa / Duplex", rooms: 5, baths: 4, basePrice: 5999, duration: "10-12 hrs", icon: "🏯", badge: "Premium", badgeColor: "bg-yellow-100 text-yellow-700" },
-];
-
-const ADD_ON_AREAS = [
-  { id: "kitchen_deep", label: "Kitchen Deep Clean", desc: "Oven, fridge, counters", price: 399, icon: "🍳" },
-  { id: "bathroom_extra", label: "Extra Bathroom", desc: "Per additional bathroom", price: 249, icon: "🚿" },
-  { id: "sofa", label: "Sofa Cleaning", desc: "Fabric/leather sofa steam clean", price: 499, icon: "🛋️" },
-  { id: "carpet", label: "Carpet Cleaning", desc: "Vacuum + steam extraction", price: 349, icon: "🪣" },
-  { id: "windows", label: "Window Cleaning", desc: "Inside + outside glass", price: 299, icon: "🪟" },
-  { id: "fans", label: "Fan Cleaning", desc: "All ceiling fans", price: 149, icon: "🌀" },
-  { id: "balcony", label: "Balcony Cleaning", desc: "Floor, grill, ceiling", price: 199, icon: "🌿" },
-  { id: "fridge", label: "Fridge Deep Clean", desc: "Interior cleaning + coils", price: 249, icon: "❄️" },
-];
-
-const TIME_SLOTS = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00"];
+const generateTimeSlots = (openTime: string, closeTime: string, stepMinutes: number): string[] => {
+  const slots: string[] = [];
+  const [openH, openM] = openTime.split(":").map(Number);
+  const [closeH, closeM] = closeTime.split(":").map(Number);
+  let current = openH * 60 + openM;
+  const end = closeH * 60 + closeM;
+  while (current < end) {
+    const h = Math.floor(current / 60).toString().padStart(2, "0");
+    const m = (current % 60).toString().padStart(2, "0");
+    slots.push(`${h}:${m}`);
+    current += stepMinutes;
+  }
+  return slots;
+};
 
 const DeepCleaningServicePage = () => {
   const navigate = useNavigate();
-  const [services, setServices] = useState<Service[]>([]);
+  const [service, setService] = useState<Service | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [timeSlots, setTimeSlots] = useState<string[]>([]);
 
   // Booking params
-  const [selectedPackage, setSelectedPackage] = useState<(typeof PACKAGES)[0] | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<SizeOption | null>(null);
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
   const [bookingDate, setBookingDate] = useState("");
   const [startTime, setStartTime] = useState("09:00");
@@ -71,32 +88,43 @@ const DeepCleaningServicePage = () => {
   const [specialInstructions, setSpecialInstructions] = useState("");
 
   useEffect(() => {
-    fetchData();
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    setBookingDate(tomorrow.toISOString().split("T")[0]);
+    const tomorrowStr = tomorrow.toISOString().split("T")[0];
+    setBookingDate(tomorrowStr);
+    fetchData(tomorrowStr);
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = async (dateStr: string) => {
     try {
       setLoading(true);
-      const [servicesData, profileData] = await Promise.all([
-        servicesAPI.getAll({
-          serviceType: "deep_cleaning_full_house,deep_cleaning_room,deep_cleaning_kitchen,deep_cleaning_bathroom",
-          isActive: true,
-          limit: 20,
-        }),
+      const [servicesData, profileData, slotsData] = await Promise.all([
+        servicesAPI.getAll({ serviceType: "deep_cleaning_full_house", isActive: true, limit: 1 }),
         authAPI.getProfile(),
+        bookingsAPI.getBookedSlots(dateStr, null),
       ]);
-      setServices(servicesData.services || []);
+      const svc: Service = servicesData.services?.[0] || null;
+      setService(svc);
       setProfile(profileData.user || profileData);
+
+      // Build time slots from admin business hours
+      const open = slotsData.openTime || "08:00";
+      const close = slotsData.closeTime || "18:00";
+      const step = slotsData.slotDurationMinutes || 60;
+      setTimeSlots(generateTimeSlots(open, close, step));
+      setStartTime(open);
     } catch (error) {
       console.error("Fetch error:", error);
-      // Not a hard fail — pricing is from PACKAGES, service id from list
     } finally {
       setLoading(false);
     }
   };
+
+  const packages: SizeOption[] = service?.sizeParameters?.enabled
+    ? (service.sizeParameters.sizes || [])
+    : [];
+
+  const addOnAreas: AddonOption[] = service?.addons || [];
 
   const toggleAddOn = (id: string) => {
     setSelectedAddOns((prev) =>
@@ -105,33 +133,26 @@ const DeepCleaningServicePage = () => {
   };
 
   const addOnsTotal = selectedAddOns.reduce((sum, id) => {
-    const ao = ADD_ON_AREAS.find((a) => a.id === id);
+    const ao = addOnAreas.find((a) => a.id === id);
     return sum + (ao?.price || 0);
   }, 0);
 
-  const totalAmount = (selectedPackage?.basePrice || 0) + addOnsTotal;
-
-  const getServiceId = () => {
-    // Use first available deep cleaning service, or null
-    return services[0]?._id ?? null;
-  };
+  const totalAmount = (selectedPackage?.price || 0) + addOnsTotal;
 
   const handleBook = async () => {
     if (!selectedPackage) return toast.error("Please select a package");
     if (!bookingDate) return toast.error("Please select a date");
-
-    const serviceId = getServiceId();
-    if (!serviceId) return toast.error("No deep cleaning service available in your area");
+    if (!service?._id) return toast.error("No deep cleaning service available in your area");
 
     const defaultAddr = profile?.addresses?.find((a) => a.isDefault) || profile?.addresses?.[0];
 
     try {
       setBooking(true);
       await bookingsAPI.create({
-        service: serviceId,
+        service: service._id,
         bookingDate,
         startTime,
-        endTime: startTime, // backend will compute from duration
+        endTime: startTime,
         totalAmount,
         bookingType: "adhoc",
         preferences: {
@@ -139,7 +160,7 @@ const DeepCleaningServicePage = () => {
           specialInstructions,
         },
         serviceDetails: {
-          package: selectedPackage.id,
+          package: selectedPackage.label,
           areas: selectedAddOns,
           addOns: selectedAddOns,
         },
@@ -197,32 +218,29 @@ const DeepCleaningServicePage = () => {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-2xl">✨</span>
-              <h1 className="text-xl font-bold text-foreground">Deep Cleaning</h1>
+              <h1 className="text-xl font-bold text-foreground">{service?.name || "Deep Cleaning"}</h1>
             </div>
-            <p className="text-xs text-muted-foreground">Full home deep clean by professional team</p>
+            <p className="text-xs text-muted-foreground">{service?.description || "Full home deep clean by professional team"}</p>
           </div>
         </motion.div>
 
-        {/* Features row */}
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2"
-        >
-          {[
-            { icon: "👥", label: "2-member team" },
-            { icon: "🧪", label: "Pro cleaning agents" },
-            { icon: "📸", label: "Before & after photos" },
-          ].map((f) => (
-            <div
-              key={f.label}
-              className="p-3 rounded-xl bg-green-50 border border-green-200 text-center"
-            >
-              <div className="text-lg mb-0.5">{f.icon}</div>
-              <p className="text-xs font-medium text-green-800">{f.label}</p>
-            </div>
-          ))}
-        </motion.div>
+        {/* Service Dos (admin-configured features) */}
+        {service?.dos && service.dos.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2"
+          >
+            {service.dos.slice(0, 3).map((item) => (
+              <div
+                key={item}
+                className="p-3 rounded-xl bg-green-50 border border-green-200 text-center"
+              >
+                <p className="text-xs font-medium text-green-800">✓ {item}</p>
+              </div>
+            ))}
+          </motion.div>
+        )}
 
         {/* Step indicator */}
         <div className="flex items-center gap-2">
@@ -261,39 +279,42 @@ const DeepCleaningServicePage = () => {
               <p className="text-xs text-muted-foreground mb-3">
                 Includes all rooms, kitchen & bathrooms in the package
               </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {PACKAGES.map((pkg) => (
-                  <button
-                    key={pkg.id}
-                    onClick={() => setSelectedPackage(pkg)}
-                    className={`relative text-left p-4 rounded-2xl border-2 transition-all ${
-                      selectedPackage?.id === pkg.id
-                        ? "border-green-400 bg-green-50"
-                        : "border-border hover:border-green-300 bg-card"
-                    }`}
-                  >
-                    {pkg.badge && (
-                      <span className={`absolute top-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${pkg.badgeColor}`}>
-                        {pkg.badge}
-                      </span>
-                    )}
-                    {selectedPackage?.id === pkg.id && (
-                      <div className="absolute top-2 left-2 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
-                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    )}
-                    <div className="text-3xl mb-2 mt-1">{pkg.icon}</div>
-                    <p className="font-bold text-foreground text-base">{pkg.label}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {pkg.rooms} rm · {pkg.baths} bath
-                    </p>
-                    <p className="text-xs text-muted-foreground">{pkg.duration}</p>
-                    <p className="text-base font-bold text-green-600 mt-2">₹{pkg.basePrice.toLocaleString()}</p>
-                  </button>
-                ))}
-              </div>
+
+              {packages.length === 0 ? (
+                <div className="p-6 rounded-2xl border border-border bg-muted/30 text-center">
+                  <p className="text-sm text-muted-foreground">No packages configured yet. Please contact support.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {packages.map((pkg) => (
+                    <button
+                      key={pkg.label}
+                      onClick={() => setSelectedPackage(pkg)}
+                      className={`relative text-left p-4 rounded-2xl border-2 transition-all ${
+                        selectedPackage?.label === pkg.label
+                          ? "border-green-400 bg-green-50"
+                          : "border-border hover:border-green-300 bg-card"
+                      }`}
+                    >
+                      {selectedPackage?.label === pkg.label && (
+                        <div className="absolute top-2 left-2 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      )}
+                      <p className="font-bold text-foreground text-base mt-1">{pkg.label}</p>
+                      {pkg.duration > 0 && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          ~{Math.round(pkg.duration / 60)} hrs
+                          {pkg.workersRequired && pkg.workersRequired > 1 ? ` · ${pkg.workersRequired} workers` : ""}
+                        </p>
+                      )}
+                      <p className="text-base font-bold text-green-600 mt-2">₹{pkg.price.toLocaleString()}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <button
@@ -301,7 +322,8 @@ const DeepCleaningServicePage = () => {
                 if (!selectedPackage) return toast.error("Please select a package");
                 setStep(2);
               }}
-              className="w-full py-3 rounded-2xl bg-green-500 hover:bg-green-600 text-white font-semibold transition-colors"
+              disabled={packages.length === 0}
+              className="w-full py-3 rounded-2xl bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-semibold transition-colors"
             >
               Continue →
             </button>
@@ -315,38 +337,42 @@ const DeepCleaningServicePage = () => {
             animate={{ opacity: 1, y: 0 }}
             className="space-y-5"
           >
-            {/* Add-ons */}
-            <div>
-              <h2 className="font-semibold text-foreground mb-1">Add-on Areas (optional)</h2>
-              <p className="text-xs text-muted-foreground mb-3">
-                Add specific areas or appliances for extra-deep cleaning
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {ADD_ON_AREAS.map((ao) => (
-                  <button
-                    key={ao.id}
-                    onClick={() => toggleAddOn(ao.id)}
-                    className={`relative text-left p-3 rounded-xl border-2 transition-all ${
-                      selectedAddOns.includes(ao.id)
-                        ? "border-green-400 bg-green-50"
-                        : "border-border hover:border-green-300 bg-card"
-                    }`}
-                  >
-                    {selectedAddOns.includes(ao.id) && (
-                      <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
-                        <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    )}
-                    <div className="text-2xl mb-1">{ao.icon}</div>
-                    <p className="text-sm font-semibold text-foreground leading-tight">{ao.label}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 leading-tight">{ao.desc}</p>
-                    <p className="text-sm font-bold text-green-600 mt-1.5">+₹{ao.price}</p>
-                  </button>
-                ))}
+            {/* Add-ons (only if admin configured them) */}
+            {addOnAreas.length > 0 && (
+              <div>
+                <h2 className="font-semibold text-foreground mb-1">Add-on Areas (optional)</h2>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Add specific areas or appliances for extra-deep cleaning
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {addOnAreas.map((ao) => (
+                    <button
+                      key={ao.id}
+                      onClick={() => toggleAddOn(ao.id)}
+                      className={`relative text-left p-3 rounded-xl border-2 transition-all ${
+                        selectedAddOns.includes(ao.id)
+                          ? "border-green-400 bg-green-50"
+                          : "border-border hover:border-green-300 bg-card"
+                      }`}
+                    >
+                      {selectedAddOns.includes(ao.id) && (
+                        <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+                          <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      )}
+                      {ao.icon && <div className="text-2xl mb-1">{ao.icon}</div>}
+                      <p className="text-sm font-semibold text-foreground leading-tight">{ao.name}</p>
+                      {ao.description && (
+                        <p className="text-xs text-muted-foreground mt-0.5 leading-tight">{ao.description}</p>
+                      )}
+                      <p className="text-sm font-bold text-green-600 mt-1.5">+₹{ao.price}</p>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Date & Time */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -367,7 +393,7 @@ const DeepCleaningServicePage = () => {
                   onChange={(e) => setStartTime(e.target.value)}
                   className="w-full rounded-xl border border-input bg-card px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
                 >
-                  {TIME_SLOTS.map((t) => (
+                  {timeSlots.map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
@@ -378,7 +404,7 @@ const DeepCleaningServicePage = () => {
             <div className="flex gap-2 p-3 rounded-xl bg-blue-50 border border-blue-200">
               <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
               <p className="text-xs text-blue-700">
-                Deep cleaning requires advance booking of at least 1 day. A 2-member professional team
+                Deep cleaning requires advance booking of at least 1 day. A professional team
                 will arrive at your specified time with all equipment and cleaning agents.
               </p>
             </div>
@@ -448,15 +474,15 @@ const DeepCleaningServicePage = () => {
             {/* Package card */}
             <div className="p-4 rounded-2xl bg-green-50 border border-green-200 space-y-3">
               <div className="flex items-center gap-3">
-                <span className="text-2xl">{selectedPackage?.icon}</span>
                 <div>
                   <p className="font-semibold text-foreground">
                     Deep Cleaning — {selectedPackage?.label}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    {selectedPackage?.rooms} rooms · {selectedPackage?.baths} bathrooms ·{" "}
-                    {selectedPackage?.duration}
-                  </p>
+                  {selectedPackage?.duration && (
+                    <p className="text-xs text-muted-foreground">
+                      ~{Math.round(selectedPackage.duration / 60)} hrs
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -476,13 +502,13 @@ const DeepCleaningServicePage = () => {
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {selectedAddOns.map((id) => {
-                    const ao = ADD_ON_AREAS.find((a) => a.id === id);
+                    const ao = addOnAreas.find((a) => a.id === id);
                     return (
                       <span
                         key={id}
                         className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full"
                       >
-                        {ao?.icon} {ao?.label} (+₹{ao?.price})
+                        {ao?.icon} {ao?.name} (+₹{ao?.price})
                       </span>
                     );
                   })}
@@ -494,16 +520,14 @@ const DeepCleaningServicePage = () => {
             <div className="p-4 rounded-2xl border border-border space-y-2">
               <p className="text-sm font-semibold text-foreground">Price Breakdown</p>
               <div className="flex justify-between text-sm text-muted-foreground">
-                <span>
-                  {selectedPackage?.label} package
-                </span>
-                <span>₹{selectedPackage?.basePrice.toLocaleString()}</span>
+                <span>{selectedPackage?.label} package</span>
+                <span>₹{selectedPackage?.price.toLocaleString()}</span>
               </div>
               {selectedAddOns.map((id) => {
-                const ao = ADD_ON_AREAS.find((a) => a.id === id);
+                const ao = addOnAreas.find((a) => a.id === id);
                 return (
                   <div key={id} className="flex justify-between text-sm text-muted-foreground">
-                    <span>{ao?.label}</span>
+                    <span>{ao?.name}</span>
                     <span>₹{ao?.price}</span>
                   </div>
                 );
@@ -514,10 +538,14 @@ const DeepCleaningServicePage = () => {
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-700">
-              📸 Our team will take before & after photos. If you're not satisfied, we'll redo any
-              missed spots free of charge.
-            </div>
+            {/* Service donts (if configured by admin) */}
+            {service?.donts && service.donts.length > 0 && (
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-700 space-y-1">
+                {service.donts.slice(0, 2).map((d) => (
+                  <p key={d}>⚠ {d}</p>
+                ))}
+              </div>
+            )}
 
             <div className="flex gap-3">
               <button

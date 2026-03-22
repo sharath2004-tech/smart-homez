@@ -44,7 +44,7 @@ interface Service {
   donts?: string[];
 }
 
-const HOUR_OPTIONS = [1, 2, 3, 4, 6, 8];
+const HOUR_OPTIONS: number[] = []; // replaced — hours derived from service.durationOptions below
 
 // Generate time slots between openTime and closeTime at slotDurationMinutes intervals
 const generateTimeSlots = (openTime = '07:00', closeTime = '19:00', slotDurationMinutes = 30) => {
@@ -472,26 +472,29 @@ const InstaServicePage = () => {
             animate={{ opacity: 1, y: 0 }}
             className="space-y-5"
           >
-            {/* Hours */}
+            {/* Hours — from admin-configured durationOptions */}
+            {service?.durationOptions && service.durationOptions.length > 0 && (
             <div>
               <h2 className="font-semibold font-heading text-foreground mb-1 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-primary" /> Number of Hours
               </h2>
-              <p className="text-xs text-muted-foreground mb-3">Minimum 1 hour</p>
+              <p className="text-xs text-muted-foreground mb-3">Minimum {service.durationOptions[0]?.hours || 1} hour</p>
               <div className="flex gap-2 flex-wrap">
-                {HOUR_OPTIONS.map((h) => (
+                {[...service.durationOptions].sort((a, b) => a.hours - b.hours).map((opt) => (
                   <button
-                    key={h}
-                    onClick={() => setHours(h)}
+                    key={opt.hours}
+                    onClick={() => setHours(opt.hours)}
                     className={`px-4 py-2 rounded-xl border-2 font-semibold text-sm transition-all ${
-                      hours === h
+                      hours === opt.hours
                         ? "border-primary bg-primary/10 text-primary"
                         : "border-border hover:border-primary/40"
                     }`}
                   >
-                    <span className="block">{h}h</span>
-                    <span className="text-xs line-through text-muted-foreground font-normal">₹{(h * mrpPerHour).toLocaleString('en-IN')}</span>
-                    <span className="text-sm text-green-700 font-bold">₹{(h * pricePerHour).toLocaleString('en-IN')}</span>
+                    <span className="block">{opt.hours}h</span>
+                    {opt.originalPrice > 0 && (
+                      <span className="text-xs line-through text-muted-foreground font-normal">₹{opt.originalPrice.toLocaleString('en-IN')}</span>
+                    )}
+                    <span className="text-sm text-green-700 font-bold">₹{opt.price.toLocaleString('en-IN')}</span>
                   </button>
                 ))}
               </div>
@@ -500,6 +503,7 @@ const InstaServicePage = () => {
                 <span>If the maid stays beyond your booked hours, <strong>overtime charges of ₹{overtimeRate}/min</strong> will apply to the final bill.</span>
               </div>
             </div>
+            )}
 
             {/* Date */}
             {bookingMode === "now" ? (

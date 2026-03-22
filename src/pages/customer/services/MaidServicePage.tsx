@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authAPI, bookingsAPI, servicesAPI } from "@/lib/api";
-import { AlertCircle, Calendar as CalendarIcon, ChevronLeft, Clock, UserCheck } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, Clock, UserCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -21,6 +21,12 @@ interface Service {
     weekly: number;
     monthly: number;
   };
+  addons?: Array<{
+    name: string;
+    price: number;
+    type?: string;
+    isActive?: boolean;
+  }>;
   dos?: string[];
   donts?: string[];
 }
@@ -88,45 +94,56 @@ const MaidServicePage = () => {
 
   const calculateTotalPrice = () => {
     if (!service) return 0;
-    
-    const pricePerHour = service.pricingPlans 
+
+    const pricePerHour = service.pricingPlans
       ? service.pricingPlans[maidDetails.bookingType]
       : service.price;
-    
+
     let totalPrice = pricePerHour * maidDetails.hours;
-    
+
     // For subscriptions, calculate based on frequency
     if (maidDetails.bookingType === 'monthly' && maidDetails.startDate && maidDetails.endDate) {
       const days = Math.ceil(
-        (new Date(maidDetails.endDate).getTime() - new Date(maidDetails.startDate).getTime()) 
+        (new Date(maidDetails.endDate).getTime() - new Date(maidDetails.startDate).getTime())
         / (1000 * 60 * 60 * 24)
       );
       totalPrice = pricePerHour * maidDetails.hours * days;
     } else if (maidDetails.bookingType === 'weekly') {
-      totalPrice = pricePerHour * maidDetails.hours * 4; // 4 weeks
+      totalPrice = pricePerHour * maidDetails.hours;
     } else if (maidDetails.bookingType === 'daily') {
-      totalPrice = pricePerHour * maidDetails.hours * 30; // 30 days
+      totalPrice = pricePerHour * maidDetails.hours;
     }
-    
-    // Supply charges
+
+    // Supply charges from admin-configured addons
     if (maidDetails.bringSupplies) {
-      totalPrice += 100;
+      const suppliesAddon = service.addons?.find(
+        (a) => a.isActive !== false && (a.type === 'supplies' || a.name.toLowerCase().includes('suppl'))
+      );
+      totalPrice += suppliesAddon?.price || 0;
     }
-    
+
     return Math.round(totalPrice);
   };
 
   const calculateTotalHours = () => {
     if (maidDetails.bookingType === 'monthly' && maidDetails.startDate && maidDetails.endDate) {
       const days = Math.ceil(
-        (new Date(maidDetails.endDate).getTime() - new Date(maidDetails.startDate).getTime()) 
+        (new Date(maidDetails.endDate).getTime() - new Date(maidDetails.startDate).getTime())
         / (1000 * 60 * 60 * 24)
       );
       return maidDetails.hours * days;
-    } else if (maidDetails.bookingType === 'weekly') {
-      return maidDetails.hours * 4;
-    } else if (maidDetails.bookingType === 'daily') {
-      return maidDetails.hours * 30;
+    } else if (maidDetails.bookingType === 'weekly' && maidDetails.startDate && maidDetails.endDate) {
+      const days = Math.ceil(
+        (new Date(maidDetails.endDate).getTime() - new Date(maidDetails.startDate).getTime())
+        / (1000 * 60 * 60 * 24)
+      );
+      return maidDetails.hours * Math.ceil(days / 7);
+    } else if (maidDetails.bookingType === 'daily' && maidDetails.startDate && maidDetails.endDate) {
+      const days = Math.ceil(
+        (new Date(maidDetails.endDate).getTime() - new Date(maidDetails.startDate).getTime())
+        / (1000 * 60 * 60 * 24)
+      );
+      return maidDetails.hours * days;
     }
     return maidDetails.hours;
   };
@@ -246,10 +263,6 @@ const MaidServicePage = () => {
                     <span className="font-semibold">Price:</span>
                     <span className="text-primary font-bold">₹{service?.price}/hour</span>
                   </span>
-                  <span className="flex items-center gap-1">
-                    <span className="font-semibold">Minimum:</span>
-                    <span>1 hour</span>
-                  </span>
                 </div>
               </div>
             </div>
@@ -341,7 +354,7 @@ const MaidServicePage = () => {
 
           {/* Hours Selection */}
           <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6">
-            <h2 className="text-xl font-bold mb-4">Duration (Minimum 1 Hour)</h2>
+            <h2 className="text-xl font-bold mb-4">Duration</h2>
             <div className="flex items-center gap-4">
               <Button
                 type="button"
@@ -360,19 +373,10 @@ const MaidServicePage = () => {
                 type="button"
                 variant="outline"
                 size="icon"
-                onClick={() => setMaidDetails(prev => ({ ...prev, hours: Math.min(8, prev.hours + 1) }))}
-                disabled={maidDetails.hours >= 8}
+                onClick={() => setMaidDetails(prev => ({ ...prev, hours: prev.hours + 1 }))}
               >
                 +
               </Button>
-            </div>
-            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5" />
-                <p className="text-sm text-blue-700 dark:text-blue-400">
-                  Maximum 8 hours per session. For longer requirements, please book multiple sessions.
-                </p>
-              </div>
             </div>
           </div>
 
@@ -446,7 +450,12 @@ const MaidServicePage = () => {
                     onChange={(e) => setMaidDetails(prev => ({ ...prev, bringSupplies: e.target.checked }))}
                     className="w-4 h-4 text-primary"
                   />
-                  <span className="text-sm">Bring cleaning supplies (+₹100)</span>
+                  <span className="text-sm">
+                    Bring cleaning supplies
+                    {service?.addons?.find((a) => a.isActive !== false && (a.type === 'supplies' || a.name.toLowerCase().includes('suppl')))?.price
+                      ? ` (+₹${service.addons.find((a) => a.isActive !== false && (a.type === 'supplies' || a.name.toLowerCase().includes('suppl')))?.price})`
+                      : ''}
+                  </span>
                 </label>
               </div>
 
@@ -482,7 +491,9 @@ const MaidServicePage = () => {
               {maidDetails.bringSupplies && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Supplies:</span>
-                  <span>+₹100</span>
+                  <span>
+                    +₹{service?.addons?.find((a) => a.isActive !== false && (a.type === 'supplies' || a.name.toLowerCase().includes('suppl')))?.price || 0}
+                  </span>
                 </div>
               )}
               <div className="flex justify-between pt-3 border-t border-primary/20">
