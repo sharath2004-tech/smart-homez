@@ -98,6 +98,52 @@ interface TaskDetailModalProps {
   onRefresh: () => void;
 }
 
+const getBreakDurationSeconds = (
+  breakRequests: Task['breakRequests'] = [],
+  now: number,
+) => {
+  return (breakRequests || []).reduce((total, breakRequest) => {
+    if (breakRequest.status === 'active' && breakRequest.startedAt) {
+      const startedAt = new Date(breakRequest.startedAt).getTime();
+      if (Number.isFinite(startedAt)) {
+        return total + Math.max(0, Math.floor((now - startedAt) / 1000));
+      }
+    }
+
+    if (breakRequest.status === 'completed') {
+      if (breakRequest.startedAt && breakRequest.endedAt) {
+        const startedAt = new Date(breakRequest.startedAt).getTime();
+        const endedAt = new Date(breakRequest.endedAt).getTime();
+
+        if (Number.isFinite(startedAt) && Number.isFinite(endedAt)) {
+          return total + Math.max(0, Math.floor((endedAt - startedAt) / 1000));
+        }
+      }
+
+      if (breakRequest.durationMinutes > 0) {
+        return total + (breakRequest.durationMinutes * 60);
+      }
+    }
+
+    return total;
+  }, 0);
+};
+
+const getScheduledDurationSeconds = (bookingDate: string, startTime: string, endTime: string) => {
+  const scheduledStart = new Date(`${bookingDate}T${startTime}`).getTime();
+  let scheduledEnd = new Date(`${bookingDate}T${endTime}`).getTime();
+
+  if (!Number.isFinite(scheduledStart) || !Number.isFinite(scheduledEnd)) {
+    return 0;
+  }
+
+  if (scheduledEnd < scheduledStart) {
+    scheduledEnd += 24 * 60 * 60 * 1000;
+  }
+
+  return Math.max(0, Math.floor((scheduledEnd - scheduledStart) / 1000));
+};
+
 const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) => {
   const { t } = useTranslation();
   const [task, setTask] = useState<Task | null>(null);
@@ -183,7 +229,8 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       const updateElapsedTime = () => {
         const startTime = new Date(task.actualStartTime!).getTime();
         const now = Date.now();
-        const elapsedSeconds = Math.floor((now - startTime) / 1000);
+        const breakDurationSeconds = getBreakDurationSeconds(task.breakRequests, now);
+        const elapsedSeconds = Math.floor((now - startTime) / 1000) - breakDurationSeconds;
         const elapsed = Math.max(0, elapsedSeconds);
         
         console.log('⏱️ Timer Update:', {
@@ -196,10 +243,9 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
         setElapsedTime(elapsed);
 
         // Calculate overtime
-        const scheduledEnd = new Date(`${task.bookingDate}T${task.endTime}`).getTime();
-        if (now > scheduledEnd) {
-          const overtimeMs = now - scheduledEnd;
-          const overtimeMins = Math.ceil(overtimeMs / 60000);
+        const scheduledDurationSeconds = getScheduledDurationSeconds(task.bookingDate, task.startTime, task.endTime);
+        if (elapsed > scheduledDurationSeconds) {
+          const overtimeMins = Math.ceil((elapsed - scheduledDurationSeconds) / 60);
           setOvertimeMinutes(Math.max(0, overtimeMins));
         } else {
           setOvertimeMinutes(0);
@@ -219,7 +265,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       setOvertimeMinutes(0);
       setHasTimeOffset(false);
     }
-  }, [task?.status, task?.actualStartTime, task?.bookingDate, task?.endTime, task?._id]);
+  }, [task?.status, task?.actualStartTime, task?.bookingDate, task?.startTime, task?.endTime, task?.breakRequests, task?._id]);
 
   // Generate payment QR when task is completed or pending-review
   useEffect(() => {

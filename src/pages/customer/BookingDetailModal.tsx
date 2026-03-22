@@ -106,6 +106,52 @@ interface BookingDetailModalProps {
   onRefresh: () => void;
 }
 
+const getBreakDurationSeconds = (
+  breakRequests: BreakRequest[] = [],
+  now: number,
+) => {
+  return (breakRequests || []).reduce((total, breakRequest) => {
+    if (breakRequest.status === 'active' && breakRequest.startedAt) {
+      const startedAt = new Date(breakRequest.startedAt).getTime();
+      if (Number.isFinite(startedAt)) {
+        return total + Math.max(0, Math.floor((now - startedAt) / 1000));
+      }
+    }
+
+    if (breakRequest.status === 'completed') {
+      if (breakRequest.startedAt && breakRequest.endedAt) {
+        const startedAt = new Date(breakRequest.startedAt).getTime();
+        const endedAt = new Date(breakRequest.endedAt).getTime();
+
+        if (Number.isFinite(startedAt) && Number.isFinite(endedAt)) {
+          return total + Math.max(0, Math.floor((endedAt - startedAt) / 1000));
+        }
+      }
+
+      if (breakRequest.durationMinutes > 0) {
+        return total + (breakRequest.durationMinutes * 60);
+      }
+    }
+
+    return total;
+  }, 0);
+};
+
+const getScheduledDurationSeconds = (bookingDate: string, startTime: string, endTime: string) => {
+  const scheduledStart = new Date(`${bookingDate}T${startTime}`).getTime();
+  let scheduledEnd = new Date(`${bookingDate}T${endTime}`).getTime();
+
+  if (!Number.isFinite(scheduledStart) || !Number.isFinite(scheduledEnd)) {
+    return 0;
+  }
+
+  if (scheduledEnd < scheduledStart) {
+    scheduledEnd += 24 * 60 * 60 * 1000;
+  }
+
+  return Math.max(0, Math.floor((scheduledEnd - scheduledStart) / 1000));
+};
+
 const STATUS_STEPS = [
   { key: 'pending',        label: 'Booking Placed',   icon: ClipboardCheck },
   { key: 'confirmed',      label: 'Worker Assigned',  icon: User },
@@ -242,16 +288,16 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
       const interval = setInterval(() => {
         const start = new Date(booking.actualStartTime!).getTime();
         const now = Date.now();
-        const rawElapsed = Math.floor((now - start) / 1000);
+        const breakDurationSeconds = getBreakDurationSeconds(booking.breakRequests, now);
+        const rawElapsed = Math.floor((now - start) / 1000) - breakDurationSeconds;
         const elapsed = Math.max(0, rawElapsed + timeOffsetRef.current);
         
         setElapsedTime(elapsed);
 
         // Calculate overtime
-        const scheduledEnd = new Date(`${booking.bookingDate}T${booking.endTime}`).getTime();
-        if (now > scheduledEnd) {
-          const overtimeMs = now - scheduledEnd;
-          const overtimeMins = Math.ceil(overtimeMs / 60000);
+        const scheduledDurationSeconds = getScheduledDurationSeconds(booking.bookingDate, booking.startTime, booking.endTime);
+        if (elapsed > scheduledDurationSeconds) {
+          const overtimeMins = Math.ceil((elapsed - scheduledDurationSeconds) / 60);
           setOvertimeMinutes(Math.max(0, overtimeMins));
         } else {
           setOvertimeMinutes(0);
@@ -267,7 +313,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
       offsetCalculatedRef.current = false;
       timeOffsetRef.current = 0;
     }
-  }, [booking?.status, booking?.actualStartTime, booking?.bookingDate, booking?.endTime]);
+  }, [booking?.status, booking?.actualStartTime, booking?.bookingDate, booking?.startTime, booking?.endTime, booking?.breakRequests]);
 
   const handleScanStartQR = useCallback(async (qrCode: string) => {
     try {
