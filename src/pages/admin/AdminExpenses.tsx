@@ -168,6 +168,8 @@ const CATEGORY_ICONS: Record<string, string> = {
   other: '⭐'
 };
 
+const DEFAULT_VISIBLE_ITEMS = 2;
+
 const AdminExpenses = () => {
   const { role, name } = useAdminRole();
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -181,6 +183,9 @@ const AdminExpenses = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showAllRevenueServices, setShowAllRevenueServices] = useState(false);
+  const [showAllWages, setShowAllWages] = useState(false);
+  const [expandedWageBreakdowns, setExpandedWageBreakdowns] = useState<Record<string, boolean>>({});
 
   const [formData, setFormData] = useState({
     title: "",
@@ -480,6 +485,21 @@ const AdminExpenses = () => {
   const getWageBookingDisplayId = (booking: WageDetailItem['bookingBreakdown'][number]) => {
     if (booking.bookingId) return booking.bookingId;
     return `BK-${booking.bookingMongoId.slice(-6).toUpperCase()}`;
+  };
+
+  const visibleRevenueServices = showAllRevenueServices
+    ? profitStats.revenueByService
+    : profitStats.revenueByService.slice(0, DEFAULT_VISIBLE_ITEMS);
+
+  const visibleWages = showAllWages
+    ? profitStats.wageDetails
+    : profitStats.wageDetails.slice(0, DEFAULT_VISIBLE_ITEMS);
+
+  const toggleWageBreakdown = (wageId: string) => {
+    setExpandedWageBreakdowns((current) => ({
+      ...current,
+      [wageId]: !current[wageId]
+    }));
   };
 
   const superAdminExpenseDetails = useMemo(() => {
@@ -894,15 +914,30 @@ const AdminExpenses = () => {
             {profitStats.revenueByService.length === 0 ? (
               <p className="text-sm text-muted-foreground">No completed services found in the selected range.</p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                {profitStats.revenueByService.map((item) => (
-                  <div key={`${item.serviceId}-${item.serviceName}`} className="rounded-xl border border-emerald-100 bg-white/80 p-4">
-                    <p className="text-sm font-semibold text-foreground break-words">{item.serviceName}</p>
-                    <p className="mt-2 text-2xl font-bold text-emerald-700">₹{item.totalRevenue.toLocaleString()}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{item.bookingCount} completed booking{item.bookingCount !== 1 ? 's' : ''}</p>
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {visibleRevenueServices.map((item) => (
+                    <div key={`${item.serviceId}-${item.serviceName}`} className="rounded-xl border border-emerald-100 bg-white/80 p-4">
+                      <p className="text-sm font-semibold text-foreground break-words">{item.serviceName}</p>
+                      <p className="mt-2 text-2xl font-bold text-emerald-700">₹{item.totalRevenue.toLocaleString()}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{item.bookingCount} completed booking{item.bookingCount !== 1 ? 's' : ''}</p>
+                    </div>
+                  ))}
+                </div>
+                {profitStats.revenueByService.length > DEFAULT_VISIBLE_ITEMS && (
+                  <div className="mt-3 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => setShowAllRevenueServices((current) => !current)}
+                      className="text-sm font-medium text-emerald-700 hover:text-emerald-800"
+                    >
+                      {showAllRevenueServices
+                        ? 'Show fewer services'
+                        : `Show ${profitStats.revenueByService.length - DEFAULT_VISIBLE_ITEMS} more service${profitStats.revenueByService.length - DEFAULT_VISIBLE_ITEMS !== 1 ? 's' : ''}`}
+                    </button>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </div>
 
@@ -915,8 +950,15 @@ const AdminExpenses = () => {
             {profitStats.wageDetails.length === 0 ? (
               <p className="text-sm text-muted-foreground">No wage payments found in the selected range.</p>
             ) : (
+              <>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                {profitStats.wageDetails.map((wage) => (
+                {visibleWages.map((wage) => {
+                  const isBreakdownExpanded = !!expandedWageBreakdowns[wage._id];
+                  const visibleBookingBreakdown = isBreakdownExpanded
+                    ? wage.bookingBreakdown
+                    : wage.bookingBreakdown.slice(0, DEFAULT_VISIBLE_ITEMS);
+
+                  return (
                   <div key={wage._id} className="rounded-xl border border-blue-100 bg-white/85 p-4 space-y-2">
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -985,7 +1027,7 @@ const AdminExpenses = () => {
                           <p className="text-[11px] text-muted-foreground">{wage.bookingBreakdown.length} item{wage.bookingBreakdown.length !== 1 ? 's' : ''}</p>
                         </div>
                         <div className="divide-y divide-blue-100">
-                          {wage.bookingBreakdown.map((booking) => (
+                          {visibleBookingBreakdown.map((booking) => (
                             <div key={`${wage._id}-${booking.bookingMongoId}`} className="grid grid-cols-1 gap-2 px-3 py-2 text-xs md:grid-cols-[minmax(0,1.5fr)_auto_auto] md:items-start md:gap-3">
                               <div className="min-w-0">
                                 <p className="font-semibold text-foreground break-words">{getWageBookingDisplayId(booking)} · {booking.serviceName}</p>
@@ -1016,11 +1058,38 @@ const AdminExpenses = () => {
                             </div>
                           ))}
                         </div>
+                        {wage.bookingBreakdown.length > DEFAULT_VISIBLE_ITEMS && (
+                          <div className="border-t border-blue-100 px-3 py-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => toggleWageBreakdown(wage._id)}
+                              className="text-xs font-medium text-blue-700 hover:text-blue-800"
+                            >
+                              {isBreakdownExpanded
+                                ? 'Show fewer breakdown items'
+                                : `Show ${wage.bookingBreakdown.length - DEFAULT_VISIBLE_ITEMS} more item${wage.bookingBreakdown.length - DEFAULT_VISIBLE_ITEMS !== 1 ? 's' : ''}`}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                ))}
+                )})}
               </div>
+              {profitStats.wageDetails.length > DEFAULT_VISIBLE_ITEMS && (
+                <div className="mt-3 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowAllWages((current) => !current)}
+                    className="text-sm font-medium text-blue-700 hover:text-blue-800"
+                  >
+                    {showAllWages
+                      ? 'Show fewer wage payments'
+                      : `Show ${profitStats.wageDetails.length - DEFAULT_VISIBLE_ITEMS} more wage payment${profitStats.wageDetails.length - DEFAULT_VISIBLE_ITEMS !== 1 ? 's' : ''}`}
+                  </button>
+                </div>
+              )}
+              </>
             )}
           </div>
 
