@@ -330,7 +330,7 @@ export default function DeepCleaningPage() {
     }
 
     if (!availability?.serviceId) {
-      toast.error("Deep-cleaning service is not configured yet.");
+      toast.error("Deep-cleaning service record is missing or inactive. Please ask the admin to configure it in Deep Cleaning Config → Service Settings.");
       return;
     }
 

@@ -275,7 +275,7 @@ const CustomerDashboard = () => {
     }
 
     if (!deepCleaningRequestServiceId) {
-      toast.error('Deep cleaning is not configured yet. Please ask the admin to set it up first.');
+      toast.error('Deep-cleaning service record is missing or inactive. Please ask the admin to configure it in Deep Cleaning Config → Service Settings.');
       return;
     }
 

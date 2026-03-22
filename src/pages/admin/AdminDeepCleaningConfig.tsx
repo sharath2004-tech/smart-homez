@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
-import { api } from "@/lib/api";
+import { api, servicesAPI } from "@/lib/api";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2, ChevronDown, ChevronUp, Edit2, FileClock, Plus, RefreshCcw, Save, Send, ShieldCheck, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -52,6 +52,26 @@ interface ChangeRequest {
   createdAt?: string;
 }
 
+interface DeepCleaningServiceConfig {
+  _id?: string;
+  name: string;
+  description: string;
+  category: string;
+  serviceType?: string;
+  isActive: boolean;
+  isQuoteService?: boolean;
+  workerSearchRadiusKm?: number;
+  defaultWorkerCount?: number;
+  workerWage?: {
+    type: "per_hour" | "per_session";
+    rate: number;
+  };
+  serviceCategory?: string;
+  allowBreakRequests?: boolean;
+  price: number;
+  duration: number;
+}
+
 const FALLBACK_CATEGORIES: DeepCleaningCategory[] = [
   { id: "fullhouse", label: "Full Home Deep Cleaning", emoji: "🏡", isActive: true, sortOrder: 1, description: "Choose a home-size package for full-house professional deep cleaning.", highlights: ["Packages by home size", "Advance scheduling", "Team-based cleaning"], mode: "package", headline: "Full-home deep cleaning packages for apartments, villas and handover prep.", inclusionsTitle: "Package includes", idealFor: ["Seasonal full-home reset", "Festival or guest preparation", "Homes needing a team visit"], howItWorksTitle: "How this works", howItWorksSteps: ["Pick this category to understand what is covered.", "Choose the package or continue to booking and enter your home details.", "Review the amount and confirm your preferred slot."], primaryActionLabel: "Continue to packages", secondaryActionLabel: "Prefer custom selection?" },
   { id: "bathroom", label: "Bathroom Cleaning", emoji: "🚿", isActive: true, sortOrder: 2, description: "From basic washroom cleaning to intense descaling and sanitization.", highlights: ["Descaling", "Sanitization", "Tile & fixture cleaning"], mode: "customize", headline: "Bathroom-focused deep cleaning with flexible add-to-cart options.", inclusionsTitle: "Popular bathroom tasks", idealFor: ["Hard-water stain removal", "Tile and grout refresh", "Washrooms needing hygienic sanitization"], howItWorksTitle: "How this works", howItWorksSteps: ["Pick this category to understand what is covered.", "Continue to booking, choose the tasks you want, and enter your home details.", "Review the amount and confirm your slot."], primaryActionLabel: "Continue to booking", secondaryActionLabel: "See full-home packages" },
@@ -101,6 +121,32 @@ const DEFAULT_PAGE_CONTENT: PageContent = {
   categoriesSubtitle: "Pick a category, enter your requirements and get the final amount based on your home details.",
   miniServicesTitle: "Popular mini services",
   miniServicesSubtitle: "Add-on services for specific areas and appliances.",
+};
+
+const DEFAULT_DEEP_CLEANING_SERVICE: DeepCleaningServiceConfig = {
+  name: "Deep Cleaning",
+  description: "Comprehensive deep cleaning service for your entire home. Includes kitchen, bathrooms, fans, windows and all major surfaces.",
+  category: "cleaning",
+  serviceType: "deep_cleaning_full_house",
+  isActive: true,
+  isQuoteService: true,
+  workerSearchRadiusKm: 30,
+  defaultWorkerCount: 2,
+  workerWage: {
+    type: "per_hour",
+    rate: 0,
+  },
+  serviceCategory: "deep_cleaning",
+  allowBreakRequests: true,
+  price: 2999,
+  duration: 240,
+};
+
+const matchesDeepCleaningService = (service: DeepCleaningServiceConfig) => {
+  const normalizedName = service.name?.toLowerCase?.() || "";
+  return service.serviceCategory === "deep_cleaning"
+    || service.serviceType?.startsWith("deep_cleaning")
+    || /deep cleaning|move in|move out/.test(normalizedName);
 };
 
 const getSortedCategories = (categories?: DeepCleaningCategory[]) =>
@@ -158,15 +204,20 @@ export default function AdminDeepCleaningConfig() {
   const [submittingRequest, setSubmittingRequest] = useState(false);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [reviewNote, setReviewNote] = useState("");
+  const [serviceConfig, setServiceConfig] = useState<DeepCleaningServiceConfig | null>(null);
+  const [serviceLoading, setServiceLoading] = useState(true);
+  const [serviceSaving, setServiceSaving] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       setLoadingRequests(true);
+      setServiceLoading(true);
       try {
-        const [configRes, requestsRes] = await Promise.all([
+        const [configRes, requestsRes, servicesRes] = await Promise.all([
           api.get("/deep-cleaning/config"),
           api.get("/deep-cleaning/change-requests").catch(() => ({ requests: [] })),
+          servicesAPI.getAll({}).catch(() => ({ services: [] })),
         ]);
 
         const initialConfig = {
@@ -181,6 +232,8 @@ export default function AdminDeepCleaningConfig() {
         setCategories(getSortedCategories(initialConfig.categories));
         setActiveCategory(prev => prev || (getSortedCategories(initialConfig.categories).find(c => c.isActive)?.id ?? getSortedCategories(initialConfig.categories)[0]?.id ?? ""));
         setRequests(requestsRes.requests || []);
+        const deepCleaningService = (servicesRes.services || []).find((service: DeepCleaningServiceConfig) => matchesDeepCleaningService(service)) || null;
+        setServiceConfig(deepCleaningService);
         setHasDraftChanges(false);
       } catch (error) {
         console.error(error);
@@ -188,6 +241,7 @@ export default function AdminDeepCleaningConfig() {
       } finally {
         setLoading(false);
         setLoadingRequests(false);
+        setServiceLoading(false);
       }
     };
 
@@ -228,6 +282,54 @@ export default function AdminDeepCleaningConfig() {
       toast.error(error instanceof Error ? error.message : "Failed to refresh change requests");
     } finally {
       setLoadingRequests(false);
+    }
+  };
+
+  const saveServiceConfig = async () => {
+    if (!serviceConfig) return;
+
+    setServiceSaving(true);
+    try {
+      const payload = {
+        ...serviceConfig,
+        serviceType: serviceConfig.serviceType || "deep_cleaning_full_house",
+        serviceCategory: "deep_cleaning",
+        isQuoteService: true,
+        workerSearchRadiusKm: Number(serviceConfig.workerSearchRadiusKm || 0),
+        defaultWorkerCount: Number(serviceConfig.defaultWorkerCount || 1),
+        workerWage: {
+          type: serviceConfig.workerWage?.type || "per_hour",
+          rate: Number(serviceConfig.workerWage?.rate || 0),
+        },
+        allowBreakRequests: serviceConfig.allowBreakRequests === true,
+        isActive: serviceConfig.isActive === true,
+      };
+
+      if (serviceConfig._id) {
+        await servicesAPI.update(serviceConfig._id, payload as unknown as Record<string, unknown>);
+        toast.success("Deep-cleaning service settings updated");
+      } else {
+        const response = await servicesAPI.create({
+          ...DEFAULT_DEEP_CLEANING_SERVICE,
+          ...payload,
+          serviceTypeName: "Deep Cleaning",
+        } as unknown as Record<string, unknown>);
+
+        if (response.requestSubmitted) {
+          toast.success("Deep-cleaning service setup request sent for approval");
+        } else {
+          toast.success("Deep-cleaning service created");
+        }
+      }
+
+      const refreshedServices = await servicesAPI.getAll({}).catch(() => ({ services: [] }));
+      const refreshedDeepCleaningService = (refreshedServices.services || []).find((service: DeepCleaningServiceConfig) => matchesDeepCleaningService(service)) || null;
+      setServiceConfig(refreshedDeepCleaningService);
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "Failed to save deep-cleaning service settings");
+    } finally {
+      setServiceSaving(false);
     }
   };
 
@@ -539,6 +641,178 @@ export default function AdminDeepCleaningConfig() {
             </div>
           </div>
         )}
+
+        <div className="bg-card border border-border rounded-2xl p-4 space-y-4">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="text-base font-semibold text-foreground">Deep-cleaning service settings</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Control the actual service record used for availability, worker wages, break requests, active status and search range.
+              </p>
+            </div>
+            <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${serviceConfig?.isActive ? "bg-green-100 text-green-700 border-green-200" : "bg-amber-100 text-amber-800 border-amber-200"}`}>
+              {serviceConfig?._id ? (serviceConfig.isActive ? "Active service" : "Inactive service") : "Service not created"}
+            </span>
+          </div>
+
+          {serviceLoading ? (
+            <div className="text-sm text-muted-foreground">Loading service settings...</div>
+          ) : (
+            <>
+              {!serviceConfig?._id && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  Deep-cleaning page content is ready, but the actual service record is missing. Create it here so customers can book and request service correctly.
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="label-clean">Service name</label>
+                  <input
+                    value={serviceConfig?.name ?? DEFAULT_DEEP_CLEANING_SERVICE.name}
+                    onChange={e => setServiceConfig(prev => ({ ...(prev || DEFAULT_DEEP_CLEANING_SERVICE), name: e.target.value }))}
+                    className="input-clean text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="label-clean">Base price (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={serviceConfig?.price ?? DEFAULT_DEEP_CLEANING_SERVICE.price}
+                    onChange={e => setServiceConfig(prev => ({ ...(prev || DEFAULT_DEEP_CLEANING_SERVICE), price: Number(e.target.value) }))}
+                    className="input-clean text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="label-clean">Description</label>
+                <textarea
+                  value={serviceConfig?.description ?? DEFAULT_DEEP_CLEANING_SERVICE.description}
+                  onChange={e => setServiceConfig(prev => ({ ...(prev || DEFAULT_DEEP_CLEANING_SERVICE), description: e.target.value }))}
+                  rows={3}
+                  className="input-clean min-h-[84px] text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="label-clean">Service range (km)</label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="100"
+                    step="1"
+                    value={serviceConfig?.workerSearchRadiusKm ?? DEFAULT_DEEP_CLEANING_SERVICE.workerSearchRadiusKm}
+                    onChange={e => setServiceConfig(prev => ({ ...(prev || DEFAULT_DEEP_CLEANING_SERVICE), workerSearchRadiusKm: Number(e.target.value) }))}
+                    className="w-full accent-primary"
+                  />
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    step="1"
+                    value={serviceConfig?.workerSearchRadiusKm ?? DEFAULT_DEEP_CLEANING_SERVICE.workerSearchRadiusKm}
+                    onChange={e => setServiceConfig(prev => ({ ...(prev || DEFAULT_DEEP_CLEANING_SERVICE), workerSearchRadiusKm: Number(e.target.value) }))}
+                    className="input-clean text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">How far the system checks for deep-cleaning coverage and matching locations.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="label-clean">Default worker count</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    step="1"
+                    value={serviceConfig?.defaultWorkerCount ?? DEFAULT_DEEP_CLEANING_SERVICE.defaultWorkerCount}
+                    onChange={e => setServiceConfig(prev => ({ ...(prev || DEFAULT_DEEP_CLEANING_SERVICE), defaultWorkerCount: Number(e.target.value) }))}
+                    className="input-clean text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">Used when assigning workforce and calculating worker wage totals.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="label-clean">Wage type</label>
+                  <select
+                    value={serviceConfig?.workerWage?.type ?? DEFAULT_DEEP_CLEANING_SERVICE.workerWage?.type}
+                    onChange={e => setServiceConfig(prev => ({
+                      ...(prev || DEFAULT_DEEP_CLEANING_SERVICE),
+                      workerWage: {
+                        type: e.target.value as "per_hour" | "per_session",
+                        rate: prev?.workerWage?.rate ?? DEFAULT_DEEP_CLEANING_SERVICE.workerWage?.rate ?? 0,
+                      },
+                    }))}
+                    className="input-clean text-sm"
+                  >
+                    <option value="per_hour">Per hour</option>
+                    <option value="per_session">Per session</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="label-clean">Wage rate (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={serviceConfig?.workerWage?.rate ?? DEFAULT_DEEP_CLEANING_SERVICE.workerWage?.rate}
+                    onChange={e => setServiceConfig(prev => ({
+                      ...(prev || DEFAULT_DEEP_CLEANING_SERVICE),
+                      workerWage: {
+                        type: prev?.workerWage?.type ?? DEFAULT_DEEP_CLEANING_SERVICE.workerWage?.type ?? "per_hour",
+                        rate: Number(e.target.value),
+                      },
+                    }))}
+                    className="input-clean text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label className="flex items-center justify-between gap-3 rounded-xl border border-border p-3 cursor-pointer">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Activate deep cleaning</p>
+                    <p className="text-xs text-muted-foreground">Customers can only book/request deep cleaning when this service is active.</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={(serviceConfig?.isActive ?? DEFAULT_DEEP_CLEANING_SERVICE.isActive) === true}
+                    onChange={e => setServiceConfig(prev => ({ ...(prev || DEFAULT_DEEP_CLEANING_SERVICE), isActive: e.target.checked }))}
+                    className="h-4 w-4 accent-primary"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between gap-3 rounded-xl border border-border p-3 cursor-pointer">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Allow break requests</p>
+                    <p className="text-xs text-muted-foreground">Workers can request a break during an in-progress deep-cleaning booking.</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={(serviceConfig?.allowBreakRequests ?? DEFAULT_DEEP_CLEANING_SERVICE.allowBreakRequests) === true}
+                    onChange={e => setServiceConfig(prev => ({ ...(prev || DEFAULT_DEEP_CLEANING_SERVICE), allowBreakRequests: e.target.checked }))}
+                    className="h-4 w-4 accent-primary"
+                  />
+                </label>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2">
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={saveServiceConfig}
+                  disabled={serviceSaving}
+                  className="flex items-center justify-center gap-2 text-sm font-semibold bg-primary text-primary-foreground px-4 py-2.5 rounded-xl disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" /> {serviceSaving ? "Saving service..." : serviceConfig?._id ? "Save service settings" : "Create deep-cleaning service"}
+                </motion.button>
+              </div>
+            </>
+          )}
+        </div>
 
         <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
