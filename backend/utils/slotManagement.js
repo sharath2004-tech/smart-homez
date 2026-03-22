@@ -84,7 +84,7 @@ export const generateTimeSlots = (date = new Date(), startHour = 6, endHour = 22
  * @param {number} bufferMinutes - Buffer time between bookings (default: 15)
  * @returns {Promise<Object>} {available: boolean, reason: string}
  */
-export const checkSlotAvailability = async (workerId, date, startTime, endTime, Booking, bufferMinutes = 15) => {
+export const checkSlotAvailability = async (workerId, date, startTime, endTime, Booking, bufferMinutes = 15, excludeBookingId = null) => {
   try {
     // Convert times to minutes for comparison
     const [startHour, startMin] = startTime.split(':').map(Number);
@@ -98,14 +98,20 @@ export const checkSlotAvailability = async (workerId, date, startTime, endTime, 
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const existingBookings = await Booking.find({
+    const bookingQuery = {
       worker: workerId,
       bookingDate: {
         $gte: startOfDay,
         $lte: endOfDay
       },
       status: { $in: ['confirmed', 'in-progress', 'pending'] }
-    }).select('startTime endTime');
+    };
+
+    if (excludeBookingId) {
+      bookingQuery._id = { $ne: excludeBookingId };
+    }
+
+    const existingBookings = await Booking.find(bookingQuery).select('startTime endTime');
 
     // Check for conflicts with buffer
     for (const booking of existingBookings) {

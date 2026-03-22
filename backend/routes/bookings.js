@@ -17,6 +17,7 @@ import {
 import { processQueuedBookings, updateBookingStatuses } from '../utils/bookingStatusUpdater.js';
 import notificationService from '../utils/notificationService.js';
 import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
+import { checkSlotAvailability } from '../utils/slotManagement.js';
 import { checkIfOnTime, updateWorkerStats } from '../utils/updateWorkerStats.js';
 import { assignWorkerToBooking, reassignWorker } from '../utils/workerAssignment.js';
 import {
@@ -1597,7 +1598,7 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
     // Check if original worker is available at new time
     // checkWorkerAvailability expects duration in hours
     const durationHours = durationMinutes / 60;
-    const workerAvailable = oldWorker ? await checkWorkerAvailability(oldWorker._id, newScheduledDate, durationHours) : false;
+    const workerAvailable = oldWorker ? await checkWorkerAvailability(oldWorker._id, newScheduledDate, durationHours, booking._id) : false;
     
     let workerReassigned = false;
     let newWorkerInfo = null;
@@ -1748,43 +1749,32 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
 });
 
 // Helper function to check worker availability
-async function checkWorkerAvailability(workerId, scheduledDate, duration) {
+async function checkWorkerAvailability(workerId, scheduledDate, duration, excludeBookingId = null) {
   try {
     // Check if worker exists and is available
     const worker = await User.findById(workerId);
-    if (!worker || !worker.workerDetails?.isAvailable) {
+    if (!worker || worker.isActive === false || worker.workerProfile?.availability !== true) {
       return false;
     }
 
-    // Check for conflicting bookings
     const startTime = new Date(scheduledDate);
     const endTime = new Date(startTime.getTime() + duration * 60 * 60 * 1000);
-    
-    // Get all bookings for this worker in the relevant time period
-    const existingBookings = await Booking.find({
-      worker: workerId,
-      status: { $in: ['pending', 'confirmed', 'in-progress'] }
-    });
 
-    // Check if any existing booking conflicts with the new time slot
-    for (const existingBooking of existingBookings) {
-      // Parse existing booking's start and end times
-      const existingDate = new Date(existingBooking.bookingDate);
-      const [existingStartHour, existingStartMinute] = existingBooking.startTime.split(':').map(Number);
-      existingDate.setHours(existingStartHour, existingStartMinute, 0, 0);
-      
-      const existingEndDate = new Date(existingDate);
-      // Handle both duration (hours) and estimatedDuration (minutes)
-      if (existingBooking.estimatedDuration) {
-        existingEndDate.setTime(existingEndDate.getTime() + existingBooking.estimatedDuration * 60 * 1000);
-      } else if (existingBooking.duration) {
-        existingEndDate.setTime(existingEndDate.getTime() + existingBooking.duration * 60 * 60 * 1000);
-      }
-      
-      // Check for overlap: new booking overlaps if it starts before existing ends AND ends after existing starts
-      if (startTime < existingEndDate && endTime > existingDate) {
-        return false; // Conflict found
-      }
+    const startTimeString = `${String(startTime.getHours()).padStart(2, '0')}:${String(startTime.getMinutes()).padStart(2, '0')}`;
+    const endTimeString = `${String(endTime.getHours()).padStart(2, '0')}:${String(endTime.getMinutes()).padStart(2, '0')}`;
+
+    const slotAvailability = await checkSlotAvailability(
+      workerId,
+      startTime,
+      startTimeString,
+      endTimeString,
+      Booking,
+      15,
+      excludeBookingId
+    );
+
+    if (!slotAvailability.available) {
+      return false;
     }
 
     return true; // No conflicts

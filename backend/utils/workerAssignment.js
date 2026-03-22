@@ -1,6 +1,7 @@
 import Booking from '../models/Booking.js';
 import Location from '../models/Location.js';
 import User from '../models/User.js';
+import { checkSlotAvailability } from './slotManagement.js';
 
 /**
  * Worker Assignment Algorithm
@@ -91,7 +92,7 @@ const calculateWorkerScore = (worker, booking, locationDistance = null) => {
  */
 export const findBestWorkers = async (bookingDetails, count = 3) => {
   try {
-    const { service, bookingDate, location } = bookingDetails;
+    const { _id, service, bookingDate, startTime, endTime, location } = bookingDetails;
     const serviceRadiusKm = service?.workerSearchRadiusKm || 50;
     const serviceRadiusMeters = serviceRadiusKm * 1000;
 
@@ -198,8 +199,35 @@ export const findBestWorkers = async (bookingDetails, count = 3) => {
       console.warn('⚠️ All workers exhausted leaves — using all online workers by rating');
     }
 
-    const workersToScore = eligibleByLeave.length > 0 ? eligibleByLeave : onlineWorkers;
-    console.log(`🎯 Scoring ${workersToScore.length} worker(s)`);
+    const workersToCheck = eligibleByLeave.length > 0 ? eligibleByLeave : onlineWorkers;
+    console.log(`🎯 Checking ${workersToCheck.length} worker(s) for slot availability and score`);
+
+    const workersToScore = [];
+    for (const worker of workersToCheck) {
+      if (bookingDate && startTime && endTime) {
+        const slotAvailability = await checkSlotAvailability(
+          worker._id,
+          bookingDate,
+          startTime,
+          endTime,
+          Booking,
+          15,
+          _id || null
+        );
+
+        if (!slotAvailability.available) {
+          continue;
+        }
+      }
+
+      workersToScore.push(worker);
+    }
+
+    console.log(`🗓️ ${workersToScore.length} worker(s) remain after slot conflict filtering`);
+
+    if (workersToScore.length === 0) {
+      throw new Error('No workers available for the selected date and time slot.');
+    }
 
     // ── 6. Build location-to-customer distance map ────────────────────────────
     // key: workerId string → distance (km) from their assigned Location center to customer
@@ -239,6 +267,7 @@ export const findBestWorkers = async (bookingDetails, count = 3) => {
     const workloadPromises = workersWithScores.map(async ({ worker, score, distance }) => {
       const concurrentBookings = await Booking.countDocuments({
         worker: worker._id,
+        _id: { $ne: _id || null },
         bookingDate: {
           $gte: new Date(bookingTime.getTime() - 2 * 60 * 60 * 1000),
           $lte: new Date(bookingTime.getTime() + 2 * 60 * 60 * 1000)
@@ -325,7 +354,7 @@ export const assignWorkerToBooking = async (bookingId) => {
  */
 export const reassignWorker = async (bookingId, reason) => {
   try {
-    const booking = await Booking.findById(bookingId);
+    const booking = await Booking.findById(bookingId).populate('service');
     if (!booking) throw new Error('Booking not found');
 
     // Try backup workers first
