@@ -1,11 +1,11 @@
+import BookingOrderPrint from "@/components/BookingOrderPrint";
 import ChatModal from "@/components/ChatModal";
 import EmbeddedQRScanner from "@/components/EmbeddedQRScanner";
-import BookingOrderPrint from "@/components/BookingOrderPrint";
 import { API_BASE_URL, bookingsAPI } from "@/lib/api";
+import html2pdf from "html2pdf.js";
 import { ArrowLeft, Calendar, Camera, CheckCircle, ClipboardCheck, Clock3, Coffee, DollarSign, Download, MapPin, MessageCircle, Pause, Phone, Play, Printer, QrCode, Timer, User, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import html2pdf from "html2pdf.js";
 import ReviewModal from "./ReviewModal";
 
 interface Worker {
