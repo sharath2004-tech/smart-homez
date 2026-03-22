@@ -46,25 +46,37 @@ const CustomerDashboard = () => {
   const [serviceableStatus, setServiceableStatus] = useState<'available' | 'unavailable' | 'unknown'>('unknown');
   const [quickServices, setQuickServices] = useState<any[]>([]);
   const [washroomServiceId, setWashroomServiceId] = useState<string | null>(null);
+  const [kitchenServiceId, setKitchenServiceId] = useState<string | null>(null);
+  const [windowServiceId, setWindowServiceId] = useState<string | null>(null);
   const { latitude, longitude, error: locationError } = useGeolocation();
 
-  // Fetch washroom service ID
+  // Fetch spot-clean service IDs for dashboard quick cards
   useEffect(() => {
-    const fetchWashroomService = async () => {
+    const fetchSpotCleanServices = async () => {
       try {
-        const response = await servicesAPI.getAll({ search: 'washroom deep', isActive: true });
-        const washroomService = response.services?.find((s: any) => 
-          s.name.toLowerCase().includes('washroom') && 
-          s.name.toLowerCase().includes('deep')
+        const response = await servicesAPI.getAll({ isActive: true, limit: 50 });
+        const list = response.services || [];
+
+        const washroom = list.find((s: any) =>
+          s.name.toLowerCase().includes('washroom') && s.name.toLowerCase().includes('deep')
         );
-        if (washroomService) {
-          setWashroomServiceId(washroomService._id);
-        }
+        const kitchen = list.find((s: any) =>
+          s.name.toLowerCase().includes('kitchen') &&
+          (s.name.toLowerCase().includes('deep') || s.serviceType?.includes('kitchen'))
+        );
+        const window = list.find((s: any) =>
+          s.name.toLowerCase().includes('window') &&
+          (s.name.toLowerCase().includes('clean') || s.serviceType?.includes('window'))
+        );
+
+        if (washroom) setWashroomServiceId(washroom._id);
+        if (kitchen) setKitchenServiceId(kitchen._id);
+        if (window) setWindowServiceId(window._id);
       } catch (error) {
-        console.error('Error fetching washroom service:', error);
+        console.error('Error fetching spot-clean services:', error);
       }
     };
-    fetchWashroomService();
+    fetchSpotCleanServices();
   }, []);
 
   // Only 3 service category cards - now fetched dynamically
@@ -336,6 +348,50 @@ const CustomerDashboard = () => {
             ))}
           </motion.div>
         </motion.div>
+
+        {/* Room-Specific Deep Cleaning */}
+        {(kitchenServiceId || windowServiceId) && (
+          <motion.div variants={itemVariants}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold font-heading text-foreground">Room-Specific Deep Cleaning</h2>
+              <Link to="/customer/services" className="text-sm text-primary font-medium flex items-center gap-1 hover:gap-2 transition-all">
+                See all <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {kitchenServiceId && (
+                <motion.div whileHover="hover" whileTap="tap" variants={cardHoverVariants}>
+                  <Link
+                    to={`/customer/book/${kitchenServiceId}`}
+                    className="card-elevated-hover p-4 text-center group block flex flex-col items-center justify-center min-h-[120px] border-2 border-orange-200 bg-orange-50 hover:border-orange-400 hover:bg-orange-100 rounded-2xl transition-all"
+                  >
+                    <motion.div className="text-3xl mb-2" whileHover={{ scale: 1.15 }} transition={{ duration: 0.2 }}>
+                      🍽️
+                    </motion.div>
+                    <p className="text-xs font-semibold text-orange-900 leading-tight">Kitchen Deep Clean</p>
+                    <p className="text-xs text-orange-700 mt-0.5">Grease · Appliances · Tiles</p>
+                    <span className="mt-2 text-[10px] font-semibold bg-orange-600 text-white px-2.5 py-1 rounded-full inline-block">Quick Book</span>
+                  </Link>
+                </motion.div>
+              )}
+              {windowServiceId && (
+                <motion.div whileHover="hover" whileTap="tap" variants={cardHoverVariants}>
+                  <Link
+                    to={`/customer/book/${windowServiceId}`}
+                    className="card-elevated-hover p-4 text-center group block flex flex-col items-center justify-center min-h-[120px] border-2 border-blue-200 bg-blue-50 hover:border-blue-400 hover:bg-blue-100 rounded-2xl transition-all"
+                  >
+                    <motion.div className="text-3xl mb-2" whileHover={{ scale: 1.15 }} transition={{ duration: 0.2 }}>
+                      🪟
+                    </motion.div>
+                    <p className="text-xs font-semibold text-blue-900 leading-tight">Window Deep Cleaning</p>
+                    <p className="text-xs text-blue-700 mt-0.5">Glass · Frames · Tracks</p>
+                    <span className="mt-2 text-[10px] font-semibold bg-blue-600 text-white px-2.5 py-1 rounded-full inline-block">Quick Book</span>
+                  </Link>
+                </motion.div>
+              )}
+            </div>
+          </motion.div>
+        )}
 
         {/* Upcoming Bookings */}
         <motion.div variants={itemVariants}>

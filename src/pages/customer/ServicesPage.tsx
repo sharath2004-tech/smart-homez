@@ -260,7 +260,7 @@ const ServicesPage = () => {
                   🧹
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-cyan-900 text-sm leading-tight">Spot Cleaning — Mini Services</p>
+                  <p className="font-bold text-cyan-900 text-sm leading-tight">Mini Services  — Spot Cleaning</p>
                   <p className="text-xs text-cyan-700 mt-0.5">Kitchen · Bathroom · Sofa · Fan · Fridge · Balcony &amp; more</p>
                 </div>
                 <span className="shrink-0 text-xs font-semibold bg-cyan-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">From ₹149 →</span>
