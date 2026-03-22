@@ -1,5 +1,6 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
+import mongoose from 'mongoose';
 import twilio from 'twilio';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { uploadAdminDoc, uploadWorkerFiles } from '../middleware/upload.js';
@@ -1486,42 +1487,154 @@ router.get('/profit-stats', authenticate, authorize('super_admin'), async (req, 
       fromDate = new Date();
       fromDate.setDate(fromDate.getDate() - 30);
       fromDate.setHours(0, 0, 0, 0);
+    } else {
+      fromDate.setHours(0, 0, 0, 0);
+      toDate.setHours(23, 59, 59, 999);
+    }
+
+    let locationObjectId = null;
+    if (req.query.locationId) {
+      if (!mongoose.Types.ObjectId.isValid(req.query.locationId)) {
+        return res.status(400).json({ error: { message: 'Invalid location ID', status: 400 } });
+      }
+      locationObjectId = new mongoose.Types.ObjectId(req.query.locationId);
     }
 
     // Build location filter (optional for super_admin)
-    let locationFilter = {};
-    if (req.query.locationId) {
-      locationFilter = { 'location.locationId': req.query.locationId };
-    }
+    const bookingLocationFilter = locationObjectId
+      ? { 'location.locationId': locationObjectId }
+      : {};
 
-    // 1. Calculate Total Revenue (from completed bookings)
-    const revenueResult = await Booking.aggregate([
+    // 1. Calculate revenue grouped by service (from completed bookings)
+    const serviceRevenue = await Booking.aggregate([
       {
         $match: {
-          ...locationFilter,
+          ...bookingLocationFilter,
           status: 'completed',
           completedAt: { $gte: fromDate, $lte: toDate }
         }
       },
       {
+        $lookup: {
+          from: 'services',
+          localField: 'service',
+          foreignField: '_id',
+          as: 'serviceDoc'
+        }
+      },
+      {
+        $addFields: {
+          resolvedServiceName: {
+            $ifNull: [
+              { $arrayElemAt: ['$serviceDoc.name', 0] },
+              {
+                $cond: [
+                  { $gt: [{ $size: { $ifNull: ['$cartItems', []] } }, 0] },
+                  'Deep Cleaning Cart',
+                  {
+                    $cond: [
+                      { $ifNull: ['$serviceDetails.package', false] },
+                      { $concat: ['Deep Cleaning - ', '$serviceDetails.package'] },
+                      {
+                        $cond: [
+                          { $eq: ['$bookingType', 'monthly-subscription'] },
+                          'Monthly Subscription',
+                          {
+                            $cond: [
+                              { $eq: ['$bookingType', 'deep-cleaning-cart'] },
+                              'Deep Cleaning Cart',
+                              'Other Service'
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          resolvedServiceKey: {
+            $ifNull: [
+              { $toString: '$service' },
+              {
+                $cond: [
+                  { $gt: [{ $size: { $ifNull: ['$cartItems', []] } }, 0] },
+                  'deep-cleaning-cart',
+                  { $ifNull: ['$bookingType', 'other-service'] }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      {
         $group: {
-          _id: null,
+          _id: {
+            serviceId: '$resolvedServiceKey',
+            serviceName: '$resolvedServiceName'
+          },
           total: { $sum: '$totalAmount' },
           count: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          serviceId: '$_id.serviceId',
+          serviceName: '$_id.serviceName',
+          totalRevenue: '$total',
+          bookingCount: '$count'
+        }
+      },
+      {
+        $sort: {
+          totalRevenue: -1,
+          serviceName: 1
         }
       }
     ]);
 
-    const totalRevenue = revenueResult[0]?.total || 0;
-    const revenueCount = revenueResult[0]?.count || 0;
+    const totalRevenue = serviceRevenue.reduce((sum, item) => sum + (item.totalRevenue || 0), 0);
+    const revenueCount = serviceRevenue.reduce((sum, item) => sum + (item.bookingCount || 0), 0);
 
     // 2. Calculate Total Expenses (from business expenses)
-    const expensesResult = await BusinessExpense.aggregate([
+    const expenseMatch = {
+      date: { $gte: fromDate, $lte: toDate }
+    };
+
+    const expensesPipeline = [
       {
-        $match: {
-          date: { $gte: fromDate, $lte: toDate }
+        $match: expenseMatch
+      },
+      {
+        $lookup: {
+          from: 'bookings',
+          localField: 'bookingId',
+          foreignField: '_id',
+          as: 'linkedBooking'
         }
       },
+      {
+        $unwind: {
+          path: '$linkedBooking',
+          preserveNullAndEmptyArrays: true
+        }
+      }
+    ];
+
+    if (locationObjectId) {
+      expensesPipeline.push({
+        $match: {
+          $or: [
+            { location: locationObjectId },
+            { 'linkedBooking.location.locationId': locationObjectId }
+          ]
+        }
+      });
+    }
+
+    expensesPipeline.push(
       {
         $group: {
           _id: null,
@@ -1529,7 +1642,9 @@ router.get('/profit-stats', authenticate, authorize('super_admin'), async (req, 
           count: { $sum: 1 }
         }
       }
-    ]);
+    );
+
+    const expensesResult = await BusinessExpense.aggregate(expensesPipeline);
 
     const totalExpenses = expensesResult[0]?.total || 0;
     const expensesCount = expensesResult[0]?.count || 0;
@@ -1539,7 +1654,8 @@ router.get('/profit-stats', authenticate, authorize('super_admin'), async (req, 
       {
         $match: {
           status: 'paid',
-          paidAt: { $gte: fromDate, $lte: toDate }
+          paidAt: { $gte: fromDate, $lte: toDate },
+          ...(locationObjectId ? { location: locationObjectId } : {})
         }
       },
       {
@@ -1567,6 +1683,7 @@ router.get('/profit-stats', authenticate, authorize('super_admin'), async (req, 
       profitStats: {
         totalRevenue,
         revenueCount,
+        revenueByService: serviceRevenue,
         totalExpenses,
         expensesCount,
         totalWages,

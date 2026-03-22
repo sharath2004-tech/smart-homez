@@ -16,8 +16,25 @@ interface Expense {
   type: 'project_expense' | 'operational_expense';
   bookingId?: {
     _id: string;
-    bookingId: string;
-    customerId: string;
+    bookingId?: string;
+    customerId?: string;
+    bookingDate?: string;
+    status?: string;
+    totalAmount?: number;
+    customer?: {
+      name?: string;
+      email?: string;
+      phone?: string;
+    };
+    service?: {
+      name?: string;
+      serviceType?: string;
+    };
+    location?: {
+      apartmentName?: string;
+      area?: string;
+      city?: string;
+    };
   };
   createdBy: {
     _id: string;
@@ -31,6 +48,36 @@ interface Expense {
     city: string;
   };
   createdAt: string;
+}
+
+interface LocationOption {
+  _id: string;
+  apartmentName: string;
+  area: string;
+  city: string;
+}
+
+interface RevenueByServiceItem {
+  serviceId: string;
+  serviceName: string;
+  totalRevenue: number;
+  bookingCount: number;
+}
+
+interface ProfitStatsState {
+  totalRevenue: number;
+  revenueCount: number;
+  revenueByService: RevenueByServiceItem[];
+  totalExpenses: number;
+  expensesCount: number;
+  totalWages: number;
+  wagesCount: number;
+  totalProfit: number;
+  profitMargin: number;
+  dateRange: {
+    from: string;
+    to: string;
+  };
 }
 
 interface Booking {
@@ -86,10 +133,12 @@ const AdminExpenses = () => {
   const { role, name } = useAdminRole();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [locations, setLocations] = useState<LocationOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
+  const [selectedLocationId, setSelectedLocationId] = useState("all");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -110,9 +159,10 @@ const AdminExpenses = () => {
   const [grandTotal, setGrandTotal] = useState(0);
 
   // Profit stats state
-  const [profitStats, setProfitStats] = useState({
+  const [profitStats, setProfitStats] = useState<ProfitStatsState>({
     totalRevenue: 0,
     revenueCount: 0,
+    revenueByService: [],
     totalExpenses: 0,
     expensesCount: 0,
     totalWages: 0,
@@ -128,18 +178,31 @@ const AdminExpenses = () => {
 
   useEffect(() => {
     fetchExpenses();
-    fetchBookings();
     // Only fetch profit stats for super_admin
     if (role === 'super_admin') {
       fetchProfitStats();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role, selectedLocationId]);
+
+  useEffect(() => {
+    fetchBookings();
+    if (role === 'super_admin') {
+      fetchLocations();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role]);
+
+  const activeLocationId = role === 'super_admin' && selectedLocationId !== 'all'
+    ? selectedLocationId
+    : undefined;
 
   const fetchExpenses = async () => {
     try {
       setLoading(true);
-      const data = await businessExpensesAPI.getAll();
+      const data = await businessExpensesAPI.getAll({
+        ...(activeLocationId ? { locationId: activeLocationId } : {})
+      });
       setExpenses(data.expenses || []);
       setSummary(data.summary.reduce((acc: Record<string, { total: number; count: number }>, item: { _id: string; total: number; count: number }) => {
         acc[item._id] = { total: item.total, count: item.count };
@@ -163,16 +226,27 @@ const AdminExpenses = () => {
     }
   };
 
+  const fetchLocations = async () => {
+    try {
+      const data = await adminAPI.getLocations();
+      setLocations(data.locations || []);
+    } catch (error) {
+      console.error('Failed to load locations', error);
+    }
+  };
+
   const fetchProfitStats = async (from?: string, to?: string) => {
     try {
       setLoadingProfit(true);
       const data = await adminAPI.getProfitStats(
         from || profitStats.dateRange.from,
-        to || profitStats.dateRange.to
+        to || profitStats.dateRange.to,
+        activeLocationId
       );
       if (data.success) {
         setProfitStats({
           ...data.profitStats,
+          revenueByService: data.profitStats.revenueByService || [],
           dateRange: {
             from: from || profitStats.dateRange.from,
             to: to || profitStats.dateRange.to
@@ -188,10 +262,10 @@ const AdminExpenses = () => {
   };
 
   const handleDateRangeChange = (from: string, to: string) => {
-    setProfitStats({
-      ...profitStats,
+    setProfitStats((current) => ({
+      ...current,
       dateRange: { from, to }
-    });
+    }));
     fetchProfitStats(from, to);
   };
 
@@ -331,6 +405,26 @@ const AdminExpenses = () => {
       return customCategory.trim();
     }
     return category.replace(/_/g, ' ');
+  };
+
+  const formatLocationLabel = (location?: { apartmentName?: string; area?: string; city?: string } | null) => {
+    if (!location) return '';
+    return [location.apartmentName, location.area, location.city].filter(Boolean).join(', ');
+  };
+
+  const selectedLocationLabel = useMemo(() => {
+    if (selectedLocationId === 'all') {
+      return 'All locations';
+    }
+    const selectedLocation = locations.find((location) => location._id === selectedLocationId);
+    return selectedLocation
+      ? formatLocationLabel(selectedLocation)
+      : 'Selected location';
+  }, [locations, selectedLocationId]);
+
+  const getBookingDisplayId = (expense: Expense) => {
+    if (!expense.bookingId) return '—';
+    return expense.bookingId.bookingId || `BK-${expense.bookingId._id.slice(-6).toUpperCase()}`;
   };
 
   const superAdminExpenseDetails = useMemo(() => {
@@ -630,9 +724,27 @@ const AdminExpenses = () => {
               <p className="text-sm text-muted-foreground">
                 Revenue, expenses, wages, and overall profit calculation
               </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Scope: {selectedLocationLabel}
+              </p>
             </div>
             <div className="flex gap-3 items-center">
               <div className="flex flex-col sm:flex-row gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Location</label>
+                  <select
+                    value={selectedLocationId}
+                    onChange={(e) => setSelectedLocationId(e.target.value)}
+                    className="input-clean text-sm py-1 px-2 min-w-[220px]"
+                  >
+                    <option value="all">All locations</option>
+                    {locations.map((location) => (
+                      <option key={location._id} value={location._id}>
+                        {formatLocationLabel(location)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1">From</label>
                   <input
@@ -714,6 +826,29 @@ const AdminExpenses = () => {
             <p className="text-xs text-muted-foreground text-center">
               <span className="font-semibold">Profit Formula:</span> Total Profit = Revenue (₹{profitStats.totalRevenue.toLocaleString()}) - Expenses (₹{profitStats.totalExpenses.toLocaleString()}) - Wages (₹{profitStats.totalWages.toLocaleString()})
             </p>
+          </div>
+
+          <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Revenue by Service</p>
+                <p className="text-sm text-emerald-800/80">Overall revenue is now rolled up from each completed service in the selected scope.</p>
+              </div>
+            </div>
+
+            {profitStats.revenueByService.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No completed services found in the selected range.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {profitStats.revenueByService.map((item) => (
+                  <div key={`${item.serviceId}-${item.serviceName}`} className="rounded-xl border border-emerald-100 bg-white/80 p-4">
+                    <p className="text-sm font-semibold text-foreground break-words">{item.serviceName}</p>
+                    <p className="mt-2 text-2xl font-bold text-emerald-700">₹{item.totalRevenue.toLocaleString()}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{item.bookingCount} completed booking{item.bookingCount !== 1 ? 's' : ''}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -821,6 +956,11 @@ const AdminExpenses = () => {
             <option value="operational_expense">💼 Operational</option>
             <option value="project_expense">📊 Project-Based</option>
           </select>
+          {role === 'super_admin' && (
+            <div className="flex items-center text-xs text-muted-foreground px-2">
+              Viewing <span className="font-semibold text-foreground ml-1">{selectedLocationLabel}</span>
+            </div>
+          )}
         </div>
 
         {/* Expenses Table */}
@@ -847,7 +987,7 @@ const AdminExpenses = () => {
                   <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Category</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Description</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Type</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Booking</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Linked Project</th>
                   {role === 'super_admin' && (
                     <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Created By</th>
                   )}
@@ -887,13 +1027,25 @@ const AdminExpenses = () => {
                     <td className="px-6 py-4">
                       {expense.bookingId ? (
                         <div className="space-y-1">
-                          <a
-                            href={`/admin/bookings/${expense.bookingId._id}`}
-                            className="text-primary hover:underline font-medium text-sm"
-                          >
-                            {expense.bookingId.bookingId}
-                          </a>
-                          <p className="text-xs text-muted-foreground">Linked project expense</p>
+                          <p className="font-medium text-sm text-foreground">{getBookingDisplayId(expense)}</p>
+                          {expense.bookingId.service?.name && (
+                            <p className="text-xs text-muted-foreground">Service: {expense.bookingId.service.name}</p>
+                          )}
+                          {expense.bookingId.customer?.name && (
+                            <p className="text-xs text-muted-foreground">Customer: {expense.bookingId.customer.name}</p>
+                          )}
+                          {formatLocationLabel(expense.bookingId.location || expense.location) && (
+                            <p className="text-xs text-muted-foreground">Location: {formatLocationLabel(expense.bookingId.location || expense.location)}</p>
+                          )}
+                          {expense.bookingId.bookingDate && (
+                            <p className="text-xs text-muted-foreground">
+                              Booking date: {new Date(expense.bookingId.bookingDate).toLocaleDateString('en-IN', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                              })}
+                            </p>
+                          )}
                         </div>
                       ) : (
                         <span className="text-muted-foreground text-sm">—</span>

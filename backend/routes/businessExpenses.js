@@ -6,6 +6,7 @@
 import express from 'express';
 import { body, param, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
+import Booking from '../models/Booking.js';
 import BusinessExpense from '../models/BusinessExpense.js';
 
 const router = express.Router();
@@ -39,6 +40,15 @@ router.post(
         return res.status(400).json({ error: { message: 'Booking ID is required for project expenses' } });
       }
 
+      let resolvedLocationId = locationId || null;
+      if (bookingId && !resolvedLocationId) {
+        const linkedBooking = await Booking.findById(bookingId).select('location.locationId');
+        if (!linkedBooking) {
+          return res.status(400).json({ error: { message: 'Linked booking not found' } });
+        }
+        resolvedLocationId = linkedBooking.location?.locationId || null;
+      }
+
       const expense = new BusinessExpense({
         title,
         amount: Number(amount),
@@ -46,7 +56,7 @@ router.post(
         customCategory: category === 'other' ? customCategory : undefined,
         description,
         date: new Date(date),
-        location: locationId || null,
+        location: resolvedLocationId,
         bookingId: bookingId || null,
         type: type || 'operational_expense',
         createdBy: req.user._id,
@@ -56,7 +66,14 @@ router.post(
       await expense.save();
       await expense.populate('createdBy', 'name email');
       await expense.populate('location', 'apartmentName area city');
-      await expense.populate('bookingId', 'bookingId customerId');
+      await expense.populate({
+        path: 'bookingId',
+        select: 'bookingId customerId bookingDate status totalAmount location service customer',
+        populate: [
+          { path: 'service', select: 'name serviceType' },
+          { path: 'customer', select: 'name email phone' }
+        ]
+      });
 
       res.status(201).json({ success: true, expense });
     } catch (error) {
@@ -86,7 +103,13 @@ router.get(
         filter.createdBy = req.user._id;
       }
 
-      if (locationId) filter.location = locationId;
+      if (locationId) {
+        const bookingIdsForLocation = await Booking.find({ 'location.locationId': locationId }).distinct('_id');
+        filter.$or = [
+          { location: locationId },
+          { bookingId: { $in: bookingIdsForLocation } }
+        ];
+      }
       if (category) filter.category = category;
       if (bookingId) filter.bookingId = bookingId;
 
@@ -101,7 +124,14 @@ router.get(
       const expenses = await BusinessExpense.find(filter)
         .populate('createdBy', 'name email role')
         .populate('location', 'apartmentName area city')
-        .populate('bookingId', 'bookingId customerId')
+        .populate({
+          path: 'bookingId',
+          select: 'bookingId customerId bookingDate status totalAmount location service customer',
+          populate: [
+            { path: 'service', select: 'name serviceType' },
+            { path: 'customer', select: 'name email phone' }
+          ]
+        })
         .sort({ date: -1 })
         .skip(skip)
         .limit(Number(limit));
@@ -154,6 +184,15 @@ router.patch(
         return res.status(400).json({ error: { message: 'Booking ID is required for project expenses' } });
       }
 
+      let resolvedLocationId = locationId;
+      if (bookingId !== undefined && bookingId) {
+        const linkedBooking = await Booking.findById(bookingId).select('location.locationId');
+        if (!linkedBooking) {
+          return res.status(400).json({ error: { message: 'Linked booking not found' } });
+        }
+        resolvedLocationId = locationId !== undefined ? locationId : linkedBooking.location?.locationId || null;
+      }
+
       // Update fields if provided
       if (title) expense.title = title;
       if (amount !== undefined) expense.amount = Number(amount);
@@ -161,14 +200,21 @@ router.patch(
       if (customCategory !== undefined) expense.customCategory = category === 'other' ? customCategory : undefined;
       if (description !== undefined) expense.description = description;
       if (date) expense.date = new Date(date);
-      if (locationId !== undefined) expense.location = locationId || null;
+      if (locationId !== undefined || bookingId !== undefined) expense.location = resolvedLocationId || null;
       if (bookingId !== undefined) expense.bookingId = bookingId || null;
       if (type) expense.type = type;
 
       await expense.save();
       await expense.populate('createdBy', 'name email');
       await expense.populate('location', 'apartmentName area city');
-      await expense.populate('bookingId', 'bookingId customerId');
+      await expense.populate({
+        path: 'bookingId',
+        select: 'bookingId customerId bookingDate status totalAmount location service customer',
+        populate: [
+          { path: 'service', select: 'name serviceType' },
+          { path: 'customer', select: 'name email phone' }
+        ]
+      });
 
       res.json({ success: true, expense });
     } catch (error) {
