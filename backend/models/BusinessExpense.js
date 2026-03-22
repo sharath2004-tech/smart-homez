@@ -12,9 +12,13 @@ const businessExpenseSchema = new mongoose.Schema({
     min: 0
   },
   category: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'ExpenseCategory',
+    type: String,
     required: [true, 'Category is required']
+  },
+  customCategory: {
+    type: String,
+    trim: true,
+    default: null
   },
   description: {
     type: String,
