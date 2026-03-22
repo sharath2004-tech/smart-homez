@@ -574,6 +574,7 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
 
     const booking = await Booking.create({
       customer:     req.user._id,
+      service:      deepCleanServiceDoc?._id,
       bookingType:  'deep-cleaning-cart',
       bookingDate:  new Date(bookingDate),
       startTime,

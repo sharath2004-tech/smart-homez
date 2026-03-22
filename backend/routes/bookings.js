@@ -27,6 +27,31 @@ import {
 
 const router = express.Router();
 
+const findDeepCleaningServiceFallback = async () => {
+  const directMatch = await Service.findOne({
+    serviceCategory: 'deep_cleaning',
+    isActive: true,
+  })
+    .select('_id name description price duration allowBreakRequests')
+    .sort({ displayOrder: 1, createdAt: 1 })
+    .lean();
+
+  if (directMatch) {
+    return directMatch;
+  }
+
+  return Service.findOne({
+    isActive: true,
+    $or: [
+      { serviceType: { $regex: '^deep_cleaning', $options: 'i' } },
+      { name: { $regex: 'deep cleaning|move in|move out', $options: 'i' } },
+    ],
+  })
+    .select('_id name description price duration allowBreakRequests')
+    .sort({ createdAt: 1 })
+    .lean();
+};
+
 // Multer error handler middleware
 const handleMulterError = (err, req, res, next) => {
   if (err) {
@@ -500,7 +525,17 @@ router.get('/:id', authenticate, async (req, res) => {
       });
     }
 
-    res.json({ booking });
+    let bookingResponse = booking;
+
+    if (!booking.service && booking.bookingType === 'deep-cleaning-cart') {
+      const deepCleaningService = await findDeepCleaningServiceFallback();
+      if (deepCleaningService) {
+        bookingResponse = booking.toObject();
+        bookingResponse.service = deepCleaningService;
+      }
+    }
+
+    res.json({ booking: bookingResponse });
   } catch (error) {
     console.error('Get booking error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
@@ -1986,8 +2021,14 @@ router.post('/:id/break-request', authenticate, authorize('worker', 'admin', 'su
       return res.status(400).json({ error: { message: 'Break can only be requested for in-progress bookings', status: 400 } });
     }
 
+    const effectiveService = booking.service || (
+      booking.bookingType === 'deep-cleaning-cart'
+        ? await findDeepCleaningServiceFallback()
+        : null
+    );
+
     // Check if service allows break requests
-    if (booking.service && booking.service.allowBreakRequests === false) {
+    if (effectiveService && effectiveService.allowBreakRequests === false) {
       return res.status(403).json({ error: { message: 'Break requests are not allowed for this service', status: 403 } });
     }
 

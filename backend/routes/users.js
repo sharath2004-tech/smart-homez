@@ -649,7 +649,7 @@ router.get('/worker/current-task', authenticate, authorize('worker'), async (req
       status: 'in-progress'
     })
     .populate('customer', 'name email phone')
-    .populate('service', 'name description price duration')
+    .populate('service', 'name description price duration allowBreakRequests')
     .populate('worker', 'name email phone')
     .populate('supportStaff.worker', 'name email phone')
     .sort({ bookingDate: -1 });
@@ -687,7 +687,7 @@ router.get('/worker/upcoming-tasks', authenticate, authorize('worker'), async (r
       bookingDate: { $gte: now.toISOString().split('T')[0] }
     })
     .populate('customer', 'name email phone')
-    .populate('service', 'name description price duration')
+    .populate('service', 'name description price duration allowBreakRequests')
     .populate('worker', 'name email phone')
     .populate('supportStaff.worker', 'name email phone')
     .sort({ bookingDate: 1, startTime: 1 })
