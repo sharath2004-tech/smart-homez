@@ -309,6 +309,23 @@ const CustomerDashboard = () => {
 
 
 
+        {/* Move In / Move Out Promo Banner */}
+        <motion.div variants={itemVariants}>
+          <Link
+            to="/customer/services/deep-cleaning"
+            className="flex items-center gap-4 p-4 rounded-2xl border-2 border-green-300 bg-gradient-to-r from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 hover:border-green-400 transition-all group block"
+          >
+            <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform text-3xl">
+              ✨
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-green-900 text-sm leading-tight">Move In / Move Out — Commercial &amp; Residential</p>
+              <p className="text-xs text-green-700 mt-0.5">Villas · Restaurants · Offices · Bungalows</p>
+            </div>
+            <span className="shrink-0 text-xs font-semibold bg-green-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">Book Now</span>
+          </Link>
+        </motion.div>
+
         {/* Quick Services */}
         <motion.div variants={itemVariants}>
           <div className="flex items-center justify-between mb-4">
