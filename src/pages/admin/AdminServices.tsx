@@ -366,6 +366,10 @@ const AdminServices = () => {
           ...formData,
           serviceType,
           serviceTypeName: SERVICE_TYPE_CARDS.find(c => c.id === serviceType)?.label || formData.name,
+          durationOptions: (formData.durationOptions || []).map((tier: any) => {
+            const { _priceMode, ...cleanTier } = tier;
+            return cleanTier;
+          }),
           ...(MINI_SERVICE_IDS.has(serviceType) && {
             tags: ['mini-service', 'spot-clean']
           })
@@ -1500,12 +1504,12 @@ const AdminServices = () => {
                         ⏱ Duration Tiers (Time-Based Pricing)
                       </label>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        e.g. 1 hr → ₹200, 1.5 hr → ₹300 · For subscription: 1h/day → ₹3500/mo
+                        e.g. 1 hr → ₹60/hr · 2 hr → ₹110 · For subscription: use /mo or /session mode
                       </p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setFormData({ ...formData, durationOptions: [...(formData.durationOptions || []), { hours: 1, price: 0, originalPrice: 0, isDefault: false, _priceMode: 'month' } as any] })}
+                      onClick={() => setFormData({ ...formData, durationOptions: [...(formData.durationOptions || []), { hours: 1, price: 0, originalPrice: 0, isDefault: false, _priceMode: 'hour' } as any] })}
                       className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1"
                     >
                       <Plus className="w-3 h-3" /> Add Tier
@@ -1521,12 +1525,13 @@ const AdminServices = () => {
                           <span className="col-span-2" />
                         </div>
                         {(formData.durationOptions || []).map((tier, index) => {
-                          const mode = (tier as any)._priceMode || 'month';
+                          const mode = (tier as any)._priceMode || 'hour';
                           const DAILY_SESSIONS = 26;
                           const originalPrice = (tier as any).originalPrice || 0;
                           const savingsPct = originalPrice > tier.price && originalPrice > 0
                             ? Math.round((1 - tier.price / originalPrice) * 100)
                             : 0;
+                          // 'hour' and 'month' store value as-is; 'session' stores monthly total
                           const displayOurPrice = mode === 'session' ? Math.round(tier.price / DAILY_SESSIONS) : tier.price;
                           const displayMrp = mode === 'session' ? Math.round(originalPrice / DAILY_SESSIONS) : originalPrice;
                           return (
@@ -1546,6 +1551,14 @@ const AdminServices = () => {
                                 <div className="col-span-4 space-y-1">
                                   <div className="flex rounded overflow-hidden border border-blue-200 text-[10px]">
                                     <button type="button"
+                                      className={`flex-1 py-0.5 text-center transition-colors ${mode === 'hour' ? 'bg-blue-600 text-white' : 'bg-white text-muted-foreground'}`}
+                                      onClick={() => {
+                                        const updated = [...(formData.durationOptions || [])];
+                                        updated[index] = { ...updated[index], _priceMode: 'hour' } as any;
+                                        setFormData({ ...formData, durationOptions: updated });
+                                      }}
+                                    >/hr</button>
+                                    <button type="button"
                                       className={`flex-1 py-0.5 text-center transition-colors ${mode === 'month' ? 'bg-blue-600 text-white' : 'bg-white text-muted-foreground'}`}
                                       onClick={() => {
                                         const updated = [...(formData.durationOptions || [])];
@@ -1563,7 +1576,7 @@ const AdminServices = () => {
                                     >/session</button>
                                   </div>
                                   <input
-                                    type="number" min="0" step={mode === 'session' ? '10' : '50'} value={displayOurPrice}
+                                    type="number" min="0" step={mode === 'session' ? '10' : mode === 'hour' ? '10' : '50'} value={displayOurPrice}
                                     onChange={e => {
                                       const entered = Number(e.target.value);
                                       const monthly = mode === 'session' ? Math.round(entered * DAILY_SESSIONS) : entered;
@@ -1571,17 +1584,19 @@ const AdminServices = () => {
                                       updated[index] = { ...updated[index], price: monthly };
                                       setFormData({ ...formData, durationOptions: updated });
                                     }}
-                                    className="input-clean text-sm" placeholder={mode === 'session' ? '500' : '13000'}
+                                    className="input-clean text-sm" placeholder={mode === 'session' ? '500' : mode === 'hour' ? '60' : '13000'}
                                   />
                                   <p className="text-[10px] text-muted-foreground">
                                     {mode === 'session'
                                       ? `≈ ₹${tier.price.toLocaleString('en-IN')}/mo`
+                                      : mode === 'hour'
+                                      ? `₹${tier.price.toLocaleString('en-IN')} per hour`
                                       : `≈ ₹${Math.round(tier.price / DAILY_SESSIONS).toLocaleString('en-IN')}/visit`}
                                   </p>
                                 </div>
                                 <div className="col-span-3 space-y-1">
                                   <input
-                                    type="number" min="0" step={mode === 'session' ? '10' : '50'} value={displayMrp}
+                                    type="number" min="0" step={mode === 'session' ? '10' : mode === 'hour' ? '10' : '50'} value={displayMrp}
                                     onChange={e => {
                                       const entered = Number(e.target.value);
                                       const monthly = mode === 'session' ? Math.round(entered * DAILY_SESSIONS) : entered;
@@ -1589,7 +1604,7 @@ const AdminServices = () => {
                                       updated[index] = { ...updated[index], originalPrice: monthly } as any;
                                       setFormData({ ...formData, durationOptions: updated });
                                     }}
-                                    className="input-clean text-sm" placeholder={mode === 'session' ? '700' : '18200'}
+                                    className="input-clean text-sm" placeholder={mode === 'session' ? '700' : mode === 'hour' ? '80' : '18200'}
                                   />
                                   {savingsPct > 0 && (
                                     <p className="text-[10px] font-medium text-green-600">{savingsPct}% off</p>

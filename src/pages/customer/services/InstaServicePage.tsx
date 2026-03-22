@@ -6,7 +6,6 @@ import {
     Calendar,
     Clock,
     MapPin,
-    ShoppingBag,
     Sparkles,
     User,
     Zap,
@@ -63,7 +62,6 @@ const generateTimeSlots = (openTime = '07:00', closeTime = '19:00', slotDuration
 const DEFAULT_SLOTS = generateTimeSlots();
 
 const DEFAULT_PRICE = 150;
-const DEFAULT_SUPPLIES_PRICE = 50;
 
 const getNearestSlot = () => {
   const now = new Date();
@@ -93,7 +91,6 @@ const InstaServicePage = () => {
   const [service, setService] = useState<Service | null>(null);
   const [pricePerHour, setPricePerHour] = useState(DEFAULT_PRICE);
   const [mrpPerHour, setMrpPerHour] = useState(0);          // from service.originalPrice
-  const [suppliesAddonPrice, setSuppliesAddonPrice] = useState(DEFAULT_SUPPLIES_PRICE);
   const [overtimeRate, setOvertimeRate] = useState(2.5);     // from Settings.booking.overtimeRate
   const [serviceId, setServiceId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -102,9 +99,10 @@ const InstaServicePage = () => {
 
   const [bookingMode, setBookingMode] = useState<"now" | "schedule">("now");
   const [hours, setHours] = useState(2);
+  const [selectedDurationTotal, setSelectedDurationTotal] = useState<number | null>(null);
+  const [selectedDurationMrp, setSelectedDurationMrp] = useState<number | null>(null);
   const [bookingDate, setBookingDate] = useState(new Date().toISOString().split("T")[0]);
   const [startTime, setStartTime] = useState(getNearestSlot());
-  const [bringSupplies, setBringSupplies] = useState(false);
   const [genderPref, setGenderPref] = useState<"any" | "male" | "female">("any");
   const [notes, setNotes] = useState("");
   const [noServiceWarning, setNoServiceWarning] = useState(false);
@@ -122,10 +120,10 @@ const InstaServicePage = () => {
     [businessHours]
   );
 
-  const totalAmount = hours * pricePerHour + (bringSupplies ? suppliesAddonPrice : 0);
-  const mrpTotal = hours * mrpPerHour + (bringSupplies ? suppliesAddonPrice : 0);
-  const discountPct = mrpPerHour > pricePerHour
-    ? Math.round((1 - pricePerHour / mrpPerHour) * 100)
+  const totalAmount = selectedDurationTotal ?? hours * pricePerHour;
+  const mrpTotal = selectedDurationMrp ?? hours * mrpPerHour;
+  const discountPct = mrpTotal > totalAmount && mrpTotal > 0
+    ? Math.round((1 - totalAmount / mrpTotal) * 100)
     : 0;
 
   const availableSlots = (() => {
@@ -162,9 +160,6 @@ const InstaServicePage = () => {
           setServiceId(svc._id);
           // MRP from DB — falls back to computing 25% above if not set
           setMrpPerHour(svc.originalPrice > 0 ? svc.originalPrice : Math.round((svc.price || DEFAULT_PRICE) / 0.8));
-          // Supplies add-on from first active addon, fallback to default
-          const suppliesAddon = svc.addons?.find((a: any) => a.isActive !== false);
-          if (suppliesAddon?.price > 0) setSuppliesAddonPrice(suppliesAddon.price);
         } else {
           setNoServiceWarning(true);
         }
@@ -271,7 +266,7 @@ const InstaServicePage = () => {
         totalAmount,
         bookingType: "adhoc",
         preferences: { workerGenderPreference: genderPref, specialInstructions: notes },
-        serviceDetails: { hours, bringSupplies },
+        serviceDetails: { hours },
         ...(hasValidCoords && {
           location: {
             coordinates: coords,
@@ -483,7 +478,11 @@ const InstaServicePage = () => {
                 {[...service.durationOptions].sort((a, b) => a.hours - b.hours).map((opt) => (
                   <button
                     key={opt.hours}
-                    onClick={() => setHours(opt.hours)}
+                    onClick={() => {
+                      setHours(opt.hours);
+                      setSelectedDurationTotal(opt.price);
+                      setSelectedDurationMrp((opt as any).originalPrice > 0 ? (opt as any).originalPrice : null);
+                    }}
                     className={`px-4 py-2 rounded-xl border-2 font-semibold text-sm transition-all ${
                       hours === opt.hours
                         ? "border-primary bg-primary/10 text-primary"
@@ -625,36 +624,9 @@ const InstaServicePage = () => {
                         )}
                       </div>
                     </div>
-                  ) : genderPref !== 'any' ? (
-                    <p className="mt-2 text-xs text-muted-foreground text-center py-1">
-                      No {genderPref} workers available right now — you can still book and we'll assign the best match.
-                    </p>
                   ) : null}
                 </>
               )}
-            </div>
-
-            {/* Bring supplies */}
-            <div className="card-elevated p-4 flex items-center justify-between rounded-xl">
-              <div className="flex items-center gap-3">
-                <ShoppingBag className="w-5 h-5 text-primary" />
-                <div>
-                  <p className="font-medium text-foreground text-sm">Bring Supplies</p>
-                  <p className="text-xs text-muted-foreground">Cleaning supplies included (+₹{suppliesAddonPrice})</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setBringSupplies(!bringSupplies)}
-                className={`w-12 h-6 rounded-full relative transition-colors ${
-                  bringSupplies ? "bg-primary" : "bg-muted"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${
-                    bringSupplies ? "left-6" : "left-0.5"
-                  }`}
-                />
-              </button>
             </div>
 
             {/* Gender preference */}
@@ -794,16 +766,10 @@ const InstaServicePage = () => {
               <div className="flex justify-between text-sm text-muted-foreground">
                 <span>{hours} hr × <span className="line-through">₹{mrpPerHour}/hr</span> <span className="text-green-600 font-medium">₹{pricePerHour}/hr</span></span>
                 <div className="text-right">
-                  <div className="text-xs line-through">₹{(hours * mrpPerHour).toLocaleString('en-IN')}</div>
-                  <div className="text-green-700 font-medium">₹{(hours * pricePerHour).toLocaleString('en-IN')}</div>
+                  <div className="text-xs line-through">₹{mrpTotal.toLocaleString('en-IN')}</div>
+                  <div className="text-green-700 font-medium">₹{totalAmount.toLocaleString('en-IN')}</div>
                 </div>
               </div>
-              {bringSupplies && (
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>Cleaning supplies</span>
-                  <span>₹{suppliesAddonPrice}</span>
-                </div>
-              )}
               <div className="flex justify-between font-bold text-foreground border-t pt-2 text-base">
                 <span>Total</span>
                 <div className="text-right">
