@@ -606,20 +606,27 @@ const InstaServicePage = () => {
                       const busy = busyWorkersBySlot[t] ?? { total: 0, male: 0, female: 0 };
 
                       // Calculate free workers based on gender preference
-                      let freeMale = workerCounts.male - busy.male;
-                      let freeFemale = workerCounts.female - busy.female;
-                      let freeTotal = workerCounts.total - busy.total;
+                      const freeMale = workerCounts.male - busy.male;
+                      const freeFemale = workerCounts.female - busy.female;
+                      const freeTotal = workerCounts.total - busy.total;
 
                       // Determine what to show based on gender preference
-                      let displayInfo: { label: string; count: number; isFull: boolean }[] = [];
+                      const displayInfo: { label: string; count: number; isFull: boolean }[] = [];
 
                       if (genderPref === 'any') {
-                        // Show both male and female counts
+                        // Show both male and female counts, plus "other" gender
                         if (workerCounts.male > 0) {
                           displayInfo.push({ label: '👨', count: freeMale, isFull: freeMale <= 0 });
                         }
                         if (workerCounts.female > 0) {
                           displayInfo.push({ label: '👩', count: freeFemale, isFull: freeFemale <= 0 });
+                        }
+                        // Calculate "other" gender workers (total - male - female)
+                        const otherWorkerCount = workerCounts.total - workerCounts.male - workerCounts.female;
+                        const busyOtherCount = busy.total - busy.male - busy.female;
+                        const freeOther = otherWorkerCount - busyOtherCount;
+                        if (otherWorkerCount > 0) {
+                          displayInfo.push({ label: '👤', count: freeOther, isFull: freeOther <= 0 });
                         }
                       } else if (genderPref === 'male') {
                         // Show only male count
@@ -649,9 +656,9 @@ const InstaServicePage = () => {
                           <span>{fmt12(t)}</span>
                           {displayInfo.length > 0 && (
                             <div className="flex gap-1 flex-wrap justify-center">
-                              {displayInfo.map((info, idx) => (
+                              {displayInfo.map((info) => (
                                 <span
-                                  key={idx}
+                                  key={info.label}
                                   className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none ${
                                     fullyBooked || info.isFull
                                       ? "bg-muted text-muted-foreground"
