@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { adminAPI, bookingsAPI, businessExpensesAPI } from "@/lib/api";
-import { DollarSign, Edit2, Plus, Trash2, X, TrendingUp, TrendingDown } from "lucide-react";
+import { DollarSign, Edit2, Plus, Trash2, TrendingDown, TrendingUp, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 

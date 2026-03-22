@@ -5,12 +5,11 @@ import { ArrowRight, CheckCircle2, Layers3, ShieldCheck, Sparkles } from "lucide
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  CATEGORY_META,
-  type ConfigItem,
-  type DeepCleaningConfig,
-  type UserProfile,
-  getCategoryAction,
-  getStartingPrice,
+    CATEGORY_META,
+    type DeepCleaningConfig,
+    type UserProfile,
+    getCategoryAction,
+    getStartingPrice
 } from "./deepCleaningTemplate";
 
 const DeepCleaningLandingPage = () => {

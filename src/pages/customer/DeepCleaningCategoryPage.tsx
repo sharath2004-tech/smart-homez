@@ -5,12 +5,11 @@ import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardList, ShieldCheck, Sparkl
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import {
-  CATEGORY_META,
-  type ConfigItem,
-  type DeepCleaningCategory,
-  type DeepCleaningConfig,
-  type UserProfile,
-  getStartingPrice,
+    CATEGORY_META,
+    type ConfigItem,
+    type DeepCleaningConfig,
+    type UserProfile,
+    getStartingPrice
 } from "./deepCleaningTemplate";
 
 const getPrimaryAction = (categoryId: string) => {
