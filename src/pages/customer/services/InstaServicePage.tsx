@@ -555,7 +555,8 @@ const InstaServicePage = () => {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     {availableSlots.map((t) => {
                       const busy = busyWorkersBySlot[t] ?? 0;
-                      const free = totalWorkers > 0 ? totalWorkers - busy : null;
+                      const activeWorkers = genderPref === 'male' ? maleWorkers : genderPref === 'female' ? femaleWorkers : totalWorkers;
+                      const free = activeWorkers > 0 ? activeWorkers - busy : null;
                       const fullyBooked = free !== null && free <= 0;
                       const limited = free !== null && free === 1;
                       return (
@@ -597,7 +598,7 @@ const InstaServicePage = () => {
                       );
                     })}
                   </div>
-                  {totalWorkers > 0 ? (
+                  {(totalWorkers > 0 || maleWorkers > 0 || femaleWorkers > 0) ? (
                     <div className="mt-2 space-y-1.5">
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" /> Available</span>
@@ -618,9 +619,9 @@ const InstaServicePage = () => {
                             )}
                           </>
                         ) : genderPref === 'female' ? (
-                          <span>👩 {totalWorkers} female worker{totalWorkers !== 1 ? 's' : ''} available</span>
+                          <span>👩 {femaleWorkers} female worker{femaleWorkers !== 1 ? 's' : ''} available</span>
                         ) : (
-                          <span>👨 {totalWorkers} male worker{totalWorkers !== 1 ? 's' : ''} available</span>
+                          <span>👨 {maleWorkers} male worker{maleWorkers !== 1 ? 's' : ''} available</span>
                         )}
                       </div>
                     </div>
