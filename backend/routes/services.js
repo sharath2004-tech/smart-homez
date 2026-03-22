@@ -200,8 +200,14 @@ router.post('/',
         sizeParameters, durationOptions, subscriptionOptions, addons,
         equipmentRequired, pricingTiers, workerPreferences, serviceFields,
         timeSlotRestrictions, cancellationPolicy, specialInstructionsTemplate,
+        taskOptions,
         // Workforce & wage fields
-        defaultWorkerCount, workerWage
+        defaultWorkerCount, workerWage,
+        // Service state and capabilities
+        originalPrice, isActive, isQuoteService,
+        workerSearchRadiusKm, allowBreakRequests,
+        suggestedServices, dos, donts,
+        displayOrder, serviceCategory
       } = req.body;
 
       const servicePayload = {
@@ -211,7 +217,12 @@ router.post('/',
         sizeParameters, durationOptions, subscriptionOptions, addons,
         equipmentRequired, pricingTiers, workerPreferences, serviceFields,
         timeSlotRestrictions, cancellationPolicy, specialInstructionsTemplate,
-        defaultWorkerCount, workerWage
+        taskOptions,
+        defaultWorkerCount, workerWage,
+        originalPrice, isActive, isQuoteService,
+        workerSearchRadiusKm, allowBreakRequests,
+        suggestedServices, dos, donts,
+        displayOrder, serviceCategory
       };
 
       // Admins cannot create services directly — their request goes to super admin for approval
@@ -371,6 +382,7 @@ const handleServiceUpdate = async (req, res) => {
       workerSearchRadiusKm, allowBreakRequests,
       // Service capabilities
       suggestedServices, dos, donts,
+      isQuoteService,
       displayOrder, serviceCategory
     } = req.body;
 
@@ -425,6 +437,7 @@ const handleServiceUpdate = async (req, res) => {
     if ('tags' in req.body) updateData.tags = tags;
     if ('requirements' in req.body) updateData.requirements = requirements;
     if ('isActive' in req.body) updateData.isActive = isActive;
+    if ('isQuoteService' in req.body) updateData.isQuoteService = isQuoteService;
     if ('additionalServiceOptions' in req.body) updateData.additionalServiceOptions = additionalServiceOptions;
     if ('serviceLocations' in req.body) updateData.serviceLocations = serviceLocations;
     if ('availableInAllLocations' in req.body) updateData.availableInAllLocations = availableInAllLocations;

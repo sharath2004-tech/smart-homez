@@ -1061,7 +1061,7 @@ router.post('/service-requests/:id/approve', async (req, res) => {
     const service = new Service({
       ...request.serviceData,
       createdBy: request.requestedBy,
-      isActive: true
+      isActive: request.serviceData?.isActive ?? true
     });
     await service.save();
 
