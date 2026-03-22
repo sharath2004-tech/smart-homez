@@ -1077,7 +1077,7 @@ router.get('/price-change-requests', async (req, res) => {
     const { status = 'pending' } = req.query;
     const query = status === 'all' ? {} : { status };
     const requests = await PriceChangeRequest.find(query)
-      .populate('service', 'name price')
+      .populate('service', 'name price workerWage')
       .populate('requestedBy', 'name email')
       .populate('reviewedBy', 'name email')
       .sort({ createdAt: -1 });
@@ -1109,6 +1109,7 @@ router.post('/price-change-requests/:id/approve', async (req, res) => {
     if (proposed.subscriptionPlans !== undefined) updateData.subscriptionPlans = proposed.subscriptionPlans;
     if (proposed.durationOptions !== undefined) updateData.durationOptions = proposed.durationOptions;
     if (proposed.pricingTiers !== undefined) updateData.pricingTiers = proposed.pricingTiers;
+    if (proposed.workerWage !== undefined) updateData.workerWage = proposed.workerWage;
 
     const service = await Service.findByIdAndUpdate(
       request.service,

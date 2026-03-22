@@ -98,7 +98,7 @@ const AdminBookings = () => {
 
   // Workforce state
   const [workforceBooking, setWorkforceBooking] = useState<Booking | null>(null);
-  const [workforceForm, setWorkforceForm] = useState({ workerCount: 1, actualDurationMinutes: 0, wageRate: 0 });
+  const [workforceForm, setWorkforceForm] = useState({ workerCount: 1 });
   const [workforceLoading, setWorkforceLoading] = useState(false);
 
   useEffect(() => {
@@ -194,8 +194,6 @@ const AdminBookings = () => {
     setWorkforceBooking(booking);
     setWorkforceForm({
       workerCount: booking.workforce?.workerCount ?? 1,
-      actualDurationMinutes: booking.actualDurationMinutes ?? 0,
-      wageRate: booking.workforce?.wageRate ?? 0,
     });
   };
 
@@ -203,7 +201,7 @@ const AdminBookings = () => {
     if (!workforceBooking) return;
     try {
       setWorkforceLoading(true);
-      const res = await bookingsAPI.updateWorkforce(workforceBooking._id, workforceForm);
+      const res = await bookingsAPI.updateWorkforce(workforceBooking._id, { workerCount: workforceForm.workerCount });
       setWorkforceBooking(prev => prev ? { ...prev, workforce: res.workforce, actualDurationMinutes: res.actualDurationMinutes } : prev);
       setBookings(prev => prev.map(b => b._id === workforceBooking._id
         ? { ...b, workforce: res.workforce, actualDurationMinutes: res.actualDurationMinutes }
@@ -845,7 +843,7 @@ const AdminBookings = () => {
             <div className="sticky top-0 bg-card border-b border-border p-4 flex items-center justify-between rounded-t-2xl">
               <div>
                 <h2 className="font-bold text-foreground text-lg flex items-center gap-2">
-                  <Wallet className="w-5 h-5 text-emerald-600" /> Workforce & Wages
+                  <Wallet className="w-5 h-5 text-emerald-600" /> Workforce Snapshot
                 </h2>
                 <p className="text-sm text-muted-foreground">
                   {workforceBooking.service?.name || 'Booking'} · {formatDate(workforceBooking.bookingDate)} · {workforceBooking.customer?.name}
@@ -878,7 +876,9 @@ const AdminBookings = () => {
 
               {/* Edit fields */}
               <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">Update after visiting the site. Worker count and duration can only be increased.</p>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  Wage and duration are locked after booking. Start/end scans and break approvals control duration, and any wage change must go through super-admin service price approval. Only extra worker count can be increased here.
+                </div>
                 <div>
                   <label className="block text-xs font-medium text-foreground mb-1">Workers Needed</label>
                   <input
@@ -889,39 +889,6 @@ const AdminBookings = () => {
                     className="input-clean text-sm w-full"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-foreground mb-1">Actual Duration (minutes)</label>
-                  <input
-                    type="number"
-                    min={workforceBooking.actualDurationMinutes ?? 0}
-                    value={workforceForm.actualDurationMinutes}
-                    onChange={e => setWorkforceForm(f => ({ ...f, actualDurationMinutes: Math.max(workforceBooking.actualDurationMinutes ?? 0, parseInt(e.target.value) || 0) }))}
-                    className="input-clean text-sm w-full"
-                    placeholder="e.g. 120"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-foreground mb-1">
-                    Wage Rate (₹ {workforceBooking.workforce?.wageType === 'per_session' ? 'per session' : 'per hour'})
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={workforceForm.wageRate}
-                    onChange={e => setWorkforceForm(f => ({ ...f, wageRate: Math.max(0, parseFloat(e.target.value) || 0) }))}
-                    className="input-clean text-sm w-full"
-                  />
-                </div>
-
-                {/* Live preview */}
-                {workforceForm.wageRate > 0 && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-800">
-                    💡 Preview: {workforceForm.workerCount} worker{workforceForm.workerCount > 1 ? 's' : ''} ×{' '}
-                    {workforceBooking.workforce?.wageType === 'per_hour'
-                      ? `₹${workforceForm.wageRate}/hr × ${(workforceForm.actualDurationMinutes / 60).toFixed(2)} hrs = ₹${(workforceForm.workerCount * workforceForm.wageRate * workforceForm.actualDurationMinutes / 60).toFixed(2)}`
-                      : `₹${workforceForm.wageRate}/session = ₹${(workforceForm.workerCount * workforceForm.wageRate).toFixed(2)}`}
-                  </div>
-                )}
               </div>
 
               <div className="flex gap-3 pt-2">
@@ -930,7 +897,7 @@ const AdminBookings = () => {
                   disabled={workforceLoading}
                   className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-semibold text-sm hover:bg-emerald-700 transition-colors disabled:opacity-60"
                 >
-                  {workforceLoading ? 'Saving…' : 'Save & Recalculate'}
+                  {workforceLoading ? 'Saving…' : 'Save worker count'}
                 </button>
                 <button
                   onClick={() => setWorkforceBooking(null)}

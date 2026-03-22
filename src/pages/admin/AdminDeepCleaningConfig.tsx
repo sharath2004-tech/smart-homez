@@ -205,8 +205,12 @@ export default function AdminDeepCleaningConfig() {
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [reviewNote, setReviewNote] = useState("");
   const [serviceConfig, setServiceConfig] = useState<DeepCleaningServiceConfig | null>(null);
+  const [serviceBaseline, setServiceBaseline] = useState<DeepCleaningServiceConfig | null>(null);
   const [serviceLoading, setServiceLoading] = useState(true);
   const [serviceSaving, setServiceSaving] = useState(false);
+
+  const hasChanged = (nextValue: unknown, previousValue: unknown) =>
+    JSON.stringify(nextValue ?? null) !== JSON.stringify(previousValue ?? null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -234,6 +238,7 @@ export default function AdminDeepCleaningConfig() {
         setRequests(requestsRes.requests || []);
         const deepCleaningService = (servicesRes.services || []).find((service: DeepCleaningServiceConfig) => matchesDeepCleaningService(service)) || null;
         setServiceConfig(deepCleaningService);
+        setServiceBaseline(deepCleaningService);
         setHasDraftChanges(false);
       } catch (error) {
         console.error(error);
@@ -306,8 +311,45 @@ export default function AdminDeepCleaningConfig() {
       };
 
       if (serviceConfig._id) {
-        await servicesAPI.update(serviceConfig._id, payload as unknown as Record<string, unknown>);
-        toast.success("Deep-cleaning service settings updated");
+        if (isSuperAdmin) {
+          await servicesAPI.update(serviceConfig._id, payload as unknown as Record<string, unknown>);
+          toast.success("Deep-cleaning service settings updated");
+        } else {
+          if (!serviceBaseline?._id) {
+            throw new Error("Original deep-cleaning service settings could not be loaded. Please refresh and try again.");
+          }
+
+          const approvalPayload: Record<string, unknown> = {};
+          if (hasChanged(payload.price, serviceBaseline.price)) approvalPayload.price = payload.price;
+          if (hasChanged(payload.workerWage, serviceBaseline.workerWage)) approvalPayload.workerWage = payload.workerWage;
+
+          const { price: _price, workerWage: _workerWage, ...directPayload } = payload as Record<string, unknown>;
+          const baselineRecord = serviceBaseline as Record<string, unknown>;
+          const hasDirectChanges = Object.entries(directPayload).some(([key, value]) =>
+            hasChanged(value, baselineRecord[key])
+          );
+          const hasApprovalChanges = Object.keys(approvalPayload).length > 0;
+
+          if (!hasDirectChanges && !hasApprovalChanges) {
+            toast.info("No changes to save");
+            return;
+          }
+
+          const successMessages: string[] = [];
+          if (hasDirectChanges) {
+            await servicesAPI.update(serviceConfig._id, directPayload);
+            successMessages.push("service settings updated");
+          }
+          if (hasApprovalChanges) {
+            await servicesAPI.requestPriceChange(serviceConfig._id, {
+              ...approvalPayload,
+              reason: "Submitted from deep-cleaning service settings",
+            });
+            successMessages.push("price/wage change sent for super-admin approval");
+          }
+
+          toast.success(successMessages.join(" and "));
+        }
       } else {
         const response = await servicesAPI.create({
           ...DEFAULT_DEEP_CLEANING_SERVICE,
@@ -325,6 +367,7 @@ export default function AdminDeepCleaningConfig() {
       const refreshedServices = await servicesAPI.getAll({}).catch(() => ({ services: [] }));
       const refreshedDeepCleaningService = (refreshedServices.services || []).find((service: DeepCleaningServiceConfig) => matchesDeepCleaningService(service)) || null;
       setServiceConfig(refreshedDeepCleaningService);
+      setServiceBaseline(refreshedDeepCleaningService);
     } catch (error) {
       console.error(error);
       toast.error(error instanceof Error ? error.message : "Failed to save deep-cleaning service settings");
@@ -662,6 +705,12 @@ export default function AdminDeepCleaningConfig() {
               {!serviceConfig?._id && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                   Deep-cleaning page content is ready, but the actual service record is missing. Create it here so customers can book and request service correctly.
+                </div>
+              )}
+
+              {!isSuperAdmin && serviceConfig?._id && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  Admins can update operational settings here, but price and wage changes are sent to super admin as service price-change requests instead of applying immediately.
                 </div>
               )}
 

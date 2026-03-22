@@ -3611,7 +3611,7 @@ router.patch('/:id/checklist/:itemId/toggle', authenticate, authorize('worker'),
 });
 
 // @route   PATCH /api/bookings/:id/workforce
-// @desc    Admin/super_admin updates worker count and/or duration after site visit; wage auto-recalculated
+// @desc    Admin/super_admin can only add extra workers after booking; duration comes from QR flow and wage is locked from service snapshot
 // @access  Private/Admin, Private/SuperAdmin
 router.patch('/:id/workforce', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
   try {
@@ -3627,38 +3627,38 @@ router.patch('/:id/workforce', authenticate, authorize('admin', 'super_admin'), 
         error: { message: 'Workforce can only be updated for confirmed or active bookings', status: 400 }
       });
     }
+    if (actualDurationMinutes !== undefined || wageRate !== undefined) {
+      return res.status(403).json({
+        error: {
+          message: 'Post-booking duration and wage are locked. Team-head scan flow controls duration, and wage changes must be requested through service price change approval.',
+          status: 403
+        }
+      });
+    }
+
+    if (workerCount === undefined) {
+      return res.status(400).json({
+        error: { message: 'Only workerCount can be updated after booking', status: 400 }
+      });
+    }
 
     const current = booking.workforce || {};
-
-    // workerCount can only increase
-    if (workerCount !== undefined) {
-      if (typeof workerCount !== 'number' || workerCount < 1) {
-        return res.status(400).json({ error: { message: 'workerCount must be a positive number', status: 400 } });
-      }
-      if (workerCount < (current.workerCount || 1)) {
-        return res.status(400).json({ error: { message: 'Worker count can only be increased, not decreased', status: 400 } });
-      }
-      booking.workforce.workerCount = workerCount;
+    if (!booking.workforce) {
+      booking.workforce = {
+        workerCount: 1,
+        wageType: 'per_hour',
+        wageRate: 0,
+        totalWorkerWage: 0
+      };
     }
 
-    // actualDurationMinutes can only increase
-    if (actualDurationMinutes !== undefined) {
-      if (typeof actualDurationMinutes !== 'number' || actualDurationMinutes < 1) {
-        return res.status(400).json({ error: { message: 'actualDurationMinutes must be a positive number', status: 400 } });
-      }
-      if (actualDurationMinutes < (booking.actualDurationMinutes || 0)) {
-        return res.status(400).json({ error: { message: 'Duration can only be increased, not decreased', status: 400 } });
-      }
-      booking.actualDurationMinutes = actualDurationMinutes;
+    if (typeof workerCount !== 'number' || workerCount < 1) {
+      return res.status(400).json({ error: { message: 'workerCount must be a positive number', status: 400 } });
     }
-
-    // Admin can override the wage rate
-    if (wageRate !== undefined) {
-      if (typeof wageRate !== 'number' || wageRate < 0) {
-        return res.status(400).json({ error: { message: 'wageRate must be a non-negative number', status: 400 } });
-      }
-      booking.workforce.wageRate = wageRate;
+    if (workerCount < (current.workerCount || 1)) {
+      return res.status(400).json({ error: { message: 'Worker count can only be increased, not decreased', status: 400 } });
     }
+    booking.workforce.workerCount = workerCount;
 
     // Recalculate totalWorkerWage
     const count = booking.workforce.workerCount || 1;
@@ -3678,7 +3678,7 @@ router.patch('/:id/workforce', authenticate, authorize('admin', 'super_admin'), 
     await booking.save();
 
     res.json({
-      message: 'Workforce updated successfully',
+      message: 'Extra worker count updated successfully',
       workforce: booking.workforce,
       actualDurationMinutes: booking.actualDurationMinutes
     });

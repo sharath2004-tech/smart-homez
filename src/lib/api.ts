@@ -281,6 +281,13 @@ export const servicesAPI = {
     });
   },
 
+  requestPriceChange: async (id: string, serviceData: Record<string, unknown>) => {
+    return apiCall(`/services/${id}/price-change-request`, {
+      method: 'POST',
+      body: JSON.stringify(serviceData)
+    });
+  },
+
   delete: async (id: string) => {
     return apiCall(`/services/${id}`, {
       method: 'DELETE'
@@ -520,7 +527,7 @@ export const bookingsAPI = {
   rejectBreak: (bookingId: string, breakId: string) =>
     apiCall(`/bookings/${bookingId}/break-reject/${breakId}`, { method: 'PATCH' }),
 
-  updateWorkforce: (bookingId: string, data: { workerCount?: number; actualDurationMinutes?: number; wageRate?: number }) =>
+  updateWorkforce: (bookingId: string, data: { workerCount?: number }) =>
     apiCall(`/bookings/${bookingId}/workforce`, {
       method: 'PATCH',
       body: JSON.stringify(data)

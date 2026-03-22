@@ -332,6 +332,25 @@ function validatePricingFields(body) {
   return errors;
 }
 
+function validateWorkerWage(workerWage) {
+  if (workerWage === undefined) return [];
+
+  const errors = [];
+  if (!workerWage || typeof workerWage !== 'object' || Array.isArray(workerWage)) {
+    return ['workerWage must be an object'];
+  }
+
+  if (workerWage.type !== undefined && !['per_hour', 'per_session'].includes(workerWage.type)) {
+    errors.push('workerWage.type must be per_hour or per_session');
+  }
+
+  if (workerWage.rate !== undefined && (typeof workerWage.rate !== 'number' || workerWage.rate < 0)) {
+    errors.push('workerWage.rate must be a non-negative number');
+  }
+
+  return errors;
+}
+
 // @route   PUT/PATCH /api/services/:id
 // @desc    Update service (including all dynamic parameters)
 // Shared update handler with proper validation and field clearing
@@ -356,7 +375,7 @@ const handleServiceUpdate = async (req, res) => {
     } = req.body;
 
     // Admins cannot directly edit pricing — they must submit a price change request
-    const PRICING_FIELDS = ['price', 'originalPrice', 'pricingPlans', 'subscriptionPlans', 'durationOptions', 'pricingTiers'];
+    const PRICING_FIELDS = ['price', 'originalPrice', 'pricingPlans', 'subscriptionPlans', 'durationOptions', 'pricingTiers', 'workerWage'];
     if (req.user.role === 'admin') {
       const attempted = PRICING_FIELDS.filter(f => f in req.body);
       if (attempted.length > 0) {
@@ -373,6 +392,11 @@ const handleServiceUpdate = async (req, res) => {
     const pricingErrors = validatePricingFields(req.body);
     if (pricingErrors.length > 0) {
       return res.status(400).json({ error: { message: pricingErrors.join('; '), status: 400 } });
+    }
+
+    const workerWageErrors = validateWorkerWage(workerWage);
+    if (workerWageErrors.length > 0) {
+      return res.status(400).json({ error: { message: workerWageErrors.join('; '), status: 400 } });
     }
 
     // Validation for subscription plans
@@ -462,27 +486,27 @@ router.patch('/:id', authenticate, authorize('admin', 'super_admin'), handleServ
 router.put('/:id', authenticate, authorize('admin', 'super_admin'), handleServiceUpdate);
 
 // @route   POST /api/services/:id/price-change-request
-// @desc    Admin submits a pricing update request for super admin review
+// @desc    Admin submits a pricing or worker-wage update request for super admin review
 // @access  Private/Admin
 router.post('/:id/price-change-request', authenticate, authorize('admin'), async (req, res) => {
   try {
     const PriceChangeRequest = (await import('../models/PriceChangeRequest.js')).default;
 
     const service = await Service.findById(req.params.id)
-      .select('price originalPrice pricingPlans subscriptionPlans durationOptions pricingTiers')
+      .select('price originalPrice pricingPlans subscriptionPlans durationOptions pricingTiers workerWage')
       .lean();
     if (!service) {
       return res.status(404).json({ error: { message: 'Service not found', status: 404 } });
     }
 
-    const { price, originalPrice, pricingPlans, subscriptionPlans, durationOptions, pricingTiers, reason } = req.body;
+    const { price, originalPrice, pricingPlans, subscriptionPlans, durationOptions, pricingTiers, workerWage, reason } = req.body;
 
-    const hasPricingField = [price, originalPrice, pricingPlans, subscriptionPlans, durationOptions, pricingTiers]
+    const hasPricingField = [price, originalPrice, pricingPlans, subscriptionPlans, durationOptions, pricingTiers, workerWage]
       .some(v => v !== undefined);
     if (!hasPricingField) {
       return res.status(400).json({
         error: {
-          message: 'At least one pricing field must be provided: price, originalPrice, pricingPlans, subscriptionPlans, durationOptions, pricingTiers',
+          message: 'At least one pricing field must be provided: price, originalPrice, pricingPlans, subscriptionPlans, durationOptions, pricingTiers, workerWage',
           status: 400
         }
       });
@@ -494,6 +518,11 @@ router.post('/:id/price-change-request', authenticate, authorize('admin'), async
       return res.status(400).json({ error: { message: pricingErrors.join('; '), status: 400 } });
     }
 
+    const workerWageErrors = validateWorkerWage(workerWage);
+    if (workerWageErrors.length > 0) {
+      return res.status(400).json({ error: { message: workerWageErrors.join('; '), status: 400 } });
+    }
+
     const proposedPricing = {};
     if (price !== undefined) proposedPricing.price = price;
     if (originalPrice !== undefined) proposedPricing.originalPrice = originalPrice;
@@ -501,6 +530,7 @@ router.post('/:id/price-change-request', authenticate, authorize('admin'), async
     if (subscriptionPlans !== undefined) proposedPricing.subscriptionPlans = subscriptionPlans;
     if (durationOptions !== undefined) proposedPricing.durationOptions = durationOptions;
     if (pricingTiers !== undefined) proposedPricing.pricingTiers = pricingTiers;
+    if (workerWage !== undefined) proposedPricing.workerWage = workerWage;
 
     const request = new PriceChangeRequest({
       service: service._id,
@@ -512,13 +542,14 @@ router.post('/:id/price-change-request', authenticate, authorize('admin'), async
         pricingPlans: service.pricingPlans,
         subscriptionPlans: service.subscriptionPlans,
         durationOptions: service.durationOptions,
-        pricingTiers: service.pricingTiers
+        pricingTiers: service.pricingTiers,
+        workerWage: service.workerWage
       },
       proposedPricing
     });
     await request.save();
 
-    res.status(201).json({ message: 'Price change request submitted for super admin review', request });
+    res.status(201).json({ message: 'Price/wage change request submitted for super admin review', request });
   } catch (error) {
     console.error('Price change request error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });

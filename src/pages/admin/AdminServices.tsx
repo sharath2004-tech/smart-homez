@@ -12,6 +12,7 @@ interface Service {
   category: string;
   serviceType?: string;
   price: number;
+  originalPrice?: number;
   pricingPlans: {
     oneTime: number;
     daily: number;
@@ -257,8 +258,21 @@ const AdminServices = () => {
     workerSearchRadiusKm: 10,
     serviceCategory: 'other',
     displayOrder: 0,
-  });  const isSuperAdmin = profile?.role === 'super_admin';
+  });
+  const isSuperAdmin = profile?.role === 'super_admin';
   const deepCleaningConfigPath = isSuperAdmin ? '/super-admin/deep-cleaning-config' : '/admin/deep-cleaning-config';
+
+  const hasChanged = (nextValue: unknown, previousValue: unknown) =>
+    JSON.stringify(nextValue ?? null) !== JSON.stringify(previousValue ?? null);
+
+  const buildServicePayload = (serviceData: Service) => ({
+    ...serviceData,
+    serviceType: serviceData.serviceType || 'other',
+    durationOptions: (serviceData.durationOptions || []).map((tier) => {
+      const { _priceMode, ...cleanTier } = tier as Record<string, unknown>;
+      return cleanTier;
+    }),
+  });
 
   useEffect(() => {
     fetchData();
@@ -351,28 +365,74 @@ const AdminServices = () => {
     
     try {
       if (editingId) {
-        // Strip UI-only _priceMode field before sending to backend
-        const payload = {
-          ...formData,
-          serviceType: formData.serviceType || 'other',
-          durationOptions: (formData.durationOptions || []).map((tier: any) => {
-            const { _priceMode, ...cleanTier } = tier;
-            return cleanTier;
-          }),
-        };
-        await servicesAPI.update(editingId, payload as unknown as Record<string, unknown>);
-        toast.success('Service updated!');
-        fetchData();
+        const payload = buildServicePayload(formData);
+
+        if (isSuperAdmin) {
+          await servicesAPI.update(editingId, payload as unknown as Record<string, unknown>);
+          toast.success('Service updated!');
+          fetchData();
+        } else {
+          const originalService = services.find(service => service._id === editingId);
+          if (!originalService) {
+            throw new Error('Original service details could not be loaded. Please refresh and try again.');
+          }
+
+          const payloadRecord = payload as Record<string, unknown>;
+          const originalServiceRecord = originalService as Record<string, unknown>;
+
+          const approvalPayload: Record<string, unknown> = {};
+          if (hasChanged(payload.price, originalService.price)) approvalPayload.price = payload.price;
+          if (hasChanged(payload.originalPrice, originalService.originalPrice)) approvalPayload.originalPrice = payload.originalPrice;
+          if (hasChanged(payload.pricingPlans, originalService.pricingPlans)) approvalPayload.pricingPlans = payload.pricingPlans;
+          if (hasChanged(payload.subscriptionPlans, originalService.subscriptionPlans)) approvalPayload.subscriptionPlans = payload.subscriptionPlans;
+          if (hasChanged(payload.durationOptions, originalService.durationOptions)) approvalPayload.durationOptions = payload.durationOptions;
+          if (hasChanged(payloadRecord.pricingTiers, originalServiceRecord.pricingTiers)) approvalPayload.pricingTiers = payloadRecord.pricingTiers;
+          if (hasChanged(payload.workerWage, originalService.workerWage)) approvalPayload.workerWage = payload.workerWage;
+
+          const {
+            price: _price,
+            originalPrice: _originalPrice,
+            pricingPlans: _pricingPlans,
+            subscriptionPlans: _subscriptionPlans,
+            durationOptions: _durationOptions,
+            pricingTiers: _pricingTiers,
+            workerWage: _workerWage,
+            ...directPayload
+          } = payloadRecord;
+
+          const hasDirectChanges = Object.entries(directPayload).some(([key, value]) =>
+            hasChanged(value, originalServiceRecord[key])
+          );
+          const hasApprovalChanges = Object.keys(approvalPayload).length > 0;
+
+          if (!hasDirectChanges && !hasApprovalChanges) {
+            toast.info('No changes to save');
+            return;
+          }
+
+          const successMessages: string[] = [];
+          if (hasDirectChanges) {
+            await servicesAPI.update(editingId, directPayload);
+            successMessages.push('service details updated');
+          }
+          if (hasApprovalChanges) {
+            await servicesAPI.requestPriceChange(editingId, {
+              ...approvalPayload,
+              reason: 'Submitted from admin service editor',
+            });
+            successMessages.push('price/wage change sent for super-admin approval');
+          }
+
+          toast.success(successMessages.join(' and '));
+          fetchData();
+        }
       } else {
         const serviceType = formData.serviceType || 'other';
+        const payload = buildServicePayload(formData);
         const res = await servicesAPI.create({
-          ...formData,
+          ...payload,
           serviceType,
           serviceTypeName: SERVICE_TYPE_CARDS.find(c => c.id === serviceType)?.label || formData.name,
-          durationOptions: (formData.durationOptions || []).map((tier: any) => {
-            const { _priceMode, ...cleanTier } = tier;
-            return cleanTier;
-          }),
           ...(MINI_SERVICE_IDS.has(serviceType) && {
             tags: ['mini-service', 'spot-clean']
           })
@@ -2125,6 +2185,11 @@ const AdminServices = () => {
                       Set the default number of workers needed and how they are paid for this service
                     </p>
                   </div>
+                  {!isSuperAdmin && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                      Wage edits do not apply immediately for admins. They are sent as a service price-change request for super-admin approval.
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-foreground mb-1">Workers Needed</label>
