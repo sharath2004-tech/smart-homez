@@ -112,9 +112,12 @@ const AdminExpenses = () => {
   useEffect(() => {
     fetchExpenses();
     fetchBookings();
-    fetchProfitStats();
+    // Only fetch profit stats for super_admin
+    if (role === 'super_admin') {
+      fetchProfitStats();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [role]);
 
   const fetchExpenses = async () => {
     try {
@@ -544,7 +547,8 @@ const AdminExpenses = () => {
           </div>
         )}
 
-        {/* Total Profit Section */}
+        {/* Total Profit Section - Only visible to super_admin */}
+        {role === 'super_admin' && (
         <div className="card-elevated p-6 border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-accent/5">
           <div className="flex justify-between items-start mb-6">
             <div>
@@ -641,8 +645,10 @@ const AdminExpenses = () => {
             </p>
           </div>
         </div>
+        )}
 
-        {/* Stats Cards */}
+        {/* Stats Cards - Only visible to super_admin */}
+        {role === 'super_admin' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Total */}
           <div className="card-elevated p-3 bg-gradient-to-br from-primary/10 to-accent/10 border border-primary/20">
@@ -672,6 +678,7 @@ const AdminExpenses = () => {
             );
           })}
         </div>
+        )}
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3">
