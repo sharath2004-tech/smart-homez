@@ -334,7 +334,7 @@ const CustomerDashboard = () => {
               {t('dashboard.allServices')} <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
-          <motion.div 
+          <motion.div
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
             variants={containerVariants}
           >
@@ -363,52 +363,40 @@ const CustomerDashboard = () => {
                 </Link>
               </motion.div>
             ))}
+
+            {/* Kitchen Deep Clean — only if admin has created the service */}
+            {kitchenServiceId && (
+              <motion.div variants={itemVariants} whileHover="hover" whileTap="tap">
+                <Link
+                  to={`/customer/book/${kitchenServiceId}`}
+                  className="card-elevated-hover p-4 text-center group block flex flex-col items-center justify-center min-h-[130px]"
+                >
+                  <motion.div className="text-3xl mb-2" whileHover={{ scale: 1.15 }} transition={{ duration: 0.2, ease: "easeOut" }}>
+                    🍽️
+                  </motion.div>
+                  <p className="text-xs font-semibold text-foreground leading-tight">Kitchen Deep Clean</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">Grease · Appliances · Tiles</p>
+                </Link>
+              </motion.div>
+            )}
+
+            {/* Window Deep Cleaning — only if admin has created the service */}
+            {windowServiceId && (
+              <motion.div variants={itemVariants} whileHover="hover" whileTap="tap">
+                <Link
+                  to={`/customer/book/${windowServiceId}`}
+                  className="card-elevated-hover p-4 text-center group block flex flex-col items-center justify-center min-h-[130px]"
+                >
+                  <motion.div className="text-3xl mb-2" whileHover={{ scale: 1.15 }} transition={{ duration: 0.2, ease: "easeOut" }}>
+                    🪟
+                  </motion.div>
+                  <p className="text-xs font-semibold text-foreground leading-tight">Window Deep Cleaning</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">Glass · Frames · Tracks</p>
+                </Link>
+              </motion.div>
+            )}
           </motion.div>
         </motion.div>
-
-        {/* Room-Specific Deep Cleaning */}
-        {(kitchenServiceId || windowServiceId) && (
-          <motion.div variants={itemVariants}>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-bold font-heading text-foreground">Room-Specific Deep Cleaning</h2>
-              <Link to="/customer/services" className="text-sm text-primary font-medium flex items-center gap-1 hover:gap-2 transition-all">
-                See all <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {kitchenServiceId && (
-                <motion.div whileHover="hover" whileTap="tap" variants={cardHoverVariants}>
-                  <Link
-                    to={`/customer/book/${kitchenServiceId}`}
-                    className="card-elevated-hover p-4 text-center group block flex flex-col items-center justify-center min-h-[120px] border-2 border-orange-200 bg-orange-50 hover:border-orange-400 hover:bg-orange-100 rounded-2xl transition-all"
-                  >
-                    <motion.div className="text-3xl mb-2" whileHover={{ scale: 1.15 }} transition={{ duration: 0.2 }}>
-                      🍽️
-                    </motion.div>
-                    <p className="text-xs font-semibold text-orange-900 leading-tight">Kitchen Deep Clean</p>
-                    <p className="text-xs text-orange-700 mt-0.5">Grease · Appliances · Tiles</p>
-                    <span className="mt-2 text-[10px] font-semibold bg-orange-600 text-white px-2.5 py-1 rounded-full inline-block">Quick Book</span>
-                  </Link>
-                </motion.div>
-              )}
-              {windowServiceId && (
-                <motion.div whileHover="hover" whileTap="tap" variants={cardHoverVariants}>
-                  <Link
-                    to={`/customer/book/${windowServiceId}`}
-                    className="card-elevated-hover p-4 text-center group block flex flex-col items-center justify-center min-h-[120px] border-2 border-blue-200 bg-blue-50 hover:border-blue-400 hover:bg-blue-100 rounded-2xl transition-all"
-                  >
-                    <motion.div className="text-3xl mb-2" whileHover={{ scale: 1.15 }} transition={{ duration: 0.2 }}>
-                      🪟
-                    </motion.div>
-                    <p className="text-xs font-semibold text-blue-900 leading-tight">Window Deep Cleaning</p>
-                    <p className="text-xs text-blue-700 mt-0.5">Glass · Frames · Tracks</p>
-                    <span className="mt-2 text-[10px] font-semibold bg-blue-600 text-white px-2.5 py-1 rounded-full inline-block">Quick Book</span>
-                  </Link>
-                </motion.div>
-              )}
-            </div>
-          </motion.div>
-        )}
 
         {/* Upcoming Bookings */}
         <motion.div variants={itemVariants}>
