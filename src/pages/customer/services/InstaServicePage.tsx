@@ -594,7 +594,7 @@ const InstaServicePage = () => {
                       );
                     })}
                   </div>
-                  {totalWorkers > 0 && (
+                  {totalWorkers > 0 ? (
                     <div className="mt-2 space-y-1.5">
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" /> Available</span>
@@ -602,18 +602,30 @@ const InstaServicePage = () => {
                         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-destructive inline-block" /> Fully booked</span>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span>👥 {totalWorkers} worker{totalWorkers !== 1 ? 's' : ''} available</span>
-                        {genderPref === 'any' && (maleWorkers > 0 || femaleWorkers > 0) && (
+                        {genderPref === 'any' ? (
                           <>
-                            <span>·</span>
-                            <span>👨 {maleWorkers} male</span>
-                            <span>·</span>
-                            <span>👩 {femaleWorkers} female</span>
+                            <span>👥 {totalWorkers} worker{totalWorkers !== 1 ? 's' : ''} available</span>
+                            {(maleWorkers > 0 || femaleWorkers > 0) && (
+                              <>
+                                <span>·</span>
+                                <span>👨 {maleWorkers} male</span>
+                                <span>·</span>
+                                <span>👩 {femaleWorkers} female</span>
+                              </>
+                            )}
                           </>
+                        ) : genderPref === 'female' ? (
+                          <span>👩 {totalWorkers} female worker{totalWorkers !== 1 ? 's' : ''} available</span>
+                        ) : (
+                          <span>👨 {totalWorkers} male worker{totalWorkers !== 1 ? 's' : ''} available</span>
                         )}
                       </div>
                     </div>
-                  )}
+                  ) : genderPref !== 'any' ? (
+                    <p className="mt-2 text-xs text-muted-foreground text-center py-1">
+                      No {genderPref} workers available right now — you can still book and we'll assign the best match.
+                    </p>
+                  ) : null}
                 </>
               )}
             </div>
