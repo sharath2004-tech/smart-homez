@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { adminAPI, authAPI, locationRequestsAPI, locationsAPI } from "@/lib/api";
 import { cropQRFromImage } from "@/utils/cropQRFromImage";
-import L from 'leaflet';
+import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Building, CheckCircle, Clock, FileText, MapPin, Pencil, Plus, QrCode, Search, Shield, Trash2, Upload, UserPlus, X, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
