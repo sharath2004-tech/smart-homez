@@ -828,6 +828,23 @@ router.post('/',
         };
       }
 
+      // Snapshot workforce details from service at booking creation time
+      if (service) {
+        try {
+          const serviceDoc = await Service.findById(service).select('defaultWorkerCount workerWage').lean();
+          if (serviceDoc) {
+            bookingData.workforce = {
+              workerCount: serviceDoc.defaultWorkerCount || 1,
+              wageType: serviceDoc.workerWage?.type || 'per_hour',
+              wageRate: serviceDoc.workerWage?.rate || 0,
+              totalWorkerWage: 0 // will be calculated when admin updates after visit
+            };
+          }
+        } catch (wErr) {
+          console.error('Workforce snapshot error (non-fatal):', wErr.message);
+        }
+      }
+
       const booking = new Booking(bookingData);
 
       await booking.save();
@@ -3255,6 +3272,84 @@ router.patch('/:id/checklist/:itemId/toggle', authenticate, authorize('worker'),
     res.json({ item });
   } catch (error) {
     console.error('Toggle checklist error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   PATCH /api/bookings/:id/workforce
+// @desc    Admin/super_admin updates worker count and/or duration after site visit; wage auto-recalculated
+// @access  Private/Admin, Private/SuperAdmin
+router.patch('/:id/workforce', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { workerCount, actualDurationMinutes, wageRate } = req.body;
+    const booking = await Booking.findById(req.params.id);
+
+    if (!booking) {
+      return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
+    }
+
+    if (!['confirmed', 'in-progress', 'pending-review', 'completed'].includes(booking.status)) {
+      return res.status(400).json({
+        error: { message: 'Workforce can only be updated for confirmed or active bookings', status: 400 }
+      });
+    }
+
+    const current = booking.workforce || {};
+
+    // workerCount can only increase
+    if (workerCount !== undefined) {
+      if (typeof workerCount !== 'number' || workerCount < 1) {
+        return res.status(400).json({ error: { message: 'workerCount must be a positive number', status: 400 } });
+      }
+      if (workerCount < (current.workerCount || 1)) {
+        return res.status(400).json({ error: { message: 'Worker count can only be increased, not decreased', status: 400 } });
+      }
+      booking.workforce.workerCount = workerCount;
+    }
+
+    // actualDurationMinutes can only increase
+    if (actualDurationMinutes !== undefined) {
+      if (typeof actualDurationMinutes !== 'number' || actualDurationMinutes < 1) {
+        return res.status(400).json({ error: { message: 'actualDurationMinutes must be a positive number', status: 400 } });
+      }
+      if (actualDurationMinutes < (booking.actualDurationMinutes || 0)) {
+        return res.status(400).json({ error: { message: 'Duration can only be increased, not decreased', status: 400 } });
+      }
+      booking.actualDurationMinutes = actualDurationMinutes;
+    }
+
+    // Admin can override the wage rate
+    if (wageRate !== undefined) {
+      if (typeof wageRate !== 'number' || wageRate < 0) {
+        return res.status(400).json({ error: { message: 'wageRate must be a non-negative number', status: 400 } });
+      }
+      booking.workforce.wageRate = wageRate;
+    }
+
+    // Recalculate totalWorkerWage
+    const count = booking.workforce.workerCount || 1;
+    const rate = booking.workforce.wageRate || 0;
+    const durationMins = booking.actualDurationMinutes || booking.scheduledDurationMinutes || 0;
+
+    if (booking.workforce.wageType === 'per_hour') {
+      booking.workforce.totalWorkerWage = Math.round(count * (durationMins / 60) * rate * 100) / 100;
+    } else {
+      // per_session
+      booking.workforce.totalWorkerWage = Math.round(count * rate * 100) / 100;
+    }
+
+    booking.workforce.updatedBy = req.user._id;
+    booking.workforce.updatedAt = new Date();
+
+    await booking.save();
+
+    res.json({
+      message: 'Workforce updated successfully',
+      workforce: booking.workforce,
+      actualDurationMinutes: booking.actualDurationMinutes
+    });
+  } catch (error) {
+    console.error('Update workforce error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
   }
 });

@@ -530,6 +530,38 @@ const bookingSchema = new mongoose.Schema({
       default: null
     }
   },
+  // Workforce tracking — snapshotted from service at booking creation, editable by admin post-confirm
+  workforce: {
+    workerCount: {
+      type: Number,
+      default: 1,
+      min: 1
+    },
+    wageType: {
+      type: String,
+      enum: ['per_hour', 'per_session'],
+      default: 'per_hour'
+    },
+    wageRate: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    totalWorkerWage: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    updatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    updatedAt: {
+      type: Date,
+      default: null
+    }
+  },
   // Work Documentation (REQ-C-012)
   workDocumentation: {
     photos: [{

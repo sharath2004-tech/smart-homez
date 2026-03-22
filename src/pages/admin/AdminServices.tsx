@@ -70,6 +70,11 @@ interface Service {
   }>;
   dos?: string[];
   donts?: string[];
+  defaultWorkerCount?: number;
+  workerWage?: {
+    type: 'per_hour' | 'per_session';
+    rate: number;
+  };
 }
 
 interface UserProfile {
@@ -234,7 +239,9 @@ const AdminServices = () => {
     sizeParameters: { enabled: false, sizeType: 'quantity', options: [] },
     suggestedServices: [],
     dos: [],
-    donts: []
+    donts: [],
+    defaultWorkerCount: 1,
+    workerWage: { type: 'per_hour', rate: 0 }
   });  const isSuperAdmin = profile?.role === 'super_admin';
 
   useEffect(() => {
@@ -409,6 +416,8 @@ const AdminServices = () => {
       suggestedServices: service.suggestedServices || [],
       dos: (service as any).dos || [],
       donts: (service as any).donts || [],
+      defaultWorkerCount: (service as any).defaultWorkerCount ?? 1,
+      workerWage: (service as any).workerWage || { type: 'per_hour', rate: 0 },
     });
     setSelectedServiceType(service.serviceType || null);
     setEditingId(service._id!);
@@ -454,6 +463,8 @@ const AdminServices = () => {
       subscriptionPlans: [],
       dos: [],
       donts: [],
+      defaultWorkerCount: 1,
+      workerWage: { type: 'per_hour', rate: 0 },
     });
   };
 
@@ -2090,6 +2101,61 @@ const AdminServices = () => {
                   >
                     <Plus className="w-3 h-3" /> Add Don't Item
                   </button>
+                </div>
+
+                {/* Workforce & Wages Section */}
+                <div className="space-y-4 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground">👥 Workforce & Wages</label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Set the default number of workers needed and how they are paid for this service
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-foreground mb-1">Workers Needed</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={formData.defaultWorkerCount ?? 1}
+                        onChange={(e) => setFormData({ ...formData, defaultWorkerCount: Math.max(1, parseInt(e.target.value) || 1) })}
+                        className="input-clean text-sm w-full"
+                        placeholder="1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground mb-1">Wage Type</label>
+                      <select
+                        value={formData.workerWage?.type ?? 'per_hour'}
+                        onChange={(e) => setFormData({ ...formData, workerWage: { ...(formData.workerWage || { rate: 0 }), type: e.target.value as 'per_hour' | 'per_session' } })}
+                        className="input-clean text-sm w-full"
+                      >
+                        <option value="per_hour">Per Hour (₹/hr)</option>
+                        <option value="per_session">Per Session (₹/session)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground mb-1">
+                        Wage Rate (₹ {formData.workerWage?.type === 'per_session' ? 'per session' : 'per hour'})
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={formData.workerWage?.rate ?? 0}
+                        onChange={(e) => setFormData({ ...formData, workerWage: { ...(formData.workerWage || { type: 'per_hour' }), rate: Math.max(0, parseFloat(e.target.value) || 0) } })}
+                        className="input-clean text-sm w-full"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                  {(formData.workerWage?.rate ?? 0) > 0 && (
+                    <p className="text-xs text-blue-700 bg-blue-100 rounded px-3 py-2">
+                      💡 Example: {formData.defaultWorkerCount ?? 1} worker{(formData.defaultWorkerCount ?? 1) > 1 ? 's' : ''} ×{' '}
+                      {formData.workerWage?.type === 'per_hour'
+                        ? `₹${formData.workerWage.rate}/hr for a 2-hour job = ₹${((formData.defaultWorkerCount ?? 1) * (formData.workerWage?.rate ?? 0) * 2).toFixed(0)} total wage`
+                        : `₹${formData.workerWage?.rate ?? 0}/session = ₹${((formData.defaultWorkerCount ?? 1) * (formData.workerWage?.rate ?? 0)).toFixed(0)} total wage`}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 pt-4">

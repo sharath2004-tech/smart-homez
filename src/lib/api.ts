@@ -492,6 +492,12 @@ export const bookingsAPI = {
 
   removeSupportStaff: (bookingId: string, workerId: string) =>
     apiCall(`/bookings/${bookingId}/support-staff/${workerId}`, { method: 'DELETE' }),
+
+  updateWorkforce: (bookingId: string, data: { workerCount?: number; actualDurationMinutes?: number; wageRate?: number }) =>
+    apiCall(`/bookings/${bookingId}/workforce`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    }),
 };
 
 // ====== Locations APIs ======

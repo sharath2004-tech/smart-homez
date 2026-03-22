@@ -192,14 +192,16 @@ router.post('/',
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { 
+      const {
         name, description, category, serviceType, price, pricingPlans, subscriptionPlans,
         duration, image, tags, requirements, additionalServiceOptions,
         serviceLocations, availableInAllLocations,
         // New parameter fields
         sizeParameters, durationOptions, subscriptionOptions, addons,
         equipmentRequired, pricingTiers, workerPreferences, serviceFields,
-        timeSlotRestrictions, cancellationPolicy, specialInstructionsTemplate
+        timeSlotRestrictions, cancellationPolicy, specialInstructionsTemplate,
+        // Workforce & wage fields
+        defaultWorkerCount, workerWage
       } = req.body;
 
       const servicePayload = {
@@ -208,7 +210,8 @@ router.post('/',
         serviceLocations, availableInAllLocations,
         sizeParameters, durationOptions, subscriptionOptions, addons,
         equipmentRequired, pricingTiers, workerPreferences, serviceFields,
-        timeSlotRestrictions, cancellationPolicy, specialInstructionsTemplate
+        timeSlotRestrictions, cancellationPolicy, specialInstructionsTemplate,
+        defaultWorkerCount, workerWage
       };
 
       // Admins cannot create services directly — their request goes to super admin for approval
@@ -334,7 +337,7 @@ function validatePricingFields(body) {
 // Shared update handler with proper validation and field clearing
 const handleServiceUpdate = async (req, res) => {
   try {
-    const { 
+    const {
       name, description, category, serviceType, price, pricingPlans, subscriptionPlans,
       duration, image, tags, requirements, isActive, additionalServiceOptions,
       serviceLocations, availableInAllLocations,
@@ -342,7 +345,9 @@ const handleServiceUpdate = async (req, res) => {
       sizeParameters, durationOptions, subscriptionOptions, addons,
       equipmentRequired, pricingTiers, workerPreferences, serviceFields,
       timeSlotRestrictions, cancellationPolicy, specialInstructionsTemplate,
-      taskOptions
+      taskOptions,
+      // Workforce & wage fields
+      defaultWorkerCount, workerWage
     } = req.body;
 
     // Admins cannot directly edit pricing — they must submit a price change request
@@ -408,6 +413,8 @@ const handleServiceUpdate = async (req, res) => {
     if ('cancellationPolicy' in req.body) updateData.cancellationPolicy = cancellationPolicy;
     if ('specialInstructionsTemplate' in req.body) updateData.specialInstructionsTemplate = specialInstructionsTemplate;
     if ('taskOptions' in req.body) updateData.taskOptions = taskOptions;
+    if ('defaultWorkerCount' in req.body) updateData.defaultWorkerCount = defaultWorkerCount;
+    if ('workerWage' in req.body) updateData.workerWage = workerWage;
 
     const service = await Service.findByIdAndUpdate(
       req.params.id,

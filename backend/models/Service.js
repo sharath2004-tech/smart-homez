@@ -15,6 +15,25 @@ const serviceSchema = new mongoose.Schema({
     required: [true, 'Category is required'],
     enum: ['health', 'cleaning', 'maintenance', 'consultation', 'therapy', 'other']
   },
+  // Number of workers typically required for this service (set by super admin)
+  defaultWorkerCount: {
+    type: Number,
+    default: 1,
+    min: 1
+  },
+  // Worker wage configuration set by super admin
+  workerWage: {
+    type: {
+      type: String,
+      enum: ['per_hour', 'per_session'],
+      default: 'per_hour'
+    },
+    rate: {
+      type: Number,
+      default: 0,
+      min: 0
+    }
+  },
   // Service type determines which parameters are applicable
   serviceType: {
     type: String,

@@ -3,7 +3,7 @@ import BookingOrderPrint from "@/components/BookingOrderPrint";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { bookingsAPI, superAdminAPI } from "@/lib/api";
 import ExcelJS from "exceljs";
-import { CheckCircle, Download, Eye, MapPin, Printer, Search, Users, X } from "lucide-react";
+import { CheckCircle, Download, Eye, MapPin, Printer, Search, Users, Wallet, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import html2pdf from "html2pdf.js";
 
@@ -32,6 +32,14 @@ interface Booking {
   completionPhoto?: ProofPhoto;
   completionPhotos?: ProofPhoto[];
   paymentProof?: ProofPhoto;
+  actualDurationMinutes?: number;
+  workforce?: {
+    workerCount: number;
+    wageType: 'per_hour' | 'per_session';
+    wageRate: number;
+    totalWorkerWage: number;
+    updatedAt?: string;
+  };
 }
 
 const statusConfig: Record<string, string> = {
@@ -72,6 +80,11 @@ const AdminBookings = () => {
   // Print state
   const [showPrintModal, setShowPrintModal] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
+
+  // Workforce state
+  const [workforceBooking, setWorkforceBooking] = useState<Booking | null>(null);
+  const [workforceForm, setWorkforceForm] = useState({ workerCount: 1, actualDurationMinutes: 0, wageRate: 0 });
+  const [workforceLoading, setWorkforceLoading] = useState(false);
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -159,6 +172,31 @@ const AdminBookings = () => {
       alert((error as Error).message || 'Failed to approve booking');
     } finally {
       setApprovingBookingId(null);
+    }
+  };
+
+  const openWorkforce = (booking: Booking) => {
+    setWorkforceBooking(booking);
+    setWorkforceForm({
+      workerCount: booking.workforce?.workerCount ?? 1,
+      actualDurationMinutes: booking.actualDurationMinutes ?? 0,
+      wageRate: booking.workforce?.wageRate ?? 0,
+    });
+  };
+
+  const handleUpdateWorkforce = async () => {
+    if (!workforceBooking) return;
+    try {
+      setWorkforceLoading(true);
+      const res = await bookingsAPI.updateWorkforce(workforceBooking._id, workforceForm);
+      setWorkforceBooking(prev => prev ? { ...prev, workforce: res.workforce, actualDurationMinutes: res.actualDurationMinutes } : prev);
+      setBookings(prev => prev.map(b => b._id === workforceBooking._id
+        ? { ...b, workforce: res.workforce, actualDurationMinutes: res.actualDurationMinutes }
+        : b));
+    } catch (e) {
+      alert((e as Error).message || 'Failed to update workforce');
+    } finally {
+      setWorkforceLoading(false);
     }
   };
 
@@ -385,6 +423,15 @@ const AdminBookings = () => {
                           >
                             <Users className="w-3.5 h-3.5" />
                             Team ({(b.supportStaff?.length ?? 0) + (b.worker ? 1 : 0)})
+                          </button>
+                        )}
+                        {['confirmed', 'in-progress', 'pending-review', 'completed'].includes(b.status) && (
+                          <button
+                            onClick={() => openWorkforce(b)}
+                            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors"
+                          >
+                            <Wallet className="w-3.5 h-3.5" />
+                            {b.workforce?.totalWorkerWage ? `₹${b.workforce.totalWorkerWage}` : 'Wages'}
                           </button>
                         )}
                         {(b.status === 'completed' || b.status === 'pending-review') ? (
@@ -718,6 +765,114 @@ const AdminBookings = () => {
               >
                 Done
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      )}
+
+      {/* Workforce & Wages Modal */}
+      {workforceBooking && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-card rounded-2xl max-w-md w-full my-8 shadow-2xl">
+            <div className="sticky top-0 bg-card border-b border-border p-4 flex items-center justify-between rounded-t-2xl">
+              <div>
+                <h2 className="font-bold text-foreground text-lg flex items-center gap-2">
+                  <Wallet className="w-5 h-5 text-emerald-600" /> Workforce & Wages
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {workforceBooking.service?.name || 'Booking'} · {formatDate(workforceBooking.bookingDate)} · {workforceBooking.customer?.name}
+                </p>
+              </div>
+              <button onClick={() => setWorkforceBooking(null)} className="p-2 hover:bg-muted rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-5">
+              {/* Current wage summary */}
+              {workforceBooking.workforce && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-1.5">
+                  <p className="text-xs font-semibold text-emerald-800 uppercase tracking-wide">Current Snapshot</p>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <span className="text-muted-foreground">Workers:</span>
+                    <span className="font-medium">{workforceBooking.workforce.workerCount}</span>
+                    <span className="text-muted-foreground">Wage type:</span>
+                    <span className="font-medium">{workforceBooking.workforce.wageType === 'per_hour' ? 'Per Hour' : 'Per Session'}</span>
+                    <span className="text-muted-foreground">Rate:</span>
+                    <span className="font-medium">₹{workforceBooking.workforce.wageRate}{workforceBooking.workforce.wageType === 'per_hour' ? '/hr' : '/session'}</span>
+                    <span className="text-muted-foreground">Duration (mins):</span>
+                    <span className="font-medium">{workforceBooking.actualDurationMinutes ?? '—'}</span>
+                    <span className="text-muted-foreground font-semibold">Total Wage:</span>
+                    <span className="font-bold text-emerald-700 text-base">₹{workforceBooking.workforce.totalWorkerWage}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Edit fields */}
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">Update after visiting the site. Worker count and duration can only be increased.</p>
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">Workers Needed</label>
+                  <input
+                    type="number"
+                    min={workforceBooking.workforce?.workerCount ?? 1}
+                    value={workforceForm.workerCount}
+                    onChange={e => setWorkforceForm(f => ({ ...f, workerCount: Math.max(workforceBooking.workforce?.workerCount ?? 1, parseInt(e.target.value) || 1) }))}
+                    className="input-clean text-sm w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">Actual Duration (minutes)</label>
+                  <input
+                    type="number"
+                    min={workforceBooking.actualDurationMinutes ?? 0}
+                    value={workforceForm.actualDurationMinutes}
+                    onChange={e => setWorkforceForm(f => ({ ...f, actualDurationMinutes: Math.max(workforceBooking.actualDurationMinutes ?? 0, parseInt(e.target.value) || 0) }))}
+                    className="input-clean text-sm w-full"
+                    placeholder="e.g. 120"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">
+                    Wage Rate (₹ {workforceBooking.workforce?.wageType === 'per_session' ? 'per session' : 'per hour'})
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={workforceForm.wageRate}
+                    onChange={e => setWorkforceForm(f => ({ ...f, wageRate: Math.max(0, parseFloat(e.target.value) || 0) }))}
+                    className="input-clean text-sm w-full"
+                  />
+                </div>
+
+                {/* Live preview */}
+                {workforceForm.wageRate > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-800">
+                    💡 Preview: {workforceForm.workerCount} worker{workforceForm.workerCount > 1 ? 's' : ''} ×{' '}
+                    {workforceBooking.workforce?.wageType === 'per_hour'
+                      ? `₹${workforceForm.wageRate}/hr × ${(workforceForm.actualDurationMinutes / 60).toFixed(2)} hrs = ₹${(workforceForm.workerCount * workforceForm.wageRate * workforceForm.actualDurationMinutes / 60).toFixed(2)}`
+                      : `₹${workforceForm.wageRate}/session = ₹${(workforceForm.workerCount * workforceForm.wageRate).toFixed(2)}`}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={handleUpdateWorkforce}
+                  disabled={workforceLoading}
+                  className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-semibold text-sm hover:bg-emerald-700 transition-colors disabled:opacity-60"
+                >
+                  {workforceLoading ? 'Saving…' : 'Save & Recalculate'}
+                </button>
+                <button
+                  onClick={() => setWorkforceBooking(null)}
+                  className="flex-1 py-2.5 border border-border rounded-xl font-medium text-sm hover:bg-muted transition-colors"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
