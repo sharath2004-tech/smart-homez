@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import WorkerAvailabilityToggle from "@/components/WorkerAvailabilityToggle";
-import { API_BASE_URL, authAPI, bookingsAPI, workersAPI } from "@/lib/api";
-import { Bell, CheckCircle, ChevronRight, Clock, MapPin, QrCode, TrendingUp } from "lucide-react";
+import { API_BASE_URL, authAPI, workersAPI } from "@/lib/api";
+import { Bell, CheckCircle, ChevronRight, Clock, MapPin, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -142,21 +142,6 @@ const WorkerDashboard = () => {
     }
   };
 
-  const handleCompleteService = async () => {
-    if (!currentTask) return;
-
-    if (confirm(t('worker.dashboard.markCompletedConfirm'))) {
-      try {
-        await bookingsAPI.update(currentTask._id, { status: 'pending-review', completedAt: new Date().toISOString() });
-        await fetchDashboardData();
-        alert('Service marked as completed. Awaiting admin approval.');
-      } catch (error) {
-        console.error('Error completing service:', error);
-        alert(t('worker.dashboard.failedCompleteService'));
-      }
-    }
-  };
-
   const formatMinutes = (mins: number) => {
     if (!mins || mins <= 0) return '0m';
     const h = Math.floor(mins / 60);
@@ -279,19 +264,12 @@ const WorkerDashboard = () => {
                   </div>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 <button
-                  onClick={() => alert('QR Code feature coming soon!')}
+                  onClick={() => setSelectedTaskId(currentTask._id)}
                   className="py-2.5 border border-border rounded-xl text-sm font-medium text-foreground hover:bg-muted transition-colors flex items-center justify-center gap-2"
                 >
-                  <QrCode className="w-4 h-4" />
-                  {t('worker.tasks.serviceStartQR')}
-                </button>
-                <button
-                  onClick={handleCompleteService}
-                  className="btn-brand py-2.5 text-sm"
-                >
-                  {t('worker.tasks.completeBooking')}
+                  View task details
                 </button>
               </div>
             </div>

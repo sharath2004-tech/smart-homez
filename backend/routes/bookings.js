@@ -1997,11 +1997,10 @@ router.post('/:id/break-request', authenticate, authorize('worker', 'admin', 'su
 
     // Check requesting worker is part of the team
     const isTeamHead = booking.worker && booking.worker._id.toString() === req.user._id.toString();
-    const isSupport = booking.supportStaff?.some(s => s.worker.toString() === req.user._id.toString());
     const isAdmin = ['admin', 'super_admin'].includes(req.user.role);
 
-    if (!isTeamHead && !isSupport && !isAdmin) {
-      return res.status(403).json({ error: { message: 'Only team members can request breaks', status: 403 } });
+    if (!isTeamHead && !isAdmin) {
+      return res.status(403).json({ error: { message: 'Only the team head can request breaks for this booking', status: 403 } });
     }
 
     const breakRequest = {

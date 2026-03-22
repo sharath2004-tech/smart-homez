@@ -642,11 +642,16 @@ router.get('/worker/current-task', authenticate, authorize('worker'), async (req
     const workerId = req.user._id;
     
     const currentTask = await Booking.findOne({
-      worker: workerId,
+      $or: [
+        { worker: workerId },
+        { 'supportStaff.worker': workerId }
+      ],
       status: 'in-progress'
     })
     .populate('customer', 'name email phone')
     .populate('service', 'name description price duration')
+    .populate('worker', 'name email phone')
+    .populate('supportStaff.worker', 'name email phone')
     .sort({ bookingDate: -1 });
     
     res.json({
@@ -674,12 +679,17 @@ router.get('/worker/upcoming-tasks', authenticate, authorize('worker'), async (r
     console.log('   Current date:', now.toISOString().split('T')[0]);
     
     const upcomingTasks = await Booking.find({
-      worker: workerId,
+      $or: [
+        { worker: workerId },
+        { 'supportStaff.worker': workerId }
+      ],
       status: { $in: ['confirmed', 'pending'] },
       bookingDate: { $gte: now.toISOString().split('T')[0] }
     })
     .populate('customer', 'name email phone')
     .populate('service', 'name description price duration')
+    .populate('worker', 'name email phone')
+    .populate('supportStaff.worker', 'name email phone')
     .sort({ bookingDate: 1, startTime: 1 })
     .limit(parseInt(limit));
     

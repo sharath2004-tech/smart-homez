@@ -519,7 +519,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
               </div>
 
               {/* Break Request Section */}
-              {!task.isOnBreak && task.service?.allowBreakRequests === true && (
+              {!task.isOnBreak && task.service?.allowBreakRequests === true && isTeamHead && (
                 <div className="card-elevated p-4">
                   {!showBreakForm ? (
                     <button
@@ -560,6 +560,20 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                       </p>
                     </div>
                   )}
+                </div>
+              )}
+
+              {!task.isOnBreak && task.service?.allowBreakRequests === true && !isTeamHead && (
+                <div className="card-elevated p-4 bg-blue-50 border border-blue-200">
+                  <div className="flex items-start gap-2 text-blue-800">
+                    <Coffee className="w-4 h-4 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold">Break requests are managed by the team head</p>
+                      <p className="text-xs text-blue-700 mt-1">
+                        If the team needs a pause, please ask <strong>{task.worker?.name || 'the team head'}</strong> to send the break request.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
 
