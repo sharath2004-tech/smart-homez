@@ -48,12 +48,17 @@ interface RequestAnalytics {
   recentRequests: {
     _id: string;
     serviceName: string;
+    serviceType?: string;
     customerName?: string;
     address?: string;
     area?: string;
     city?: string;
     requestCount: number;
     lastRequestedAt: string;
+    location?: {
+      type?: string;
+      coordinates?: [number, number];
+    };
     requestedBy?: {
       name?: string;
       email?: string;
@@ -66,7 +71,7 @@ const AdminServiceAreas = () => {
   const { role, name } = useAdminRole();
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const markersRef = useRef<Map<string, { marker: L.Marker; circle: L.Circle }>>(new Map());
+  const markersRef = useRef<Map<string, { marker: L.Marker; circle?: L.Circle }>>(new Map());
   const isAddingNewRef = useRef(false);
   const roleRef = useRef(role);
 
@@ -99,6 +104,16 @@ const AdminServiceAreas = () => {
     isActive: true,
     color: "#10b981"
   });
+
+  const getRequestCoordinates = (request: RequestAnalytics['recentRequests'][number]) => {
+    const coordinates = request.location?.coordinates;
+    if (!coordinates || coordinates.length !== 2) return null;
+
+    const [lng, lat] = coordinates;
+    if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+
+    return { lat, lng };
+  };
 
   useEffect(() => {
     isAddingNewRef.current = isAddingNew;
@@ -158,7 +173,7 @@ const AdminServiceAreas = () => {
     // Clear existing markers and circles
     markersRef.current.forEach(({ marker, circle }) => {
       marker.remove();
-      circle.remove();
+      circle?.remove();
     });
     markersRef.current.clear();
 
@@ -202,6 +217,36 @@ const AdminServiceAreas = () => {
         markersRef.current.set(area._id, { marker, circle });
       }
     });
+
+    if (!isAddingNew && role === 'super_admin') {
+      requestAnalytics.recentRequests.forEach((request) => {
+        if (!mapRef.current) return;
+
+        const coordinates = getRequestCoordinates(request);
+        if (!coordinates) return;
+
+        const requestMarker = L.marker([coordinates.lat, coordinates.lng], {
+          icon: L.divIcon({
+            className: 'custom-div-icon',
+            html: `<div style="background-color: #f97316; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 10px rgba(0,0,0,0.35); display:flex; align-items:center; justify-content:center; color:white; font-size:10px; font-weight:700;">${Math.min(request.requestCount, 99)}</div>`,
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+          })
+        }).addTo(mapRef.current);
+
+        requestMarker.bindPopup(`
+          <div style="font-size: 12px; min-width: 180px;">
+            <strong>${request.serviceName}</strong><br/>
+            ${request.requestedBy?.name || request.customerName || 'Customer'}<br/>
+            ${request.address || [request.area, request.city].filter(Boolean).join(', ') || 'Location saved'}<br/>
+            Polls: ${request.requestCount}<br/>
+            ${new Date(request.lastRequestedAt).toLocaleString()}
+          </div>
+        `);
+
+        markersRef.current.set(`request-${request._id}`, { marker: requestMarker });
+      });
+    }
 
     // Add preview marker if adding new
     if (isAddingNew && selectedLocation) {
@@ -254,7 +299,7 @@ const AdminServiceAreas = () => {
 
       markersRef.current.set('analytics', { marker: analyticsMarker, circle: analyticsCircle });
     }
-  }, [serviceAreas, isAddingNew, selectedLocation, formData.radiusKm, analyticsCenter, analyticsRadiusKm, role]);
+  }, [serviceAreas, isAddingNew, selectedLocation, formData.radiusKm, analyticsCenter, analyticsRadiusKm, role, requestAnalytics.recentRequests]);
 
   const fetchRequestAnalytics = async (center?: { lat: number; lng: number } | null) => {
     if (role !== 'super_admin') return;
@@ -418,6 +463,18 @@ const AdminServiceAreas = () => {
     } catch (error) {
       console.error('Error updating service area:', error);
     }
+  };
+
+  const handleFocusRequest = (request: RequestAnalytics['recentRequests'][number]) => {
+    const coordinates = getRequestCoordinates(request);
+    if (!coordinates || !mapRef.current) {
+      toast.error('This request does not have a mappable location yet.');
+      return;
+    }
+
+    mapRef.current.setView([coordinates.lat, coordinates.lng], Math.max(mapRef.current.getZoom(), 13));
+    const markerEntry = markersRef.current.get(`request-${request._id}`);
+    markerEntry?.marker.openPopup();
   };
 
   return (
@@ -600,7 +657,12 @@ const AdminServiceAreas = () => {
                     <p className="text-xs text-muted-foreground">No recent requests for the current range.</p>
                   ) : (
                     requestAnalytics.recentRequests.slice(0, 6).map((request) => (
-                      <div key={request._id} className="bg-muted rounded-lg p-3 text-xs space-y-1">
+                      <button
+                        key={request._id}
+                        type="button"
+                        onClick={() => handleFocusRequest(request)}
+                        className="w-full bg-muted rounded-lg p-3 text-xs space-y-1 text-left hover:bg-muted/80 transition-colors"
+                      >
                         <div className="flex items-start justify-between gap-2">
                           <p className="font-semibold text-foreground">{request.serviceName}</p>
                           <span className="text-[11px] font-semibold bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full">
@@ -616,7 +678,10 @@ const AdminServiceAreas = () => {
                         <p className="text-muted-foreground">
                           {new Date(request.lastRequestedAt).toLocaleString()}
                         </p>
-                      </div>
+                        <p className="text-[11px] font-medium text-orange-700">
+                          Click to view this request on the map
+                        </p>
+                      </button>
                     ))
                   )}
                 </div>
