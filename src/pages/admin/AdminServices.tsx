@@ -523,6 +523,10 @@ const AdminServices = () => {
     service?.serviceType?.startsWith('deep_cleaning') || service?.isQuoteService
   );
 
+  const handleOpenDeepCleaningConfig = () => {
+    navigate(deepCleaningConfigPath);
+  };
+
   // Service Card Component
   const ServiceCard = ({ service, handleEdit, handleDelete }: { service: Service; handleEdit: (service: Service) => void; handleDelete: (id: string) => void }) => {
     const activeSubscriptionPlans = (service.subscriptionPlans || [])
@@ -625,14 +629,18 @@ const AdminServices = () => {
         <div className="flex gap-1">
           {isDeepCleaningService(service) && (
             <button
-              onClick={() => navigate(deepCleaningConfigPath)}
+              onClick={handleOpenDeepCleaningConfig}
               className="p-1.5 hover:bg-muted rounded-lg transition-colors"
               title="Open deep-cleaning customer page content"
             >
               <Sparkles className="w-4 h-4 text-emerald-600" />
             </button>
           )}
-          <button onClick={() => handleEdit(service)} className="p-1.5 hover:bg-muted rounded-lg transition-colors">
+          <button
+            onClick={() => isDeepCleaningService(service) ? handleOpenDeepCleaningConfig() : handleEdit(service)}
+            className="p-1.5 hover:bg-muted rounded-lg transition-colors"
+            title={isDeepCleaningService(service) ? 'Open deep-cleaning config' : 'Edit service'}
+          >
             <Edit className="w-4 h-4 text-primary" />
           </button>
           <button onClick={() => handleDelete(service._id!)} className="p-1.5 hover:bg-muted rounded-lg transition-colors">
@@ -686,17 +694,31 @@ const AdminServices = () => {
             )}
           </div>
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-            Deep-cleaning page content is now managed from the deep-cleaning service card here instead of a separate sidebar shortcut.
+            Click the Deep Cleaning card to open the deep-cleaning config directly.
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {coverageItems.map((item) => (
-              <div
+              <button
                 key={item.id}
+                type="button"
+                onClick={() => {
+                  if (item.id === 'deep_cleaning_full_house') {
+                    handleOpenDeepCleaningConfig();
+                    return;
+                  }
+
+                  if (item.service) {
+                    handleEdit(item.service);
+                    return;
+                  }
+
+                  handleTypeSelect(item.id);
+                }}
                 className={`flex items-center gap-3 p-3 rounded-lg border ${
                   item.isConfigured
                     ? 'border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-900'
                     : 'border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900'
-                }`}
+                } ${item.id === 'deep_cleaning_full_house' ? 'ring-1 ring-emerald-300 hover:bg-emerald-50' : 'hover:bg-muted/40'} text-left transition-colors`}
               >
                 <span className="text-2xl shrink-0">{item.emoji}</span>
                 <div className="flex-1 min-w-0">
@@ -714,31 +736,21 @@ const AdminServices = () => {
                   )}
                 </div>
                 <div className="flex shrink-0 flex-col gap-1">
-                  {item.service ? (
-                    <button
-                      onClick={() => handleEdit(item.service!)}
-                      className="text-xs px-2 py-1 rounded-md bg-muted hover:bg-muted/80 text-muted-foreground shrink-0"
-                    >
-                      Edit
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleTypeSelect(item.id)}
-                      className="text-xs px-2 py-1 rounded-md bg-amber-600 hover:bg-amber-700 text-white font-medium shrink-0"
-                    >
-                      Setup
-                    </button>
-                  )}
-                  {item.id === 'deep_cleaning_full_house' && (
-                    <button
-                      onClick={() => navigate(deepCleaningConfigPath)}
-                      className="inline-flex items-center justify-center gap-1 rounded-md border border-emerald-300 bg-white px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50 shrink-0"
-                    >
-                      <Sparkles className="h-3.5 w-3.5" /> Page Content
-                    </button>
-                  )}
+                  <span className={`inline-flex items-center justify-center gap-1 rounded-md px-2 py-1 text-xs font-medium shrink-0 ${
+                    item.id === 'deep_cleaning_full_house'
+                      ? 'border border-emerald-300 bg-white text-emerald-700'
+                      : item.service
+                      ? 'bg-muted text-muted-foreground'
+                      : 'bg-amber-600 text-white'
+                  }`}>
+                    {item.id === 'deep_cleaning_full_house' ? (
+                      <>
+                        <Sparkles className="h-3.5 w-3.5" /> Open Config
+                      </>
+                    ) : item.service ? 'Edit' : 'Setup'}
+                  </span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
