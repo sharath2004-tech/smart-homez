@@ -536,16 +536,16 @@ const AdminBookings = () => {
       {/* Proof Viewer Modal */}
       {selectedProofBooking && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-card rounded-2xl max-w-2xl w-full my-8 shadow-2xl">
+          <div className="bg-card rounded-2xl max-w-2xl w-full my-8 shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
             {/* Modal Header */}
-            <div className="sticky top-0 bg-card border-b border-border p-4 flex items-center justify-between rounded-t-2xl">
-              <div>
+            <div className="sticky top-0 z-10 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/90 border-b border-border p-4 flex items-start justify-between gap-3 rounded-t-2xl shrink-0">
+              <div className="min-w-0 flex-1 pr-2">
                 <h2 className="font-bold text-foreground text-lg">Worker Proof Documents</h2>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground break-words leading-relaxed mt-1">
                   {selectedProofBooking.service?.name} · {selectedProofBooking.worker?.name || 'Unknown worker'} · {formatDate(selectedProofBooking.bookingDate)}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => setShowPrintModal(true)}
                   className="p-2 hover:bg-muted rounded-lg transition-colors"
@@ -562,7 +562,7 @@ const AdminBookings = () => {
               </div>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 overscroll-contain">
               {/* Booking summary */}
               <div className="bg-muted/40 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div>
