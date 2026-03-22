@@ -105,6 +105,7 @@ const LocationSelector = ({ onLocationConfirmed, onClose, defaultLocation, showC
       center: defaultCenter,
       zoom: defaultLocation ? 15 : 12,
       zoomControl: true,
+      scrollWheelZoom: false,   // prevents _leaflet_pos crash on wheel scroll
     });
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {

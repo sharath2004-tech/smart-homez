@@ -574,34 +574,24 @@ const InstaServicePage = () => {
                           key={t}
                           onClick={() => !fullyBooked && setStartTime(t)}
                           disabled={fullyBooked}
-                          title={
-                            free === null
-                              ? undefined
-                              : fullyBooked
-                              ? "All workers booked"
-                              : `${free} worker${free !== 1 ? "s" : ""} available`
-                          }
-                          className={`py-2.5 rounded-xl border-2 text-xs font-semibold transition-all relative ${
+                          className={`py-2 px-1 rounded-xl border-2 text-xs font-semibold transition-all flex flex-col items-center gap-0.5 ${
                             fullyBooked
-                              ? "border-destructive/30 bg-destructive/5 text-destructive/50 cursor-not-allowed line-through"
+                              ? "border-muted bg-muted/40 text-muted-foreground cursor-not-allowed opacity-50"
                               : startTime === t
                               ? "border-primary bg-primary/10 text-primary"
                               : "border-border hover:border-primary/40 text-foreground"
                           }`}
                         >
-                          {fmt12(t)}
-                          {free !== null && !fullyBooked && (
-                            <span
-                              className={`absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full text-[8px] flex items-center justify-center text-white font-bold ${
-                                limited ? "bg-amber-500" : "bg-green-500"
-                              }`}
-                            >
-                              {free}
-                            </span>
-                          )}
-                          {fullyBooked && (
-                            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-destructive text-[8px] flex items-center justify-center text-white font-bold">
-                              ✕
+                          <span>{fmt12(t)}</span>
+                          {free !== null && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none ${
+                              fullyBooked
+                                ? "bg-muted text-muted-foreground"
+                                : limited
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-green-100 text-green-700"
+                            }`}>
+                              {fullyBooked ? "Full" : `${free} free`}
                             </span>
                           )}
                         </button>
@@ -611,8 +601,8 @@ const InstaServicePage = () => {
                   {(totalWorkers > 0 || maleWorkers > 0 || femaleWorkers > 0) && (
                     <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Available</span>
-                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> Limited</span>
-                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-destructive inline-block" /> Full</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> 1 left</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-muted-foreground inline-block" /> Full</span>
                     </div>
                   )}
                 </>
