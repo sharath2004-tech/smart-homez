@@ -112,6 +112,8 @@ const InstaServicePage = () => {
   const [totalWorkers, setTotalWorkers] = useState(0);
   const [maleWorkers, setMaleWorkers] = useState(0);
   const [femaleWorkers, setFemaleWorkers] = useState(0);
+  // Base worker counts (always from 'any'-gender fetch) — shown on gender buttons
+  const [workerCounts, setWorkerCounts] = useState({ total: 0, male: 0, female: 0 });
   const [businessHours, setBusinessHours] = useState({ openTime: '07:00', closeTime: '19:00', slotDurationMinutes: 30 });
 
   // Dynamic time slots from admin-configured business hours
@@ -202,6 +204,14 @@ const InstaServicePage = () => {
         setTotalWorkers(data.totalWorkers || 0);
         setMaleWorkers(data.maleWorkers || 0);
         setFemaleWorkers(data.femaleWorkers || 0);
+        // Persist the full gender breakdown from the unfiltered fetch for button labels
+        if (!genderPref || genderPref === 'any') {
+          setWorkerCounts({
+            total: data.totalWorkers || 0,
+            male: data.maleWorkers || 0,
+            female: data.femaleWorkers || 0,
+          });
+        }
 
         // Update time slots from admin-configured business hours
         if (data.openTime || data.closeTime) {
@@ -598,34 +608,13 @@ const InstaServicePage = () => {
                       );
                     })}
                   </div>
-                  {(totalWorkers > 0 || maleWorkers > 0 || femaleWorkers > 0) ? (
-                    <div className="mt-2 space-y-1.5">
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" /> Available</span>
-                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> Limited (1 worker)</span>
-                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-destructive inline-block" /> Fully booked</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        {genderPref === 'any' ? (
-                          <>
-                            <span>👥 {totalWorkers} worker{totalWorkers !== 1 ? 's' : ''} available</span>
-                            {(maleWorkers > 0 || femaleWorkers > 0) && (
-                              <>
-                                <span>·</span>
-                                <span>👨 {maleWorkers} male</span>
-                                <span>·</span>
-                                <span>👩 {femaleWorkers} female</span>
-                              </>
-                            )}
-                          </>
-                        ) : genderPref === 'female' ? (
-                          <span>👩 {femaleWorkers} female worker{femaleWorkers !== 1 ? 's' : ''} available</span>
-                        ) : (
-                          <span>👨 {maleWorkers} male worker{maleWorkers !== 1 ? 's' : ''} available</span>
-                        )}
-                      </div>
+                  {(totalWorkers > 0 || maleWorkers > 0 || femaleWorkers > 0) && (
+                    <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Available</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> Limited</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-destructive inline-block" /> Full</span>
                     </div>
-                  ) : null}
+                  )}
                 </>
               )}
             </div>
@@ -636,19 +625,30 @@ const InstaServicePage = () => {
                 <User className="w-4 h-4" /> Worker Gender Preference
               </label>
               <div className="flex gap-2">
-                {(["any", "female", "male"] as const).map((g) => (
-                  <button
-                    key={g}
-                    onClick={() => setGenderPref(g)}
-                    className={`flex-1 py-2 rounded-xl border-2 text-sm font-medium transition-all ${
-                      genderPref === g
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border hover:border-primary/40"
-                    }`}
-                  >
-                    {g === "any" ? "Any" : g === "female" ? "👩 Female" : "👨 Male"}
-                  </button>
-                ))}
+                {(["any", "female", "male"] as const).map((g) => {
+                  const count = g === 'any' ? workerCounts.total : g === 'male' ? workerCounts.male : workerCounts.female;
+                  const label = g === "any" ? "Any" : g === "female" ? "👩 Female" : "👨 Male";
+                  return (
+                    <button
+                      key={g}
+                      onClick={() => setGenderPref(g)}
+                      className={`flex-1 py-2 rounded-xl border-2 text-sm font-medium transition-all ${
+                        genderPref === g
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border hover:border-primary/40"
+                      }`}
+                    >
+                      {label}
+                      {count > 0 && (
+                        <span className={`ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full ${
+                          genderPref === g ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
+                        }`}>
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
