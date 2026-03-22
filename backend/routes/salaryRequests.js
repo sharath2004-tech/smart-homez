@@ -10,6 +10,18 @@ const router = express.Router();
 // Default hourly rate if not set on worker profile
 const DEFAULT_HOURLY_RATE = 90;
 
+function deriveLocationIdFromBookings(bookings = []) {
+  const uniqueLocationIds = [
+    ...new Set(
+      bookings
+        .map((booking) => booking.location?.locationId?.toString())
+        .filter(Boolean)
+    )
+  ];
+
+  return uniqueLocationIds.length === 1 ? uniqueLocationIds[0] : null;
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // WORKER routes
 // ────────────────────────────────────────────────────────────────────────────
@@ -149,7 +161,7 @@ router.post('/',
         worker: req.user._id,
         status: 'completed',
         bookingDate: { $gte: fromDate, $lte: toDate }
-      }).select('_id actualDurationMinutes actualStartTime actualEndTime').lean();
+      }).select('_id actualDurationMinutes actualStartTime actualEndTime location').lean();
 
       let totalMinutes = 0;
       for (const b of bookings) {
@@ -177,6 +189,11 @@ router.post('/',
           }).select('_id').lean();
           if (admin) adminId = admin._id;
         }
+      }
+
+      const bookingDerivedLocationId = deriveLocationIdFromBookings(bookings);
+      if (bookingDerivedLocationId) {
+        locationId = bookingDerivedLocationId;
       }
 
       const request = new WorkerSalaryRequest({
@@ -321,7 +338,7 @@ router.post('/admin/send',
         worker: workerId,
         status: 'completed',
         bookingDate: { $gte: fromDate, $lte: toDate }
-      }).select('_id actualDurationMinutes actualStartTime actualEndTime').lean();
+      }).select('_id actualDurationMinutes actualStartTime actualEndTime location').lean();
 
       let totalMinutes = 0;
       for (const b of bookings) {
@@ -334,10 +351,14 @@ router.post('/admin/send',
 
       const hourlyRate = worker.workerProfile?.hourlyRate || DEFAULT_HOURLY_RATE;
       const requestedAmount = Math.round((totalMinutes / 60) * hourlyRate * 100) / 100;
+      const derivedLocationId = deriveLocationIdFromBookings(bookings)
+        || worker.workerProfile?.assignedApartments?.[0]?.locationId
+        || null;
 
       const record = new WorkerSalaryRequest({
         worker: workerId,
         admin: req.user._id,
+        location: derivedLocationId,
         periodFrom: fromDate,
         periodTo: toDate,
         totalMinutesWorked: totalMinutes,
@@ -348,12 +369,15 @@ router.post('/admin/send',
         status: 'paid',
         approvedBy: req.user._id,
         approvedAt: new Date(),
+        paidBy: req.user._id,
         paidAt: new Date(),
         adminNotes: notes ? String(notes).slice(0, 500) : null
       });
 
       await record.save();
       await record.populate('worker', 'name email');
+      await record.populate('paidBy', 'name email');
+      await record.populate('location', 'apartmentName area city');
 
       res.status(201).json({
         success: true,
@@ -395,11 +419,14 @@ router.get('/admin', authenticate, authorize('admin', 'super_admin'), async (req
     const requests = await WorkerSalaryRequest.find(query)
       .sort({ createdAt: -1 })
       .populate('worker', 'name email phone workerProfile')
+      .populate('admin', 'name email')
       .populate('approvedBy', 'name')
+      .populate('paidBy', 'name email')
       .populate('rejectedBy', 'name')
+      .populate('location', 'apartmentName area city')
       .populate({
         path: 'bookings',
-        select: 'bookingDate startTime endTime actualDurationMinutes actualStartTime actualEndTime service',
+        select: 'bookingId bookingDate startTime endTime actualDurationMinutes actualStartTime actualEndTime service location',
         populate: { path: 'service', select: 'name' }
       })
       .lean();
@@ -494,10 +521,12 @@ router.patch('/:id/mark-paid', authenticate, authorize('admin', 'super_admin'), 
     const { notes } = req.body;
     request.status = 'paid';
     request.paidAt = new Date();
+    request.paidBy = req.user._id;
     if (notes) request.adminNotes = String(notes).slice(0, 500);
 
     await request.save();
     await request.populate('worker', 'name email');
+    await request.populate('paidBy', 'name email');
 
     res.json({ success: true, message: 'Salary marked as paid', request });
   } catch (error) {

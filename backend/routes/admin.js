@@ -1682,26 +1682,127 @@ router.get('/profit-stats', authenticate, authorize('super_admin'), async (req, 
     const totalExpenses = expensesResult[0]?.total || 0;
     const expensesCount = expensesResult[0]?.count || 0;
 
-    // 3. Calculate Total Wages Paid (from paid salary requests)
-    const wagesResult = await WorkerSalaryRequest.aggregate([
-      {
-        $match: {
-          status: 'paid',
-          paidAt: { $gte: fromDate, $lte: toDate },
-          ...(locationObjectId ? { location: locationObjectId } : {})
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: '$requestedAmount' },
-          count: { $sum: 1 }
-        }
-      }
-    ]);
+    // 3. Calculate Total Wages Paid (from paid salary requests) with detail payload
+    const paidWageRequests = await WorkerSalaryRequest.find({
+      status: 'paid',
+      paidAt: { $gte: fromDate, $lte: toDate }
+    })
+      .populate('worker', 'name email phone workerProfile.assignedApartments')
+      .populate('admin', 'name email')
+      .populate('approvedBy', 'name email')
+      .populate('paidBy', 'name email')
+      .populate('location', 'apartmentName area city')
+      .populate({
+        path: 'bookings',
+        select: 'bookingId bookingDate startTime endTime actualDurationMinutes actualStartTime actualEndTime location service',
+        populate: { path: 'service', select: 'name' }
+      })
+      .lean();
 
-    const totalWages = wagesResult[0]?.total || 0;
-    const wagesCount = wagesResult[0]?.count || 0;
+    const locationIdStr = locationObjectId?.toString() || null;
+
+    const calculateBookingMinutes = (booking) => {
+      if (!booking) return 0;
+      if (booking.actualDurationMinutes > 0) {
+        return booking.actualDurationMinutes;
+      }
+      if (booking.actualStartTime && booking.actualEndTime) {
+        return Math.max(0, Math.floor((new Date(booking.actualEndTime) - new Date(booking.actualStartTime)) / 60000));
+      }
+      return 0;
+    };
+
+    const wageDetails = paidWageRequests
+      .map((request) => {
+        const paidBy = request.paidBy || request.approvedBy || request.admin || null;
+        const bookings = request.bookings || [];
+        const bookingsWithMinutes = bookings.map((booking) => ({
+          booking,
+          minutesWorked: calculateBookingMinutes(booking)
+        }));
+        const matchedBookings = locationIdStr
+          ? bookingsWithMinutes.filter(({ booking }) => booking.location?.locationId?.toString() === locationIdStr)
+          : bookingsWithMinutes;
+
+        const directLocationMatch = locationIdStr
+          ? request.location?._id?.toString() === locationIdStr
+          : false;
+        const workerAssignedLocationMatch = locationIdStr
+          ? (request.worker?.workerProfile?.assignedApartments || []).some((apartment) => apartment.locationId?.toString() === locationIdStr)
+          : false;
+
+        if (locationIdStr && !directLocationMatch && matchedBookings.length === 0 && !workerAssignedLocationMatch) {
+          return null;
+        }
+
+        const requestMinutes = request.totalMinutesWorked || bookingsWithMinutes.reduce((sum, item) => sum + item.minutesWorked, 0);
+        const matchedMinutes = matchedBookings.reduce((sum, item) => sum + item.minutesWorked, 0);
+
+        let allocatedAmount = request.requestedAmount || 0;
+        let allocatedMinutes = request.totalMinutesWorked || 0;
+        let allocatedTasks = request.totalTasksCompleted || bookings.length;
+
+        if (locationIdStr) {
+          if (matchedBookings.length > 0 && requestMinutes > 0) {
+            allocatedAmount = Number((((request.requestedAmount || 0) * matchedMinutes) / requestMinutes).toFixed(2));
+            allocatedMinutes = matchedMinutes;
+            allocatedTasks = matchedBookings.length;
+          } else if (matchedBookings.length > 0) {
+            allocatedTasks = matchedBookings.length;
+            allocatedMinutes = matchedMinutes;
+          }
+        }
+
+        const locationSource = request.location
+          ? {
+              apartmentName: request.location.apartmentName,
+              area: request.location.area,
+              city: request.location.city
+            }
+          : matchedBookings[0]?.booking?.location
+            ? {
+                apartmentName: matchedBookings[0].booking.location.apartmentName,
+                area: matchedBookings[0].booking.location.area,
+                city: matchedBookings[0].booking.location.city
+              }
+            : bookingsWithMinutes[0]?.booking?.location
+              ? {
+                  apartmentName: bookingsWithMinutes[0].booking.location.apartmentName,
+                  area: bookingsWithMinutes[0].booking.location.area,
+                  city: bookingsWithMinutes[0].booking.location.city
+                }
+              : null;
+
+        return {
+          _id: request._id,
+          worker: request.worker
+            ? {
+                name: request.worker.name,
+                email: request.worker.email,
+                phone: request.worker.phone || ''
+              }
+            : null,
+          paidBy: paidBy
+            ? {
+                name: paidBy.name,
+                email: paidBy.email || ''
+              }
+            : null,
+          amount: allocatedAmount,
+          paidAt: request.paidAt || null,
+          totalMinutesWorked: allocatedMinutes,
+          totalTasksCompleted: allocatedTasks,
+          hourlyRate: request.hourlyRate || 0,
+          periodFrom: request.periodFrom,
+          periodTo: request.periodTo,
+          location: locationSource
+        };
+      })
+      .filter((request) => request && request.amount > 0)
+      .sort((a, b) => new Date(b.paidAt || b.periodTo).getTime() - new Date(a.paidAt || a.periodTo).getTime());
+
+    const totalWages = wageDetails.reduce((sum, request) => sum + (request.amount || 0), 0);
+    const wagesCount = wageDetails.length;
 
     // 4. Calculate Overall Profit
     const totalProfit = totalRevenue - totalExpenses - totalWages;
@@ -1721,6 +1822,7 @@ router.get('/profit-stats', authenticate, authorize('super_admin'), async (req, 
         expensesCount,
         totalWages,
         wagesCount,
+        wageDetails,
         totalProfit,
         profitMargin,
         dateRange: {

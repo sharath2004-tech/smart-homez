@@ -70,6 +70,11 @@ const workerSalaryRequestSchema = new mongoose.Schema({
     maxlength: 500,
     default: null
   },
+  paidBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
   paidAt: Date,
   adminNotes: {
     type: String,

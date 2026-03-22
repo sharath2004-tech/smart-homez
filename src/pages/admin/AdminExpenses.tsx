@@ -64,6 +64,31 @@ interface RevenueByServiceItem {
   bookingCount: number;
 }
 
+interface WageDetailItem {
+  _id: string;
+  worker: {
+    name: string;
+    email?: string;
+    phone?: string;
+  } | null;
+  paidBy: {
+    name: string;
+    email?: string;
+  } | null;
+  amount: number;
+  paidAt?: string | null;
+  totalMinutesWorked: number;
+  totalTasksCompleted: number;
+  hourlyRate: number;
+  periodFrom: string;
+  periodTo: string;
+  location?: {
+    apartmentName?: string;
+    area?: string;
+    city?: string;
+  } | null;
+}
+
 interface ProfitStatsState {
   totalRevenue: number;
   revenueCount: number;
@@ -72,6 +97,7 @@ interface ProfitStatsState {
   expensesCount: number;
   totalWages: number;
   wagesCount: number;
+  wageDetails: WageDetailItem[];
   totalProfit: number;
   profitMargin: number;
   dateRange: {
@@ -167,6 +193,7 @@ const AdminExpenses = () => {
     expensesCount: 0,
     totalWages: 0,
     wagesCount: 0,
+    wageDetails: [],
     totalProfit: 0,
     profitMargin: 0,
     dateRange: {
@@ -247,6 +274,7 @@ const AdminExpenses = () => {
         setProfitStats({
           ...data.profitStats,
           revenueByService: data.profitStats.revenueByService || [],
+          wageDetails: data.profitStats.wageDetails || [],
           dateRange: {
             from: from || profitStats.dateRange.from,
             to: to || profitStats.dateRange.to
@@ -405,6 +433,15 @@ const AdminExpenses = () => {
       return customCategory.trim();
     }
     return category.replace(/_/g, ' ');
+  };
+
+  const formatMinutes = (mins: number) => {
+    if (!mins || mins <= 0) return '0m';
+    const hours = Math.floor(mins / 60);
+    const minutes = mins % 60;
+    if (hours === 0) return `${minutes}m`;
+    if (minutes === 0) return `${hours}h`;
+    return `${hours}h ${minutes}m`;
   };
 
   const formatLocationLabel = (location?: { apartmentName?: string; area?: string; city?: string } | null) => {
@@ -845,6 +882,83 @@ const AdminExpenses = () => {
                     <p className="text-sm font-semibold text-foreground break-words">{item.serviceName}</p>
                     <p className="mt-2 text-2xl font-bold text-emerald-700">₹{item.totalRevenue.toLocaleString()}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{item.bookingCount} completed booking{item.bookingCount !== 1 ? 's' : ''}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-5 rounded-xl border border-blue-200 bg-blue-50/50 p-4">
+            <div className="mb-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Wage Payments</p>
+              <p className="text-sm text-blue-900/80">See who was paid, how long they worked, and who processed the payment in the selected scope.</p>
+            </div>
+
+            {profitStats.wageDetails.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No wage payments found in the selected range.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {profitStats.wageDetails.map((wage) => (
+                  <div key={wage._id} className="rounded-xl border border-blue-100 bg-white/85 p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">Paid to</p>
+                        <p className="text-sm font-semibold text-foreground break-words">{wage.worker?.name || 'Worker'}</p>
+                        {wage.worker?.email && (
+                          <p className="text-xs text-muted-foreground break-all">{wage.worker.email}</p>
+                        )}
+                        {wage.worker?.phone && (
+                          <p className="text-xs text-muted-foreground">Phone: {wage.worker.phone}</p>
+                        )}
+                      </div>
+                      <p className="text-lg font-bold text-blue-700">₹{wage.amount.toLocaleString()}</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="rounded-lg bg-blue-50 p-2">
+                        <p className="text-muted-foreground">Time worked</p>
+                        <p className="font-semibold text-foreground">{formatMinutes(wage.totalMinutesWorked)}</p>
+                      </div>
+                      <div className="rounded-lg bg-blue-50 p-2">
+                        <p className="text-muted-foreground">Tasks</p>
+                        <p className="font-semibold text-foreground">{wage.totalTasksCompleted}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1 text-xs text-muted-foreground">
+                      <p><span className="font-medium text-foreground">Paid by:</span> {wage.paidBy?.name || 'Not recorded'}</p>
+                      {wage.paidBy?.email && (
+                        <p><span className="font-medium text-foreground">Payer email:</span> {wage.paidBy.email}</p>
+                      )}
+                      <p><span className="font-medium text-foreground">Rate:</span> ₹{wage.hourlyRate}/hr</p>
+                      {wage.paidAt && (
+                        <p>
+                          <span className="font-medium text-foreground">Paid on:</span>{' '}
+                          {new Date(wage.paidAt).toLocaleDateString('en-IN', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </p>
+                      )}
+                      <p><span className="font-medium text-foreground">Worked time:</span> {formatMinutes(wage.totalMinutesWorked)}</p>
+                      <p>
+                        <span className="font-medium text-foreground">Work period:</span>{' '}
+                        {new Date(wage.periodFrom).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'short'
+                        })}
+                        {' — '}
+                        {new Date(wage.periodTo).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric'
+                        })}
+                      </p>
+                      {formatLocationLabel(wage.location) && (
+                        <p><span className="font-medium text-foreground">Location:</span> {formatLocationLabel(wage.location)}</p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
