@@ -62,6 +62,8 @@ router.put('/', authenticate, authorize('admin', 'super_admin'), [
   body('services.*.icon').notEmpty().withMessage('Service icon is required'),
   body('services.*.nameKey').notEmpty().withMessage('Service name key is required'),
   body('services.*.subtitleKey').notEmpty().withMessage('Service subtitle key is required'),
+  body('services.*.customName').optional().isString().withMessage('Custom name must be a string'),
+  body('services.*.customSubtitle').optional().isString().withMessage('Custom subtitle must be a string'),
   body('services.*.badge').notEmpty().withMessage('Service badge is required'),
   body('services.*.path').notEmpty().withMessage('Service path is required'),
   body('services.*.isActive').isBoolean().withMessage('isActive must be boolean'),

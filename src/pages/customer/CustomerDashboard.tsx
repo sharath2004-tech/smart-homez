@@ -148,8 +148,8 @@ const CustomerDashboard = () => {
         // Map backend service configuration to frontend format
         const mappedServices = services.map((service: any) => ({
           icon: service.icon,
-          name: t(service.nameKey),
-          subtitle: t(service.subtitleKey),
+          name: service.customName || t(service.nameKey),
+          subtitle: service.customSubtitle || t(service.subtitleKey),
           badge: service.badge,
           path: service.id === 'move_in_out_cleaning' ? '/customer/deep-cleaning' : service.path
         }));

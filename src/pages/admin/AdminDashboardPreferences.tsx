@@ -10,6 +10,8 @@ interface DashboardService {
   icon: string;
   nameKey: string;
   subtitleKey: string;
+  customName?: string;
+  customSubtitle?: string;
   badge: string;
   path: string;
   isActive: boolean;
@@ -109,6 +111,17 @@ const AdminDashboardPreferences = () => {
     }
 
     setServices(updatedServices);
+    setHasChanges(true);
+  };
+
+  const handleServiceFieldChange = (
+    serviceId: string,
+    field: keyof DashboardService,
+    value: string
+  ) => {
+    setServices((prev) => prev.map((service) =>
+      service.id === serviceId ? { ...service, [field]: value } : service
+    ));
     setHasChanges(true);
   };
 
@@ -294,17 +307,68 @@ const AdminDashboardPreferences = () => {
 
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-medium text-foreground">{service.nameKey.split('.').pop()}</h3>
+                      <h3 className="font-medium text-foreground">{service.customName?.trim() || service.nameKey.split('.').pop()}</h3>
                       {service.isDefault && (
                         <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
                           Default
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground mb-2">{service.subtitleKey.split('.').pop()}</p>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <span>Badge: {service.badge}</span>
-                      <span>Path: {service.path}</span>
+                    <p className="text-sm text-muted-foreground mb-3">{service.customSubtitle?.trim() || service.subtitleKey.split('.').pop()}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-muted-foreground mb-1">Icon</label>
+                        <input
+                          type="text"
+                          value={service.icon}
+                          onChange={(e) => handleServiceFieldChange(service.id, 'icon', e.target.value)}
+                          className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm"
+                          placeholder="⚡"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-muted-foreground mb-1">Badge</label>
+                        <input
+                          type="text"
+                          value={service.badge}
+                          onChange={(e) => handleServiceFieldChange(service.id, 'badge', e.target.value)}
+                          className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm"
+                          placeholder="On demand"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-muted-foreground mb-1">Title override</label>
+                        <input
+                          type="text"
+                          value={service.customName || ''}
+                          onChange={(e) => handleServiceFieldChange(service.id, 'customName', e.target.value)}
+                          className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm"
+                          placeholder={service.nameKey.split('.').pop()}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-muted-foreground mb-1">Subtitle override</label>
+                        <input
+                          type="text"
+                          value={service.customSubtitle || ''}
+                          onChange={(e) => handleServiceFieldChange(service.id, 'customSubtitle', e.target.value)}
+                          className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm"
+                          placeholder={service.subtitleKey.split('.').pop()}
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-medium text-muted-foreground mb-1">Path</label>
+                        <input
+                          type="text"
+                          value={service.path}
+                          onChange={(e) => handleServiceFieldChange(service.id, 'path', e.target.value)}
+                          className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm"
+                          placeholder="/customer/services/insta"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground mt-3">
+                      <span>Fallback title key: {service.nameKey}</span>
                       <span>Order: {service.sortOrder}</span>
                     </div>
                   </div>
