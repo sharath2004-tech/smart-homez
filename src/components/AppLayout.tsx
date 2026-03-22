@@ -178,6 +178,7 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
 
   const superAdminNav = useMemo(() => [
     { to: "/super-admin/dashboard",          icon: LayoutDashboard, label: "Overview" },
+    { to: "/super-admin/demand-requests",    icon: MapPin,          label: "Demand Requests" },
     { to: "/super-admin/bookings",           icon: Calendar,        label: t('nav.bookings') },
     { to: "/admin/customers",                icon: UserCircle,      label: t('nav.customers') },
     { to: "/admin/expenses",                 icon: DollarSign,      label: "Expenses" },
@@ -207,6 +208,7 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
       defaultOpen: true,
       items: [
         { to: "/super-admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+        { to: "/super-admin/demand-requests", icon: MapPin, label: "Demand Requests" },
         { to: "/super-admin/heatmap", icon: BarChart3, label: "Worker Heatmap" },
       ]
     },

@@ -187,6 +187,7 @@ const App = () => (
           <Route path="/super-admin/quotes" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminQuotes /></ProtectedRoute>} />
           <Route path="/super-admin/help-messages" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminHelpMessages /></ProtectedRoute>} />
           <Route path="/super-admin/locations" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminLocations /></ProtectedRoute>} />
+          <Route path="/super-admin/demand-requests" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminServiceAreas /></ProtectedRoute>} />
           <Route path="/super-admin/service-areas" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminServiceAreas /></ProtectedRoute>} />
           <Route path="/super-admin/services" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminServices /></ProtectedRoute>} />
           <Route path="/super-admin/settings" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminSettings /></ProtectedRoute>} />
