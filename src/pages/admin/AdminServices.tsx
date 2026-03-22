@@ -222,7 +222,6 @@ const AdminServices = () => {
   const [groupByCategory, setGroupByCategory] = useState(false); // Group services by category
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [selectedServiceType, setSelectedServiceType] = useState<string>('other');
   const [pendingRequests, setPendingRequests] = useState<ServiceRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [rejectModalId, setRejectModalId] = useState<string | null>(null);
@@ -322,7 +321,6 @@ const AdminServices = () => {
   // No values are auto-filled — super admin configures everything manually
   const handleTypeSelect = (typeId: string) => {
     resetForm();
-    setSelectedServiceType(typeId);
     setFormData(prev => ({ ...prev, serviceType: typeId }));
     setEditingId(null);
     setShowForm(true);
@@ -381,7 +379,6 @@ const AdminServices = () => {
 
       setShowForm(false);
       setEditingId(null);
-      setSelectedServiceType('other');
       resetForm();
     } catch (error) {
       console.error('Error saving service:', error);
@@ -421,7 +418,6 @@ const AdminServices = () => {
       serviceCategory: (service as any).serviceCategory ?? 'other',
       displayOrder: (service as any).displayOrder ?? 0,
     });
-    setSelectedServiceType(service.serviceType || 'other');
     setEditingId(service._id!);
     setShowForm(true);
   };
@@ -641,7 +637,6 @@ const AdminServices = () => {
               onClick={() => {
                 resetForm();
                 setEditingId(null);
-                setSelectedServiceType('other');
                 setShowForm(true);
               }}
               className="btn-brand flex items-center gap-2"
@@ -964,9 +959,7 @@ const AdminServices = () => {
                   <select
                     value={formData.serviceType || 'other'}
                     onChange={(e) => {
-                      const t = e.target.value;
-                      setSelectedServiceType(t);
-                      setFormData(prev => ({ ...prev, serviceType: t }));
+                      setFormData(prev => ({ ...prev, serviceType: e.target.value }));
                     }}
                     className="input-clean"
                     required
