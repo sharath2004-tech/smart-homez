@@ -1,5 +1,5 @@
 import { api, settingsAPI } from "@/lib/api";
-import { AlertTriangle, BarChart3, Bell, Building, Calendar, ClipboardCheck, CreditCard, DollarSign, FileText, Grid3x3, HelpCircle, IndianRupee, KeyRound, LayoutDashboard, MapPin, MessageSquare, RefreshCw, Settings, Settings2, Sparkles, TrendingUp, User, UserCircle, Users, Wrench } from "lucide-react";
+import { AlertTriangle, BarChart3, Bell, Building, Calendar, ClipboardCheck, CreditCard, DollarSign, FileText, Grid3x3, HelpCircle, IndianRupee, KeyRound, LayoutDashboard, MapPin, MessageSquare, RefreshCw, Settings, Settings2, TrendingUp, User, UserCircle, Users, Wrench } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -108,7 +108,6 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
     { to: "/admin/help-messages",      icon: MessageSquare,   label: "Help Messages" },
     { to: "/admin/locations",          icon: MapPin,          label: t('nav.locations') },
     { to: "/admin/services",           icon: Wrench,          label: t('nav.services') },
-    { to: "/admin/deep-cleaning-config", icon: Sparkles,      label: "Deep Clean Config" },
     { to: "/admin/dashboard-preferences", icon: Settings2,    label: "Dashboard Preferences" },
     { to: "/admin/settings",           icon: Settings,        label: t('nav.settings') },
     { to: "/change-password",          icon: KeyRound,        label: "Change Password" },
@@ -132,7 +131,6 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
       defaultOpen: false,
       items: [
         { to: "/admin/services", icon: Wrench, label: t('nav.services') },
-        { to: "/admin/deep-cleaning-config", icon: Sparkles, label: "Deep Clean Config" },
         { to: "/admin/dashboard-preferences", icon: Settings2, label: "Dashboard Preferences" },
       ]
     },
@@ -195,7 +193,6 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
     { to: "/super-admin/help-messages",      icon: MessageSquare,   label: "Help Messages" },
     { to: "/super-admin/locations",          icon: MapPin,          label: t('nav.locations') },
     { to: "/super-admin/services",           icon: Wrench,          label: t('nav.services') },
-    { to: "/super-admin/deep-cleaning-config", icon: Sparkles,      label: "Deep Clean Config" },
     { to: "/super-admin/heatmap",            icon: BarChart3,       label: "Worker Heatmap" },
     { to: "/super-admin/settings",           icon: Settings,        label: t('nav.settings') },
     { to: "/change-password",                icon: KeyRound,        label: "Change Password" },
@@ -220,7 +217,6 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
       defaultOpen: false,
       items: [
         { to: "/super-admin/services", icon: Wrench, label: t('nav.services') },
-        { to: "/super-admin/deep-cleaning-config", icon: Sparkles, label: "Deep Clean Config" },
         { to: "/admin/dashboard-preferences", icon: Settings2, label: "Dashboard Preferences" },
       ]
     },

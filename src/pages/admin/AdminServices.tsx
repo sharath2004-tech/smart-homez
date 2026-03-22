@@ -1,7 +1,8 @@
 import AppLayout from "@/components/AppLayout";
 import { authAPI, servicesAPI, superAdminAPI } from "@/lib/api";
-import { AlertTriangle, CheckCircle, Clock, Edit, Info, Plus, Save, Search, Trash2, X, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle, Clock, Edit, Info, Plus, Save, Search, Sparkles, Trash2, X, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 interface Service {
@@ -215,6 +216,7 @@ const SERVICE_TYPE_CARDS = [
 ];
 
 const AdminServices = () => {
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
@@ -256,6 +258,7 @@ const AdminServices = () => {
     serviceCategory: 'other',
     displayOrder: 0,
   });  const isSuperAdmin = profile?.role === 'super_admin';
+  const deepCleaningConfigPath = isSuperAdmin ? '/super-admin/deep-cleaning-config' : '/admin/deep-cleaning-config';
 
   useEffect(() => {
     fetchData();
@@ -516,6 +519,10 @@ const AdminServices = () => {
   }));
   const missingCount = coverageItems.filter(c => !c.isConfigured).length;
 
+  const isDeepCleaningService = (service?: Service | null) => Boolean(
+    service?.serviceType?.startsWith('deep_cleaning') || service?.isQuoteService
+  );
+
   // Service Card Component
   const ServiceCard = ({ service, handleEdit, handleDelete }: { service: Service; handleEdit: (service: Service) => void; handleDelete: (id: string) => void }) => {
     const activeSubscriptionPlans = (service.subscriptionPlans || [])
@@ -616,6 +623,15 @@ const AdminServices = () => {
 
         {/* Actions */}
         <div className="flex gap-1">
+          {isDeepCleaningService(service) && (
+            <button
+              onClick={() => navigate(deepCleaningConfigPath)}
+              className="p-1.5 hover:bg-muted rounded-lg transition-colors"
+              title="Open deep-cleaning customer page content"
+            >
+              <Sparkles className="w-4 h-4 text-emerald-600" />
+            </button>
+          )}
           <button onClick={() => handleEdit(service)} className="p-1.5 hover:bg-muted rounded-lg transition-colors">
             <Edit className="w-4 h-4 text-primary" />
           </button>
@@ -669,6 +685,9 @@ const AdminServices = () => {
               </span>
             )}
           </div>
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+            Deep-cleaning page content is now managed from the deep-cleaning service card here instead of a separate sidebar shortcut.
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {coverageItems.map((item) => (
               <div
@@ -694,21 +713,31 @@ const AdminServices = () => {
                     <p className="text-xs text-amber-700 dark:text-amber-400">Not configured</p>
                   )}
                 </div>
-                {item.service ? (
-                  <button
-                    onClick={() => handleEdit(item.service!)}
-                    className="text-xs px-2 py-1 rounded-md bg-muted hover:bg-muted/80 text-muted-foreground shrink-0"
-                  >
-                    Edit
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleTypeSelect(item.id)}
-                    className="text-xs px-2 py-1 rounded-md bg-amber-600 hover:bg-amber-700 text-white font-medium shrink-0"
-                  >
-                    Setup
-                  </button>
-                )}
+                <div className="flex shrink-0 flex-col gap-1">
+                  {item.service ? (
+                    <button
+                      onClick={() => handleEdit(item.service!)}
+                      className="text-xs px-2 py-1 rounded-md bg-muted hover:bg-muted/80 text-muted-foreground shrink-0"
+                    >
+                      Edit
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleTypeSelect(item.id)}
+                      className="text-xs px-2 py-1 rounded-md bg-amber-600 hover:bg-amber-700 text-white font-medium shrink-0"
+                    >
+                      Setup
+                    </button>
+                  )}
+                  {item.id === 'deep_cleaning_full_house' && (
+                    <button
+                      onClick={() => navigate(deepCleaningConfigPath)}
+                      className="inline-flex items-center justify-center gap-1 rounded-md border border-emerald-300 bg-white px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50 shrink-0"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" /> Page Content
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>

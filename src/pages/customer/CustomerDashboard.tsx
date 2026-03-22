@@ -7,6 +7,7 @@ import { AlertCircle, ArrowRight, Bell, ChevronRight, Clock, MapPin, RefreshCw, 
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 interface Booking {
   _id: string;
@@ -93,6 +94,8 @@ const CustomerDashboard = () => {
   const [quickServices, setQuickServices] = useState<any[]>([]);
   const [kitchenServiceId, setKitchenServiceId] = useState<string | null>(null);
   const [windowServiceId, setWindowServiceId] = useState<string | null>(null);
+  const [deepCleaningRequestServiceId, setDeepCleaningRequestServiceId] = useState<string | null>(null);
+  const [requestingDeepCleaning, setRequestingDeepCleaning] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   const [showLocationSelector, setShowLocationSelector] = useState(false);
   const { latitude, longitude, error: locationError, loading: locationLoading, refetch } = useGeolocation();
@@ -119,9 +122,15 @@ const CustomerDashboard = () => {
           s.name.toLowerCase().includes('window') &&
           (s.name.toLowerCase().includes('clean') || s.serviceType?.includes('window'))
         );
+        const deepCleaning = list.find((s: any) =>
+          s.serviceType === 'deep_cleaning_full_house' ||
+          s.serviceCategory === 'deep_cleaning' ||
+          s.name.toLowerCase().includes('deep cleaning')
+        );
 
         if (kitchen) setKitchenServiceId(kitchen._id);
         if (window) setWindowServiceId(window._id);
+        if (deepCleaning) setDeepCleaningRequestServiceId(deepCleaning._id);
       } catch (error) {
         console.error('Error fetching spot-clean services:', error);
       }
@@ -258,6 +267,37 @@ const CustomerDashboard = () => {
     : latitude && longitude
     ? t('dashboard.currentLocation')
     : t('dashboard.loadingLocation');
+
+  const handleRequestDeepCleaning = useCallback(async () => {
+    if (!selectedLocation) {
+      toast.error('Choose a location first so we know where to expand service.');
+      return;
+    }
+
+    if (!deepCleaningRequestServiceId) {
+      toast.error('Deep cleaning is not configured yet. Please ask the admin to set it up first.');
+      return;
+    }
+
+    try {
+      setRequestingDeepCleaning(true);
+      await serviceAreasAPI.requestUnavailableService({
+        serviceId: deepCleaningRequestServiceId,
+        latitude: selectedLocation.lat,
+        longitude: selectedLocation.lng,
+        address: selectedLocation.address || tracedAddress || undefined,
+        area: selectedLocation.area || defaultAddress?.area,
+        city: selectedLocation.city || defaultAddress?.city,
+        zipCode: selectedLocation.zipCode || defaultAddress?.zipCode,
+        serviceAreaId: selectedLocation.serviceAreaId,
+      });
+      toast.success('Deep-cleaning demand recorded for this area. We’ll nudge the ops team.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to request deep cleaning for this area.');
+    } finally {
+      setRequestingDeepCleaning(false);
+    }
+  }, [deepCleaningRequestServiceId, defaultAddress?.area, defaultAddress?.city, defaultAddress?.zipCode, selectedLocation, tracedAddress]);
 
   const formatDate = (dateString: string, timeString?: string) => {
     const date = new Date(dateString);
@@ -439,6 +479,16 @@ const CustomerDashboard = () => {
               >
                 {serviceableStatus === 'unavailable' ? 'Choose location' : 'Set location'}
               </button>
+              {serviceableStatus === 'unavailable' && selectedLocation && deepCleaningRequestServiceId && (
+                <button
+                  type="button"
+                  onClick={handleRequestDeepCleaning}
+                  disabled={requestingDeepCleaning}
+                  className="rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {requestingDeepCleaning ? 'Requesting...' : 'Request Deep Cleaning'}
+                </button>
+              )}
               {locationError && (
                 <button
                   type="button"
