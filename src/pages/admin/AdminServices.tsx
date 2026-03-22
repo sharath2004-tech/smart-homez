@@ -1504,7 +1504,7 @@ const AdminServices = () => {
                         ⏱ Duration Tiers (Time-Based Pricing)
                       </label>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        e.g. 1 hr → ₹60/hr · 2 hr → ₹110 · For subscription: use /mo or /session mode
+                        e.g. 1 hr → ₹60/hr · 2 hr → ₹110 · For subscription: use /mo mode
                       </p>
                     </div>
                     <button
@@ -1526,14 +1526,12 @@ const AdminServices = () => {
                         </div>
                         {(formData.durationOptions || []).map((tier, index) => {
                           const mode = (tier as any)._priceMode || 'hour';
-                          const DAILY_SESSIONS = 26;
                           const originalPrice = (tier as any).originalPrice || 0;
                           const savingsPct = originalPrice > tier.price && originalPrice > 0
                             ? Math.round((1 - tier.price / originalPrice) * 100)
                             : 0;
-                          // 'hour' and 'month' store value as-is; 'session' stores monthly total
-                          const displayOurPrice = mode === 'session' ? Math.round(tier.price / DAILY_SESSIONS) : tier.price;
-                          const displayMrp = mode === 'session' ? Math.round(originalPrice / DAILY_SESSIONS) : originalPrice;
+                          const displayOurPrice = tier.price;
+                          const displayMrp = originalPrice;
                           return (
                             <div key={index} className="space-y-1 bg-white rounded-lg border border-blue-100 p-2">
                               <div className="grid grid-cols-12 gap-2 items-start">
@@ -1566,45 +1564,31 @@ const AdminServices = () => {
                                         setFormData({ ...formData, durationOptions: updated });
                                       }}
                                     >/mo</button>
-                                    <button type="button"
-                                      className={`flex-1 py-0.5 text-center transition-colors ${mode === 'session' ? 'bg-blue-600 text-white' : 'bg-white text-muted-foreground'}`}
-                                      onClick={() => {
-                                        const updated = [...(formData.durationOptions || [])];
-                                        updated[index] = { ...updated[index], _priceMode: 'session' } as any;
-                                        setFormData({ ...formData, durationOptions: updated });
-                                      }}
-                                    >/session</button>
                                   </div>
                                   <input
-                                    type="number" min="0" step={mode === 'session' ? '10' : mode === 'hour' ? '10' : '50'} value={displayOurPrice}
+                                    type="number" min="0" step="10" value={displayOurPrice}
                                     onChange={e => {
-                                      const entered = Number(e.target.value);
-                                      const monthly = mode === 'session' ? Math.round(entered * DAILY_SESSIONS) : entered;
                                       const updated = [...(formData.durationOptions || [])];
-                                      updated[index] = { ...updated[index], price: monthly };
+                                      updated[index] = { ...updated[index], price: Number(e.target.value) };
                                       setFormData({ ...formData, durationOptions: updated });
                                     }}
-                                    className="input-clean text-sm" placeholder={mode === 'session' ? '500' : mode === 'hour' ? '60' : '13000'}
+                                    className="input-clean text-sm" placeholder={mode === 'hour' ? '60' : '13000'}
                                   />
                                   <p className="text-[10px] text-muted-foreground">
-                                    {mode === 'session'
-                                      ? `≈ ₹${tier.price.toLocaleString('en-IN')}/mo`
-                                      : mode === 'hour'
+                                    {mode === 'hour'
                                       ? `₹${tier.price.toLocaleString('en-IN')} per hour`
-                                      : `≈ ₹${Math.round(tier.price / DAILY_SESSIONS).toLocaleString('en-IN')}/visit`}
+                                      : `₹${tier.price.toLocaleString('en-IN')} per month`}
                                   </p>
                                 </div>
                                 <div className="col-span-3 space-y-1">
                                   <input
-                                    type="number" min="0" step={mode === 'session' ? '10' : mode === 'hour' ? '10' : '50'} value={displayMrp}
+                                    type="number" min="0" step="10" value={displayMrp}
                                     onChange={e => {
-                                      const entered = Number(e.target.value);
-                                      const monthly = mode === 'session' ? Math.round(entered * DAILY_SESSIONS) : entered;
                                       const updated = [...(formData.durationOptions || [])];
-                                      updated[index] = { ...updated[index], originalPrice: monthly } as any;
+                                      updated[index] = { ...updated[index], originalPrice: Number(e.target.value) } as any;
                                       setFormData({ ...formData, durationOptions: updated });
                                     }}
-                                    className="input-clean text-sm" placeholder={mode === 'session' ? '700' : mode === 'hour' ? '80' : '18200'}
+                                    className="input-clean text-sm" placeholder={mode === 'hour' ? '80' : '18200'}
                                   />
                                   {savingsPct > 0 && (
                                     <p className="text-[10px] font-medium text-green-600">{savingsPct}% off</p>
