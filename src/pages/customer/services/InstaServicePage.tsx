@@ -119,30 +119,39 @@ const InstaServicePage = () => {
     [businessHours]
   );
 
-  // Busy worker count per slot, filtered by current gender preference — updates instantly on gender change
+  // Busy worker count per slot, with separate male/female tracking
   const busyWorkersBySlot = useMemo(() => {
-    const busy: Record<string, number> = {};
+    const busy: Record<string, { total: number; male: number; female: number }> = {};
     for (const slot of generatedTimeSlots) {
       const [sh, sm] = slot.split(":").map(Number);
       const slotStartMins = sh * 60 + sm;
       const slotEndMins = slotStartMins + hours * 60;
-      const workersBusy = new Set<string>();
+      const workersBusyTotal = new Set<string>();
+      const workersBusyMale = new Set<string>();
+      const workersBusyFemale = new Set<string>();
       for (const r of rawBookedRanges) {
         if (!r.workerId) continue;
-        // Skip workers who don't match the selected gender preference
-        if (genderPref !== 'any' && r.workerGender && r.workerGender !== genderPref) continue;
         const [rsh, rsm] = r.startTime.split(":").map(Number);
         const [reh, rem] = r.endTime.split(":").map(Number);
         const rStart = rsh * 60 + rsm;
         const rEnd = reh * 60 + rem;
         if (rStart < slotEndMins && rEnd > slotStartMins) {
-          workersBusy.add(r.workerId);
+          workersBusyTotal.add(r.workerId);
+          if (r.workerGender === 'male') {
+            workersBusyMale.add(r.workerId);
+          } else if (r.workerGender === 'female') {
+            workersBusyFemale.add(r.workerId);
+          }
         }
       }
-      busy[slot] = workersBusy.size;
+      busy[slot] = {
+        total: workersBusyTotal.size,
+        male: workersBusyMale.size,
+        female: workersBusyFemale.size
+      };
     }
     return busy;
-  }, [rawBookedRanges, genderPref, hours, generatedTimeSlots]);
+  }, [rawBookedRanges, hours, generatedTimeSlots]);
 
   const totalAmount = selectedDurationTotal ?? hours * pricePerHour;
   const mrpTotal = selectedDurationMrp ?? hours * mrpPerHour;
@@ -594,11 +603,36 @@ const InstaServicePage = () => {
                 <>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     {availableSlots.map((t) => {
-                      const busy = busyWorkersBySlot[t] ?? 0;
-                      const activeWorkers = genderPref === 'male' ? workerCounts.male : genderPref === 'female' ? workerCounts.female : workerCounts.total;
-                      const free = activeWorkers > 0 ? activeWorkers - busy : null;
-                      const fullyBooked = free !== null && free <= 0;
-                      const limited = free !== null && free === 1;
+                      const busy = busyWorkersBySlot[t] ?? { total: 0, male: 0, female: 0 };
+
+                      // Calculate free workers based on gender preference
+                      let freeMale = workerCounts.male - busy.male;
+                      let freeFemale = workerCounts.female - busy.female;
+                      let freeTotal = workerCounts.total - busy.total;
+
+                      // Determine what to show based on gender preference
+                      let displayInfo: { label: string; count: number; isFull: boolean }[] = [];
+
+                      if (genderPref === 'any') {
+                        // Show both male and female counts
+                        if (workerCounts.male > 0) {
+                          displayInfo.push({ label: '👨', count: freeMale, isFull: freeMale <= 0 });
+                        }
+                        if (workerCounts.female > 0) {
+                          displayInfo.push({ label: '👩', count: freeFemale, isFull: freeFemale <= 0 });
+                        }
+                      } else if (genderPref === 'male') {
+                        // Show only male count
+                        displayInfo.push({ label: '👨', count: freeMale, isFull: freeMale <= 0 });
+                      } else if (genderPref === 'female') {
+                        // Show only female count
+                        displayInfo.push({ label: '👩', count: freeFemale, isFull: freeFemale <= 0 });
+                      }
+
+                      const fullyBooked = (genderPref === 'any' && freeTotal <= 0) ||
+                                         (genderPref === 'male' && freeMale <= 0) ||
+                                         (genderPref === 'female' && freeFemale <= 0);
+
                       return (
                         <button
                           key={t}
@@ -613,15 +647,27 @@ const InstaServicePage = () => {
                           }`}
                         >
                           <span>{fmt12(t)}</span>
-                          {free !== null && (
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none ${
-                              fullyBooked
-                                ? "bg-muted text-muted-foreground"
-                                : limited
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-green-100 text-green-700"
-                            }`}>
-                              {fullyBooked ? "Full" : `${free} free`}
+                          {displayInfo.length > 0 && (
+                            <div className="flex gap-1 flex-wrap justify-center">
+                              {displayInfo.map((info, idx) => (
+                                <span
+                                  key={idx}
+                                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none ${
+                                    fullyBooked || info.isFull
+                                      ? "bg-muted text-muted-foreground"
+                                      : info.count === 1
+                                      ? "bg-amber-100 text-amber-700"
+                                      : "bg-green-100 text-green-700"
+                                  }`}
+                                >
+                                  {info.label} {info.isFull ? "0" : info.count}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {displayInfo.length === 0 && fullyBooked && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none bg-muted text-muted-foreground">
+                              Full
                             </span>
                           )}
                         </button>
