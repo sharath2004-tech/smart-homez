@@ -1,11 +1,12 @@
 import AppLayout from "@/components/AppLayout";
 import LocationSelector, { LocationData } from "@/components/LocationSelector";
-import { authAPI, servicesAPI } from "@/lib/api";
+import { authAPI, serviceAreasAPI, servicesAPI } from "@/lib/api";
 import { motion } from "framer-motion";
 import { Clock, MapPin, Search, Sparkles, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 
 interface Service {
   _id: string;
@@ -43,6 +44,7 @@ const ServicesPage = () => {
   const [profile, setProfile] = useState<{ name: string; addresses?: { isDefault: boolean; [key: string]: unknown }[] } | null>(null);
   const [showLocationSelector, setShowLocationSelector] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
+  const [requestingServiceId, setRequestingServiceId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProfile();
@@ -84,6 +86,50 @@ const ServicesPage = () => {
 
   const handleChangeLocation = () => {
     setShowLocationSelector(true);
+  };
+
+  const handleUnavailableServiceRequest = async (service: Service) => {
+    if (!selectedLocation) {
+      toast.error("Please select your location first.");
+      setShowLocationSelector(true);
+      return;
+    }
+
+    try {
+      setRequestingServiceId(service._id);
+      const response = await serviceAreasAPI.requestUnavailableService({
+        serviceId: service._id,
+        latitude: selectedLocation.lat,
+        longitude: selectedLocation.lng,
+        address: selectedLocation.address,
+        area: selectedLocation.area,
+        city: selectedLocation.city,
+        zipCode: selectedLocation.zipCode,
+        serviceAreaId: selectedLocation.serviceAreaId,
+      });
+
+      toast.success(response.message || `Request saved for ${service.name}.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to submit service request.");
+    } finally {
+      setRequestingServiceId(null);
+    }
+  };
+
+  const handleQuickServiceAction = async (matcher: (service: Service) => boolean) => {
+    const matchedService = services.find(matcher);
+
+    if (!matchedService) {
+      toast.error("This service is not configured yet.");
+      return;
+    }
+
+    if (matchedService.availability?.available === false) {
+      await handleUnavailableServiceRequest(matchedService);
+      return;
+    }
+
+    navigate(`/customer/book/${matchedService._id}`);
   };
 
   const fetchServices = useCallback(async () => {
@@ -290,15 +336,10 @@ const ServicesPage = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* Bathroom DC */}
               <button
-                onClick={() => {
-                  const bathroomService = services.find(s =>
-                    s.name.toLowerCase().includes('bathroom') &&
-                    (s.name.toLowerCase().includes('deep') || s.serviceType?.includes('bathroom'))
-                  );
-                  if (bathroomService) {
-                    navigate(`/customer/book/${bathroomService._id}`);
-                  }
-                }}
+                onClick={() => handleQuickServiceAction((s) =>
+                  s.name.toLowerCase().includes('bathroom') &&
+                  (s.name.toLowerCase().includes('deep') || s.serviceType?.includes('bathroom'))
+                )}
                 className="p-4 rounded-xl border-2 border-purple-300 bg-purple-50 hover:bg-purple-100 hover:border-purple-400 transition-all text-center group"
               >
                 <div className="text-3xl mb-2">🚿</div>
@@ -309,15 +350,10 @@ const ServicesPage = () => {
 
               {/* Kitchen DC */}
               <button
-                onClick={() => {
-                  const kitchenService = services.find(s =>
-                    s.name.toLowerCase().includes('kitchen') &&
-                    (s.name.toLowerCase().includes('deep') || s.serviceType?.includes('kitchen'))
-                  );
-                  if (kitchenService) {
-                    navigate(`/customer/book/${kitchenService._id}`);
-                  }
-                }}
+                onClick={() => handleQuickServiceAction((s) =>
+                  s.name.toLowerCase().includes('kitchen') &&
+                  (s.name.toLowerCase().includes('deep') || s.serviceType?.includes('kitchen'))
+                )}
                 className="p-4 rounded-xl border-2 border-orange-300 bg-orange-50 hover:bg-orange-100 hover:border-orange-400 transition-all text-center group"
               >
                 <div className="text-3xl mb-2">🍽️</div>
@@ -328,15 +364,10 @@ const ServicesPage = () => {
 
               {/* Windows DC */}
               <button
-                onClick={() => {
-                  const windowService = services.find(s =>
-                    s.name.toLowerCase().includes('window') &&
-                    (s.name.toLowerCase().includes('clean') || s.serviceType?.includes('window'))
-                  );
-                  if (windowService) {
-                    navigate(`/customer/book/${windowService._id}`);
-                  }
-                }}
+                onClick={() => handleQuickServiceAction((s) =>
+                  s.name.toLowerCase().includes('window') &&
+                  (s.name.toLowerCase().includes('clean') || s.serviceType?.includes('window'))
+                )}
                 className="p-4 rounded-xl border-2 border-blue-300 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 transition-all text-center group"
               >
                 <div className="text-3xl mb-2">🪟</div>
@@ -469,7 +500,16 @@ const ServicesPage = () => {
                     </div>
 
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                      {service.isQuoteService ? (
+                      {service.availability?.available === false ? (
+                        <button
+                          type="button"
+                          onClick={() => handleUnavailableServiceRequest(service)}
+                          disabled={requestingServiceId === service._id}
+                          className="w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors bg-amber-100 text-amber-900 hover:bg-amber-200 disabled:opacity-60"
+                        >
+                          {requestingServiceId === service._id ? "Sending request..." : "Request service in my location"}
+                        </button>
+                      ) : service.isQuoteService ? (
                         <Link
                           to="/customer/deep-cleaning"
                           className="w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors btn-brand"
@@ -486,13 +526,9 @@ const ServicesPage = () => {
                       ) : (
                         <Link
                           to={`/customer/book/${service._id}`}
-                          className={`w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors ${
-                            service.availability?.available === false
-                              ? 'bg-muted text-muted-foreground hover:bg-border'
-                              : 'btn-brand'
-                          }`}
+                          className="w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors btn-brand"
                         >
-                          {service.availability?.available === false ? t('customer.services.view') : t('customer.services.bookNow')}
+                          {t('customer.services.bookNow')}
                         </Link>
                       )}
                     </motion.div>

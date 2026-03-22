@@ -656,6 +656,44 @@ export const serviceAreasAPI = {
       method: 'POST',
       body: JSON.stringify({ latitude, longitude, email })
     });
+  },
+
+  requestUnavailableService: async (requestData: {
+    serviceId: string;
+    latitude: number;
+    longitude: number;
+    address?: string;
+    area?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    serviceAreaId?: string;
+  }) => {
+    return apiCall('/service-areas/requests', {
+      method: 'POST',
+      body: JSON.stringify(requestData)
+    });
+  },
+
+  getRequestAnalytics: async (params?: {
+    latitude?: number;
+    longitude?: number;
+    radiusKm?: number;
+    from?: string;
+    to?: string;
+    serviceId?: string;
+  }) => {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, String(value));
+        }
+      });
+    }
+
+    const queryString = queryParams.toString();
+    return apiCall(`/service-areas/requests/analytics${queryString ? `?${queryString}` : ''}`);
   }
 };
 

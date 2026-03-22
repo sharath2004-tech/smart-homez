@@ -1,10 +1,11 @@
 import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, serviceAreasAPI } from "@/lib/api";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Edit2, MapPin, Plus, Save, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 // Fix Leaflet default marker icon issue
 if (L.Icon.Default.prototype._getIconUrl) {
@@ -30,16 +31,62 @@ interface ServiceArea {
   color?: string;
 }
 
+interface RequestAnalytics {
+  summary: {
+    uniqueRequestRecords: number;
+    totalPollCount: number;
+    uniqueCustomers: number;
+    uniqueLocations: number;
+  };
+  byService: {
+    _id: string;
+    serviceName: string;
+    serviceType: string;
+    requestRecords: number;
+    totalPollCount: number;
+  }[];
+  recentRequests: {
+    _id: string;
+    serviceName: string;
+    area?: string;
+    city?: string;
+    requestCount: number;
+    lastRequestedAt: string;
+    requestedBy?: {
+      name?: string;
+      email?: string;
+      phone?: string;
+    };
+  }[];
+}
+
 const AdminServiceAreas = () => {
   const { role, name } = useAdminRole();
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<Map<string, { marker: L.Marker; circle: L.Circle }>>(new Map());
+  const isAddingNewRef = useRef(false);
+  const roleRef = useRef(role);
 
   const [serviceAreas, setServiceAreas] = useState<ServiceArea[]>([]);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [analyticsCenter, setAnalyticsCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [analyticsRadiusKm, setAnalyticsRadiusKm] = useState(5);
+  const [analyticsFrom, setAnalyticsFrom] = useState("");
+  const [analyticsTo, setAnalyticsTo] = useState("");
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [requestAnalytics, setRequestAnalytics] = useState<RequestAnalytics>({
+    summary: {
+      uniqueRequestRecords: 0,
+      totalPollCount: 0,
+      uniqueCustomers: 0,
+      uniqueLocations: 0,
+    },
+    byService: [],
+    recentRequests: [],
+  });
   
   const [formData, setFormData] = useState<ServiceArea>({
     name: "",
@@ -50,6 +97,14 @@ const AdminServiceAreas = () => {
     isActive: true,
     color: "#10b981"
   });
+
+  useEffect(() => {
+    isAddingNewRef.current = isAddingNew;
+  }, [isAddingNew]);
+
+  useEffect(() => {
+    roleRef.current = role;
+  }, [role]);
 
   // Initialize map
   useEffect(() => {
@@ -68,12 +123,14 @@ const AdminServiceAreas = () => {
 
     // Add click handler for adding new service areas
     map.on("click", (e: L.LeafletMouseEvent) => {
-      if (isAddingNew) {
+      if (isAddingNewRef.current) {
         setSelectedLocation({ lat: e.latlng.lat, lng: e.latlng.lng });
         setFormData(prev => ({
           ...prev,
           coordinates: { lat: e.latlng.lat, lng: e.latlng.lng }
         }));
+      } else if (roleRef.current === 'super_admin') {
+        setAnalyticsCenter({ lat: e.latlng.lat, lng: e.latlng.lng });
       }
     });
 
@@ -85,7 +142,7 @@ const AdminServiceAreas = () => {
         mapRef.current = null;
       }
     };
-  }, [isAddingNew]);
+  }, []);
 
   // Load service areas from backend
   useEffect(() => {
@@ -166,7 +223,69 @@ const AdminServiceAreas = () => {
 
       markersRef.current.set('preview', { marker: previewMarker, circle: previewCircle });
     }
-  }, [serviceAreas, isAddingNew, selectedLocation, formData.radiusKm]);
+
+    if (!isAddingNew && role === 'super_admin' && analyticsCenter) {
+      const analyticsMarker = L.marker([analyticsCenter.lat, analyticsCenter.lng], {
+        icon: L.divIcon({
+          className: 'custom-div-icon',
+          html: `<div style="background-color: #f97316; width: 30px; height: 30px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>`,
+          iconSize: [30, 30],
+          iconAnchor: [15, 15]
+        })
+      }).addTo(mapRef.current);
+
+      const analyticsCircle = L.circle([analyticsCenter.lat, analyticsCenter.lng], {
+        radius: analyticsRadiusKm * 1000,
+        color: '#f97316',
+        fillColor: '#fb923c',
+        fillOpacity: 0.1,
+        weight: 2,
+        dashArray: '6, 6'
+      }).addTo(mapRef.current);
+
+      analyticsMarker.bindPopup(`
+        <div style="font-size: 12px;">
+          <strong>Demand analytics range</strong><br/>
+          Radius: ${analyticsRadiusKm} km
+        </div>
+      `);
+
+      markersRef.current.set('analytics', { marker: analyticsMarker, circle: analyticsCircle });
+    }
+  }, [serviceAreas, isAddingNew, selectedLocation, formData.radiusKm, analyticsCenter, analyticsRadiusKm, role]);
+
+  const fetchRequestAnalytics = async (center?: { lat: number; lng: number } | null) => {
+    if (role !== 'super_admin') return;
+
+    try {
+      setAnalyticsLoading(true);
+      const data = await serviceAreasAPI.getRequestAnalytics({
+        latitude: center?.lat,
+        longitude: center?.lng,
+        radiusKm: analyticsRadiusKm,
+        from: analyticsFrom || undefined,
+        to: analyticsTo || undefined,
+      });
+
+      setRequestAnalytics({
+        summary: data.summary,
+        byService: data.byService || [],
+        recentRequests: data.recentRequests || [],
+      });
+    } catch (error) {
+      console.error('Error fetching request analytics:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to load request analytics');
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (role === 'super_admin') {
+      fetchRequestAnalytics(analyticsCenter);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role, analyticsCenter, analyticsRadiusKm, analyticsFrom, analyticsTo]);
 
   const fetchServiceAreas = async () => {
     try {
@@ -339,6 +458,11 @@ const AdminServiceAreas = () => {
                     Click on the map to place a service area marker
                   </p>
                 )}
+                {!isAddingNew && role === 'super_admin' && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Click anywhere on the map to inspect service request polls in that range.
+                  </p>
+                )}
               </div>
               <div ref={mapContainerRef} className="h-[500px] w-full" />
             </div>
@@ -346,6 +470,154 @@ const AdminServiceAreas = () => {
 
           {/* Form/List Section */}
           <div className="space-y-4">
+            {!isAddingNew && role === 'super_admin' && (
+              <div className="card-elevated p-4 space-y-4">
+                <div>
+                  <h3 className="font-bold text-foreground">Service Request Polls</h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Review how many unavailable-service requests came from a selected map range.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-muted rounded-lg p-3">
+                    <p className="text-muted-foreground">Total polls</p>
+                    <p className="text-lg font-bold text-foreground">{requestAnalytics.summary.totalPollCount}</p>
+                  </div>
+                  <div className="bg-muted rounded-lg p-3">
+                    <p className="text-muted-foreground">Unique locations</p>
+                    <p className="text-lg font-bold text-foreground">{requestAnalytics.summary.uniqueLocations}</p>
+                  </div>
+                  <div className="bg-muted rounded-lg p-3">
+                    <p className="text-muted-foreground">Customers</p>
+                    <p className="text-lg font-bold text-foreground">{requestAnalytics.summary.uniqueCustomers}</p>
+                  </div>
+                  <div className="bg-muted rounded-lg p-3">
+                    <p className="text-muted-foreground">Request records</p>
+                    <p className="text-lg font-bold text-foreground">{requestAnalytics.summary.uniqueRequestRecords}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                    Range radius (km)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    step="1"
+                    value={analyticsRadiusKm}
+                    onChange={(e) => setAnalyticsRadiusKm(Number(e.target.value) || 1)}
+                    className="input-clean"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                      From
+                    </label>
+                    <input
+                      type="date"
+                      value={analyticsFrom}
+                      onChange={(e) => setAnalyticsFrom(e.target.value)}
+                      className="input-clean"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                      To
+                    </label>
+                    <input
+                      type="date"
+                      value={analyticsTo}
+                      onChange={(e) => setAnalyticsTo(e.target.value)}
+                      className="input-clean"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => fetchRequestAnalytics(analyticsCenter)}
+                    className="btn-brand flex-1"
+                    disabled={analyticsLoading}
+                  >
+                    {analyticsLoading ? 'Refreshing...' : 'Refresh analytics'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAnalyticsCenter(null);
+                      setAnalyticsFrom('');
+                      setAnalyticsTo('');
+                      setAnalyticsRadiusKm(5);
+                    }}
+                    className="bg-muted text-foreground px-3 rounded-lg hover:bg-border transition-colors"
+                    type="button"
+                  >
+                    Reset
+                  </button>
+                </div>
+
+                {analyticsCenter ? (
+                  <div className="text-xs text-muted-foreground bg-orange-50 border border-orange-200 rounded-lg p-3">
+                    📍 Selected range center: {analyticsCenter.lat.toFixed(4)}, {analyticsCenter.lng.toFixed(4)}
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground bg-muted rounded-lg p-3">
+                    No map range selected yet. Click on the map to inspect a specific area.
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold text-foreground">Top requested services</h4>
+                  {requestAnalytics.byService.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No request polls found for the current filters.</p>
+                  ) : (
+                    requestAnalytics.byService.map((item) => (
+                      <div key={item._id} className="bg-muted rounded-lg p-3 text-xs">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-semibold text-foreground">{item.serviceName}</p>
+                            {item.serviceType && <p className="text-muted-foreground">{item.serviceType}</p>}
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-foreground">{item.totalPollCount}</p>
+                            <p className="text-muted-foreground">polls</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold text-foreground">Recent request polls</h4>
+                  {requestAnalytics.recentRequests.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No recent requests for the current range.</p>
+                  ) : (
+                    requestAnalytics.recentRequests.slice(0, 6).map((request) => (
+                      <div key={request._id} className="bg-muted rounded-lg p-3 text-xs space-y-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-semibold text-foreground">{request.serviceName}</p>
+                          <span className="text-[11px] font-semibold bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full">
+                            {request.requestCount} poll{request.requestCount > 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        <p className="text-muted-foreground">
+                          {[request.area, request.city].filter(Boolean).join(', ') || 'Location saved'}
+                        </p>
+                        <p className="text-muted-foreground">
+                          {request.requestedBy?.name || 'Customer'} • {new Date(request.lastRequestedAt).toLocaleString()}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
             {isAddingNew ? (
               // Add/Edit Form
               <div className="card-elevated p-4 space-y-4">
