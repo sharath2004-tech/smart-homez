@@ -348,11 +348,17 @@ export const bookingsAPI = {
     return apiCall('/bookings?status=completed,cancelled');
   },
 
-  getBookedSlots: async (date: string, location?: { lng: number; lat: number } | null) => {
+  getBookedSlots: async (
+    date: string,
+    location?: { lng: number; lat: number } | null,
+    options?: { gender?: string; service?: string }
+  ) => {
     let url = `/bookings/booked-slots?date=${date}`;
     if (location?.lng && location?.lat && !isNaN(location.lng) && !isNaN(location.lat)) {
       url += `&lng=${location.lng}&lat=${location.lat}`;
     }
+    if (options?.gender && options.gender !== 'any') url += `&gender=${options.gender}`;
+    if (options?.service) url += `&service=${options.service}`;
     return apiCall(url);
   },
 

@@ -473,20 +473,20 @@ const BookServicePage = () => {
   };
 
   // Fetch booked slots for the selected date
-  const fetchBookedSlots = useCallback(async (date: string, manageLoading = true) => {
+  const fetchBookedSlots = useCallback(async (date: string, manageLoading = true, gender = 'any') => {
     if (!date) return;
     if (manageLoading) setLoadingSlots(true);
     try {
       const token = localStorage.getItem('token');
-      
+
       // Get user location from localStorage to filter workers by location
       const userLocation = localStorage.getItem('userLocation');
       let locationParams = '';
-      
+
       if (userLocation) {
         try {
           const location = JSON.parse(userLocation);
-          if (location.lng && location.lat && 
+          if (location.lng && location.lat &&
               !isNaN(location.lng) && !isNaN(location.lat)) {
             locationParams = `&lng=${location.lng}&lat=${location.lat}`;
           }
@@ -494,9 +494,12 @@ const BookServicePage = () => {
           console.error('Failed to parse user location:', e);
         }
       }
-      
+
+      const genderParam = gender && gender !== 'any' ? `&gender=${gender}` : '';
+      const serviceParam = id ? `&service=${id}` : '';
+
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/bookings/booked-slots?date=${date}${locationParams}`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/bookings/booked-slots?date=${date}${locationParams}${genderParam}${serviceParam}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (response.ok) {
@@ -509,7 +512,7 @@ const BookServicePage = () => {
     } finally {
       if (manageLoading) setLoadingSlots(false);
     }
-  }, []);
+  }, [id]);
 
   const fetchAvailableSlots = useCallback(async (date: string) => {
     if (!date) return;
@@ -522,12 +525,12 @@ const BookServicePage = () => {
     }
   }, []);
 
-  const fetchDateAvailability = useCallback(async (date: string) => {
+  const fetchDateAvailability = useCallback(async (date: string, gender = 'any') => {
     if (!date) return;
     setLoadingSlots(true);
     try {
       await Promise.all([
-        fetchBookedSlots(date, false),
+        fetchBookedSlots(date, false, gender),
         fetchAvailableSlots(date)
       ]);
     } finally {
@@ -536,13 +539,13 @@ const BookServicePage = () => {
   }, [fetchAvailableSlots, fetchBookedSlots]);
 
   useEffect(() => {
-    if (selectedDate) fetchDateAvailability(selectedDate);
+    if (selectedDate) fetchDateAvailability(selectedDate, preferences.workerGenderPreference);
     else {
       setBookedRanges([]);
       setAvailableSlots([]);
     }
     setSelectedExactTime('');
-  }, [selectedDate, fetchDateAvailability]);
+  }, [selectedDate, fetchDateAvailability, preferences.workerGenderPreference]);
 
   // Convert HH:MM string to minutes
   const toMinutes = (t: string): number => {

@@ -11,7 +11,7 @@ import {
     User,
     Zap,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -46,12 +46,21 @@ interface Service {
 
 const HOUR_OPTIONS = [1, 2, 3, 4, 6, 8];
 
-const TIME_SLOTS = [
-  "07:00", "07:30", "08:00", "08:30", "09:00", "09:30",
-  "10:00", "10:30", "11:00", "11:30", "12:00", "12:30",
-  "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
-  "16:00", "16:30", "17:00", "17:30", "18:00",
-];
+// Generate time slots between openTime and closeTime at slotDurationMinutes intervals
+const generateTimeSlots = (openTime = '07:00', closeTime = '19:00', slotDurationMinutes = 30) => {
+  const slots: string[] = [];
+  const [oh, om] = openTime.split(':').map(Number);
+  const [ch, cm] = closeTime.split(':').map(Number);
+  let cur = oh * 60 + om;
+  const close = ch * 60 + cm;
+  while (cur < close) {
+    slots.push(`${String(Math.floor(cur / 60)).padStart(2, '0')}:${String(cur % 60).padStart(2, '0')}`);
+    cur += slotDurationMinutes;
+  }
+  return slots;
+};
+
+const DEFAULT_SLOTS = generateTimeSlots();
 
 const DEFAULT_PRICE = 150;
 const DEFAULT_SUPPLIES_PRICE = 50;
@@ -60,10 +69,10 @@ const getNearestSlot = () => {
   const now = new Date();
   const nowMins = now.getHours() * 60 + now.getMinutes() + 30;
   return (
-    TIME_SLOTS.find((t) => {
+    DEFAULT_SLOTS.find((t) => {
       const [h, m] = t.split(":").map(Number);
       return h * 60 + m >= nowMins;
-    }) || TIME_SLOTS[TIME_SLOTS.length - 1]
+    }) || DEFAULT_SLOTS[DEFAULT_SLOTS.length - 1]
   );
 };
 
@@ -103,6 +112,15 @@ const InstaServicePage = () => {
   // Slot availability: map of startTime → number of workers busy during that slot
   const [busyWorkersBySlot, setBusyWorkersBySlot] = useState<Record<string, number>>({});
   const [totalWorkers, setTotalWorkers] = useState(0);
+  const [maleWorkers, setMaleWorkers] = useState(0);
+  const [femaleWorkers, setFemaleWorkers] = useState(0);
+  const [businessHours, setBusinessHours] = useState({ openTime: '07:00', closeTime: '19:00', slotDurationMinutes: 30 });
+
+  // Dynamic time slots from admin-configured business hours
+  const generatedTimeSlots = useMemo(
+    () => generateTimeSlots(businessHours.openTime, businessHours.closeTime, businessHours.slotDurationMinutes),
+    [businessHours]
+  );
 
   const totalAmount = hours * pricePerHour + (bringSupplies ? suppliesAddonPrice : 0);
   const mrpTotal = hours * mrpPerHour + (bringSupplies ? suppliesAddonPrice : 0);
@@ -114,12 +132,12 @@ const InstaServicePage = () => {
     const today = new Date().toISOString().split("T")[0];
     if (bookingMode === "now" || bookingDate === today) {
       const nowMins = new Date().getHours() * 60 + new Date().getMinutes() + 30;
-      return TIME_SLOTS.filter((t) => {
+      return generatedTimeSlots.filter((t) => {
         const [h, m] = t.split(":").map(Number);
         return h * 60 + m >= nowMins;
       });
     }
-    return TIME_SLOTS;
+    return generatedTimeSlots;
   })();
 
   useEffect(() => {
@@ -159,14 +177,14 @@ const InstaServicePage = () => {
     init();
   }, []);
 
-  // Fetch booked-slots whenever the date changes
+  // Fetch booked-slots whenever the date, hours, or gender preference changes
   useEffect(() => {
     const fetchSlots = async () => {
       try {
         // Get user location from localStorage
         const userLocation = localStorage.getItem('userLocation');
         let location = null;
-        
+
         if (userLocation) {
           try {
             const loc = JSON.parse(userLocation);
@@ -177,15 +195,36 @@ const InstaServicePage = () => {
             console.error('Failed to parse user location:', e);
           }
         }
-        
-        const data = await bookingsAPI.getBookedSlots(bookingDate, location);
+
+        const data = await bookingsAPI.getBookedSlots(
+          bookingDate,
+          location,
+          { gender: genderPref, service: serviceId || undefined }
+        );
         const ranges: { workerId: string | null; startTime: string; endTime: string }[] =
           data.bookedRanges || [];
-        setTotalWorkers(data.totalWorkers || 0);
 
-        // For each TIME_SLOT, count how many workers are busy during [slotStart, slotStart+hours]
+        setTotalWorkers(data.totalWorkers || 0);
+        setMaleWorkers(data.maleWorkers || 0);
+        setFemaleWorkers(data.femaleWorkers || 0);
+
+        // Update time slots from admin-configured business hours
+        if (data.openTime || data.closeTime) {
+          setBusinessHours({
+            openTime: data.openTime || '07:00',
+            closeTime: data.closeTime || '19:00',
+            slotDurationMinutes: data.slotDurationMinutes || 30,
+          });
+        }
+
+        // Compute busy count per slot using the freshly received business hours
+        const slots = generateTimeSlots(
+          data.openTime || '07:00',
+          data.closeTime || '19:00',
+          data.slotDurationMinutes || 30
+        );
         const busy: Record<string, number> = {};
-        for (const slot of TIME_SLOTS) {
+        for (const slot of slots) {
           const [sh, sm] = slot.split(":").map(Number);
           const slotStartMins = sh * 60 + sm;
           const slotEndMins = slotStartMins + hours * 60;
@@ -208,7 +247,7 @@ const InstaServicePage = () => {
       }
     };
     fetchSlots();
-  }, [bookingDate, hours]);
+  }, [bookingDate, hours, genderPref, serviceId]);
 
   const handleBook = async () => {
     if (!serviceId) {
@@ -556,10 +595,23 @@ const InstaServicePage = () => {
                     })}
                   </div>
                   {totalWorkers > 0 && (
-                    <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" /> Available</span>
-                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> Limited (1 worker)</span>
-                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-destructive inline-block" /> Fully booked</span>
+                    <div className="mt-2 space-y-1.5">
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" /> Available</span>
+                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> Limited (1 worker)</span>
+                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-destructive inline-block" /> Fully booked</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span>👥 {totalWorkers} worker{totalWorkers !== 1 ? 's' : ''} available</span>
+                        {genderPref === 'any' && (maleWorkers > 0 || femaleWorkers > 0) && (
+                          <>
+                            <span>·</span>
+                            <span>👨 {maleWorkers} male</span>
+                            <span>·</span>
+                            <span>👩 {femaleWorkers} female</span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   )}
                 </>

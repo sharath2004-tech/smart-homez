@@ -341,7 +341,19 @@ const RegisterPage = () => {
                 {/* Religion field (optional) */}
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">{t('auth.register.religion')}</label>
-                  <input className="input-clean" placeholder={t('auth.register.religionPlaceholder')} value={form.religion} onChange={(e) => setForm({ ...form, religion: e.target.value })} />
+                  <select className="input-clean" value={form.religion} onChange={(e) => setForm({ ...form, religion: e.target.value })}>
+                    <option value="">Select religion (optional)</option>
+                    <option value="Hindu">Hindu</option>
+                    <option value="Muslim">Muslim</option>
+                    <option value="Christian">Christian</option>
+                    <option value="Sikh">Sikh</option>
+                    <option value="Buddhist">Buddhist</option>
+                    <option value="Jain">Jain</option>
+                    <option value="Parsi">Parsi</option>
+                    <option value="Jewish">Jewish</option>
+                    <option value="Other">Other</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                  </select>
                 </div>
 
                 {userType === "customer" ? (

@@ -928,13 +928,23 @@ const AdminWorkers = () => {
 
                 <div>
                   <label className="block text-sm font-medium mb-1">Religion (Optional)</label>
-                  <input
-                    type="text"
+                  <select
                     className="input-clean"
-                    placeholder="e.g. Hindu, Muslim, Christian, etc."
                     value={workerForm.religion}
                     onChange={(e) => setWorkerForm({...workerForm, religion: e.target.value})}
-                  />
+                  >
+                    <option value="">Select religion</option>
+                    <option value="Hindu">Hindu</option>
+                    <option value="Muslim">Muslim</option>
+                    <option value="Christian">Christian</option>
+                    <option value="Sikh">Sikh</option>
+                    <option value="Buddhist">Buddhist</option>
+                    <option value="Jain">Jain</option>
+                    <option value="Parsi">Parsi</option>
+                    <option value="Jewish">Jewish</option>
+                    <option value="Other">Other</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                  </select>
                 </div>
 
                 <div>
@@ -1285,12 +1295,23 @@ const AdminWorkers = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-1">Religion</label>
-                      <input
-                        type="text"
+                      <select
                         className="input-clean"
                         value={editWorker.religion || ''}
                         onChange={(e) => setEditWorker({ ...editWorker, religion: e.target.value })}
-                      />
+                      >
+                        <option value="">Select religion</option>
+                        <option value="Hindu">Hindu</option>
+                        <option value="Muslim">Muslim</option>
+                        <option value="Christian">Christian</option>
+                        <option value="Sikh">Sikh</option>
+                        <option value="Buddhist">Buddhist</option>
+                        <option value="Jain">Jain</option>
+                        <option value="Parsi">Parsi</option>
+                        <option value="Jewish">Jewish</option>
+                        <option value="Other">Other</option>
+                        <option value="Prefer not to say">Prefer not to say</option>
+                      </select>
                     </div>
                   </div>
                 </div>

@@ -290,11 +290,12 @@ router.post('/:id/accept-order', authenticate, authorize('worker'), async (req, 
 });
 
 // @route   GET /api/bookings/booked-slots
-// @desc    Get booked time ranges for a specific date (for slot availability UI)
+// @desc    Get booked time ranges + worker availability for a date
+//          Supports: gender filter, service specialization filter, business-hours timings
 // @access  Private/Customer
 router.get('/booked-slots', authenticate, async (req, res) => {
   try {
-    const { date, locationId, lng, lat } = req.query;
+    const { date, locationId, lng, lat, gender, service: serviceId } = req.query;
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return res.status(400).json({ error: { message: 'date query param required (YYYY-MM-DD)', status: 400 } });
     }
@@ -304,93 +305,109 @@ router.get('/booked-slots', authenticate, async (req, res) => {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Parse booking date for leave checking
     const bookingDate = new Date(date);
     bookingDate.setHours(0, 0, 0, 0);
 
-    // Determine location for worker filtering
+    // ── Business hours for this day (admin-configured) ────────────────────────
+    const bhConfig = await BusinessHours.getConfig();
+    const dayName = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][new Date(date).getDay()];
+    const dayConfig = bhConfig.schedule?.find(d => d.day === dayName);
+    const openTime = dayConfig?.openTime || '09:00';
+    const closeTime = dayConfig?.closeTime || '18:00';
+    const slotDurationMinutes = bhConfig.slotDurationMinutes || 30;
+    const isDayActive = dayConfig?.isActive ?? true;
+
+    // ── Resolve nearest Location from coordinates ─────────────────────────────
     let targetLocationId = locationId;
-    
-    // If no locationId but coordinates provided, find nearby location
     if (!targetLocationId && lng && lat) {
       const customerLng = parseFloat(lng);
       const customerLat = parseFloat(lat);
-      
       if (!isNaN(customerLng) && !isNaN(customerLat)) {
-        // Use a broad pre-filter (50km) — just finding the nearest Location doc for the slot check
         const nearbyLocation = await Location.findOne({
           location: {
             $near: {
-              $geometry: {
-                type: 'Point',
-                coordinates: [customerLng, customerLat]
-              },
-              $maxDistance: 50000 // 50km broad pre-filter to find nearest Location
+              $geometry: { type: 'Point', coordinates: [customerLng, customerLat] },
+              $maxDistance: 50000 // broad pre-filter — just resolving nearest service zone
             }
           },
           isActive: true,
           isServiceAvailable: true
         });
-        
-        if (nearbyLocation) {
-          targetLocationId = nearbyLocation._id.toString();
-        }
+        if (nearbyLocation) targetLocationId = nearbyLocation._id.toString();
       }
     }
 
-    // All active bookings on this date (only those with assigned workers)
+    // ── Booked ranges for this date ───────────────────────────────────────────
     const bookings = await Booking.find({
       bookingDate: { $gte: startOfDay, $lte: endOfDay },
       status: { $in: ['pending', 'confirmed', 'in-progress'] },
-      worker: { $ne: null } // Only count bookings that have a worker assigned
+      worker: { $ne: null }
     }).select('worker startTime endTime').lean();
 
-    // Build per-worker booked ranges
     const bookedRanges = bookings.map(b => ({
       workerId: b.worker ? b.worker.toString() : null,
       startTime: b.startTime,
       endTime: b.endTime
     }));
 
-    // Build query for available workers
+    // ── Build worker query ────────────────────────────────────────────────────
     const workerQuery = {
       role: 'worker',
       isActive: true,
-      'workerProfile.availability': true // Only count workers who are available
+      'workerProfile.availability': true
     };
 
-    // If location determined, filter workers by assigned location
+    // Filter by assigned location
     if (targetLocationId) {
       workerQuery['workerProfile.assignedApartments.locationId'] = targetLocationId;
     }
 
-    // Get all potentially available workers
+    // Filter by service specialization — only show specialists for this service
+    if (serviceId) {
+      const svcDoc = await Service.findById(serviceId).select('category').lean();
+      if (svcDoc?.category) {
+        workerQuery['workerProfile.specialization'] = { $in: [svcDoc.category] };
+      }
+    }
+
+    // Filter by gender preference
+    const genderFilter = gender && gender !== 'any' ? gender : null;
+    if (genderFilter) {
+      workerQuery['gender'] = genderFilter;
+    }
+
+    // ── Fetch workers (include gender for breakdown) ──────────────────────────
     const workers = await User.find(workerQuery)
-      .select('_id workerProfile.leaves')
+      .select('_id gender workerProfile.leaves')
       .lean();
 
-    // Filter out workers on approved leave for this date
+    // Remove workers on approved leave for this date
     const availableWorkers = workers.filter(worker => {
-      if (!worker.workerProfile?.leaves || worker.workerProfile.leaves.length === 0) {
-        return true;
-      }
-
-      // Check if worker has approved leave on this date
-      const hasLeave = worker.workerProfile.leaves.some(leave => {
-        if (leave.status !== 'approved') {
-          return false;
-        }
+      if (!worker.workerProfile?.leaves?.length) return true;
+      return !worker.workerProfile.leaves.some(leave => {
+        if (leave.status !== 'approved') return false;
         const leaveDate = new Date(leave.date);
         leaveDate.setHours(0, 0, 0, 0);
         return leaveDate.getTime() === bookingDate.getTime();
       });
-
-      return !hasLeave;
     });
 
     const totalWorkers = availableWorkers.length;
+    const maleWorkers = availableWorkers.filter(w => w.gender === 'male').length;
+    const femaleWorkers = availableWorkers.filter(w => w.gender === 'female').length;
 
-    res.json({ success: true, bookedRanges, totalWorkers, locationId: targetLocationId });
+    res.json({
+      success: true,
+      bookedRanges,
+      totalWorkers,
+      maleWorkers,
+      femaleWorkers,
+      openTime,
+      closeTime,
+      slotDurationMinutes,
+      isDayActive,
+      locationId: targetLocationId
+    });
   } catch (error) {
     console.error('Get booked slots error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
