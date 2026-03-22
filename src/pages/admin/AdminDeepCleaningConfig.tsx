@@ -1,9 +1,10 @@
 import AppLayout from "@/components/AppLayout";
-import { api } from "@/lib/api";
 import { useAdminRole } from "@/hooks/useAdminRole";
+import { api } from "@/lib/api";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, ChevronUp, Edit2, Plus, Save, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { CheckCircle2, ChevronDown, ChevronUp, Edit2, FileClock, Plus, RefreshCcw, Save, Send, ShieldCheck, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Tier { label: string; price: number; }
@@ -17,6 +18,20 @@ interface DeepCleaningCategory {
   id: string; label: string; emoji: string; isActive: boolean; sortOrder: number;
 }
 interface Config { items: ConfigItem[]; minimumCartValue: number; categories?: DeepCleaningCategory[]; }
+interface ChangeRequestUser { name?: string; email?: string; role?: string; }
+interface ChangeRequest {
+  _id: string;
+  title: string;
+  requestNote?: string;
+  reviewNote?: string;
+  status: "pending" | "approved" | "rejected";
+  proposedConfig: Config;
+  requestedBy?: ChangeRequestUser;
+  reviewedBy?: ChangeRequestUser;
+  submittedAt?: string;
+  reviewedAt?: string;
+  createdAt?: string;
+}
 
 const FALLBACK_CATEGORIES: DeepCleaningCategory[] = [
   { id: "fullhouse",        label: "Full Home Deep Cleaning",    emoji: "🏡", isActive: true, sortOrder: 1 },
@@ -49,13 +64,34 @@ const BLANK_CATEGORY: DeepCleaningCategory = {
   id: "", label: "", emoji: "✨", isActive: true, sortOrder: 99,
 };
 
+const getSortedCategories = (categories?: DeepCleaningCategory[]) =>
+  (categories?.length ? categories : FALLBACK_CATEGORIES)
+    .map(category => ({ ...category }))
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+
+const getSnapshot = (items: ConfigItem[], minimumCartValue: number, categories: DeepCleaningCategory[]): Config => ({
+  items,
+  minimumCartValue,
+  categories: getSortedCategories(categories),
+});
+
+const statusClasses: Record<ChangeRequest["status"], string> = {
+  pending: "bg-amber-100 text-amber-800 border-amber-200",
+  approved: "bg-green-100 text-green-700 border-green-200",
+  rejected: "bg-red-100 text-red-700 border-red-200",
+};
+
 export default function AdminDeepCleaningConfig() {
-  const { name, role } = useAdminRole();
+  const { name, role, isSuperAdmin } = useAdminRole();
   const [config, setConfig]           = useState<Config | null>(null);
+  const [liveConfig, setLiveConfig]   = useState<Config | null>(null);
   const [loading, setLoading]         = useState(true);
+  const [loadingRequests, setLoadingRequests] = useState(true);
   const [saving, setSaving]           = useState(false);
   const [saved, setSaved]             = useState(false);
+  const [hasDraftChanges, setHasDraftChanges] = useState(false);
   const [categories, setCategories]   = useState<DeepCleaningCategory[]>([]);
+  const [requests, setRequests]       = useState<ChangeRequest[]>([]);
   const [activeCategory, setActiveCategory] = useState("");
   const [editingId, setEditingId]     = useState<string | null>(null);
   const [editForm, setEditForm]       = useState<ConfigItem | null>(null);
@@ -68,35 +104,162 @@ export default function AdminDeepCleaningConfig() {
   const [addCatForm, setAddCatForm]   = useState<DeepCleaningCategory>({ ...BLANK_CATEGORY });
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [editCatForm, setEditCatForm] = useState<DeepCleaningCategory | null>(null);
+  const [requestTitle, setRequestTitle] = useState("");
+  const [requestNote, setRequestNote] = useState("");
+  const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [reviewNote, setReviewNote] = useState("");
 
   useEffect(() => {
-    api.get("/deep-cleaning/config").then(d => {
-      setConfig(d.config);
-      setMinCart(d.config.minimumCartValue ?? 500);
-      const cats: DeepCleaningCategory[] = (d.config.categories?.length ? d.config.categories : FALLBACK_CATEGORIES)
-        .sort((a: DeepCleaningCategory, b: DeepCleaningCategory) => a.sortOrder - b.sortOrder);
-      setCategories(cats);
-      setActiveCategory(cats.find(c => c.isActive)?.id ?? cats[0]?.id ?? "");
-    }).finally(() => setLoading(false));
-  }, []);
+    const loadData = async () => {
+      setLoading(true);
+      setLoadingRequests(true);
+      try {
+        const [configRes, requestsRes] = await Promise.all([
+          api.get("/deep-cleaning/config"),
+          api.get("/deep-cleaning/change-requests").catch(() => ({ requests: [] })),
+        ]);
+
+        const initialConfig = {
+          ...configRes.config,
+          categories: getSortedCategories(configRes.config.categories),
+        };
+
+        setLiveConfig(initialConfig);
+        setConfig(initialConfig);
+        setMinCart(initialConfig.minimumCartValue ?? 500);
+        setCategories(getSortedCategories(initialConfig.categories));
+        setActiveCategory(prev => prev || (getSortedCategories(initialConfig.categories).find(c => c.isActive)?.id ?? getSortedCategories(initialConfig.categories)[0]?.id ?? ""));
+        setRequests(requestsRes.requests || []);
+        setHasDraftChanges(false);
+      } catch (error) {
+        console.error(error);
+        toast.error(error instanceof Error ? error.message : "Failed to load deep-cleaning template");
+      } finally {
+        setLoading(false);
+        setLoadingRequests(false);
+      }
+    };
+
+    loadData();
+  }, [role]);
+
+  const applyConfigState = (nextConfig: Config, options?: { updateLive?: boolean; clearDraft?: boolean }) => {
+    const normalized = {
+      ...nextConfig,
+      categories: getSortedCategories(nextConfig.categories),
+    };
+
+    setConfig(normalized);
+    setMinCart(normalized.minimumCartValue ?? 500);
+
+    const nextCategories = getSortedCategories(normalized.categories);
+    setCategories(nextCategories);
+    setActiveCategory(prev => nextCategories.some(category => category.id === prev)
+      ? prev
+      : nextCategories.find(category => category.isActive)?.id ?? nextCategories[0]?.id ?? "");
+
+    if (options?.updateLive) {
+      setLiveConfig(normalized);
+    }
+    if (options?.clearDraft) {
+      setHasDraftChanges(false);
+    }
+  };
+
+  const refreshRequests = async () => {
+    setLoadingRequests(true);
+    try {
+      const res = await api.get("/deep-cleaning/change-requests");
+      setRequests(res.requests || []);
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "Failed to refresh change requests");
+    } finally {
+      setLoadingRequests(false);
+    }
+  };
 
   const saveAll = async (nextItems: ConfigItem[], nextMin = minCart, nextCats = categories) => {
+    const snapshot = getSnapshot(nextItems, nextMin, nextCats);
+
+    if (!isSuperAdmin) {
+      applyConfigState(snapshot);
+      setHasDraftChanges(true);
+      return;
+    }
+
     setSaving(true);
     try {
-      const res = await api.put("/deep-cleaning/config", {
-        items: nextItems,
-        minimumCartValue: nextMin,
-        categories: nextCats,
-      });
-      setConfig(res.config);
-      setMinCart(res.config.minimumCartValue);
-      const updatedCats: DeepCleaningCategory[] = (res.config.categories?.length ? res.config.categories : FALLBACK_CATEGORIES)
-        .sort((a: DeepCleaningCategory, b: DeepCleaningCategory) => a.sortOrder - b.sortOrder);
-      setCategories(updatedCats);
+      const res = await api.put("/deep-cleaning/config", snapshot);
+      applyConfigState(res.config, { updateLive: true, clearDraft: true });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-    } catch (e) { console.error(e); }
+      toast.success("Deep-cleaning template published");
+    } catch (e) {
+      console.error(e);
+      toast.error(e instanceof Error ? e.message : "Failed to save template");
+    }
     finally { setSaving(false); }
+  };
+
+  const resetDraftToLive = () => {
+    if (!liveConfig) return;
+    applyConfigState(liveConfig, { clearDraft: true });
+    setRequestTitle("");
+    setRequestNote("");
+    toast.success("Draft reset to live configuration");
+  };
+
+  const submitChangeRequest = async () => {
+    if (!config) return;
+
+    const title = requestTitle.trim() || `Deep cleaning template update · ${new Date().toLocaleDateString("en-IN")}`;
+
+    setSubmittingRequest(true);
+    try {
+      await api.post("/deep-cleaning/change-requests", {
+        title,
+        requestNote,
+        proposedConfig: getSnapshot(config.items, minCart, categories),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+      setHasDraftChanges(false);
+      setRequestTitle("");
+      setRequestNote("");
+      await refreshRequests();
+      toast.success("Change request submitted for super-admin review");
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "Failed to submit change request");
+    } finally {
+      setSubmittingRequest(false);
+    }
+  };
+
+  const reviewRequest = async (id: string, status: "approved" | "rejected") => {
+    setSaving(true);
+    try {
+      const res = await api.post(`/deep-cleaning/change-requests/${id}/review`, {
+        status,
+        reviewNote,
+      });
+
+      if (status === "approved" && res.config) {
+        applyConfigState(res.config, { updateLive: true, clearDraft: true });
+      }
+
+      setReviewingId(null);
+      setReviewNote("");
+      await refreshRequests();
+      toast.success(`Request ${status}`);
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : `Failed to ${status} request`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   // ── Items ──────────────────────────────────────────────────────────────────
@@ -176,7 +339,7 @@ export default function AdminDeepCleaningConfig() {
   const addCategory = () => {
     if (!addCatForm.label.trim()) return;
     const id = addCatForm.id.trim() || addCatForm.label.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
-    if (categories.some(c => c.id === id)) { alert("A category with this ID already exists."); return; }
+    if (categories.some(c => c.id === id)) { toast.error("A category with this ID already exists."); return; }
     const next = [...categories, { ...addCatForm, id, sortOrder: categories.length + 1 }];
     setCategories(next);
     saveAll(config?.items ?? [], minCart, next);
@@ -196,6 +359,7 @@ export default function AdminDeepCleaningConfig() {
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
   const activeCatLabel = categories.find(c => c.id === activeCategory)?.label ?? activeCategory;
+  const pendingRequestCount = useMemo(() => requests.filter(req => req.status === "pending").length, [requests]);
 
   if (loading) return (
     <AppLayout userType={role} userName={name}>
@@ -214,28 +378,203 @@ export default function AdminDeepCleaningConfig() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold font-heading text-foreground">Deep Cleaning Template</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Manage services, prices, tiers and categories</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {isSuperAdmin
+                ? "Publish live deep-cleaning categories, items and pricing"
+                : "Build a draft and submit it for super-admin approval"}
+            </p>
           </div>
-          <AnimatePresence>
-            {saved && (
-              <motion.span initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
-                className="text-sm text-green-700 bg-green-100 border border-green-300 px-3 py-1.5 rounded-full font-medium">
-                ✓ Saved
-              </motion.span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${isSuperAdmin ? "bg-primary/10 text-primary border-primary/20" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
+              {isSuperAdmin ? "Super Admin · Live Publish" : "Admin · Request Mode"}
+            </span>
+            {pendingRequestCount > 0 && (
+              <span className="text-xs font-semibold px-3 py-1.5 rounded-full border bg-amber-100 text-amber-800 border-amber-200">
+                {pendingRequestCount} pending request{pendingRequestCount !== 1 ? "s" : ""}
+              </span>
             )}
-          </AnimatePresence>
+            <AnimatePresence>
+              {saved && (
+                <motion.span initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+                  className="text-sm text-green-700 bg-green-100 border border-green-300 px-3 py-1.5 rounded-full font-medium">
+                  {isSuperAdmin ? "✓ Published" : "✓ Request sent"}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {!isSuperAdmin && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-4">
+            <div className="flex items-start gap-3">
+              <FileClock className="w-5 h-5 text-amber-700 mt-0.5 shrink-0" />
+              <div>
+                <h2 className="text-sm font-semibold text-amber-900">Draft change request</h2>
+                <p className="text-sm text-amber-800 mt-1">
+                  Your edits stay local until you submit them. A super admin can then approve and publish the proposed template snapshot.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="label-clean">Request title</label>
+                <input
+                  value={requestTitle}
+                  onChange={e => setRequestTitle(e.target.value)}
+                  className="input-clean text-sm"
+                  placeholder="e.g. Add move-out detail services"
+                />
+              </div>
+              <div>
+                <label className="label-clean">Draft status</label>
+                <div className="input-clean text-sm flex items-center justify-between">
+                  <span>{hasDraftChanges ? "Unsaved draft changes ready" : "Draft matches last submitted/live state"}</span>
+                  {hasDraftChanges ? <CheckCircle2 className="w-4 h-4 text-amber-600" /> : <ShieldCheck className="w-4 h-4 text-green-600" />}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="label-clean">Request note (optional)</label>
+              <textarea
+                value={requestNote}
+                onChange={e => setRequestNote(e.target.value)}
+                rows={3}
+                className="input-clean min-h-[88px] text-sm"
+                placeholder="Summarize what changed and why it should be published"
+              />
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={submitChangeRequest}
+                disabled={submittingRequest || !config}
+                className="flex items-center justify-center gap-2 text-sm font-semibold bg-primary text-primary-foreground px-4 py-2.5 rounded-xl disabled:opacity-50"
+              >
+                <Send className="w-4 h-4" /> {submittingRequest ? "Submitting..." : "Submit change request"}
+              </motion.button>
+              <button
+                onClick={resetDraftToLive}
+                disabled={!liveConfig}
+                className="flex items-center justify-center gap-2 text-sm font-semibold bg-muted text-muted-foreground px-4 py-2.5 rounded-xl hover:bg-border disabled:opacity-50"
+              >
+                <RefreshCcw className="w-4 h-4" /> Reset to live config
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="text-base font-semibold text-foreground">{isSuperAdmin ? "Change requests" : "My submitted requests"}</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {isSuperAdmin ? "Approve or reject pending admin template proposals." : "Track review status for your template proposals."}
+              </p>
+            </div>
+            <button
+              onClick={refreshRequests}
+              disabled={loadingRequests}
+              className="text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+            >
+              {loadingRequests ? "Refreshing..." : "Refresh requests"}
+            </button>
+          </div>
+
+          {requests.length === 0 ? (
+            <div className="text-sm text-muted-foreground border border-dashed border-border rounded-xl p-4 text-center">
+              No change requests yet.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {requests.map((request) => (
+                <div key={request._id} className="border border-border rounded-2xl p-4 bg-muted/20 space-y-3">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-sm font-semibold text-foreground">{request.title}</h3>
+                        <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border ${statusClasses[request.status]}`}>
+                          {request.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        By {request.requestedBy?.name || "Admin"}
+                        {request.createdAt || request.submittedAt ? ` · ${new Date(request.createdAt || request.submittedAt || "").toLocaleString("en-IN")}` : ""}
+                      </p>
+                    </div>
+                    <div className="text-xs text-muted-foreground text-right">
+                      <div>{request.proposedConfig.categories?.length || 0} categories</div>
+                      <div>{request.proposedConfig.items?.length || 0} items</div>
+                      <div>Min cart ₹{request.proposedConfig.minimumCartValue ?? 0}</div>
+                    </div>
+                  </div>
+
+                  {request.requestNote && (
+                    <div className="text-sm text-muted-foreground bg-card border border-border rounded-xl p-3">
+                      {request.requestNote}
+                    </div>
+                  )}
+
+                  {request.reviewNote && (
+                    <div className="text-xs text-muted-foreground bg-card border border-border rounded-xl p-3">
+                      <span className="font-semibold text-foreground">Review note:</span> {request.reviewNote}
+                    </div>
+                  )}
+
+                  {isSuperAdmin && request.status === "pending" && (
+                    <div className="space-y-2">
+                      {reviewingId === request._id ? (
+                        <>
+                          <textarea
+                            value={reviewNote}
+                            onChange={e => setReviewNote(e.target.value)}
+                            rows={3}
+                            className="input-clean min-h-[84px] text-sm"
+                            placeholder="Optional note for the admin"
+                          />
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <motion.button whileTap={{ scale: 0.97 }} onClick={() => reviewRequest(request._id, "approved")}
+                              disabled={saving}
+                              className="text-sm font-semibold bg-green-600 text-white px-4 py-2 rounded-xl disabled:opacity-50">
+                              Approve & publish
+                            </motion.button>
+                            <motion.button whileTap={{ scale: 0.97 }} onClick={() => reviewRequest(request._id, "rejected")}
+                              disabled={saving}
+                              className="text-sm font-semibold bg-red-600 text-white px-4 py-2 rounded-xl disabled:opacity-50">
+                              Reject request
+                            </motion.button>
+                            <button onClick={() => { setReviewingId(null); setReviewNote(""); }}
+                              className="text-sm font-semibold bg-muted text-muted-foreground px-4 py-2 rounded-xl hover:bg-border">
+                              Cancel
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <button onClick={() => { setReviewingId(request._id); setReviewNote(request.reviewNote || ""); }}
+                          className="text-sm font-semibold text-primary hover:underline">
+                          Review request
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Min cart value */}
         <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-4 flex-wrap">
           <label className="text-sm font-semibold text-foreground shrink-0">Minimum Cart Value (₹)</label>
           <input type="number" min="0" value={minCart}
-            onChange={e => setMinCart(Number(e.target.value))}
+            onChange={e => { setMinCart(Number(e.target.value)); if (!isSuperAdmin) setHasDraftChanges(true); }}
             className="input-clean w-36 text-sm" />
           <motion.button whileTap={{ scale: 0.95 }} onClick={() => saveAll(config?.items ?? [], minCart)}
             disabled={saving}
             className="text-sm font-semibold bg-primary text-primary-foreground px-4 py-2 rounded-xl disabled:opacity-50">
-            {saving ? "Saving..." : "Update"}
+            {saving ? "Saving..." : isSuperAdmin ? "Publish" : "Save in draft"}
           </motion.button>
         </div>
 

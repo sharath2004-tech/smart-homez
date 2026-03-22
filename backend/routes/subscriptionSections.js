@@ -29,7 +29,7 @@ router.get('/', async (req, res) => {
 // @route   GET /api/subscription-sections/admin/all
 // @desc    Get all subscription sections (admin view - includes inactive)
 // @access  Admin, Super Admin
-router.get('/admin/all', authenticate, authorize(['admin', 'super_admin']), async (req, res) => {
+router.get('/admin/all', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
   try {
     const sections = await SubscriptionSection.find()
       .populate('createdBy', 'name email')
@@ -77,7 +77,7 @@ router.get('/:id', async (req, res) => {
 router.post(
   '/',
   authenticate,
-  authorize(['admin', 'super_admin']),
+  authorize('admin', 'super_admin'),
   [
     body('name').trim().notEmpty().withMessage('Section name is required'),
     body('description').trim().notEmpty().withMessage('Section description is required'),
@@ -137,7 +137,7 @@ router.post(
 router.patch(
   '/:id',
   authenticate,
-  authorize(['admin', 'super_admin']),
+  authorize('admin', 'super_admin'),
   [
     body('name').optional().trim().notEmpty().withMessage('Section name cannot be empty'),
     body('description').optional().trim().notEmpty().withMessage('Section description cannot be empty'),
@@ -202,7 +202,7 @@ router.patch(
 router.delete(
   '/:id',
   authenticate,
-  authorize(['super_admin']),
+  authorize('super_admin'),
   async (req, res) => {
     try {
       const section = await SubscriptionSection.findById(req.params.id);
@@ -234,7 +234,7 @@ router.delete(
 router.patch(
   '/:id/toggle',
   authenticate,
-  authorize(['admin', 'super_admin']),
+  authorize('admin', 'super_admin'),
   async (req, res) => {
     try {
       const section = await SubscriptionSection.findById(req.params.id);

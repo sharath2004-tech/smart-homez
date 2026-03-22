@@ -20,6 +20,8 @@ import WorkerSignUp from "./pages/auth/WorkerSignUp";
 // Customer pages
 import BookingsPage from "./pages/customer/BookingsPage";
 import CustomerDashboard from "./pages/customer/CustomerDashboard";
+import DeepCleaningCategoryPage from "./pages/customer/DeepCleaningCategoryPage";
+import DeepCleaningLandingPage from "./pages/customer/DeepCleaningLandingPage";
 import DeepCleaningPage from "./pages/customer/DeepCleaningPage";
 import DeepCleaningQuotePage from "./pages/customer/DeepCleaningQuotePage";
 import HelpPage from "./pages/customer/HelpPage";
@@ -53,6 +55,7 @@ import AdminBookings from "./pages/admin/AdminBookings";
 import AdminCustomerDetails from "./pages/admin/AdminCustomerDetails";
 import AdminCustomers from "./pages/admin/AdminCustomers";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminDeepCleaningConfig from "./pages/admin/AdminDeepCleaningConfig";
 import AdminDashboardPreferences from "./pages/admin/AdminDashboardPreferences";
 import AdminExpenses from "./pages/admin/AdminExpenses";
 import AdminHelpMessages from "./pages/admin/AdminHelpMessages";
@@ -120,7 +123,9 @@ const App = () => (
           <Route path="/customer/services/subscription" element={<ProtectedRoute allowedRoles={['customer']}><SubscriptionServicePage /></ProtectedRoute>} />
           <Route path="/customer/services/deep-cleaning" element={<ProtectedRoute allowedRoles={['customer']}><DeepCleaningServicePage /></ProtectedRoute>} />
           <Route path="/customer/services/spot-clean" element={<ProtectedRoute allowedRoles={['customer']}><SpotCleanPage /></ProtectedRoute>} />
-          <Route path="/customer/deep-cleaning" element={<ProtectedRoute allowedRoles={['customer']}><DeepCleaningPage /></ProtectedRoute>} />
+          <Route path="/customer/deep-cleaning" element={<ProtectedRoute allowedRoles={['customer']}><DeepCleaningLandingPage /></ProtectedRoute>} />
+          <Route path="/customer/deep-cleaning/:categoryId" element={<ProtectedRoute allowedRoles={['customer']}><DeepCleaningCategoryPage /></ProtectedRoute>} />
+          <Route path="/customer/deep-cleaning/customize" element={<ProtectedRoute allowedRoles={['customer']}><DeepCleaningPage /></ProtectedRoute>} />
           <Route path="/customer/book/:id" element={<ProtectedRoute allowedRoles={['customer']}><ServiceRouter /></ProtectedRoute>} />
           <Route path="/customer/subscribe/:id" element={<ProtectedRoute allowedRoles={['customer']}><SubscriptionBookingPage /></ProtectedRoute>} />
           <Route path="/customer/bookings" element={<ProtectedRoute allowedRoles={['customer']}><BookingsPage /></ProtectedRoute>} />
@@ -157,6 +162,7 @@ const App = () => (
           <Route path="/admin/worker-requests" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminWorkerRequests /></ProtectedRoute>} />
           <Route path="/admin/leaves" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminLeaves /></ProtectedRoute>} />
           <Route path="/admin/services" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminServices /></ProtectedRoute>} />
+          <Route path="/admin/deep-cleaning-config" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminDeepCleaningConfig /></ProtectedRoute>} />
           <Route path="/admin/workers" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminWorkers /></ProtectedRoute>} />
           <Route path="/admin/locations" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminLocations /></ProtectedRoute>} />
           <Route path="/admin/service-areas" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminServiceAreas /></ProtectedRoute>} />

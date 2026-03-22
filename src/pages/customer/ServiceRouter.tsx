@@ -22,9 +22,9 @@ const ServiceRouter = () => {
         const serviceName = service.name.toLowerCase();
         const serviceTags = service.tags || [];
 
-        // Quote services → deep cleaning cart page
+        // Quote services → deep cleaning custom builder
         if (service.isQuoteService) {
-          navigate('/customer/deep-cleaning', { replace: true });
+          navigate('/customer/deep-cleaning/customize', { replace: true });
           return;
         }
 

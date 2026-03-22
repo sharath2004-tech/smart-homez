@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { adminAPI, bookingsAPI, businessExpensesAPI } from "@/lib/api";
 import { DollarSign, Edit2, Plus, Trash2, X, TrendingUp, TrendingDown } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 interface Expense {
@@ -34,8 +34,24 @@ interface Expense {
 
 interface Booking {
   _id: string;
-  bookingId: string;
-  customerId: string;
+  bookingId?: string;
+  customerId?: string;
+  customer?: {
+    _id?: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+  };
+  status: string;
+}
+
+interface NormalizedBooking {
+  _id: string;
+  displayId: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  customerRef: string;
   status: string;
 }
 
@@ -273,13 +289,36 @@ const AdminExpenses = () => {
     return matchesSearch && matchesCategory && matchesType;
   });
 
-  const filteredBookings = bookings.filter(booking => {
+  const normalizedBookings = useMemo<NormalizedBooking[]>(() => bookings.map((booking) => {
+    const displayId = booking.bookingId || booking._id.slice(-8).toUpperCase();
+    const customerName = booking.customer?.name || "Unknown customer";
+    const customerEmail = booking.customer?.email || "";
+    const customerPhone = booking.customer?.phone || "";
+    const customerRef = booking.customerId || booking.customer?._id || "";
+
+    return {
+      _id: booking._id,
+      displayId,
+      customerName,
+      customerEmail,
+      customerPhone,
+      customerRef,
+      status: booking.status,
+    };
+  }), [bookings]);
+
+  const filteredBookings = normalizedBookings.filter(booking => {
     if (formData.bookingSearch === "") return true;
     try {
       const search = (formData.bookingSearch || "").toLowerCase();
-      const bookingId = (booking.bookingId || "").toString().toLowerCase();
-      const customerId = (booking.customerId || "").toString().toLowerCase();
-      return bookingId.includes(search) || customerId.includes(search);
+      return [
+        booking.displayId,
+        booking._id,
+        booking.customerName,
+        booking.customerEmail,
+        booking.customerPhone,
+        booking.customerRef,
+      ].some((value) => value.toLowerCase().includes(search));
     } catch (err) {
       console.error("Booking filter error:", err);
       return false;
@@ -456,11 +495,11 @@ const AdminExpenses = () => {
                     </label>
                     {bookings.length === 0 ? (
                       <p className="text-sm text-red-600">❌ No bookings found. Please create a booking first.</p>
-                    ) : bookings.length > 5 ? (
+                    ) : normalizedBookings.length > 5 ? (
                       <>
                         <input
                           type="text"
-                          placeholder="🔍 Search booking ID or customer name..."
+                          placeholder="🔍 Search booking ID, customer name, phone, or email..."
                           value={formData.bookingSearch}
                           onChange={(e) => setFormData({ ...formData, bookingSearch: e.target.value })}
                           className="input-clean w-full"
@@ -477,7 +516,7 @@ const AdminExpenses = () => {
                               <option value="">Select a booking from results</option>
                               {filteredBookings.map(booking => (
                                 <option key={booking._id} value={booking._id}>
-                                  {booking.bookingId} - {booking.customerId}
+                                  {booking.displayId} - {booking.customerName}
                                 </option>
                               ))}
                             </select>
@@ -498,9 +537,9 @@ const AdminExpenses = () => {
                         required
                       >
                         <option value="">Select a booking</option>
-                        {bookings.map(booking => (
+                        {normalizedBookings.map(booking => (
                           <option key={booking._id} value={booking._id}>
-                            {booking.bookingId} - {booking.customerId}
+                            {booking.displayId} - {booking.customerName}
                           </option>
                         ))}
                       </select>

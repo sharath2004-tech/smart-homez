@@ -3,7 +3,7 @@ import { api, authAPI } from "@/lib/api";
 import { AnimatePresence, motion } from "framer-motion";
 import { Calendar, CheckCircle, Clock, MapPin, Minus, Plus, ShoppingCart, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface ConfigItem {
@@ -75,6 +75,7 @@ const AnimatedTotal = ({ value }: { value: number }) => (
 // ─── Main Page ───────────────────────────────────────────────────────────────
 export default function DeepCleaningPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [config, setConfig] = useState<DeepCleaningConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("bathroom");
@@ -97,16 +98,20 @@ export default function DeepCleaningPage() {
     ]).then(([cfg, prof]) => {
       setConfig(cfg.config);
       setProfile(prof?.user || prof);
+      const requestedCategory = searchParams.get("category");
       // Set active category to first active category from config (ONLY from backend, no fallback)
       const cats = (cfg.config?.categories ?? [])
         .filter((c: DeepCleaningCategory) => c.isActive)
         .sort((a: DeepCleaningCategory, b: DeepCleaningCategory) => a.sortOrder - b.sortOrder);
       if (cats.length > 0) {
-        setActiveCategory(cats[0].id);
-        prevCat.current = cats[0].id;
+        const initialCategory = requestedCategory && cats.some((c: DeepCleaningCategory) => c.id === requestedCategory)
+          ? requestedCategory
+          : cats[0].id;
+        setActiveCategory(initialCategory);
+        prevCat.current = initialCategory;
       }
     }).finally(() => setLoading(false));
-  }, []);
+  }, [searchParams]);
 
   const cartTotal  = useMemo(() => Object.values(cart).reduce((s, e) => s + e.totalPrice, 0), [cart]);
   const cartCount  = useMemo(() => Object.values(cart).reduce((s, e) => s + e.qty, 0), [cart]);
@@ -208,12 +213,17 @@ export default function DeepCleaningPage() {
             animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0.7, 0.3] }}
             transition={{ repeat: Infinity, duration: 2.8, delay: 1 }} />
           <div className="relative z-10">
+            <div className="mb-3">
+              <Link to="/customer/deep-cleaning" className="inline-flex items-center gap-1.5 text-xs font-medium text-white/80 hover:text-white transition-colors">
+                ← Back to Deep Cleaning Categories
+              </Link>
+            </div>
             <motion.div initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }}
               transition={{ type: "spring", delay: 0.2 }} className="text-4xl mb-3 inline-block">
               ✨
             </motion.div>
-            <h1 className="text-2xl font-bold text-white mb-1">Deep Cleaning</h1>
-            <p className="text-white/70 text-sm">Pick any items — build your own package</p>
+            <h1 className="text-2xl font-bold text-white mb-1">Deep Cleaning Custom Builder</h1>
+            <p className="text-white/70 text-sm">Pick any items and build your own package from the admin-configured template.</p>
             <div className="mt-3 inline-flex items-center gap-1.5 bg-white/15 text-white text-xs font-medium px-3 py-1.5 rounded-full">
               <ShoppingCart className="w-3 h-3" /> Min cart ₹{minValue}
             </div>

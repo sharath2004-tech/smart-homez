@@ -7,15 +7,7 @@ const tierSchema = new mongoose.Schema({
 
 const itemSchema = new mongoose.Schema({
   id:          { type: String, required: true },
-  category:    {
-    type: String,
-    enum: [
-      'bathroom', 'kitchen', 'furniture', 'appliances', 'fullhouse',
-      'sofa_upholstery', 'mattress', 'balcony_window',
-      'move_in_out', 'office', 'post_construction'
-    ],
-    required: true
-  },
+  category:    { type: String, required: true },
   name:        { type: String, required: true },
   description: { type: String, default: '' },
   pricingType: { type: String, enum: ['fixed', 'per_unit', 'per_sqft', 'tiered'], required: true },

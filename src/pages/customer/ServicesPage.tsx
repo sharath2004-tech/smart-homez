@@ -12,6 +12,7 @@ interface Service {
   name: string;
   description: string;
   category: string;
+  serviceType?: string;
   price: number;
   duration: number;
   isQuoteService?: boolean;
@@ -180,338 +181,337 @@ const ServicesPage = () => {
 
   return (
     <>
+      <AppLayout userType="customer" userName={profile?.name || "Loading..."}>
+        <div className="max-w-4xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 pb-20 md:pb-0">
+          <motion.div
+            initial={{ x: -20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ delay: 0.2 }}
+          >
+            <h1 className="text-2xl font-bold font-heading text-foreground mb-1">{t('customer.services.title')}</h1>
+            <p className="text-muted-foreground text-sm">{t('customer.services.subtitle')}</p>
+            {selectedLocation && (
+              <motion.div 
+                className="mt-2 flex items-center justify-between"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+              >
+                <p className="text-xs text-primary flex items-center gap-1">
+                  <MapPin className="w-3 h-3" />
+                  {selectedLocation.area && selectedLocation.city 
+                    ? `${selectedLocation.area}, ${selectedLocation.city}` 
+                    : t('customer.services.locationSet')}
+                </p>
+                <button 
+                  onClick={handleChangeLocation}
+                  className="text-xs text-primary hover:underline"
+                >
+                  {t('customer.services.changeLocation')}
+                </button>
+              </motion.div>
+            )}
+          </motion.div>
+
+
+          {/* 3 Category Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {SERVICE_CATEGORIES.map((cat) => (
+              <button
+                key={cat.key}
+                onClick={() => navigate(cat.path)}
+                className={`p-3 rounded-2xl border-2 text-center transition-all ${cat.color} hover:border-primary/60 hover:shadow-md active:scale-95`}
+              >
+                <div className="text-2xl mb-1">{cat.icon}</div>
+                <div>
+                  <p className="text-xs font-semibold text-foreground leading-tight">
+                    {cat.key === 'deep' ? 'Move In / Move Out Cleaning' : t(cat.labelKey)}
+                  </p>
+                  {cat.key === 'deep' && (
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Full Home Deep Clean</p>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block leading-tight">{t(cat.descKey)}</p>
+                <span className={`inline-block mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full ${cat.badgeColor}`}>{t(cat.badgeKey)}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Spot Clean Mini Services Banner */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.40 }}
+          >
+            <Link
+              to="/customer/services/spot-clean"
+              className="flex items-center gap-4 p-4 rounded-2xl border-2 border-cyan-300 bg-cyan-50 hover:bg-cyan-100 hover:border-cyan-400 transition-all group"
+            >
+              <div className="w-12 h-12 bg-cyan-200 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform text-2xl">
+                🧹
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-cyan-900 text-sm leading-tight">Mini Services  — Spot Cleaning</p>
+                <p className="text-xs text-cyan-700 mt-0.5">Kitchen · Bathroom · Sofa · Fan · Fridge · Balcony &amp; more</p>
+              </div>
+              <span className="shrink-0 text-xs font-semibold bg-cyan-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">From ₹149 →</span>
+            </Link>
+          </motion.div>
+
+          {/* Deep Cleaning Commercial Quote Banner */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+          >
+            <Link
+              to="/deep-cleaning-quote"
+              className="flex items-center gap-4 p-4 rounded-2xl border-2 border-green-300 bg-green-50 hover:bg-green-100 hover:border-green-400 transition-all group"
+            >
+              <div className="w-12 h-12 bg-green-200 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                <Sparkles className="w-6 h-6 text-green-700" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-green-900 text-sm leading-tight">Move In / Move Out — Commercial &amp; Residential</p>
+                <p className="text-xs text-green-700 mt-0.5">Villas · Restaurants · Offices · Bungalows</p>
+              </div>
+              <span className="shrink-0 text-xs font-semibold bg-green-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">Get Free Quote →</span>
+            </Link>
+          </motion.div>
+
+          {/* Deep Cleaning Sub-Services Cards */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.45 }}
+            className="space-y-3"
+          >
+            <h3 className="text-sm font-semibold text-foreground px-1">Room-Specific Deep Cleaning</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Bathroom DC */}
+              <button
+                onClick={() => {
+                  const bathroomService = services.find(s =>
+                    s.name.toLowerCase().includes('bathroom') &&
+                    (s.name.toLowerCase().includes('deep') || s.serviceType?.includes('bathroom'))
+                  );
+                  if (bathroomService) {
+                    navigate(`/customer/book/${bathroomService._id}`);
+                  }
+                }}
+                className="p-4 rounded-xl border-2 border-purple-300 bg-purple-50 hover:bg-purple-100 hover:border-purple-400 transition-all text-center group"
+              >
+                <div className="text-3xl mb-2">🚿</div>
+                <p className="font-semibold text-purple-900 text-sm">Bathroom DC</p>
+                <p className="text-xs text-purple-700 mt-1">Professional cleaning</p>
+                <span className="inline-block mt-2 text-[10px] font-semibold bg-purple-600 text-white px-2 py-1 rounded-full">Quick Book</span>
+              </button>
+
+              {/* Kitchen DC */}
+              <button
+                onClick={() => {
+                  const kitchenService = services.find(s =>
+                    s.name.toLowerCase().includes('kitchen') &&
+                    (s.name.toLowerCase().includes('deep') || s.serviceType?.includes('kitchen'))
+                  );
+                  if (kitchenService) {
+                    navigate(`/customer/book/${kitchenService._id}`);
+                  }
+                }}
+                className="p-4 rounded-xl border-2 border-orange-300 bg-orange-50 hover:bg-orange-100 hover:border-orange-400 transition-all text-center group"
+              >
+                <div className="text-3xl mb-2">🍽️</div>
+                <p className="font-semibold text-orange-900 text-sm">Kitchen DC</p>
+                <p className="text-xs text-orange-700 mt-1">Professional cleaning</p>
+                <span className="inline-block mt-2 text-[10px] font-semibold bg-orange-600 text-white px-2 py-1 rounded-full">Quick Book</span>
+              </button>
+
+              {/* Windows DC */}
+              <button
+                onClick={() => {
+                  const windowService = services.find(s =>
+                    s.name.toLowerCase().includes('window') &&
+                    (s.name.toLowerCase().includes('clean') || s.serviceType?.includes('window'))
+                  );
+                  if (windowService) {
+                    navigate(`/customer/book/${windowService._id}`);
+                  }
+                }}
+                className="p-4 rounded-xl border-2 border-blue-300 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 transition-all text-center group"
+              >
+                <div className="text-3xl mb-2">🪟</div>
+                <p className="font-semibold text-blue-900 text-sm">Windows DC</p>
+                <p className="text-xs text-blue-700 mt-1">Professional cleaning</p>
+                <span className="inline-block mt-2 text-[10px] font-semibold bg-blue-600 text-white px-2 py-1 rounded-full">Quick Book</span>
+              </button>
+            </div>
+          </motion.div>
+
+          {/* Search */}
+          <motion.div
+            className="flex gap-3"
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.4 }}
+          >
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                className="input-clean pl-10"
+                placeholder={t('customer.services.searchPlaceholder')}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </motion.div>
+
+          {loading ? (
+            <motion.div 
+              className="text-center py-12"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              <motion.div 
+                className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full mx-auto mb-3"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              />
+              <p className="text-sm text-muted-foreground">{t('customer.services.loading')}</p>
+            </motion.div>
+          ) : displayedServices.length === 0 ? (
+            <motion.div 
+              className="text-center py-12"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 200 }}
+            >
+              <motion.div 
+                className="text-5xl mb-3"
+                animate={{ scale: [1, 1.1, 1] }}
+                transition={{ repeat: Infinity, duration: 2 }}
+              >
+                🔍
+              </motion.div>
+              <p className="font-medium text-foreground">{t('customer.services.noServices')}</p>
+              <p className="text-sm text-muted-foreground mt-1">{t('customer.services.noServicesDesc')}</p>
+            </motion.div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {displayedServices.map((service) => (
+                <div 
+                  key={service._id} 
+                  className="card-elevated-hover p-5 group"
+                >
+                  <div className="flex items-start gap-4">
+                    <motion.div 
+                      className="w-14 h-14 bg-accent rounded-2xl flex items-center justify-center text-3xl shrink-0"
+                      whileHover={{ scale: 1.15, rotate: 5 }}
+                      transition={{ type: "spring", stiffness: 300 }}
+                    >
+                      {getCategoryEmoji(service.category, service.name)}
+                    </motion.div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-bold font-heading text-foreground text-sm">{service.name}</h3>
+                        {service.availability && (
+                          <span className={`shrink-0 text-xs ${service.availability.available ? 'badge-success' : 'badge-warning'}`}>
+                            {service.availability.available ? t('customer.services.available') : t('customer.services.limited')}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{service.description}</p>
+                    </div>
+                  </div>
+
+                  {/* Availability Info */}
+                  {service.availability && (
+                    <div className="mt-3 p-2 bg-muted rounded-lg flex items-center gap-2">
+                      <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span className="text-xs text-foreground">
+                        {service.availability.workersCount > 0 
+                          ? t('customer.services.workersNearby', { count: service.availability.workersCount })
+                          : service.availability.reason}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        {service.isQuoteService ? (
+                          <span className="text-sm font-bold text-green-700">Custom Quote</span>
+                        ) : service.subscriptionOptions?.enabled ? (
+                          <div>
+                            <div className="text-xs text-muted-foreground line-through">
+                              ₹{Math.round(service.price / 0.8).toLocaleString('en-IN')}<span className="font-normal">/mo</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm font-bold text-green-700">From ₹{service.price.toLocaleString('en-IN')}<span className="text-xs font-normal text-muted-foreground">/mo</span></span>
+                              <span className="text-xs font-semibold bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">20% off</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="text-xs text-muted-foreground line-through">
+                              ₹{Math.round(service.price / 0.8).toLocaleString('en-IN')}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm font-bold text-green-700">₹{service.price.toLocaleString('en-IN')}</span>
+                              <span className="text-xs font-semibold bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">20% off</span>
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <Clock className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">{service.duration} min</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                      {service.isQuoteService ? (
+                        <Link
+                          to="/customer/deep-cleaning"
+                          className="w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors btn-brand"
+                        >
+                          Book Now ✨
+                        </Link>
+                      ) : service.subscriptionOptions?.enabled ? (
+                        <Link
+                          to={`/customer/subscribe/${service._id}`}
+                          className="w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors btn-brand"
+                        >
+                          Subscribe 📅
+                        </Link>
+                      ) : (
+                        <Link
+                          to={`/customer/book/${service._id}`}
+                          className={`w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors ${
+                            service.availability?.available === false
+                              ? 'bg-muted text-muted-foreground hover:bg-border'
+                              : 'btn-brand'
+                          }`}
+                        >
+                          {service.availability?.available === false ? t('customer.services.view') : t('customer.services.bookNow')}
+                        </Link>
+                      )}
+                    </motion.div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </AppLayout>
+
       {showLocationSelector && (
         <LocationSelector
+          key={selectedLocation ? `${selectedLocation.lat}-${selectedLocation.lng}` : 'location-selector'}
           onLocationConfirmed={handleLocationConfirmed}
           onClose={selectedLocation ? () => setShowLocationSelector(false) : undefined}
           showCloseButton={!!selectedLocation}
           defaultLocation={selectedLocation ? { lat: selectedLocation.lat, lng: selectedLocation.lng } : undefined}
         />
-      )}
-      
-      {!showLocationSelector && (
-        <AppLayout userType="customer" userName={profile?.name || "Loading..."}>
-          <div className="max-w-4xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 pb-20 md:pb-0">
-            <motion.div
-              initial={{ x: -20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: 0.2 }}
-            >
-              <h1 className="text-2xl font-bold font-heading text-foreground mb-1">{t('customer.services.title')}</h1>
-              <p className="text-muted-foreground text-sm">{t('customer.services.subtitle')}</p>
-              {selectedLocation && (
-                <motion.div 
-                  className="mt-2 flex items-center justify-between"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  <p className="text-xs text-primary flex items-center gap-1">
-                    <MapPin className="w-3 h-3" />
-                    {selectedLocation.area && selectedLocation.city 
-                      ? `${selectedLocation.area}, ${selectedLocation.city}` 
-                      : t('customer.services.locationSet')}
-                  </p>
-                  <button 
-                    onClick={handleChangeLocation}
-                    className="text-xs text-primary hover:underline"
-                  >
-                    {t('customer.services.changeLocation')}
-                  </button>
-                </motion.div>
-              )}
-            </motion.div>
-
-
-            {/* 3 Category Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {SERVICE_CATEGORIES.map((cat) => (
-                <button
-                  key={cat.key}
-                  onClick={() => navigate(cat.path)}
-                  className={`p-3 rounded-2xl border-2 text-center transition-all ${cat.color} hover:border-primary/60 hover:shadow-md active:scale-95`}
-                >
-                  <div className="text-2xl mb-1">{cat.icon}</div>
-                  <div>
-                    <p className="text-xs font-semibold text-foreground leading-tight">
-                      {cat.key === 'deep' ? 'Move In / Move Out Cleaning' : t(cat.labelKey)}
-                    </p>
-                    {cat.key === 'deep' && (
-                      <p className="text-[10px] text-muted-foreground mt-0.5">Full Home Deep Clean</p>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block leading-tight">{t(cat.descKey)}</p>
-                  <span className={`inline-block mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full ${cat.badgeColor}`}>{t(cat.badgeKey)}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Spot Clean Mini Services Banner */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.40 }}
-            >
-              <Link
-                to="/customer/services/spot-clean"
-                className="flex items-center gap-4 p-4 rounded-2xl border-2 border-cyan-300 bg-cyan-50 hover:bg-cyan-100 hover:border-cyan-400 transition-all group"
-              >
-                <div className="w-12 h-12 bg-cyan-200 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform text-2xl">
-                  🧹
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-cyan-900 text-sm leading-tight">Mini Services  — Spot Cleaning</p>
-                  <p className="text-xs text-cyan-700 mt-0.5">Kitchen · Bathroom · Sofa · Fan · Fridge · Balcony &amp; more</p>
-                </div>
-                <span className="shrink-0 text-xs font-semibold bg-cyan-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">From ₹149 →</span>
-              </Link>
-            </motion.div>
-
-            {/* Deep Cleaning Commercial Quote Banner */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
-            >
-              <Link
-                to="/deep-cleaning-quote"
-                className="flex items-center gap-4 p-4 rounded-2xl border-2 border-green-300 bg-green-50 hover:bg-green-100 hover:border-green-400 transition-all group"
-              >
-                <div className="w-12 h-12 bg-green-200 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                  <Sparkles className="w-6 h-6 text-green-700" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-green-900 text-sm leading-tight">Move In / Move Out — Commercial &amp; Residential</p>
-                  <p className="text-xs text-green-700 mt-0.5">Villas · Restaurants · Offices · Bungalows</p>
-                </div>
-                <span className="shrink-0 text-xs font-semibold bg-green-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">Get Free Quote →</span>
-              </Link>
-            </motion.div>
-
-            {/* Deep Cleaning Sub-Services Cards */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.45 }}
-              className="space-y-3"
-            >
-              <h3 className="text-sm font-semibold text-foreground px-1">Room-Specific Deep Cleaning</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* Bathroom DC */}
-                <button
-                  onClick={() => {
-                    const bathroomService = services.find(s =>
-                      s.name.toLowerCase().includes('bathroom') &&
-                      (s.name.toLowerCase().includes('deep') || s.serviceType?.includes('bathroom'))
-                    );
-                    if (bathroomService) {
-                      navigate(`/customer/book/${bathroomService._id}`);
-                    }
-                  }}
-                  className="p-4 rounded-xl border-2 border-purple-300 bg-purple-50 hover:bg-purple-100 hover:border-purple-400 transition-all text-center group"
-                >
-                  <div className="text-3xl mb-2">🚿</div>
-                  <p className="font-semibold text-purple-900 text-sm">Bathroom DC</p>
-                  <p className="text-xs text-purple-700 mt-1">Professional cleaning</p>
-                  <span className="inline-block mt-2 text-[10px] font-semibold bg-purple-600 text-white px-2 py-1 rounded-full">Quick Book</span>
-                </button>
-
-                {/* Kitchen DC */}
-                <button
-                  onClick={() => {
-                    const kitchenService = services.find(s =>
-                      s.name.toLowerCase().includes('kitchen') &&
-                      (s.name.toLowerCase().includes('deep') || s.serviceType?.includes('kitchen'))
-                    );
-                    if (kitchenService) {
-                      navigate(`/customer/book/${kitchenService._id}`);
-                    }
-                  }}
-                  className="p-4 rounded-xl border-2 border-orange-300 bg-orange-50 hover:bg-orange-100 hover:border-orange-400 transition-all text-center group"
-                >
-                  <div className="text-3xl mb-2">🍽️</div>
-                  <p className="font-semibold text-orange-900 text-sm">Kitchen DC</p>
-                  <p className="text-xs text-orange-700 mt-1">Professional cleaning</p>
-                  <span className="inline-block mt-2 text-[10px] font-semibold bg-orange-600 text-white px-2 py-1 rounded-full">Quick Book</span>
-                </button>
-
-                {/* Windows DC */}
-                <button
-                  onClick={() => {
-                    const windowService = services.find(s =>
-                      s.name.toLowerCase().includes('window') &&
-                      (s.name.toLowerCase().includes('clean') || s.serviceType?.includes('window'))
-                    );
-                    if (windowService) {
-                      navigate(`/customer/book/${windowService._id}`);
-                    }
-                  }}
-                  className="p-4 rounded-xl border-2 border-blue-300 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 transition-all text-center group"
-                >
-                  <div className="text-3xl mb-2">🪟</div>
-                  <p className="font-semibold text-blue-900 text-sm">Windows DC</p>
-                  <p className="text-xs text-blue-700 mt-1">Professional cleaning</p>
-                  <span className="inline-block mt-2 text-[10px] font-semibold bg-blue-600 text-white px-2 py-1 rounded-full">Quick Book</span>
-                </button>
-              </div>
-            </motion.div>
-
-            {/* Search */}
-            <motion.div
-              className="flex gap-3"
-              initial={{ y: -20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.4 }}
-            >
-              <div className="relative flex-1">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                  className="input-clean pl-10"
-                  placeholder={t('customer.services.searchPlaceholder')}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-            </motion.div>
-
-        {loading ? (
-          <motion.div 
-            className="text-center py-12"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            <motion.div 
-              className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full mx-auto mb-3"
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            />
-            <p className="text-sm text-muted-foreground">{t('customer.services.loading')}</p>
-          </motion.div>
-        ) : displayedServices.length === 0 ? (
-          <motion.div 
-            className="text-center py-12"
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 200 }}
-          >
-            <motion.div 
-              className="text-5xl mb-3"
-              animate={{ scale: [1, 1.1, 1] }}
-              transition={{ repeat: Infinity, duration: 2 }}
-            >
-              🔍
-            </motion.div>
-            <p className="font-medium text-foreground">{t('customer.services.noServices')}</p>
-            <p className="text-sm text-muted-foreground mt-1">{t('customer.services.noServicesDesc')}</p>
-          </motion.div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {displayedServices.map((service, index) => (
-              <div 
-                key={service._id} 
-                className="card-elevated-hover p-5 group"
-              >
-                <div className="flex items-start gap-4">
-                  <motion.div 
-                    className="w-14 h-14 bg-accent rounded-2xl flex items-center justify-center text-3xl shrink-0"
-                    whileHover={{ scale: 1.15, rotate: 5 }}
-                    transition={{ type: "spring", stiffness: 300 }}
-                  >
-                    {getCategoryEmoji(service.category, service.name)}
-                  </motion.div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-bold font-heading text-foreground text-sm">{service.name}</h3>
-                      {service.availability && (
-                        <span className={`shrink-0 text-xs ${service.availability.available ? 'badge-success' : 'badge-warning'}`}>
-                          {service.availability.available ? t('customer.services.available') : t('customer.services.limited')}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{service.description}</p>
-                  </div>
-                </div>
-
-                {/* Availability Info */}
-                {service.availability && (
-                  <div className="mt-3 p-2 bg-muted rounded-lg flex items-center gap-2">
-                    <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-xs text-foreground">
-                      {service.availability.workersCount > 0 
-                        ? t('customer.services.workersNearby', { count: service.availability.workersCount })
-                        : service.availability.reason}
-                    </span>
-                  </div>
-                )}
-
-                <div className="mt-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      {service.isQuoteService ? (
-                        <span className="text-sm font-bold text-green-700">Custom Quote</span>
-                      ) : service.subscriptionOptions?.enabled ? (
-                        <div>
-                          <div className="text-xs text-muted-foreground line-through">
-                            ₹{Math.round(service.price / 0.8).toLocaleString('en-IN')}<span className="font-normal">/mo</span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-bold text-green-700">From ₹{service.price.toLocaleString('en-IN')}<span className="text-xs font-normal text-muted-foreground">/mo</span></span>
-                            <span className="text-xs font-semibold bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">20% off</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div>
-                          <div className="text-xs text-muted-foreground line-through">
-                            ₹{Math.round(service.price / 0.8).toLocaleString('en-IN')}
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-bold text-green-700">₹{service.price.toLocaleString('en-IN')}</span>
-                            <span className="text-xs font-semibold bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">20% off</span>
-                          </div>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <Clock className="w-3 h-3 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">{service.duration} min</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    {service.isQuoteService ? (
-                      <Link
-                        to="/customer/deep-cleaning"
-                        className="w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors btn-brand"
-                      >
-                        Book Now ✨
-                      </Link>
-                    ) : service.subscriptionOptions?.enabled ? (
-                      <Link
-                        to={`/customer/subscribe/${service._id}`}
-                        className="w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors btn-brand"
-                      >
-                        Subscribe 📅
-                      </Link>
-                    ) : (
-                      <Link
-                        to={`/customer/book/${service._id}`}
-                        className={`w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors ${
-                          service.availability?.available === false
-                            ? 'bg-muted text-muted-foreground hover:bg-border'
-                            : 'btn-brand'
-                        }`}
-                      >
-                        {service.availability?.available === false ? t('customer.services.view') : t('customer.services.bookNow')}
-                      </Link>
-                    )}
-                  </motion.div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </AppLayout>
       )}
     </>
   );

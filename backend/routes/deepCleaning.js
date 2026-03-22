@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import Booking from '../models/Booking.js';
+import DeepCleaningChangeRequest from '../models/DeepCleaningChangeRequest.js';
 import DeepCleaningConfig from '../models/DeepCleaningConfig.js';
 import Location from '../models/Location.js';
 import Service from '../models/Service.js';
@@ -118,6 +119,110 @@ router.put('/config', authenticate, authorize('super_admin'), async (req, res) =
 
     await config.save();
     res.json({ success: true, config });
+  } catch (err) {
+    res.status(500).json({ error: { message: err.message, status: 500 } });
+  }
+});
+
+// ─── GET /api/deep-cleaning/change-requests  (admin own, super admin all) ───
+router.get('/change-requests', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { status = 'all' } = req.query;
+    const query = {};
+
+    if (status !== 'all') query.status = status;
+    if (req.user.role === 'admin') query.requestedBy = req.user._id;
+
+    const requests = await DeepCleaningChangeRequest.find(query)
+      .populate('requestedBy', 'name email role')
+      .populate('reviewedBy', 'name role')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({ success: true, requests });
+  } catch (err) {
+    res.status(500).json({ error: { message: err.message, status: 500 } });
+  }
+});
+
+// ─── POST /api/deep-cleaning/change-requests  (admin only) ─────────────────
+router.post('/change-requests', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const { title, requestNote = '', proposedConfig } = req.body || {};
+
+    if (!title?.trim()) {
+      return res.status(400).json({ error: { message: 'Title is required', status: 400 } });
+    }
+
+    if (!proposedConfig || !Array.isArray(proposedConfig.items) || !Array.isArray(proposedConfig.categories)) {
+      return res.status(400).json({ error: { message: 'A valid proposed config is required', status: 400 } });
+    }
+
+    const request = await DeepCleaningChangeRequest.create({
+      title: title.trim(),
+      requestNote,
+      proposedConfig: {
+        items: proposedConfig.items,
+        categories: proposedConfig.categories,
+        minimumCartValue: Number(proposedConfig.minimumCartValue ?? 0),
+      },
+      requestedBy: req.user._id,
+    });
+
+    const hydratedRequest = await DeepCleaningChangeRequest.findById(request._id)
+      .populate('requestedBy', 'name email role')
+      .lean();
+
+    res.status(201).json({ success: true, request: hydratedRequest });
+  } catch (err) {
+    res.status(500).json({ error: { message: err.message, status: 500 } });
+  }
+});
+
+// ─── POST /api/deep-cleaning/change-requests/:id/review (super admin only) ─
+router.post('/change-requests/:id/review', authenticate, authorize('super_admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, reviewNote = '' } = req.body || {};
+
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: { message: 'Status must be approved or rejected', status: 400 } });
+    }
+
+    const request = await DeepCleaningChangeRequest.findById(id);
+    if (!request) {
+      return res.status(404).json({ error: { message: 'Change request not found', status: 404 } });
+    }
+
+    if (request.status !== 'pending') {
+      return res.status(400).json({ error: { message: 'Only pending requests can be reviewed', status: 400 } });
+    }
+
+    let config = null;
+
+    if (status === 'approved') {
+      config = await DeepCleaningConfig.findOne();
+      if (!config) config = new DeepCleaningConfig();
+
+      config.items = request.proposedConfig.items;
+      config.categories = request.proposedConfig.categories;
+      config.minimumCartValue = Number(request.proposedConfig.minimumCartValue ?? 0);
+      config.updatedBy = req.user._id;
+      await config.save();
+    }
+
+    request.status = status;
+    request.reviewNote = reviewNote;
+    request.reviewedBy = req.user._id;
+    request.reviewedAt = new Date();
+    await request.save();
+
+    const hydratedRequest = await DeepCleaningChangeRequest.findById(request._id)
+      .populate('requestedBy', 'name email role')
+      .populate('reviewedBy', 'name role')
+      .lean();
+
+    res.json({ success: true, request: hydratedRequest, config });
   } catch (err) {
     res.status(500).json({ error: { message: err.message, status: 500 } });
   }

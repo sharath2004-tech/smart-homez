@@ -108,6 +108,7 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
     { to: "/admin/help-messages",      icon: MessageSquare,   label: "Help Messages" },
     { to: "/admin/locations",          icon: MapPin,          label: t('nav.locations') },
     { to: "/admin/services",           icon: Wrench,          label: t('nav.services') },
+    { to: "/admin/deep-cleaning-config", icon: Sparkles,      label: "Deep Clean Config" },
     { to: "/admin/dashboard-preferences", icon: Settings2,    label: "Dashboard Preferences" },
     { to: "/admin/settings",           icon: Settings,        label: t('nav.settings') },
     { to: "/change-password",          icon: KeyRound,        label: "Change Password" },
@@ -131,6 +132,7 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
       defaultOpen: false,
       items: [
         { to: "/admin/services", icon: Wrench, label: t('nav.services') },
+        { to: "/admin/deep-cleaning-config", icon: Sparkles, label: "Deep Clean Config" },
         { to: "/admin/dashboard-preferences", icon: Settings2, label: "Dashboard Preferences" },
       ]
     },
