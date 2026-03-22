@@ -59,6 +59,40 @@ const bookingSchema = new mongoose.Schema({
     },
     name: { type: String }
   }],
+  // Break time tracking for deep cleaning services
+  breakRequests: [{
+    requestedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    requestedByName: { type: String },
+    reason: { type: String, default: '' },
+    requestedAt: { type: Date, default: Date.now },
+    startedAt: { type: Date, default: null },
+    endedAt: { type: Date, default: null },
+    durationMinutes: { type: Number, default: 0 },
+    status: {
+      type: String,
+      enum: ['pending', 'approved', 'active', 'completed', 'rejected'],
+      default: 'pending'
+    },
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    }
+  }],
+  // Total break duration in minutes (sum of all completed breaks)
+  totalBreakMinutes: {
+    type: Number,
+    default: 0
+  },
+  // Whether service is currently paused for a break
+  isOnBreak: {
+    type: Boolean,
+    default: false
+  },
   // Worker arrival tracking
   workerArrivalTime: {
     type: Date,

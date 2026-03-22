@@ -3,7 +3,7 @@ import BookingOrderPrint from "@/components/BookingOrderPrint";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { bookingsAPI, superAdminAPI } from "@/lib/api";
 import ExcelJS from "exceljs";
-import { CheckCircle, Download, Eye, MapPin, Printer, Search, Users, Wallet, X } from "lucide-react";
+import { CheckCircle, Clock, Coffee, Crown, Download, Eye, MapPin, Pause, Play, Printer, Search, Users, Wallet, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import html2pdf from "html2pdf.js";
 
@@ -13,6 +13,18 @@ interface ProofPhoto {
   verified: boolean;
   transactionId?: string;
   transactionTime?: string;
+}
+
+interface BreakRequest {
+  _id: string;
+  requestedBy: string;
+  requestedByName?: string;
+  reason?: string;
+  requestedAt: string;
+  startedAt?: string;
+  endedAt?: string;
+  durationMinutes: number;
+  status: 'pending' | 'approved' | 'active' | 'completed' | 'rejected';
 }
 
 interface Booking {
@@ -33,6 +45,9 @@ interface Booking {
   completionPhotos?: ProofPhoto[];
   paymentProof?: ProofPhoto;
   actualDurationMinutes?: number;
+  breakRequests?: BreakRequest[];
+  isOnBreak?: boolean;
+  totalBreakMinutes?: number;
   workforce?: {
     workerCount: number;
     wageType: 'per_hour' | 'per_session';
@@ -239,6 +254,20 @@ const AdminBookings = () => {
     }
   };
 
+  const handleSetTeamHead = async (workerId: string) => {
+    if (!selectedTeamBooking) return;
+    try {
+      setTeamActionLoading(true);
+      const res = await bookingsAPI.setTeamHead(selectedTeamBooking._id, workerId);
+      setSelectedTeamBooking(prev => prev ? { ...prev, worker: res.worker, supportStaff: res.supportStaff } : prev);
+      setBookings(prev => prev.map(b => b._id === selectedTeamBooking._id ? { ...b, worker: res.worker, supportStaff: res.supportStaff } : b));
+    } catch (e) {
+      alert((e as Error).message || 'Failed to set team head');
+    } finally {
+      setTeamActionLoading(false);
+    }
+  };
+
   const handlePrintToPDF = () => {
     if (!printRef.current || !selectedProofBooking) return;
 
@@ -410,9 +439,21 @@ const AdminBookings = () => {
                     </td>
                     <td className="px-4 py-3 text-sm font-semibold text-foreground whitespace-nowrap">₹{b.totalAmount}</td>
                     <td className="px-4 py-3">
-                      <span className={statusConfig[b.status] || statusConfig.pending}>
-                        {b.status.charAt(0).toUpperCase() + b.status.slice(1).replace('-', ' ')}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className={statusConfig[b.status] || statusConfig.pending}>
+                          {b.status.charAt(0).toUpperCase() + b.status.slice(1).replace('-', ' ')}
+                        </span>
+                        {b.isOnBreak && (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 w-fit">
+                            <Coffee className="w-3 h-3" /> On Break
+                          </span>
+                        )}
+                        {b.totalBreakMinutes && b.totalBreakMinutes > 0 ? (
+                          <span className="text-xs text-muted-foreground">
+                            Break: {b.totalBreakMinutes}m
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">
@@ -677,7 +718,7 @@ const AdminBookings = () => {
                   {selectedTeamBooking.worker && (
                     <div className="flex items-center justify-between p-3 bg-violet-50 border border-violet-200 rounded-xl">
                       <div className="flex items-center gap-2">
-                        <span>👑</span>
+                        <Crown className="w-4 h-4 text-amber-500" />
                         <div>
                           <p className="text-sm font-medium text-foreground">{selectedTeamBooking.worker.name}</p>
                           <p className="text-xs text-muted-foreground">{selectedTeamBooking.worker.email}</p>
@@ -687,7 +728,7 @@ const AdminBookings = () => {
                     </div>
                   )}
                   {!selectedTeamBooking.worker && (
-                    <p className="text-sm text-muted-foreground italic">No team head assigned yet</p>
+                    <p className="text-sm text-amber-600 italic bg-amber-50 border border-amber-200 rounded-xl p-3">No team head assigned — select one from the workers below</p>
                   )}
                   {(selectedTeamBooking.supportStaff ?? []).map((s) => (
                     <div key={s.worker._id} className="flex items-center justify-between p-3 bg-muted/40 border border-border rounded-xl">
@@ -697,13 +738,23 @@ const AdminBookings = () => {
                           <p className="text-sm font-medium text-foreground">{s.worker.name}</p>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleRemoveSupportStaff(s.worker._id)}
-                        disabled={teamActionLoading}
-                        className="text-xs text-red-600 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
-                      >
-                        Remove
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleSetTeamHead(s.worker._id)}
+                          disabled={teamActionLoading}
+                          className="text-xs text-violet-600 hover:text-violet-700 font-medium px-2 py-1 rounded hover:bg-violet-50 transition-colors disabled:opacity-50"
+                          title="Promote to Team Head"
+                        >
+                          <Crown className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleRemoveSupportStaff(s.worker._id)}
+                          disabled={teamActionLoading}
+                          className="text-xs text-red-600 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
                   ))}
                   {(selectedTeamBooking.supportStaff?.length ?? 0) < 4 && (
@@ -714,10 +765,12 @@ const AdminBookings = () => {
                 </div>
               </div>
 
-              {/* Add Support Staff */}
+              {/* Add Support Staff / Team Head */}
               {(selectedTeamBooking.supportStaff?.length ?? 0) < 4 && (
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-3">Add Support Staff</h3>
+                  <h3 className="text-sm font-semibold text-foreground mb-3">
+                    {!selectedTeamBooking.worker ? 'Assign Team Head & Support Staff' : 'Add Support Staff'}
+                  </h3>
                   <div className="relative mb-3">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <input
@@ -737,15 +790,30 @@ const AdminBookings = () => {
                       })
                       .slice(0, 10)
                       .map(w => (
-                        <button
+                        <div
                           key={w._id}
-                          onClick={() => handleAddSupportStaff(w._id)}
-                          disabled={teamActionLoading}
-                          className="w-full text-left p-2.5 rounded-lg hover:bg-muted transition-colors text-sm flex items-center justify-between group disabled:opacity-50"
+                          className="w-full p-2.5 rounded-lg hover:bg-muted transition-colors text-sm flex items-center justify-between group"
                         >
                           <span className="font-medium text-foreground">{w.name}</span>
-                          <span className="text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">+ Add</span>
-                        </button>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {!selectedTeamBooking.worker && (
+                              <button
+                                onClick={() => handleSetTeamHead(w._id)}
+                                disabled={teamActionLoading}
+                                className="text-xs text-violet-600 font-medium px-2 py-1 rounded hover:bg-violet-50 transition-colors disabled:opacity-50 flex items-center gap-1"
+                              >
+                                <Crown className="w-3 h-3" /> Head
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleAddSupportStaff(w._id)}
+                              disabled={teamActionLoading}
+                              className="text-xs text-primary font-medium px-2 py-1 rounded hover:bg-primary/10 transition-colors disabled:opacity-50"
+                            >
+                              + Add
+                            </button>
+                          </div>
+                        </div>
                       ))}
                     {allWorkers.filter(w => {
                       const alreadyTeamHead = selectedTeamBooking.worker?._id === w._id;

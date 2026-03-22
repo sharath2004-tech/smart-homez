@@ -564,7 +564,8 @@ const SuperAdminDashboard = () => {
                   {/* Day schedule table with inline break editor */}
                   <div>
                     <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{t('bh.weeklySchedule')}</h3>
-                    <div className="overflow-x-auto rounded-xl border border-border">
+                    <div className="overflow-x-auto -mx-5 px-5 sm:mx-0 sm:px-0">
+                      <div className="min-w-[600px] rounded-xl border border-border">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-muted/50 border-b border-border">
@@ -607,57 +608,62 @@ const SuperAdminDashboard = () => {
                                   className="input-clean py-1.5 w-28 disabled:opacity-40"
                                 />
                               </td>
-                              <td className="px-4 py-3">
-                                <div className="flex flex-wrap items-start gap-1.5">
+                              <td className="px-4 py-3 min-w-[200px]">
+                                <div className="flex flex-col gap-1.5">
                                   {day.breaks.map((br, bi) => (
-                                    <span key={bi} className="inline-flex items-center gap-1 bg-orange-50 border border-orange-200 text-orange-700 text-xs rounded-full px-2.5 py-0.5">
-                                      {formatDisplayTime(br.start)}–{formatDisplayTime(br.end)}
-                                      {br.label ? ` · ${br.label}` : ''}
+                                    <div key={bi} className="inline-flex items-center gap-1.5 bg-orange-50 border border-orange-200 text-orange-700 text-xs rounded-lg px-3 py-1.5 whitespace-nowrap w-fit max-w-full">
+                                      <span className="font-medium shrink-0">{formatDisplayTime(br.start)}–{formatDisplayTime(br.end)}</span>
+                                      {br.label && <span className="text-orange-500 shrink-0">·</span>}
+                                      {br.label && <span className="truncate">{br.label}</span>}
                                       <button
                                         onClick={() => removeBreak(idx, bi)}
-                                        className="ml-0.5 hover:text-red-600 transition-colors"
+                                        className="ml-auto shrink-0 hover:text-red-600 transition-colors"
                                         title="Remove break"
                                       >
                                         <Trash2 className="w-3 h-3" />
                                       </button>
-                                    </span>
+                                    </div>
                                   ))}
 
                                   {/* Inline add-break form */}
                                   {addBreakIdx === idx ? (
-                                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                                      <input
-                                        type="time"
-                                        value={newBreak.start}
-                                        onChange={e => setNewBreak({ ...newBreak, start: e.target.value })}
-                                        className="input-clean py-1 text-xs w-24"
-                                      />
-                                      <span className="text-muted-foreground text-xs">to</span>
-                                      <input
-                                        type="time"
-                                        value={newBreak.end}
-                                        onChange={e => setNewBreak({ ...newBreak, end: e.target.value })}
-                                        className="input-clean py-1 text-xs w-24"
-                                      />
+                                    <div className="flex flex-col gap-1.5 mt-1">
+                                      <div className="flex items-center gap-1.5">
+                                        <input
+                                          type="time"
+                                          value={newBreak.start}
+                                          onChange={e => setNewBreak({ ...newBreak, start: e.target.value })}
+                                          className="input-clean py-1 text-xs w-[100px]"
+                                        />
+                                        <span className="text-muted-foreground text-xs shrink-0">to</span>
+                                        <input
+                                          type="time"
+                                          value={newBreak.end}
+                                          onChange={e => setNewBreak({ ...newBreak, end: e.target.value })}
+                                          className="input-clean py-1 text-xs w-[100px]"
+                                        />
+                                      </div>
                                       <input
                                         type="text"
                                         placeholder="Label (e.g. Lunch)"
                                         value={newBreak.label}
                                         onChange={e => setNewBreak({ ...newBreak, label: e.target.value })}
-                                        className="input-clean py-1 text-xs w-28"
+                                        className="input-clean py-1 text-xs w-full max-w-[220px]"
                                       />
-                                      <button
-                                        onClick={() => commitAddBreak(idx)}
-                                        className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:opacity-90"
-                                      >
-                                        {t('common.save')}
-                                      </button>
-                                      <button
-                                        onClick={() => setAddBreakIdx(null)}
-                                        className="text-xs text-muted-foreground hover:text-foreground px-1"
-                                      >
-                                        {t('common.cancel')}
-                                      </button>
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          onClick={() => commitAddBreak(idx)}
+                                          className="text-xs bg-primary text-primary-foreground px-3 py-1 rounded-lg hover:opacity-90"
+                                        >
+                                          {t('common.save')}
+                                        </button>
+                                        <button
+                                          onClick={() => setAddBreakIdx(null)}
+                                          className="text-xs text-muted-foreground hover:text-foreground px-1"
+                                        >
+                                          {t('common.cancel')}
+                                        </button>
+                                      </div>
                                     </div>
                                   ) : (
                                     day.isActive && (
@@ -675,6 +681,7 @@ const SuperAdminDashboard = () => {
                           ))}
                         </tbody>
                       </table>
+                      </div>
                     </div>
                   </div>
 

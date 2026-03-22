@@ -1221,7 +1221,8 @@ const AdminWorkers = () => {
 
         {/* Edit Worker Modal */}
         {editWorker && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto">
+            <div className="min-h-full flex items-start justify-center p-4">
             <div className="bg-background rounded-2xl max-w-3xl w-full p-6 my-8">
               <form onSubmit={handleUpdateWorker} className="space-y-6">
                 <div className="flex items-center justify-between mb-4">
@@ -2097,6 +2098,7 @@ const AdminWorkers = () => {
                   </button>
                 </div>
               </form>
+            </div>
             </div>
           </div>
         )}

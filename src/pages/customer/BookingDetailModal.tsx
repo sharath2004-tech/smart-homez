@@ -2,7 +2,7 @@ import ChatModal from "@/components/ChatModal";
 import EmbeddedQRScanner from "@/components/EmbeddedQRScanner";
 import BookingOrderPrint from "@/components/BookingOrderPrint";
 import { API_BASE_URL, bookingsAPI } from "@/lib/api";
-import { ArrowLeft, Calendar, Camera, CheckCircle, ClipboardCheck, Clock3, DollarSign, Download, MapPin, MessageCircle, Phone, Printer, QrCode, Timer, User, X, XCircle } from "lucide-react";
+import { ArrowLeft, Calendar, Camera, CheckCircle, ClipboardCheck, Clock3, Coffee, DollarSign, Download, MapPin, MessageCircle, Pause, Phone, Play, Printer, QrCode, Timer, User, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import html2pdf from "html2pdf.js";
@@ -41,6 +41,18 @@ interface Location {
   zipCode?: string;
 }
 
+interface BreakRequest {
+  _id: string;
+  requestedBy: string;
+  requestedByName?: string;
+  reason?: string;
+  requestedAt: string;
+  startedAt?: string;
+  endedAt?: string;
+  durationMinutes: number;
+  status: 'pending' | 'approved' | 'active' | 'completed' | 'rejected';
+}
+
 interface Booking {
   _id: string;
   service?: Service | null;
@@ -67,6 +79,9 @@ interface Booking {
   rating?: number;
   review?: string;
   paymentStatus?: string;
+  breakRequests?: BreakRequest[];
+  isOnBreak?: boolean;
+  totalBreakMinutes?: number;
   completionPhoto?: {
     url: string;
     timestamp: string;
@@ -160,6 +175,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [endingService, setEndingService] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [breakActionLoading, setBreakActionLoading] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
   const OVERTIME_RATE = 2.5; // ₹2.5 per minute
 
@@ -334,6 +350,45 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleApproveBreak = async (breakId: string) => {
+    if (!booking) return;
+    try {
+      setBreakActionLoading(true);
+      const res = await bookingsAPI.approveBreak(booking._id, breakId);
+      setBooking(prev => prev ? { ...prev, breakRequests: res.breakRequests, isOnBreak: res.isOnBreak } : prev);
+    } catch (e) {
+      alert((e as Error).message || 'Failed to approve break');
+    } finally {
+      setBreakActionLoading(false);
+    }
+  };
+
+  const handleResumeFromBreak = async (breakId: string) => {
+    if (!booking) return;
+    try {
+      setBreakActionLoading(true);
+      const res = await bookingsAPI.resumeFromBreak(booking._id, breakId);
+      setBooking(prev => prev ? { ...prev, breakRequests: res.breakRequests, isOnBreak: res.isOnBreak, totalBreakMinutes: res.totalBreakMinutes } : prev);
+    } catch (e) {
+      alert((e as Error).message || 'Failed to resume work');
+    } finally {
+      setBreakActionLoading(false);
+    }
+  };
+
+  const handleRejectBreak = async (breakId: string) => {
+    if (!booking) return;
+    try {
+      setBreakActionLoading(true);
+      const res = await bookingsAPI.rejectBreak(booking._id, breakId);
+      setBooking(prev => prev ? { ...prev, breakRequests: res.breakRequests, isOnBreak: res.isOnBreak } : prev);
+    } catch (e) {
+      alert((e as Error).message || 'Failed to reject break');
+    } finally {
+      setBreakActionLoading(false);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -592,6 +647,17 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                   <p className="text-4xl font-bold text-purple-600 font-mono">
                     {formatElapsedTime(elapsedTime)}
                   </p>
+                  {booking.isOnBreak && (
+                    <div className="mt-2 flex items-center justify-center gap-2 text-amber-700">
+                      <Coffee className="w-4 h-4" />
+                      <span className="text-sm font-semibold">Service Paused — Workers on Break</span>
+                    </div>
+                  )}
+                  {booking.totalBreakMinutes && booking.totalBreakMinutes > 0 ? (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Total break time: {booking.totalBreakMinutes} min
+                    </p>
+                  ) : null}
                   {overtimeMinutes > 0 && (
                     <div className="mt-4 p-3 bg-orange-100 border border-orange-300 rounded-lg">
                       <p className="text-sm font-semibold text-orange-800">
@@ -603,6 +669,81 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                     </div>
                   )}
                 </div>
+
+                {/* Break Management Section */}
+                {booking.breakRequests && booking.breakRequests.length > 0 && (
+                  <div className="bg-amber-50 border-2 border-amber-200 p-4 rounded-xl space-y-3">
+                    <h4 className="font-semibold text-amber-800 flex items-center gap-2">
+                      <Coffee className="w-5 h-5" />
+                      Break Requests
+                    </h4>
+                    <div className="space-y-2">
+                      {booking.breakRequests.map((br) => (
+                        <div key={br._id} className={`p-3 rounded-lg border ${
+                          br.status === 'pending' ? 'bg-yellow-50 border-yellow-300' :
+                          br.status === 'active' ? 'bg-amber-100 border-amber-400' :
+                          br.status === 'completed' ? 'bg-green-50 border-green-300' :
+                          br.status === 'rejected' ? 'bg-red-50 border-red-300' :
+                          'bg-muted border-border'
+                        }`}>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground">
+                                {br.requestedByName || 'Worker'} requested a break
+                              </p>
+                              {br.reason && (
+                                <p className="text-xs text-muted-foreground mt-0.5">Reason: {br.reason}</p>
+                              )}
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {new Date(br.requestedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                                {br.durationMinutes > 0 && ` · ${br.durationMinutes} min`}
+                              </p>
+                            </div>
+                            <div className="shrink-0">
+                              {br.status === 'pending' && (
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => handleApproveBreak(br._id)}
+                                    disabled={breakActionLoading}
+                                    className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
+                                  >
+                                    <Pause className="w-3 h-3" /> Approve
+                                  </button>
+                                  <button
+                                    onClick={() => handleRejectBreak(br._id)}
+                                    disabled={breakActionLoading}
+                                    className="bg-red-100 hover:bg-red-200 text-red-700 text-xs font-medium px-2 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                                  >
+                                    Deny
+                                  </button>
+                                </div>
+                              )}
+                              {br.status === 'active' && (
+                                <button
+                                  onClick={() => handleResumeFromBreak(br._id)}
+                                  disabled={breakActionLoading}
+                                  className="bg-green-600 hover:bg-green-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
+                                >
+                                  <Play className="w-3 h-3" /> Resume Work
+                                </button>
+                              )}
+                              {br.status === 'completed' && (
+                                <span className="text-xs text-green-700 font-medium bg-green-100 px-2 py-1 rounded-full">
+                                  Completed
+                                </span>
+                              )}
+                              {br.status === 'rejected' && (
+                                <span className="text-xs text-red-700 font-medium bg-red-100 px-2 py-1 rounded-full">
+                                  Denied
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* End Service Options */}
                 <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 p-4 rounded-xl space-y-3">

@@ -499,6 +499,27 @@ export const bookingsAPI = {
   removeSupportStaff: (bookingId: string, workerId: string) =>
     apiCall(`/bookings/${bookingId}/support-staff/${workerId}`, { method: 'DELETE' }),
 
+  setTeamHead: (bookingId: string, workerId: string) =>
+    apiCall(`/bookings/${bookingId}/team-head`, {
+      method: 'PATCH',
+      body: JSON.stringify({ workerId })
+    }),
+
+  requestBreak: (bookingId: string, reason?: string) =>
+    apiCall(`/bookings/${bookingId}/break-request`, {
+      method: 'POST',
+      body: JSON.stringify({ reason })
+    }),
+
+  approveBreak: (bookingId: string, breakId: string) =>
+    apiCall(`/bookings/${bookingId}/break-approve/${breakId}`, { method: 'PATCH' }),
+
+  resumeFromBreak: (bookingId: string, breakId: string) =>
+    apiCall(`/bookings/${bookingId}/break-resume/${breakId}`, { method: 'PATCH' }),
+
+  rejectBreak: (bookingId: string, breakId: string) =>
+    apiCall(`/bookings/${bookingId}/break-reject/${breakId}`, { method: 'PATCH' }),
+
   updateWorkforce: (bookingId: string, data: { workerCount?: number; actualDurationMinutes?: number; wageRate?: number }) =>
     apiCall(`/bookings/${bookingId}/workforce`, {
       method: 'PATCH',

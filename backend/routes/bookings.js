@@ -1857,6 +1857,255 @@ router.delete('/:id/support-staff/:workerId', authenticate, authorize('admin', '
   }
 });
 
+// ==================== TEAM HEAD MANAGEMENT ====================
+
+// @route   PATCH /api/bookings/:id/team-head
+// @desc    Admin sets a worker as team head for a deep cleaning booking
+// @access  Private/Admin
+router.patch('/:id/team-head', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { workerId } = req.body;
+    if (!workerId) {
+      return res.status(400).json({ error: { message: 'workerId is required', status: 400 } });
+    }
+
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
+    }
+
+    if (booking.bookingType !== 'deep-cleaning-cart') {
+      return res.status(400).json({ error: { message: 'Team head only applies to deep cleaning bookings', status: 400 } });
+    }
+
+    const worker = await User.findById(workerId).select('name email phone');
+    if (!worker) {
+      return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
+    }
+
+    const previousHead = booking.worker ? booking.worker.toString() : null;
+
+    // If the new head is currently in support staff, remove them from support staff
+    booking.supportStaff = (booking.supportStaff || []).filter(
+      s => s.worker.toString() !== workerId
+    );
+
+    // If there was a previous head who is not the new head, move them to support staff
+    if (previousHead && previousHead !== workerId) {
+      const prevWorker = await User.findById(previousHead).select('name');
+      if (prevWorker) {
+        booking.supportStaff.push({ worker: previousHead, name: prevWorker.name });
+      }
+    }
+
+    // Set the new team head
+    booking.worker = workerId;
+    booking.assignmentMethod = 'manual';
+    await booking.save();
+
+    await booking.populate('worker', 'name email phone');
+    await booking.populate('supportStaff.worker', 'name email phone');
+
+    res.json({
+      message: 'Team head updated',
+      worker: booking.worker,
+      supportStaff: booking.supportStaff
+    });
+  } catch (error) {
+    console.error('Set team head error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// ==================== BREAK TIME MANAGEMENT ====================
+
+// @route   POST /api/bookings/:id/break-request
+// @desc    Worker requests a break during an in-progress booking
+// @access  Private/Worker
+router.post('/:id/break-request', authenticate, authorize('worker', 'admin', 'super_admin'), async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const booking = await Booking.findById(req.params.id).populate('worker', 'name');
+    if (!booking) {
+      return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
+    }
+
+    if (booking.status !== 'in-progress') {
+      return res.status(400).json({ error: { message: 'Break can only be requested for in-progress bookings', status: 400 } });
+    }
+
+    if (booking.isOnBreak) {
+      return res.status(400).json({ error: { message: 'A break is already active', status: 400 } });
+    }
+
+    // Check requesting worker is part of the team
+    const isTeamHead = booking.worker && booking.worker._id.toString() === req.user._id.toString();
+    const isSupport = booking.supportStaff?.some(s => s.worker.toString() === req.user._id.toString());
+    const isAdmin = ['admin', 'super_admin'].includes(req.user.role);
+
+    if (!isTeamHead && !isSupport && !isAdmin) {
+      return res.status(403).json({ error: { message: 'Only team members can request breaks', status: 403 } });
+    }
+
+    const breakRequest = {
+      requestedBy: req.user._id,
+      requestedByName: req.user.name,
+      reason: reason || '',
+      requestedAt: new Date(),
+      status: 'pending'
+    };
+
+    booking.breakRequests.push(breakRequest);
+    await booking.save();
+
+    const newBreak = booking.breakRequests[booking.breakRequests.length - 1];
+
+    res.json({
+      message: 'Break requested — waiting for customer approval',
+      breakRequest: newBreak,
+      breakRequests: booking.breakRequests
+    });
+  } catch (error) {
+    console.error('Break request error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   PATCH /api/bookings/:id/break-approve/:breakId
+// @desc    Customer approves a break request (service timer pauses)
+// @access  Private/Customer
+router.patch('/:id/break-approve/:breakId', authenticate, async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
+    }
+
+    // Allow customer, admin, or super_admin to approve
+    const isCustomer = booking.customer.toString() === req.user._id.toString();
+    const isAdmin = ['admin', 'super_admin'].includes(req.user.role);
+    if (!isCustomer && !isAdmin) {
+      return res.status(403).json({ error: { message: 'Only the customer or admin can approve breaks', status: 403 } });
+    }
+
+    const breakReq = booking.breakRequests.id(req.params.breakId);
+    if (!breakReq) {
+      return res.status(404).json({ error: { message: 'Break request not found', status: 404 } });
+    }
+
+    if (breakReq.status !== 'pending') {
+      return res.status(400).json({ error: { message: `Break is already ${breakReq.status}`, status: 400 } });
+    }
+
+    breakReq.status = 'active';
+    breakReq.startedAt = new Date();
+    breakReq.approvedBy = req.user._id;
+    booking.isOnBreak = true;
+    await booking.save();
+
+    res.json({
+      message: 'Break approved — service timer paused',
+      breakRequest: breakReq,
+      breakRequests: booking.breakRequests,
+      isOnBreak: true
+    });
+  } catch (error) {
+    console.error('Break approve error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   PATCH /api/bookings/:id/break-resume/:breakId
+// @desc    Customer resumes work after a break (service timer resumes)
+// @access  Private/Customer
+router.patch('/:id/break-resume/:breakId', authenticate, async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
+    }
+
+    const isCustomer = booking.customer.toString() === req.user._id.toString();
+    const isAdmin = ['admin', 'super_admin'].includes(req.user.role);
+    if (!isCustomer && !isAdmin) {
+      return res.status(403).json({ error: { message: 'Only the customer or admin can resume work', status: 403 } });
+    }
+
+    const breakReq = booking.breakRequests.id(req.params.breakId);
+    if (!breakReq) {
+      return res.status(404).json({ error: { message: 'Break request not found', status: 404 } });
+    }
+
+    if (breakReq.status !== 'active') {
+      return res.status(400).json({ error: { message: 'Break is not currently active', status: 400 } });
+    }
+
+    breakReq.endedAt = new Date();
+    breakReq.status = 'completed';
+    breakReq.durationMinutes = Math.round((breakReq.endedAt - breakReq.startedAt) / 60000);
+
+    booking.isOnBreak = false;
+
+    // Recalculate total break minutes
+    booking.totalBreakMinutes = booking.breakRequests
+      .filter(b => b.status === 'completed' && b.durationMinutes > 0)
+      .reduce((sum, b) => sum + b.durationMinutes, 0);
+
+    await booking.save();
+
+    res.json({
+      message: 'Work resumed — service timer restarted',
+      breakRequest: breakReq,
+      breakRequests: booking.breakRequests,
+      isOnBreak: false,
+      totalBreakMinutes: booking.totalBreakMinutes
+    });
+  } catch (error) {
+    console.error('Break resume error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   PATCH /api/bookings/:id/break-reject/:breakId
+// @desc    Customer rejects a break request
+// @access  Private/Customer
+router.patch('/:id/break-reject/:breakId', authenticate, async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
+    }
+
+    const isCustomer = booking.customer.toString() === req.user._id.toString();
+    const isAdmin = ['admin', 'super_admin'].includes(req.user.role);
+    if (!isCustomer && !isAdmin) {
+      return res.status(403).json({ error: { message: 'Only the customer or admin can reject breaks', status: 403 } });
+    }
+
+    const breakReq = booking.breakRequests.id(req.params.breakId);
+    if (!breakReq) {
+      return res.status(404).json({ error: { message: 'Break request not found', status: 404 } });
+    }
+
+    if (breakReq.status !== 'pending') {
+      return res.status(400).json({ error: { message: `Break is already ${breakReq.status}`, status: 400 } });
+    }
+
+    breakReq.status = 'rejected';
+    await booking.save();
+
+    res.json({
+      message: 'Break request rejected',
+      breakRequest: breakReq,
+      breakRequests: booking.breakRequests,
+      isOnBreak: false
+    });
+  } catch (error) {
+    console.error('Break reject error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
 // ==================== SERVICE QR CODE WORKFLOW ====================
 
 // @route   POST /api/bookings/:id/generate-start-qr

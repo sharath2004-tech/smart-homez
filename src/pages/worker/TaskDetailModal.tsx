@@ -5,6 +5,7 @@ import {
     ArrowLeft, Calendar,
     Camera,
     CheckCircle,
+    Coffee,
     DollarSign,
     Home,
     MapPin,
@@ -68,6 +69,19 @@ interface Task {
     timestamp: string;
   };
   workerChecklist?: { _id: string; text: string; completed: boolean; completedAt?: string }[];
+  breakRequests?: {
+    _id: string;
+    requestedBy: string;
+    requestedByName?: string;
+    reason?: string;
+    requestedAt: string;
+    startedAt?: string;
+    endedAt?: string;
+    durationMinutes: number;
+    status: 'pending' | 'approved' | 'active' | 'completed' | 'rejected';
+  }[];
+  isOnBreak?: boolean;
+  totalBreakMinutes?: number;
   paymentProof?: {
     url: string;
     timestamp: string;
@@ -102,6 +116,9 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   const [showCompletionCapture, setShowCompletionCapture] = useState(false);
   const [uploadingCompletionPhoto, setUploadingCompletionPhoto] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [breakReason, setBreakReason] = useState('');
+  const [requestingBreak, setRequestingBreak] = useState(false);
+  const [showBreakForm, setShowBreakForm] = useState(false);
 
   const OVERTIME_RATE = 2.5; // ₹2.5 per minute
 
@@ -378,6 +395,21 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handleRequestBreak = async () => {
+    if (!task) return;
+    try {
+      setRequestingBreak(true);
+      const res = await bookingsAPI.requestBreak(task._id, breakReason);
+      setTask(prev => prev ? { ...prev, breakRequests: res.breakRequests } : prev);
+      setBreakReason('');
+      setShowBreakForm(false);
+    } catch (e) {
+      alert((e as Error).message || 'Failed to request break');
+    } finally {
+      setRequestingBreak(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-IN', { 
@@ -462,6 +494,17 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                 <p className="text-xs text-muted-foreground mt-2">
                   {t('worker.taskDetail.target')}: {formatTime(task.startTime)} - {formatTime(task.endTime)}
                 </p>
+                {task.isOnBreak && (
+                  <div className="mt-3 flex items-center justify-center gap-2 text-amber-700 bg-amber-50 rounded-lg p-2">
+                    <Coffee className="w-4 h-4" />
+                    <span className="text-sm font-semibold">On Break — Waiting for customer to resume</span>
+                  </div>
+                )}
+                {task.totalBreakMinutes && task.totalBreakMinutes > 0 ? (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Total break time: {task.totalBreakMinutes} min
+                  </p>
+                ) : null}
                 {overtimeMinutes > 0 && (
                   <div className="mt-4 p-3 bg-orange-100 border border-orange-300 rounded-lg">
                     <p className="text-sm font-semibold text-orange-800">
@@ -473,6 +516,75 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                   </div>
                 )}
               </div>
+
+              {/* Break Request Section */}
+              {!task.isOnBreak && (
+                <div className="card-elevated p-4">
+                  {!showBreakForm ? (
+                    <button
+                      onClick={() => setShowBreakForm(true)}
+                      disabled={task.breakRequests?.some(b => b.status === 'pending')}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Coffee className="w-4 h-4" />
+                      {task.breakRequests?.some(b => b.status === 'pending') ? 'Break Request Pending...' : 'Request Break'}
+                    </button>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium text-foreground">Request a Break</p>
+                      <input
+                        type="text"
+                        placeholder="Reason (e.g., Lunch break, Water break)"
+                        value={breakReason}
+                        onChange={(e) => setBreakReason(e.target.value)}
+                        className="input-clean text-sm"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleRequestBreak}
+                          disabled={requestingBreak}
+                          className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-medium py-2 rounded-lg transition-colors text-sm disabled:opacity-50"
+                        >
+                          {requestingBreak ? 'Requesting...' : 'Send Request'}
+                        </button>
+                        <button
+                          onClick={() => { setShowBreakForm(false); setBreakReason(''); }}
+                          className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Customer needs to approve the break request. Service timer will pause.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Break Status */}
+              {task.breakRequests && task.breakRequests.length > 0 && (
+                <div className="card-elevated p-4 space-y-2">
+                  <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                    <Coffee className="w-4 h-4 text-amber-600" /> Break History
+                  </h4>
+                  {task.breakRequests.slice(-3).map((br) => (
+                    <div key={br._id} className={`text-xs p-2 rounded-lg ${
+                      br.status === 'pending' ? 'bg-yellow-50 text-yellow-800' :
+                      br.status === 'active' ? 'bg-amber-50 text-amber-800 font-medium' :
+                      br.status === 'completed' ? 'bg-green-50 text-green-700' :
+                      br.status === 'rejected' ? 'bg-red-50 text-red-700' :
+                      'bg-muted text-muted-foreground'
+                    }`}>
+                      {br.status === 'pending' && 'Pending approval...'}
+                      {br.status === 'active' && 'Break active — waiting for customer to resume'}
+                      {br.status === 'completed' && `Break completed (${br.durationMinutes} min)`}
+                      {br.status === 'rejected' && 'Break request denied'}
+                      {br.reason && ` — ${br.reason}`}
+                    </div>
+                  ))}
+                </div>
+              )}
               {hasTimeOffset && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
                   ℹ️ Timer adjusted for timezone difference. The displayed time is accurate.
