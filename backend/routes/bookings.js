@@ -382,6 +382,17 @@ router.get('/booked-slots', authenticate, async (req, res) => {
       .select('_id gender workerProfile.leaves')
       .lean();
 
+    // If specialization mapping is too strict for current worker data,
+    // gracefully retry without it. This mirrors the worker assignment logic
+    // and prevents false 0-availability in the customer UI.
+    if (workers.length === 0 && workerQuery['workerProfile.specialization']) {
+      const fallbackWithoutSpecialization = { ...workerQuery };
+      delete fallbackWithoutSpecialization['workerProfile.specialization'];
+      workers = await User.find(fallbackWithoutSpecialization)
+        .select('_id gender workerProfile.leaves')
+        .lean();
+    }
+
     // Graceful fallback: if no workers are found for the resolved location,
     // broaden the pool to all active matching workers so the customer does not
     // see a misleading 0 when worker assignments are incomplete.
@@ -391,6 +402,13 @@ router.get('/booked-slots', authenticate, async (req, res) => {
       workers = await User.find(fallbackWorkerQuery)
         .select('_id gender workerProfile.leaves')
         .lean();
+
+      if (workers.length === 0 && fallbackWorkerQuery['workerProfile.specialization']) {
+        delete fallbackWorkerQuery['workerProfile.specialization'];
+        workers = await User.find(fallbackWorkerQuery)
+          .select('_id gender workerProfile.leaves')
+          .lean();
+      }
     }
 
     // Remove workers on approved leave for this date
