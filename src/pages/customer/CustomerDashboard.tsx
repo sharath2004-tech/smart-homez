@@ -1,9 +1,10 @@
 import AppLayout from "@/components/AppLayout";
+import LocationSelector, { type LocationData } from "@/components/LocationSelector";
 import { useGeolocation } from "@/hooks/useGeolocation";
-import { authAPI, bookingsAPI, dashboardPreferencesAPI, locationsAPI, servicesAPI } from "@/lib/api";
+import { authAPI, bookingsAPI, dashboardPreferencesAPI, locationsAPI, serviceAreasAPI, servicesAPI } from "@/lib/api";
 import { motion } from "framer-motion";
-import { AlertCircle, ArrowRight, Bell, ChevronRight, Clock, MapPin, Settings, Star } from "lucide-react";
-import { useEffect, useState } from "react";
+import { AlertCircle, ArrowRight, Bell, ChevronRight, Clock, MapPin, RefreshCw, Settings, Star } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -35,6 +36,49 @@ interface UserProfile {
   };
 }
 
+const getStoredDashboardLocation = (): LocationData | null => {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = localStorage.getItem('userLocation');
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as {
+      lat?: number;
+      lng?: number;
+      latitude?: number;
+      longitude?: number;
+      address?: string;
+      area?: string;
+      city?: string;
+      zipCode?: string;
+      isAvailable?: boolean;
+      serviceAreaId?: string;
+    };
+
+    const lat = parsed.lat ?? parsed.latitude;
+    const lng = parsed.lng ?? parsed.longitude;
+
+    if (typeof lat !== 'number' || typeof lng !== 'number' || Number.isNaN(lat) || Number.isNaN(lng)) {
+      return null;
+    }
+
+    return {
+      lat,
+      lng,
+      address: parsed.address,
+      area: parsed.area,
+      city: parsed.city,
+      zipCode: parsed.zipCode,
+      isAvailable: Boolean(parsed.isAvailable),
+      serviceAreaId: parsed.serviceAreaId,
+    };
+  } catch (error) {
+    console.error('Failed to parse stored dashboard location:', error);
+    return null;
+  }
+};
+
 const CustomerDashboard = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -44,10 +88,21 @@ const CustomerDashboard = () => {
   const [nearbyWorkersCount, setNearbyWorkersCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [serviceableStatus, setServiceableStatus] = useState<'available' | 'unavailable' | 'unknown'>('unknown');
+  const [serviceabilityMessage, setServiceabilityMessage] = useState('');
+  const [nearestServiceArea, setNearestServiceArea] = useState<{ name?: string; distance?: number } | null>(null);
   const [quickServices, setQuickServices] = useState<any[]>([]);
   const [kitchenServiceId, setKitchenServiceId] = useState<string | null>(null);
   const [windowServiceId, setWindowServiceId] = useState<string | null>(null);
-  const { latitude, longitude, error: locationError } = useGeolocation();
+  const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
+  const [showLocationSelector, setShowLocationSelector] = useState(false);
+  const { latitude, longitude, error: locationError, loading: locationLoading, refetch } = useGeolocation();
+
+  useEffect(() => {
+    const stored = getStoredDashboardLocation();
+    if (stored) {
+      setSelectedLocation(stored);
+    }
+  }, []);
 
   // Fetch spot-clean service IDs for dashboard quick cards
   useEffect(() => {
@@ -124,21 +179,79 @@ const CustomerDashboard = () => {
   }, []);
 
   useEffect(() => {
-    if (!latitude || !longitude) return;
-    locationsAPI.getNearbyWorkers({ latitude, longitude, maxDistance: 500 })
-      .then((workersData) => setNearbyWorkersCount(workersData.count || 0))
-      .catch(() => {});
-    // Check serviceability
-    locationsAPI.getNearby({ latitude, longitude, maxDistance: 20000 })
-      .then((res) => {
-        const locs = res.locations || res.data || [];
-        setServiceableStatus(locs.length > 0 ? 'available' : 'unavailable');
-      })
-      .catch(() => setServiceableStatus('unknown'));
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') return;
+
+    setSelectedLocation((prev) => ({
+      lat: latitude,
+      lng: longitude,
+      address: prev?.address,
+      area: prev?.area,
+      city: prev?.city,
+      zipCode: prev?.zipCode,
+      isAvailable: prev?.isAvailable ?? false,
+      serviceAreaId: prev?.serviceAreaId,
+    }));
   }, [latitude, longitude]);
 
+  const validateDashboardLocation = useCallback(async (location: LocationData) => {
+    try {
+      setServiceableStatus('unknown');
+      const response = await serviceAreasAPI.validate(location.lat, location.lng);
+
+      const nextLocation: LocationData = {
+        ...location,
+        area: location.area || response.serviceArea?.area,
+        city: location.city || response.serviceArea?.city,
+        isAvailable: Boolean(response.isAvailable),
+        serviceAreaId: response.serviceArea?.id || location.serviceAreaId,
+      };
+
+      setSelectedLocation(nextLocation);
+      setServiceableStatus(response.isAvailable ? 'available' : 'unavailable');
+      setServiceabilityMessage(response.message || '');
+      setNearestServiceArea(response.nearest || null);
+
+      localStorage.setItem('userLocation', JSON.stringify({
+        ...nextLocation,
+        latitude: nextLocation.lat,
+        longitude: nextLocation.lng,
+        timestamp: Date.now(),
+      }));
+
+      if (response.isAvailable) {
+        const workersData = await locationsAPI.getNearbyWorkers({
+          latitude: nextLocation.lat,
+          longitude: nextLocation.lng,
+          maxDistance: 500,
+        });
+        setNearbyWorkersCount(workersData.count || 0);
+      } else {
+        setNearbyWorkersCount(0);
+      }
+    } catch (error) {
+      console.error('Error validating dashboard location:', error);
+      setServiceableStatus('unknown');
+      setServiceabilityMessage('We could not verify your service region right now.');
+      setNearestServiceArea(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!selectedLocation) return;
+    void validateDashboardLocation(selectedLocation);
+  }, [selectedLocation?.lat, selectedLocation?.lng, validateDashboardLocation]);
+
+  const handleLocationConfirmed = (location: LocationData) => {
+    setSelectedLocation(location);
+    setShowLocationSelector(false);
+  };
+
   const defaultAddress = profile?.addresses?.find(addr => addr.isDefault);
-  const displayAddress = defaultAddress 
+  const tracedAddress = selectedLocation?.address
+    || [selectedLocation?.area, selectedLocation?.city, selectedLocation?.zipCode].filter(Boolean).join(', ');
+  const displayAddress = tracedAddress
+    ? tracedAddress
+    : defaultAddress 
     ? `${defaultAddress.area}, ${defaultAddress.city} - ${defaultAddress.zipCode}`
     : locationError
     ? t('dashboard.locationUnavailable')
@@ -249,11 +362,15 @@ const CustomerDashboard = () => {
 
         {/* Location bar */}
         <motion.div variants={itemVariants}>
-          <Link to="/customer/profile" className="flex items-center gap-2 p-3 bg-card rounded-xl border border-border hover:bg-muted transition-colors group">
+          <button
+            type="button"
+            onClick={() => setShowLocationSelector(true)}
+            className="flex w-full items-center gap-2 rounded-xl border border-border bg-card p-3 text-left hover:bg-muted transition-colors group"
+          >
             <MapPin className="w-4 h-4 text-primary shrink-0 group-hover:scale-110 transition-transform" />
             <span className="text-sm text-foreground line-clamp-2 break-words">{displayAddress}</span>
             <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto shrink-0 group-hover:translate-x-1 transition-transform" />
-          </Link>
+          </button>
         </motion.div>
 
         {/* Ongoing Booking — top priority */}
@@ -286,25 +403,59 @@ const CustomerDashboard = () => {
         )}
 
         {/* Not serviceable warning */}
-        {serviceableStatus === 'unavailable' && (
+        {serviceableStatus !== 'available' && (
           <motion.div
             variants={itemVariants}
             className="rounded-2xl p-4 border border-amber-300 bg-amber-50 flex items-start gap-3"
           >
             <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="text-sm font-semibold text-foreground">{t('customer.dashboard.areaNotServiceable')}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{t('customer.dashboard.bookElsewhere')}</p>
+              <p className="text-sm font-semibold text-foreground">
+                {locationLoading
+                  ? 'Checking your current region...'
+                  : serviceableStatus === 'unavailable'
+                  ? t('customer.dashboard.areaNotServiceable')
+                  : 'Set your location to see services'}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {locationLoading
+                  ? 'We are tracing your location and verifying whether it is inside an active service region.'
+                  : serviceableStatus === 'unavailable'
+                  ? (serviceabilityMessage || t('customer.dashboard.bookElsewhere'))
+                  : (locationError || 'Choose a location to check whether services are available in your region.')}
+              </p>
+              {nearestServiceArea?.name && serviceableStatus === 'unavailable' && (
+                <p className="text-xs text-amber-700 mt-2">
+                  Nearest service area: <strong>{nearestServiceArea.name}</strong>
+                  {typeof nearestServiceArea.distance === 'number' ? ` (${nearestServiceArea.distance.toFixed(1)} km away)` : ''}
+                </p>
+              )}
             </div>
-            <Link to="/customer/services" className="text-xs text-primary font-semibold shrink-0 hover:underline whitespace-nowrap">
-              {t('customer.dashboard.bookElsewhereLink')}
-            </Link>
+            <div className="flex shrink-0 flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => setShowLocationSelector(true)}
+                className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-200 whitespace-nowrap"
+              >
+                {serviceableStatus === 'unavailable' ? 'Choose location' : 'Set location'}
+              </button>
+              {locationError && (
+                <button
+                  type="button"
+                  onClick={refetch}
+                  className="inline-flex items-center justify-center gap-1 rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100 whitespace-nowrap"
+                >
+                  <RefreshCw className="h-3 w-3" /> Retry
+                </button>
+              )}
+            </div>
           </motion.div>
         )}
 
 
 
         {/* Move In / Move Out Promo Banner */}
+        {serviceableStatus === 'available' && (
         <motion.div variants={itemVariants}>
           <Link
             to="/customer/deep-cleaning"
@@ -320,8 +471,10 @@ const CustomerDashboard = () => {
             <span className="shrink-0 text-xs font-semibold bg-green-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">Open</span>
           </Link>
         </motion.div>
+        )}
 
         {/* Quick Services */}
+        {serviceableStatus === 'available' && (
         <motion.div variants={itemVariants}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold font-heading text-foreground">{t('dashboard.quickBook')}</h2>
@@ -388,6 +541,7 @@ const CustomerDashboard = () => {
             </motion.div>
           </motion.div>
         </motion.div>
+        )}
 
         {/* Upcoming Bookings */}
         <motion.div variants={itemVariants}>
@@ -421,9 +575,19 @@ const CustomerDashboard = () => {
               <p className="text-sm font-medium text-foreground">{t('dashboard.noUpcomingBookings')}</p>
               <p className="text-xs text-muted-foreground mt-1">{t('dashboard.bookService')}</p>
               <div>
-                <Link to="/customer/services" className="btn-brand mt-4 text-sm inline-flex items-center gap-2">
-                  {t('dashboard.browseServices')} <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
+                {serviceableStatus === 'available' ? (
+                  <Link to="/customer/services" className="btn-brand mt-4 text-sm inline-flex items-center gap-2">
+                    {t('dashboard.browseServices')} <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowLocationSelector(true)}
+                    className="btn-brand mt-4 text-sm inline-flex items-center gap-2"
+                  >
+                    {serviceableStatus === 'unavailable' ? 'Choose Serviceable Location' : 'Set Location'} <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </motion.div>
           ) : (
@@ -495,6 +659,15 @@ const CustomerDashboard = () => {
 
 
       </motion.div>
+
+      {showLocationSelector && (
+        <LocationSelector
+          onLocationConfirmed={handleLocationConfirmed}
+          onClose={() => setShowLocationSelector(false)}
+          showCloseButton
+          defaultLocation={selectedLocation ? { lat: selectedLocation.lat, lng: selectedLocation.lng } : undefined}
+        />
+      )}
     </AppLayout>
   );
 };

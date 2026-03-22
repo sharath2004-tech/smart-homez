@@ -2,8 +2,9 @@ import AppLayout from "@/components/AppLayout";
 import { RecurringScheduleSetup } from "@/components/RecurringScheduleSetup";
 import { SubscriptionPlanSelector } from "@/components/SubscriptionPlanSelector";
 import { Button } from "@/components/ui/button";
+import { useServiceBookingAvailability } from "@/hooks/useServiceBookingAvailability";
 import { authAPI, bookingsAPI, servicesAPI } from "@/lib/api";
-import { ArrowLeft, CheckCircle2, Package } from "lucide-react";
+import { ArrowLeft, CheckCircle2, MapPin, Package } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -34,7 +35,19 @@ export default function SubscriptionBookingPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [service, setService] = useState<Service | null>(null);
-  const [profile, setProfile] = useState<{ name?: string } | null>(null);
+  const [profile, setProfile] = useState<{
+    name?: string;
+    addresses?: Array<{
+      isDefault?: boolean;
+      apartmentName?: string;
+      address?: string;
+      area?: string;
+      city?: string;
+      state?: string;
+      zipCode?: string;
+      location?: { coordinates?: number[] };
+    }>;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
   const [currentStep, setCurrentStep] = useState<'plan' | 'schedule' | 'confirm'>('plan');
@@ -49,6 +62,17 @@ export default function SubscriptionBookingPage() {
     pauseAllowed: true,
     specificDays: []
   });
+
+  const {
+    availability,
+    checkingAvailability,
+    requestingService,
+    resolvedLocation,
+    hasResolvedLocation,
+    isOutOfRegion,
+    canBookService,
+    requestService,
+  } = useServiceBookingAvailability(service?._id, profile);
 
   useEffect(() => {
     const loadData = async () => {
@@ -117,6 +141,20 @@ export default function SubscriptionBookingPage() {
   };
 
   const handleBooking = async () => {
+    if (isOutOfRegion) {
+      await requestService(service?.name);
+      return;
+    }
+
+    if (!canBookService) {
+      toast.error(
+        hasResolvedLocation
+          ? 'Checking whether this service is available in your region. Please wait a moment.'
+          : 'Please set a service location in your profile or services page before booking.'
+      );
+      return;
+    }
+
     try {
       setBooking(true);
       
@@ -247,6 +285,43 @@ export default function SubscriptionBookingPage() {
           </div>
         </div>
 
+        <div className={`mb-6 rounded-2xl border p-4 ${
+          isOutOfRegion
+            ? 'border-amber-300 bg-amber-50 dark:bg-amber-950/20'
+            : hasResolvedLocation
+            ? 'border-emerald-300 bg-emerald-50 dark:bg-emerald-950/20'
+            : 'border-slate-300 bg-slate-50 dark:bg-slate-900/40'
+        }`}>
+          <div className="flex items-start gap-3">
+            <MapPin className={`mt-0.5 h-4 w-4 shrink-0 ${isOutOfRegion ? 'text-amber-700' : hasResolvedLocation ? 'text-emerald-700' : 'text-slate-600'}`} />
+            <div className="space-y-1 text-sm">
+              <p className="font-semibold text-foreground">
+                {checkingAvailability
+                  ? 'Checking service region...'
+                  : isOutOfRegion
+                  ? 'This subscription cannot be booked in your region'
+                  : hasResolvedLocation
+                  ? 'Your saved location is inside a service region'
+                  : 'Service location needed before booking'}
+              </p>
+              <p className="text-muted-foreground">
+                {checkingAvailability
+                  ? 'We are verifying the admin-configured service region for your saved location.'
+                  : isOutOfRegion
+                  ? (availability?.reason || 'Subscriptions are accepted only in regions configured by admin or super admin.')
+                  : hasResolvedLocation
+                  ? (availability?.reason || 'This subscription is available at your saved location.')
+                  : 'Please set your service location from the services page or save a default address in your profile.'}
+              </p>
+              {resolvedLocation && (
+                <p className="text-xs text-muted-foreground">
+                  Location: {[resolvedLocation.area, resolvedLocation.city].filter(Boolean).join(', ') || resolvedLocation.address || 'Saved location'}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Content */}
         <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6 mb-6">
           {currentStep === 'plan' && (
@@ -365,17 +440,33 @@ export default function SubscriptionBookingPage() {
               {t('common.continue')}
               <ArrowLeft className="w-4 h-4 rotate-180" />
             </Button>
+          ) : isOutOfRegion ? (
+            <Button
+              onClick={() => requestService(service?.name)}
+              disabled={requestingService || checkingAvailability}
+              size="lg"
+              className="gap-2 bg-amber-100 text-amber-900 hover:bg-amber-200"
+            >
+              {requestingService ? 'Sending request...' : 'Request Service'}
+            </Button>
           ) : (
             <Button
               onClick={handleBooking}
-              disabled={booking}
+              disabled={booking || checkingAvailability || !canBookService}
               size="lg"
               className="gap-2"
             >
-              {booking ? t('common.loading') : 
-                selectedPlan === 'oneTime' ? t('subscription.confirmBooking') : t('subscription.startSubscription')
+              {checkingAvailability
+                ? 'Checking region...'
+                : booking
+                ? t('common.loading')
+                : !hasResolvedLocation
+                ? 'Set Location First'
+                : selectedPlan === 'oneTime'
+                ? t('subscription.confirmBooking')
+                : t('subscription.startSubscription')
               }
-              {!booking && <CheckCircle2 className="w-5 h-5" />}
+              {!booking && !checkingAvailability && hasResolvedLocation && <CheckCircle2 className="w-5 h-5" />}
             </Button>
           )}
         </div>

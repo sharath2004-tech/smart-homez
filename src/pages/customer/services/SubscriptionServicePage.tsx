@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useServiceBookingAvailability } from "@/hooks/useServiceBookingAvailability";
 import { authAPI, bookingsAPI, servicesAPI } from "@/lib/api";
 import { motion } from "framer-motion";
 import {
@@ -7,6 +8,7 @@ import {
     CheckCircle,
     ChevronLeft,
     Clock,
+    MapPin,
     RefreshCw,
     Star,
     User,
@@ -74,6 +76,17 @@ const SubscriptionServicePage = () => {
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [session1Hours, setSession1Hours] = useState(1);
   const [session2Time, setSession2Time] = useState("17:00");
+
+  const {
+    availability,
+    checkingAvailability,
+    requestingService,
+    resolvedLocation,
+    hasResolvedLocation,
+    isOutOfRegion,
+    canBookService,
+    requestService,
+  } = useServiceBookingAvailability(selectedService?._id, profile);
 
   useEffect(() => {
     fetchData();
@@ -162,6 +175,20 @@ const SubscriptionServicePage = () => {
   }
 
   const handleBook = async () => {
+    if (isOutOfRegion) {
+      await requestService(selectedService?.name);
+      return;
+    }
+
+    if (!canBookService) {
+      toast.error(
+        hasResolvedLocation
+          ? 'Checking whether this service is available in your region. Please wait a moment.'
+          : 'Please set a service location in your profile or services page before booking.'
+      );
+      return;
+    }
+
     if (!selectedService) return toast.error("Please select a service");
     if (!startDate) return toast.error("Please select a start date");
 
@@ -258,6 +285,43 @@ const SubscriptionServicePage = () => {
             <p className="text-xs text-blue-700">Same maid every day · Pause or cancel anytime · Priority support</p>
           </div>
         </motion.div>
+
+        <div className={`rounded-2xl border p-4 ${
+          isOutOfRegion
+            ? 'border-amber-300 bg-amber-50 dark:bg-amber-950/20'
+            : hasResolvedLocation
+            ? 'border-emerald-300 bg-emerald-50 dark:bg-emerald-950/20'
+            : 'border-slate-300 bg-slate-50 dark:bg-slate-900/40'
+        }`}>
+          <div className="flex items-start gap-3">
+            <MapPin className={`mt-0.5 h-4 w-4 shrink-0 ${isOutOfRegion ? 'text-amber-700' : hasResolvedLocation ? 'text-emerald-700' : 'text-slate-600'}`} />
+            <div className="space-y-1 text-sm">
+              <p className="font-semibold text-foreground">
+                {checkingAvailability
+                  ? 'Checking service region...'
+                  : isOutOfRegion
+                  ? 'This subscription is outside your region'
+                  : hasResolvedLocation
+                  ? 'This subscription can be booked in your region'
+                  : 'Service location needed before booking'}
+              </p>
+              <p className="text-muted-foreground">
+                {checkingAvailability
+                  ? 'We are verifying the admin-configured service region for your location.'
+                  : isOutOfRegion
+                  ? (availability?.reason || 'Bookings are accepted only in regions configured by admin or super admin.')
+                  : hasResolvedLocation
+                  ? (availability?.reason || 'Your saved location is inside an active service region.')
+                  : 'Please set your service location from the services page or save a default address in your profile.'}
+              </p>
+              {resolvedLocation && (
+                <p className="text-xs text-muted-foreground">
+                  Location: {[resolvedLocation.area, resolvedLocation.city].filter(Boolean).join(', ') || resolvedLocation.address || 'Saved location'}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* Step indicator */}
         <div className="flex items-center gap-2">
@@ -685,16 +749,20 @@ const SubscriptionServicePage = () => {
               <button onClick={() => setStep(2)} className="flex-1 py-3 rounded-2xl border border-border text-foreground font-semibold hover:bg-muted transition-colors">← Back</button>
               <button
                 onClick={handleBook}
-                disabled={booking}
-                className="flex-1 py-3 rounded-2xl bg-blue-500 hover:bg-blue-600 disabled:opacity-60 text-white font-semibold transition-colors flex items-center justify-center gap-2"
+                disabled={booking || requestingService || checkingAvailability || (!isOutOfRegion && !canBookService)}
+                className={`flex-1 py-3 rounded-2xl font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-60 ${
+                  isOutOfRegion
+                    ? 'bg-amber-100 text-amber-900 hover:bg-amber-200'
+                    : 'bg-blue-500 hover:bg-blue-600 text-white'
+                }`}
               >
-                {booking ? (
+                {booking || requestingService ? (
                   <>
-                    <motion.div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} />
-                    Creating...
+                    <motion.div className={`w-4 h-4 border-2 border-t-transparent rounded-full ${isOutOfRegion ? 'border-amber-900' : 'border-white'}`} animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} />
+                    {isOutOfRegion ? 'Sending request...' : 'Creating...'}
                   </>
                 ) : (
-                  <><Zap className="w-4 h-4" /> Subscribe Now</>
+                  <><Zap className="w-4 h-4" /> {isOutOfRegion ? 'Request Service' : !hasResolvedLocation ? 'Set Location First' : checkingAvailability ? 'Checking region...' : 'Subscribe Now'}</>
                 )}
               </button>
             </div>

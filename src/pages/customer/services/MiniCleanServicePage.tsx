@@ -1,7 +1,8 @@
 import AppLayout from "@/components/AppLayout";
+import { useServiceBookingAvailability } from "@/hooks/useServiceBookingAvailability";
 import { authAPI, bookingsAPI, servicesAPI } from "@/lib/api";
 import { motion } from "framer-motion";
-import { Calendar, ChevronLeft, Clock, Minus, Plus, Zap } from "lucide-react";
+import { Calendar, ChevronLeft, Clock, MapPin, Minus, Plus, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -62,6 +63,17 @@ const MiniCleanServicePage = () => {
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
 
+  const {
+    availability,
+    checkingAvailability,
+    requestingService,
+    resolvedLocation,
+    hasResolvedLocation,
+    isOutOfRegion,
+    canBookService,
+    requestService,
+  } = useServiceBookingAvailability(service?._id, profile);
+
   useEffect(() => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -107,6 +119,20 @@ const MiniCleanServicePage = () => {
   const totalAmount = (service?.price ?? 0) * quantity;
 
   const handleBook = async () => {
+    if (isOutOfRegion) {
+      await requestService(service?.name);
+      return;
+    }
+
+    if (!canBookService) {
+      toast.error(
+        hasResolvedLocation
+          ? 'Checking whether this service is available in your region. Please wait a moment.'
+          : 'Please set a service location in your profile or services page before booking.'
+      );
+      return;
+    }
+
     if (!service) return;
     if (!bookingDate) return toast.error("Please select a date");
 
@@ -201,6 +227,43 @@ const MiniCleanServicePage = () => {
             </div>
           </div>
         </motion.div>
+
+        <div className={`rounded-2xl border p-4 ${
+          isOutOfRegion
+            ? 'border-amber-300 bg-amber-50 dark:bg-amber-950/20'
+            : hasResolvedLocation
+            ? 'border-emerald-300 bg-emerald-50 dark:bg-emerald-950/20'
+            : 'border-slate-300 bg-slate-50 dark:bg-slate-900/40'
+        }`}>
+          <div className="flex items-start gap-3">
+            <MapPin className={`mt-0.5 h-4 w-4 shrink-0 ${isOutOfRegion ? 'text-amber-700' : hasResolvedLocation ? 'text-emerald-700' : 'text-slate-600'}`} />
+            <div className="space-y-1 text-sm">
+              <p className="font-semibold text-foreground">
+                {checkingAvailability
+                  ? 'Checking service region...'
+                  : isOutOfRegion
+                  ? 'This service is outside your region'
+                  : hasResolvedLocation
+                  ? 'This service can be booked in your region'
+                  : 'Service location needed before booking'}
+              </p>
+              <p className="text-muted-foreground">
+                {checkingAvailability
+                  ? 'We are verifying the admin-configured service region for your location.'
+                  : isOutOfRegion
+                  ? (availability?.reason || 'Bookings are accepted only in regions configured by admin or super admin.')
+                  : hasResolvedLocation
+                  ? (availability?.reason || 'Your saved location is inside an active service region.')
+                  : 'Please set your service location from the services page or save a default address in your profile.'}
+              </p>
+              {resolvedLocation && (
+                <p className="text-xs text-muted-foreground">
+                  Location: {[resolvedLocation.area, resolvedLocation.city].filter(Boolean).join(', ') || resolvedLocation.address || 'Saved location'}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* What's included — from admin-configured service dos */}
         {service.dos && service.dos.length > 0 && (
@@ -309,17 +372,21 @@ const MiniCleanServicePage = () => {
             </div>
             <button
               onClick={handleBook}
-              disabled={booking}
-              className="flex-1 py-3.5 rounded-2xl bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground font-semibold transition-colors flex items-center justify-center gap-2"
+              disabled={booking || requestingService || checkingAvailability || (!isOutOfRegion && !canBookService)}
+              className={`flex-1 py-3.5 rounded-2xl font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-60 ${
+                isOutOfRegion
+                  ? 'bg-amber-100 text-amber-900 hover:bg-amber-200'
+                  : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+              }`}
             >
-              {booking ? (
+              {booking || requestingService ? (
                 <motion.div
-                  className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full"
+                  className={`w-4 h-4 border-2 border-t-transparent rounded-full ${isOutOfRegion ? 'border-amber-900' : 'border-primary-foreground'}`}
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                 />
               ) : (
-                <><Zap className="w-4 h-4" /> Book Now</>
+                <><Zap className="w-4 h-4" /> {isOutOfRegion ? 'Request Service' : !hasResolvedLocation ? 'Set Location First' : checkingAvailability ? 'Checking region...' : 'Book Now'}</>
               )}
             </button>
           </div>

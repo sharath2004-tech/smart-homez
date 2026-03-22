@@ -151,7 +151,7 @@ export const checkServiceAvailability = async (
     const { default: Location } = await import('../models/Location.js');
     
     // Get the service
-    const service = await Service.findById(serviceId);
+    const service = await Service.findById(serviceId).lean();
     if (!service || !service.isActive) {
       return {
         available: false,
@@ -160,7 +160,9 @@ export const checkServiceAvailability = async (
       };
     }
 
-    // Find nearby locations within their service radius
+    const serviceRadiusMeters = (service.workerSearchRadiusKm || 50) * 1000;
+
+    // Find candidate locations inside the service search radius.
     const nearbyLocations = await Location.find({
       location: {
         $near: {
@@ -168,32 +170,95 @@ export const checkServiceAvailability = async (
             type: 'Point',
             coordinates: [longitude, latitude]
           },
-          $maxDistance: 500 // Check within 500m
+          $maxDistance: serviceRadiusMeters
         }
       },
       isServiceAvailable: true,
       isActive: true
+    }).lean();
+
+    const matchingLocation = nearbyLocations.find((loc) => {
+      const [locLongitude, locLatitude] = loc.location.coordinates;
+      const actualDistance = calculateDistance(latitude, longitude, locLatitude, locLongitude);
+      const effectiveRadius = Math.max(loc.maxServiceRadius || 500, serviceRadiusMeters);
+      const serviceAvailableAtLocation = loc.availableServices?.some(
+        (entry) => entry.service?.toString() === serviceId && entry.isActive
+      ) || loc.availableServices?.length === 0;
+
+      return actualDistance <= effectiveRadius && serviceAvailableAtLocation;
     });
 
-    if (nearbyLocations.length === 0) {
+    if (!matchingLocation) {
+      const nearestLocation = await Location.findOne({
+        location: {
+          $near: {
+            $geometry: {
+              type: 'Point',
+              coordinates: [longitude, latitude]
+            }
+          }
+        },
+        isServiceAvailable: true,
+        isActive: true
+      })
+        .select('apartmentName area city location maxServiceRadius')
+        .lean();
+
+      const nearestArea = nearestLocation
+        ? {
+            apartmentName: nearestLocation.apartmentName,
+            area: nearestLocation.area,
+            city: nearestLocation.city,
+            distance: Math.round(calculateDistance(
+              latitude,
+              longitude,
+              nearestLocation.location.coordinates[1],
+              nearestLocation.location.coordinates[0]
+            ))
+          }
+        : null;
+
       return {
         available: false,
-        reason: 'Service not available in your area',
+        reason: nearbyLocations.length > 0
+          ? 'This service is not available in your selected service region.'
+          : 'Service not available in your area',
         workers: [],
-        nearbyLocations: []
+        workersCount: 0,
+        nearbyLocations: nearestArea ? [nearestArea] : []
       };
     }
 
-    // Service is available if location exists within radius
-    // Find available workers at these locations
-    const workers = await findNearbyWorkers(longitude, latitude, 500);
+    // Service is available if location exists within the admin-defined region.
+    const workerSpecializations = service.category ? [service.category] : [];
+    const workers = await findNearbyWorkers(
+      longitude,
+      latitude,
+      Math.max(matchingLocation.maxServiceRadius || 500, serviceRadiusMeters),
+      workerSpecializations
+    );
+
+    const serviceLocationDistance = Math.round(calculateDistance(
+      latitude,
+      longitude,
+      matchingLocation.location.coordinates[1],
+      matchingLocation.location.coordinates[0]
+    ));
     
     return {
-      available: true, // Available if location exists
+      available: true,
       reason: workers.length > 0 ? 'Service available' : 'Service available (workers will be assigned)',
       workersCount: workers.length,
       workers: workers.slice(0, 3),
-      nearbyLocations: nearbyLocations.map(loc => ({
+      serviceLocation: {
+        id: matchingLocation._id?.toString(),
+        apartmentName: matchingLocation.apartmentName,
+        area: matchingLocation.area,
+        city: matchingLocation.city,
+        distanceMeters: serviceLocationDistance,
+        serviceRadiusMeters: Math.max(matchingLocation.maxServiceRadius || 500, serviceRadiusMeters)
+      },
+      nearbyLocations: nearbyLocations.slice(0, 3).map(loc => ({
         apartmentName: loc.apartmentName,
         area: loc.area,
         city: loc.city,

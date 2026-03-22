@@ -45,6 +45,8 @@ export const useGeolocation = (options: GeolocationOptions = {}) => {
 
       // Save to localStorage for quick access
       localStorage.setItem('userLocation', JSON.stringify({
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         timestamp: Date.now()
@@ -73,8 +75,8 @@ export const useGeolocation = (options: GeolocationOptions = {}) => {
         // Use cached location if less than 1 hour old
         if (Date.now() - cachedData.timestamp < 3600000) {
           setState({
-            latitude: cachedData.latitude,
-            longitude: cachedData.longitude,
+              latitude: cachedData.latitude ?? cachedData.lat,
+              longitude: cachedData.longitude ?? cachedData.lng,
             error: `${errorMessage} (using cached location)`,
             loading: false,
           });
@@ -111,6 +113,8 @@ export const useGeolocation = (options: GeolocationOptions = {}) => {
           loading: false,
         });
         localStorage.setItem('userLocation', JSON.stringify({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
           timestamp: Date.now()
@@ -135,8 +139,8 @@ export const getCachedLocation = (): { latitude: number; longitude: number } | n
     // Return if less than 1 hour old
     if (Date.now() - data.timestamp < 3600000) {
       return {
-        latitude: data.latitude,
-        longitude: data.longitude
+        latitude: data.latitude ?? data.lat,
+        longitude: data.longitude ?? data.lng
       };
     }
   }

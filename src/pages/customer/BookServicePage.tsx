@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useServiceBookingAvailability } from "@/hooks/useServiceBookingAvailability";
 import { authAPI, bookingsAPI, servicesAPI, settingsAPI } from "@/lib/api";
 import { Calendar, Clock, Info, MapPin, Sparkles, Star, User, Users, Zap } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -72,7 +73,20 @@ const BookServicePage = () => {
   const preferredWorkerId = searchParams.get('preferredWorker') ?? null;
   const preferredWorkerName = searchParams.get('preferredWorkerName') ?? null;
   const [service, setService] = useState<Service | null>(null);
-  const [profile, setProfile] = useState<{ name: string; currentLocation?: { area: string; city: string } } | null>(null);
+  const [profile, setProfile] = useState<{
+    name: string;
+    currentLocation?: { area: string; city: string };
+    addresses?: Array<{
+      isDefault?: boolean;
+      apartmentName?: string;
+      address?: string;
+      area?: string;
+      city?: string;
+      state?: string;
+      zipCode?: string;
+      location?: { coordinates?: number[] };
+    }>;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
   const [workers, setWorkers] = useState<Worker[]>([]);
@@ -107,6 +121,17 @@ const BookServicePage = () => {
   const [selectedDays, setSelectedDays] = useState<string[]>(['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
   const [autoRenewal, setAutoRenewal] = useState(true);
   const [allowPause, setAllowPause] = useState(true);
+
+  const {
+    availability,
+    checkingAvailability,
+    requestingService,
+    resolvedLocation,
+    hasResolvedLocation,
+    isOutOfRegion,
+    canBookService,
+    requestService,
+  } = useServiceBookingAvailability(service?._id, profile);
 
   useEffect(() => {
     fetchData();
@@ -312,6 +337,20 @@ const BookServicePage = () => {
 
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isOutOfRegion) {
+      await requestService(service?.name);
+      return;
+    }
+
+    if (!canBookService) {
+      toast.error(
+        hasResolvedLocation
+          ? 'Checking whether this service is available in your region. Please wait a moment.'
+          : 'Please set a service location in your profile or services page before booking.'
+      );
+      return;
+    }
     
     // Validation for subscription bookings
     if (bookingType !== 'oneTime') {
@@ -662,6 +701,43 @@ const BookServicePage = () => {
                 <span>{workers.filter(w => w.workerProfile.availability).length} workers available</span>
               </div>
             )}
+          </div>
+        </div>
+
+        <div className={`rounded-2xl border p-4 ${
+          isOutOfRegion
+            ? 'border-amber-300 bg-amber-50 dark:bg-amber-950/20'
+            : hasResolvedLocation
+            ? 'border-emerald-300 bg-emerald-50 dark:bg-emerald-950/20'
+            : 'border-slate-300 bg-slate-50 dark:bg-slate-900/40'
+        }`}>
+          <div className="flex items-start gap-3">
+            <MapPin className={`mt-0.5 h-4 w-4 shrink-0 ${isOutOfRegion ? 'text-amber-700' : hasResolvedLocation ? 'text-emerald-700' : 'text-slate-600'}`} />
+            <div className="space-y-1 text-sm">
+              <p className="font-semibold text-foreground">
+                {checkingAvailability
+                  ? 'Checking service region...'
+                  : isOutOfRegion
+                  ? 'This service is outside your service region'
+                  : hasResolvedLocation
+                  ? 'This service can be booked in your region'
+                  : 'Service location needed before booking'}
+              </p>
+              <p className="text-muted-foreground">
+                {checkingAvailability
+                  ? 'We are verifying the admin-configured service area for your location.'
+                  : isOutOfRegion
+                  ? (availability?.reason || 'Bookings are only accepted inside regions configured by admin or super admin.')
+                  : hasResolvedLocation
+                  ? (availability?.reason || 'Your selected location is inside an active service region.')
+                  : 'Set your current service location from the services page or your saved profile address first.'}
+              </p>
+              {resolvedLocation && (
+                <p className="text-xs text-muted-foreground">
+                  Location: {[resolvedLocation.area, resolvedLocation.city].filter(Boolean).join(', ') || resolvedLocation.address || 'Saved location'}
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1416,13 +1492,30 @@ const BookServicePage = () => {
             >
               Cancel
             </Link>
-            <button
-              type="submit"
-              disabled={booking}
-              className="flex-1 btn-brand disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {booking ? 'Processing...' : `Confirm Booking - ₹${calculatePrice()}`}
-            </button>
+            {isOutOfRegion ? (
+              <button
+                type="button"
+                onClick={() => requestService(service?.name)}
+                disabled={requestingService || checkingAvailability}
+                className="flex-1 rounded-xl bg-amber-100 py-3 text-center font-semibold text-amber-900 transition-colors hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {requestingService ? 'Sending request...' : 'Request Service'}
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={booking || checkingAvailability || !canBookService}
+                className="flex-1 btn-brand disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {checkingAvailability
+                  ? 'Checking region...'
+                  : booking
+                  ? 'Processing...'
+                  : !hasResolvedLocation
+                  ? 'Set Location First'
+                  : `Confirm Booking - ₹${calculatePrice()}`}
+              </button>
+            )}
           </div>
         </form>
       </div>
