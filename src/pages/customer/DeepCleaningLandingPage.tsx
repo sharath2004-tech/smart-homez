@@ -7,8 +7,8 @@ import { Link } from "react-router-dom";
 import {
     type DeepCleaningConfig,
     type UserProfile,
-  getCategoryMeta,
     getCategoryAction,
+    getCategoryMeta,
     getStartingPrice
 } from "./deepCleaningTemplate";
 

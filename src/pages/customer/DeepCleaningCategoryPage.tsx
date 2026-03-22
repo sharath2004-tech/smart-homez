@@ -6,8 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import {
     type ConfigItem,
-    type DeepCleaningConfig,
     type DeepCleaningCategory,
+    type DeepCleaningConfig,
     type UserProfile,
     getCategoryMeta,
     getStartingPrice
