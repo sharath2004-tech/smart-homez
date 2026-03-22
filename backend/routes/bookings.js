@@ -2917,6 +2917,7 @@ router.post('/:id/admin-approve',
       }
 
       booking.status = 'completed';
+      booking.completedAt = new Date();
 
       // Mark all photos as verified
       if (booking.completionPhotos && booking.completionPhotos.length > 0) {

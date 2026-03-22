@@ -61,6 +61,20 @@ const VALID_INDIAN_CITIES = [
 
 const router = express.Router();
 
+const COMPLETED_BOOKING_DATE_EXPR = {
+  $ifNull: [
+    '$completedAt',
+    {
+      $ifNull: [
+        '$actualEndTime',
+        {
+          $ifNull: ['$updatedAt', '$bookingDate']
+        }
+      ]
+    }
+  ]
+};
+
 // ============== SUPER ADMIN ROUTES ==============
 
 // @route   POST /api/admin/locations
@@ -1401,16 +1415,21 @@ router.get('/dashboard-stats', authenticate, authorize('admin', 'super_admin'), 
       status: { $in: ['pending', 'confirmed', 'in-progress'] }
     });
 
-    const completedToday = await Booking.countDocuments({
-      ...bookingLocationFilter,
-      completedAt: { $gte: today },
-      status: 'completed'
-    });
-
-    const todayRevenue = await Booking.aggregate([
-      { $match: { ...bookingLocationFilter, completedAt: { $gte: today }, status: 'completed' } },
-      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+    const [completedTodayResult, todayRevenue] = await Promise.all([
+      Booking.aggregate([
+        { $match: { ...bookingLocationFilter, status: 'completed' } },
+        { $addFields: { effectiveCompletedAt: COMPLETED_BOOKING_DATE_EXPR } },
+        { $match: { effectiveCompletedAt: { $gte: today } } },
+        { $count: 'count' }
+      ]),
+      Booking.aggregate([
+        { $match: { ...bookingLocationFilter, status: 'completed' } },
+        { $addFields: { effectiveCompletedAt: COMPLETED_BOOKING_DATE_EXPR } },
+        { $match: { effectiveCompletedAt: { $gte: today } } },
+        { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+      ])
     ]);
+    const completedToday = completedTodayResult[0]?.count || 0;
 
     // Yesterday's stats for change calculation
     const yesterdayBookings = await Booking.countDocuments({
@@ -1419,16 +1438,21 @@ router.get('/dashboard-stats', authenticate, authorize('admin', 'super_admin'), 
       status: { $in: ['pending', 'confirmed', 'in-progress'] }
     });
 
-    const completedYesterday = await Booking.countDocuments({
-      ...bookingLocationFilter,
-      completedAt: { $gte: yesterday, $lt: today },
-      status: 'completed'
-    });
-
-    const yesterdayRevenue = await Booking.aggregate([
-      { $match: { ...bookingLocationFilter, completedAt: { $gte: yesterday, $lt: today }, status: 'completed' } },
-      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+    const [completedYesterdayResult, yesterdayRevenue] = await Promise.all([
+      Booking.aggregate([
+        { $match: { ...bookingLocationFilter, status: 'completed' } },
+        { $addFields: { effectiveCompletedAt: COMPLETED_BOOKING_DATE_EXPR } },
+        { $match: { effectiveCompletedAt: { $gte: yesterday, $lt: today } } },
+        { $count: 'count' }
+      ]),
+      Booking.aggregate([
+        { $match: { ...bookingLocationFilter, status: 'completed' } },
+        { $addFields: { effectiveCompletedAt: COMPLETED_BOOKING_DATE_EXPR } },
+        { $match: { effectiveCompletedAt: { $gte: yesterday, $lt: today } } },
+        { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+      ])
     ]);
+    const completedYesterday = completedYesterdayResult[0]?.count || 0;
 
     // Helper to format percentage change
     const calcChange = (current, previous) => {
@@ -1510,8 +1534,17 @@ router.get('/profit-stats', authenticate, authorize('super_admin'), async (req, 
       {
         $match: {
           ...bookingLocationFilter,
-          status: 'completed',
-          completedAt: { $gte: fromDate, $lte: toDate }
+          status: 'completed'
+        }
+      },
+      {
+        $addFields: {
+          effectiveCompletedAt: COMPLETED_BOOKING_DATE_EXPR
+        }
+      },
+      {
+        $match: {
+          effectiveCompletedAt: { $gte: fromDate, $lte: toDate }
         }
       },
       {

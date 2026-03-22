@@ -230,6 +230,15 @@ router.get('/stats', async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    const completedBookingDateExpr = {
+      $ifNull: [
+        '$completedAt',
+        {
+          $ifNull: ['$actualEndTime', { $ifNull: ['$updatedAt', '$bookingDate'] }]
+        }
+      ]
+    };
+
     let workers = await User.find({ role: 'worker', isActive: true });
 
     if (req.query.locationId) {
@@ -243,28 +252,53 @@ router.get('/stats', async (req, res) => {
     const workerIds = workers.map((w) => w._id);
     const onlineWorkers = workers.filter((w) => w.workerProfile?.availability).length;
 
-    const [todayBookings, completedToday, todayRevenue] = await Promise.all([
+    const [todayBookings, completedTodayResult, todayRevenue] = await Promise.all([
       Booking.countDocuments({
         ...(workerIds.length ? { worker: { $in: workerIds } } : {}),
         createdAt: { $gte: today },
         status: { $in: ['pending', 'confirmed', 'in-progress'] }
       }),
-      Booking.countDocuments({
-        ...(workerIds.length ? { worker: { $in: workerIds } } : {}),
-        completedAt: { $gte: today },
-        status: 'completed'
-      }),
       Booking.aggregate([
         {
           $match: {
             ...(workerIds.length ? { worker: { $in: workerIds } } : {}),
-            completedAt: { $gte: today },
             status: 'completed'
+          }
+        },
+        {
+          $addFields: {
+            effectiveCompletedAt: completedBookingDateExpr
+          }
+        },
+        {
+          $match: {
+            effectiveCompletedAt: { $gte: today }
+          }
+        },
+        { $count: 'count' }
+      ]),
+      Booking.aggregate([
+        {
+          $match: {
+            ...(workerIds.length ? { worker: { $in: workerIds } } : {}),
+            status: 'completed'
+          }
+        },
+        {
+          $addFields: {
+            effectiveCompletedAt: completedBookingDateExpr
+          }
+        },
+        {
+          $match: {
+            effectiveCompletedAt: { $gte: today }
           }
         },
         { $group: { _id: null, total: { $sum: '$totalAmount' } } }
       ])
     ]);
+
+    const completedToday = completedTodayResult[0]?.count || 0;
 
     const totalBookingsToday = todayBookings + completedToday;
     const fulfillmentRate = totalBookingsToday > 0
