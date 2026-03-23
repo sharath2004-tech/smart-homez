@@ -8,6 +8,38 @@ import MaidServicePage from "./services/MaidServicePage";
 import MiniCleanServicePage from "./services/MiniCleanServicePage";
 import PlumbingServicePage from "./services/PlumbingServicePage";
 
+const MINI_SERVICE_TYPES = new Set([
+  'deep_cleaning_kitchen',
+  'deep_cleaning_bathroom',
+  'fixed_sofa_cleaning',
+  'fixed_carpet_cleaning',
+  'fixed_window_cleaning',
+  'fixed_fan_cleaning',
+  'fixed_balcony_cleaning',
+  'fixed_fridge_cleaning',
+  'fixed_microwave_cleaning',
+  'fixed_oven_cleaning',
+  'fixed_stove_cleaning',
+  'fixed_chimney_cleaning',
+  'fixed_kitchen_platform_cleaning',
+  'fixed_sink_cleaning',
+  'kitchen_appliances_package',
+  'fixed_washbasin_cleaning',
+  'fixed_window_mesh_cleaning',
+  'fixed_washroom_basic',
+  'fixed_washroom_deep',
+  'fixed_dining_cleaning',
+  'fixed_cabinet_cleaning',
+  'fixed_utility_cleaning',
+  'fixed_cupboard_cleaning',
+  'bedroom_package',
+  'fixed_bed_cleaning',
+  'fixed_mirror_cleaning',
+  'fixed_ac_indoor_cleaning',
+  'fixed_ac_outdoor_cleaning',
+  'fixed_door_cleaning',
+]);
+
 const ServiceRouter = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -21,6 +53,8 @@ const ServiceRouter = () => {
         const service = response.service;
         const serviceName = service.name.toLowerCase();
         const serviceTags = service.tags || [];
+        const serviceTypeValue = service.serviceType || '';
+        const serviceCategory = service.serviceCategory || '';
 
         // Quote services → deep cleaning custom builder
         if (service.isQuoteService) {
@@ -39,12 +73,18 @@ const ServiceRouter = () => {
             serviceName.includes('insta maid') ||
             serviceTags.includes('maid') ||
             serviceTags.includes('hourly') ||
+            serviceTypeValue === 'instant_hourly' ||
             serviceName.includes('instant') ||
             serviceName.includes('ad hoc')) {
           setServiceType('maid');
         }
         // Priority 2: Mini / spot-clean services (individual add-on services)
-        else if (serviceTags.includes('mini-service') || serviceTags.includes('spot-clean')) {
+        else if (
+          serviceTags.includes('mini-service') ||
+          serviceTags.includes('spot-clean') ||
+          MINI_SERVICE_TYPES.has(serviceTypeValue) ||
+          ['spot_cleaning', 'kitchen_services', 'bathroom_services', 'furniture_services', 'hvac_services'].includes(serviceCategory)
+        ) {
           setServiceType('mini');
         }
         // Priority 3: Check for other cleaning services

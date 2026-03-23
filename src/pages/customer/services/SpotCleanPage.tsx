@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 const MINI_SERVICE_TYPES =
-  "deep_cleaning_kitchen,deep_cleaning_bathroom,fixed_sofa_cleaning,fixed_carpet_cleaning,fixed_window_cleaning,fixed_fan_cleaning,fixed_balcony_cleaning,fixed_fridge_cleaning";
+  "deep_cleaning_kitchen,deep_cleaning_bathroom,fixed_sofa_cleaning,fixed_carpet_cleaning,fixed_window_cleaning,fixed_fan_cleaning,fixed_balcony_cleaning,fixed_fridge_cleaning,fixed_microwave_cleaning,fixed_oven_cleaning,fixed_stove_cleaning,fixed_chimney_cleaning,fixed_kitchen_platform_cleaning,fixed_sink_cleaning,kitchen_appliances_package,fixed_washbasin_cleaning,fixed_window_mesh_cleaning,fixed_washroom_basic,fixed_washroom_deep,fixed_dining_cleaning,fixed_cabinet_cleaning,fixed_utility_cleaning,fixed_cupboard_cleaning,bedroom_package,fixed_bed_cleaning,fixed_mirror_cleaning,fixed_ac_indoor_cleaning,fixed_ac_outdoor_cleaning,fixed_door_cleaning";
 
 const SERVICE_ICONS: Record<string, string> = {
   kitchen: "🍳", bathroom: "🚿", sofa: "🛋️", carpet: "🪣",
