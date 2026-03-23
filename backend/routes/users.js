@@ -4,6 +4,7 @@ import Booking from '../models/Booking.js';
 import Location from '../models/Location.js';
 import User from '../models/User.js';
 import { getWorkerPerformance } from '../utils/updateWorkerStats.js';
+import { evaluateWorkerEffectiveAvailability } from '../utils/workerAvailability.js';
 
 const router = express.Router();
 
@@ -167,12 +168,20 @@ router.put('/toggle-availability', authenticate, authorize('worker'), async (req
       });
     }
 
+    const effectiveAvailability = await evaluateWorkerEffectiveAvailability(worker);
+
     console.log(`🔄 Worker ${worker.name} availability changed to: ${availability ? 'ONLINE' : 'OFFLINE'}`);
 
     res.json({ 
-      message: `You are now ${availability ? 'online' : 'offline'}`, 
+      message: availability
+        ? (effectiveAvailability.effectiveAvailability
+            ? 'You are now online'
+            : effectiveAvailability.reason || 'Availability saved. You will go online during your configured working hours.')
+        : 'You are now offline',
       worker,
-      availability: worker.workerProfile.availability
+      availability: effectiveAvailability.effectiveAvailability,
+      manualAvailability: worker.workerProfile.availability,
+      availabilityReason: effectiveAvailability.reason
     });
   } catch (error) {
     console.error('Toggle availability error:', error);
@@ -322,9 +331,30 @@ router.get('/workers/available', authenticate, async (req, res) => {
       .select('-password')
       .sort({ 'workerProfile.rating': -1 });
 
-    console.log(`✅ Found ${workers.length} available workers`);
+    const workerEntries = await Promise.all(
+      workers.map(async worker => ({
+        worker,
+        effectiveAvailability: await evaluateWorkerEffectiveAvailability(worker)
+      }))
+    );
 
-    res.json({ workers });
+    const availableWorkers = workerEntries
+      .filter(entry => entry.effectiveAvailability.effectiveAvailability)
+      .map(entry => {
+        const worker = entry.worker.toObject();
+        worker.workerProfile = {
+          ...worker.workerProfile,
+          manualAvailability: worker.workerProfile?.availability,
+          availability: true,
+          effectiveAvailability: true,
+          availabilityReason: null
+        };
+        return worker;
+      });
+
+    console.log(`✅ Found ${availableWorkers.length} available workers`);
+
+    res.json({ workers: availableWorkers });
   } catch (error) {
     console.error('Get workers error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });

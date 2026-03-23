@@ -12,6 +12,7 @@ import Settings from '../models/Settings.js';
 import User from '../models/User.js';
 import { sendPasswordChangeConfirmation, sendPasswordResetEmail, sendPasswordResetOtpEmail, sendSignupOtpEmail } from '../utils/emailService.js';
 import { sendOTP, verifyOTP } from '../utils/msg91Service.js';
+import { evaluateWorkerEffectiveAvailability } from '../utils/workerAvailability.js';
 
 // Google OAuth
 import { OAuth2Client } from 'google-auth-library';
@@ -322,7 +323,22 @@ router.post('/login',
 // @access  Private
 router.get('/me', authenticate, async (req, res) => {
   try {
-    res.json({ user: { ...req.user.toObject(), ...getPasswordSetupState(req.user) } });
+    const user = req.user.toObject();
+
+    if (user.role === 'worker' && user.workerProfile) {
+      const effectiveAvailability = await evaluateWorkerEffectiveAvailability(req.user);
+      user.workerProfile = {
+        ...user.workerProfile,
+        manualAvailability: user.workerProfile.availability,
+        availability: effectiveAvailability.effectiveAvailability,
+        effectiveAvailability: effectiveAvailability.effectiveAvailability,
+        availabilityReason: effectiveAvailability.reason,
+        withinWorkingWindow: effectiveAvailability.withinWorkingWindow,
+        operationsCompleted: effectiveAvailability.operationsCompleted
+      };
+    }
+
+    res.json({ user: { ...user, ...getPasswordSetupState(req.user) } });
   } catch (error) {
     console.error('Get user error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });

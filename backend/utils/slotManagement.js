@@ -3,6 +3,13 @@
  * Slots are derived at runtime from the BusinessHours config (never hardcoded).
  */
 
+import User from '../models/User.js';
+import {
+    getWorkerOperationalAvailabilityFromBookings,
+    isWorkerAvailableForTimeRange,
+    isWorkerOnLeaveForDate
+} from './workerAvailability.js';
+
 /**
  * Generate time slots from the live BusinessHours configuration.
  * Falls back to a default 06:00–22:00 / 30-min grid if no config is available.
@@ -86,6 +93,26 @@ export const generateTimeSlots = (date = new Date(), startHour = 6, endHour = 22
  */
 export const checkSlotAvailability = async (workerId, date, startTime, endTime, Booking, bufferMinutes = 15, excludeBookingId = null) => {
   try {
+    const worker = await User.findById(workerId)
+      .select('isActive workerProfile.availability workerProfile.leaves workerProfile.workingTimeWindow');
+
+    if (!worker || worker.isActive === false) {
+      return { available: false, reason: 'Worker account is inactive' };
+    }
+
+    if (worker.workerProfile?.availability !== true) {
+      return { available: false, reason: 'Worker is offline' };
+    }
+
+    if (isWorkerOnLeaveForDate(worker, date)) {
+      return { available: false, reason: 'Worker is on approved leave for this date' };
+    }
+
+    const workingWindowStatus = isWorkerAvailableForTimeRange(worker, date, startTime, endTime);
+    if (!workingWindowStatus.available) {
+      return { available: false, reason: workingWindowStatus.reason };
+    }
+
     // Convert times to minutes for comparison
     const [startHour, startMin] = startTime.split(':').map(Number);
     const [endHour, endMin] = endTime.split(':').map(Number);
@@ -99,19 +126,29 @@ export const checkSlotAvailability = async (workerId, date, startTime, endTime, 
     endOfDay.setHours(23, 59, 59, 999);
 
     const bookingQuery = {
-      worker: workerId,
       bookingDate: {
         $gte: startOfDay,
         $lte: endOfDay
       },
-      status: { $in: ['confirmed', 'in-progress', 'pending'] }
+      status: { $ne: 'cancelled' },
+      $or: [
+        { worker: workerId },
+        { 'supportStaff.worker': workerId }
+      ]
     };
 
-    if (excludeBookingId) {
-      bookingQuery._id = { $ne: excludeBookingId };
-    }
+    const dayBookings = await Booking.find(bookingQuery).select('worker supportStaff.worker status startTime endTime actualEndTime');
+    const existingBookings = dayBookings.filter(booking => {
+      if (!['confirmed', 'in-progress', 'pending'].includes(booking.status)) {
+        return false;
+      }
 
-    const existingBookings = await Booking.find(bookingQuery).select('startTime endTime');
+      if (!excludeBookingId) {
+        return true;
+      }
+
+      return booking._id.toString() !== excludeBookingId.toString();
+    });
 
     // Check for conflicts with buffer
     for (const booking of existingBookings) {
@@ -136,6 +173,19 @@ export const checkSlotAvailability = async (workerId, date, startTime, endTime, 
             startTime: booking.startTime,
             endTime: booking.endTime
           }
+        };
+      }
+    }
+
+    const isToday = startOfDay.toDateString() === new Date().toDateString();
+    if (isToday) {
+      const operationalBookings = dayBookings.filter(booking => !excludeBookingId || booking._id.toString() !== excludeBookingId.toString());
+      const operationalStatus = getWorkerOperationalAvailabilityFromBookings(worker, operationalBookings, new Date());
+
+      if (operationalStatus.operationsCompleted) {
+        return {
+          available: false,
+          reason: 'Worker has already completed all assigned operations for today'
         };
       }
     }

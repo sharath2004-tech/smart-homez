@@ -59,6 +59,7 @@ export default function WorkerAvailabilityToggle() {
   }
 
   const isOnline = profile?.workerProfile?.availability || false;
+  const availabilityReason = profile?.workerProfile?.availabilityReason as string | undefined;
 
   return (
     <Card className="p-4 bg-gradient-to-r from-white to-gray-50 dark:from-gray-800 dark:to-gray-900">
@@ -71,7 +72,7 @@ export default function WorkerAvailabilityToggle() {
           <p className={`text-sm ${isOnline ? 'text-green-600 dark:text-green-400 font-medium' : 'text-gray-600 dark:text-gray-400'}`}>
             {isOnline 
               ? `🟢 ${t('worker.dashboard.online')}`
-              : `🔴 ${t('worker.dashboard.offline')} - No orders will be assigned`}
+              : `🔴 ${availabilityReason || `${t('worker.dashboard.offline')} - No orders will be assigned`}`}
           </p>
         </div>
         <Switch

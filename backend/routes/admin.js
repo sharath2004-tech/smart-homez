@@ -14,6 +14,7 @@ import User from '../models/User.js';
 import WorkerEarnings from '../models/WorkerEarnings.js';
 import WorkerSalaryRequest from '../models/WorkerSalaryRequest.js';
 import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/emailService.js';
+import { evaluateWorkerEffectiveAvailability, isWorkerAssignedToBooking } from '../utils/workerAvailability.js';
 
 // Send temporary password via SMS (plain message, not Twilio Verify)
 async function sendTemporaryPasswordSMS(phone, name, temporaryPassword) {
@@ -2227,7 +2228,7 @@ router.get('/workforce-status', authenticate, authorize('admin', 'super_admin'),
       role: 'worker',
       isActive: true
     })
-      .select('name email phone workerProfile.specialization workerProfile.assignedApartments workerProfile.rating workerProfile.availability workerProfile.leaves workerProfile.completedJobs currentLocation')
+      .select('name email phone workerProfile.specialization workerProfile.assignedApartments workerProfile.rating workerProfile.availability workerProfile.leaves workerProfile.completedJobs workerProfile.workingTimeWindow currentLocation')
       .sort({ name: 1 });
 
     // Filter workers by admin's assigned locations
@@ -2249,7 +2250,7 @@ router.get('/workforce-status', authenticate, authorize('admin', 'super_admin'),
     // Get all bookings for today
     const bookings = await Booking.find({
       bookingDate: { $gte: todayStart, $lte: todayEnd },
-      status: { $in: ['confirmed', 'in-progress', 'pending'] }
+      status: { $ne: 'cancelled' }
     })
       .populate('customer', 'name')
       .populate('service', 'name')
@@ -2258,6 +2259,11 @@ router.get('/workforce-status', authenticate, authorize('admin', 'super_admin'),
 
     // Build worker status map
     const workforceStatus = await Promise.all(workers.map(async (worker) => {
+      const effectiveAvailability = await evaluateWorkerEffectiveAvailability(worker, {
+        referenceDate: now,
+        bookings
+      });
+
       // Check if worker has leave today
       const todayLeave = worker.workerProfile.leaves?.find(leave => {
         const leaveDate = new Date(leave.date);
@@ -2267,7 +2273,7 @@ router.get('/workforce-status', authenticate, authorize('admin', 'super_admin'),
 
       // Find current and upcoming bookings for this worker
       const workerBookings = bookings.filter(b => 
-        b.worker && b.worker.toString() === worker._id.toString()
+        isWorkerAssignedToBooking(b, worker._id)
       );
 
       // Determine current task
@@ -2278,9 +2284,9 @@ router.get('/workforce-status', authenticate, authorize('admin', 'super_admin'),
       if (todayLeave) {
         status = 'on-leave';
         statusDetail = `On Leave${todayLeave.reason ? `: ${todayLeave.reason}` : ''}`;
-      } else if (!worker.workerProfile.availability) {
+      } else if (!effectiveAvailability.effectiveAvailability) {
         status = 'offline';
-        statusDetail = 'Offline';
+        statusDetail = effectiveAvailability.reason || 'Offline';
       } else {
         // Check if currently working
         const currentTime = now.getHours() * 60 + now.getMinutes();
@@ -2314,7 +2320,8 @@ router.get('/workforce-status', authenticate, authorize('admin', 'super_admin'),
         rating: worker.workerProfile.rating || 0,
         completedJobs: worker.workerProfile.completedJobs || 0,
         assignedApartments: worker.workerProfile.assignedApartments || [],
-        availability: worker.workerProfile.availability,
+        availability: effectiveAvailability.effectiveAvailability,
+        manualAvailability: worker.workerProfile.availability,
         status,
         statusDetail,
         currentTask: currentTask ? {

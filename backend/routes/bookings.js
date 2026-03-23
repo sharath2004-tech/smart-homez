@@ -20,6 +20,7 @@ import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
 import { checkSlotAvailability } from '../utils/slotManagement.js';
 import { checkIfOnTime, updateWorkerStats } from '../utils/updateWorkerStats.js';
 import { assignWorkerToBooking, reassignWorker } from '../utils/workerAssignment.js';
+import { getWorkerBlockedTimeRanges, getWorkerOperationalAvailabilityFromBookings } from '../utils/workerAvailability.js';
 import {
     getWorkerAvailabilityForecast,
     getWorkerCapacityStatus,
@@ -569,7 +570,7 @@ router.get('/booked-slots', authenticate, async (req, res) => {
 
     // ── Fetch workers (include gender for breakdown) ──────────────────────────
     let workers = await User.find(workerQuery)
-      .select('_id gender workerProfile.leaves')
+      .select('_id gender isActive workerProfile.availability workerProfile.leaves workerProfile.workingTimeWindow')
       .lean();
 
     // If specialization mapping is too strict for current worker data,
@@ -579,12 +580,12 @@ router.get('/booked-slots', authenticate, async (req, res) => {
       const fallbackWithoutSpecialization = { ...workerQuery };
       delete fallbackWithoutSpecialization['workerProfile.specialization'];
       workers = await User.find(fallbackWithoutSpecialization)
-        .select('_id gender workerProfile.leaves')
+        .select('_id gender isActive workerProfile.availability workerProfile.leaves workerProfile.workingTimeWindow')
         .lean();
     }
 
     // Remove workers on approved leave for this date
-    const availableWorkers = workers.filter(worker => {
+    const leaveEligibleWorkers = workers.filter(worker => {
       if (!worker.workerProfile?.leaves?.length) return true;
       return !worker.workerProfile.leaves.some(leave => {
         if (leave.status !== 'approved') return false;
@@ -592,6 +593,29 @@ router.get('/booked-slots', authenticate, async (req, res) => {
         leaveDate.setHours(0, 0, 0, 0);
         return leaveDate.getTime() === bookingDate.getTime();
       });
+    });
+
+    const workerIds = leaveEligibleWorkers.map(worker => worker._id);
+    const workerDayBookings = workerIds.length > 0
+      ? await Booking.find({
+          bookingDate: { $gte: startOfDay, $lte: endOfDay },
+          status: { $ne: 'cancelled' },
+          $or: [
+            { worker: { $in: workerIds } },
+            { 'supportStaff.worker': { $in: workerIds } }
+          ]
+        }).select('worker supportStaff.worker status startTime endTime actualEndTime').lean()
+      : [];
+
+    const now = new Date();
+    const isRequestedDateToday = startOfDay.toDateString() === now.toDateString();
+    const availableWorkers = leaveEligibleWorkers.filter(worker => {
+      if (!isRequestedDateToday) {
+        return true;
+      }
+
+      const operationalStatus = getWorkerOperationalAvailabilityFromBookings(worker, workerDayBookings, now);
+      return !operationalStatus.operationsCompleted;
     });
 
     // Filter bookedRanges to only the available workers so the frontend
@@ -614,6 +638,19 @@ router.get('/booked-slots', authenticate, async (req, res) => {
         startTime: b.startTime,
         endTime: b.endTime
       }));
+
+    availableWorkers.forEach(worker => {
+      const blockedRanges = getWorkerBlockedTimeRanges(worker, bookingDate);
+      blockedRanges.forEach(range => {
+        bookedRanges.push({
+          workerId: worker._id.toString(),
+          workerGender: workerGenderMap.get(worker._id.toString()) ?? null,
+          startTime: range.startTime,
+          endTime: range.endTime,
+          reason: range.reason
+        });
+      });
+    });
 
     const totalWorkers = availableWorkers.length;
     const maleWorkers = availableWorkers.filter(w => normalizeGender(w.gender) === 'male').length;
