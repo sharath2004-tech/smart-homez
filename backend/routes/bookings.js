@@ -77,6 +77,151 @@ const handleMulterError = (err, req, res, next) => {
   next();
 };
 
+const parsePositiveNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const timeStringToMinutes = (time) => {
+  if (typeof time !== 'string' || !/^\d{2}:\d{2}$/.test(time)) {
+    return null;
+  }
+
+  const [hours, minutes] = time.split(':').map(Number);
+  if (
+    !Number.isInteger(hours) ||
+    !Number.isInteger(minutes) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
+    return null;
+  }
+
+  return hours * 60 + minutes;
+};
+
+const minutesToTimeString = (minutes) => {
+  const normalizedMinutes = ((minutes % 1440) + 1440) % 1440;
+  const hours = Math.floor(normalizedMinutes / 60);
+  const mins = normalizedMinutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+};
+
+const addMinutesToTimeString = (startTime, durationMinutes) => {
+  const startMinutes = timeStringToMinutes(startTime);
+  if (startMinutes === null) {
+    return startTime;
+  }
+
+  return minutesToTimeString(startMinutes + durationMinutes);
+};
+
+const getTimeWindowMinutes = (startTime, endTime) => {
+  const startMinutes = timeStringToMinutes(startTime);
+  const endMinutes = timeStringToMinutes(endTime);
+
+  if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
+    return null;
+  }
+
+  return endMinutes - startMinutes;
+};
+
+const resolveServiceDurationMinutes = ({ serviceConfig, subscriptionDetails, serviceDetails, estimatedDuration }) => {
+  const explicitDurationMinutes = parsePositiveNumber(estimatedDuration) || parsePositiveNumber(serviceDetails?.durationMinutes);
+  if (explicitDurationMinutes) {
+    return explicitDurationMinutes;
+  }
+
+  const requestedPackage = [
+    serviceDetails?.package,
+    serviceDetails?.selectedPackage,
+    serviceDetails?.size,
+    serviceDetails?.sizeValue,
+  ].find(value => typeof value === 'string' && value.trim());
+  const sizeOptions = serviceConfig?.sizeParameters?.options || serviceConfig?.sizeParameters?.sizes || [];
+  if (requestedPackage && Array.isArray(sizeOptions)) {
+    const normalizedRequestedPackage = requestedPackage.trim().toLowerCase();
+    const matchingSize = sizeOptions.find(option => {
+      const optionValue = typeof option?.value === 'string' ? option.value.trim().toLowerCase() : null;
+      const optionLabel = typeof option?.label === 'string' ? option.label.trim().toLowerCase() : null;
+      return optionValue === normalizedRequestedPackage || optionLabel === normalizedRequestedPackage;
+    });
+    const sizeDuration = parsePositiveNumber(matchingSize?.duration);
+    if (sizeDuration) {
+      return sizeDuration;
+    }
+  }
+
+  const hourlyDuration = parsePositiveNumber(
+    serviceDetails?.hours ?? serviceDetails?.sessionDurationHours ?? subscriptionDetails?.durationPerSession
+  );
+  if (hourlyDuration) {
+    return hourlyDuration * 60;
+  }
+
+  const quantity = parsePositiveNumber(
+    serviceDetails?.quantity ?? serviceDetails?.qty ?? serviceDetails?.units ?? serviceDetails?.count
+  );
+  if (quantity && Array.isArray(serviceConfig?.pricingTiers)) {
+    const matchingTier = serviceConfig.pricingTiers.find(tier => {
+      const from = parsePositiveNumber(tier?.quantityFrom) ?? 0;
+      const to = parsePositiveNumber(tier?.quantityTo) ?? Number.POSITIVE_INFINITY;
+      return quantity >= from && quantity <= to;
+    });
+    const tierDuration = parsePositiveNumber(matchingTier?.duration);
+    if (tierDuration) {
+      return tierDuration;
+    }
+  }
+
+  return parsePositiveNumber(serviceConfig?.duration);
+};
+
+const resolveBookingWindow = ({ serviceConfig, startTime, endTime, subscriptionDetails, serviceDetails, estimatedDuration }) => {
+  const normalizedStartTime = typeof startTime === 'string' ? startTime : '';
+  if (timeStringToMinutes(normalizedStartTime) === null) {
+    return null;
+  }
+
+  const hasSplitSessions = Array.isArray(subscriptionDetails?.splitSessions) && subscriptionDetails.splitSessions.length > 0;
+  const requestedWindowMinutes = getTimeWindowMinutes(normalizedStartTime, endTime);
+  if (hasSplitSessions && requestedWindowMinutes) {
+    return {
+      startTime: normalizedStartTime,
+      endTime,
+      durationMinutes: requestedWindowMinutes,
+    };
+  }
+
+  const resolvedDurationMinutes = resolveServiceDurationMinutes({
+    serviceConfig,
+    subscriptionDetails,
+    serviceDetails,
+    estimatedDuration,
+  });
+
+  if (resolvedDurationMinutes) {
+    return {
+      startTime: normalizedStartTime,
+      endTime: addMinutesToTimeString(normalizedStartTime, resolvedDurationMinutes),
+      durationMinutes: resolvedDurationMinutes,
+    };
+  }
+
+  if (requestedWindowMinutes) {
+    return {
+      startTime: normalizedStartTime,
+      endTime,
+      durationMinutes: requestedWindowMinutes,
+    };
+  }
+
+  return null;
+};
+
 // @route   GET /api/bookings
 // @desc    Get bookings (filtered by user role and location)
 // @access  Private
@@ -579,7 +724,8 @@ router.post('/',
         preferences,
         isSubscription,
         subscriptionDetails,
-        serviceDetails
+        serviceDetails,
+        estimatedDuration
       } = req.body;
 
       // Resolve service: if not provided, find a matching active service by bookingType
@@ -624,11 +770,24 @@ router.post('/',
         }
       }
 
+      const serviceConfig = await Service.findById(service)
+        .select('duration durationOptions sizeParameters pricingTiers workerSearchRadiusKm defaultWorkerCount workerWage')
+        .lean();
+
+      if (!serviceConfig) {
+        return res.status(400).json({
+          error: {
+            message: 'Selected service no longer exists. Please refresh and try again.',
+            status: 400,
+            code: 'SERVICE_NOT_FOUND'
+          }
+        });
+      }
+
       // ── Subscription price validation: override totalAmount from service.durationOptions ──
       if (isSubscription && subscriptionDetails?.durationPerSession != null) {
-        const serviceDoc = await Service.findById(service).select('durationOptions price').lean();
-        if (serviceDoc?.durationOptions?.length) {
-          const tier = serviceDoc.durationOptions.find(d => d.hours === subscriptionDetails.durationPerSession);
+        if (serviceConfig?.durationOptions?.length) {
+          const tier = serviceConfig.durationOptions.find(d => d.hours === subscriptionDetails.durationPerSession);
           if (tier?.price) {
             totalAmount = tier.price; // Use server-authoritative price, not client-sent value
           }
@@ -744,10 +903,7 @@ router.post('/',
       }
 
       // Fetch service radius — use admin-configured workerSearchRadiusKm as the search perimeter
-      const serviceDoc = service
-        ? await Service.findById(service).select('workerSearchRadiusKm').lean()
-        : null;
-      const serviceRadiusMeters = (serviceDoc?.workerSearchRadiusKm || 50) * 1000;
+      const serviceRadiusMeters = (serviceConfig?.workerSearchRadiusKm || 50) * 1000;
 
       console.log(`🔍 Searching for service location near: [${customerLng}, ${customerLat}] (radius: ${serviceRadiusMeters / 1000}km)`);
       const nearbyLocation = await Location.findOne({
@@ -874,14 +1030,82 @@ router.post('/',
         console.log(`✅ Worker ${workerUser.name} verified for location ${nearbyLocation.apartmentName}`);
       }
 
+      const resolvedStartTime = isSubscription ? subscriptionDetails?.preferredTime : startTime;
+      const bookingWindow = resolveBookingWindow({
+        serviceConfig,
+        startTime: resolvedStartTime,
+        endTime,
+        subscriptionDetails,
+        serviceDetails,
+        estimatedDuration,
+      });
+
+      if (!bookingWindow) {
+        return res.status(400).json({
+          error: {
+            message: 'Booking time could not be calculated because this service duration is not configured. Please ask admin or super admin to set the service duration.',
+            status: 400,
+            code: 'SERVICE_DURATION_NOT_CONFIGURED'
+          }
+        });
+      }
+
+      const requestedBookingDate = new Date(isSubscription ? subscriptionDetails.startDate : bookingDate);
+      const startOfRequestedDay = new Date(requestedBookingDate);
+      startOfRequestedDay.setHours(0, 0, 0, 0);
+      const endOfRequestedDay = new Date(requestedBookingDate);
+      endOfRequestedDay.setHours(23, 59, 59, 999);
+
+      const customerConflict = await Booking.findOne({
+        customer: req.user._id,
+        bookingDate: { $gte: startOfRequestedDay, $lte: endOfRequestedDay },
+        status: { $in: ['pending', 'confirmed', 'in-progress'] },
+        startTime: { $lt: bookingWindow.endTime },
+        endTime: { $gt: bookingWindow.startTime }
+      })
+        .select('bookingId startTime endTime')
+        .lean();
+
+      if (customerConflict) {
+        return res.status(400).json({
+          error: {
+            message: `You already have another booking between ${customerConflict.startTime} and ${customerConflict.endTime}. Please choose a different time.`,
+            status: 400,
+            code: 'CUSTOMER_BOOKING_CONFLICT'
+          }
+        });
+      }
+
+      if (worker) {
+        const workerAvailability = await checkSlotAvailability(
+          worker,
+          requestedBookingDate,
+          bookingWindow.startTime,
+          bookingWindow.endTime,
+          Booking,
+          15
+        );
+
+        if (!workerAvailability.available) {
+          return res.status(400).json({
+            error: {
+              message: workerAvailability.reason || 'Selected worker has a conflicting booking at this time.',
+              status: 400,
+              code: 'WORKER_BOOKING_CONFLICT',
+              conflictingBooking: workerAvailability.conflictingBooking || null
+            }
+          });
+        }
+      }
+
       // Prepare booking data with validated location reference
       const bookingData = {
         customer: req.user._id,
         worker: worker || undefined,
         service,
         bookingDate: isSubscription ? subscriptionDetails.startDate : bookingDate,
-        startTime: isSubscription ? subscriptionDetails.preferredTime : startTime,
-        endTime: isSubscription ? subscriptionDetails.preferredTime : endTime,
+        startTime: bookingWindow.startTime,
+        endTime: bookingWindow.endTime,
         totalAmount,
         location: {
           ...customerLocation,
@@ -897,6 +1121,7 @@ router.post('/',
         bookingType: bookingType || 'oneTime',
         isRecurring: ['daily', 'weekly', 'monthly', 'recurring-short', 'monthly-subscription'].includes(bookingType),
         preferences: preferences || {},
+        scheduledDurationMinutes: bookingWindow.durationMinutes,
         ...(serviceDetails && { serviceDetails })
       };
 
@@ -947,12 +1172,11 @@ router.post('/',
       // Snapshot workforce details from service at booking creation time
       if (service) {
         try {
-          const serviceDoc = await Service.findById(service).select('defaultWorkerCount workerWage').lean();
-          if (serviceDoc) {
+          if (serviceConfig) {
             bookingData.workforce = {
-              workerCount: serviceDoc.defaultWorkerCount || 1,
-              wageType: serviceDoc.workerWage?.type || 'per_hour',
-              wageRate: serviceDoc.workerWage?.rate || 0,
+              workerCount: serviceConfig.defaultWorkerCount || 1,
+              wageType: serviceConfig.workerWage?.type || 'per_hour',
+              wageRate: serviceConfig.workerWage?.rate || 0,
               totalWorkerWage: 0 // will be calculated when admin updates after visit
             };
           }
@@ -1454,7 +1678,7 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
 
     const booking = await Booking.findById(req.params.id)
       .populate('customer', 'name email phone')
-      .populate('service', 'name')
+      .populate('service', 'name duration')
       .populate('worker', 'name phone');
     
     if (!booking) {
@@ -1568,16 +1792,13 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
     booking.bookingDate = new Date(parsedNewDate);
     booking.startTime = newTime;
     
-    // Calculate and update endTime based on duration
-    // Note: duration is in hours, estimatedDuration is in minutes
-    let durationMinutes;
-    if (booking.estimatedDuration) {
-      durationMinutes = booking.estimatedDuration; // Already in minutes
-    } else if (booking.duration) {
-      durationMinutes = booking.duration * 60; // Convert hours to minutes
-    } else {
-      durationMinutes = 120; // Default 2 hours
-    }
+    // Calculate and update endTime based on the existing booking window / service duration
+    let durationMinutes =
+      parsePositiveNumber(booking.scheduledDurationMinutes) ||
+      getTimeWindowMinutes(booking.startTime, booking.endTime) ||
+      parsePositiveNumber(booking.subscription?.durationPerSession) * 60 ||
+      parsePositiveNumber(booking.service?.duration) ||
+      120;
     
     const [newStartHour, newStartMinute] = newTime.split(':').map(Number);
     const totalMinutes = newStartHour * 60 + newStartMinute + durationMinutes;
