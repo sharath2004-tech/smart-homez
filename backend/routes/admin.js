@@ -3023,7 +3023,7 @@ router.get('/worker-requests', authenticate, authorize('admin', 'super_admin'), 
       role: 'worker',
       'workerProfile.accountStatus': 'pending_review'
     })
-      .select('name email phone gender profileImage workerProfile.specialization workerProfile.experience workerProfile.accountStatus workerProfile.documents createdAt')
+      .select('name email phone gender profileImage workerProfile.specialization workerProfile.experience workerProfile.accountStatus workerProfile.documents workerProfile.wageType workerProfile.hourlyRate workerProfile.dailyWage workerProfile.monthlyWage createdAt')
       .sort({ createdAt: -1 });
 
     res.json({ success: true, workers: pendingWorkers });
@@ -3038,9 +3038,56 @@ router.get('/worker-requests', authenticate, authorize('admin', 'super_admin'), 
 // @access  Private/Admin
 router.post('/worker-requests/:id/approve', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
   try {
+    const { wageType, hourlyRate, dailyWage, monthlyWage } = req.body;
+    const normalizedWageType = typeof wageType === 'string' ? wageType.toLowerCase().trim() : '';
+
+    if (!['hourly', 'daily', 'monthly'].includes(normalizedWageType)) {
+      return res.status(400).json({ error: { message: 'Valid wage type is required for approval', status: 400 } });
+    }
+
+    let approvedRateLabel = '';
+    const wageUpdates = {
+      'workerProfile.wageType': normalizedWageType,
+      'workerProfile.hourlyRate': 0,
+      'workerProfile.dailyWage': null,
+      'workerProfile.monthlyWage': null
+    };
+
+    if (normalizedWageType === 'hourly') {
+      const parsedHourlyRate = Number(hourlyRate);
+      if (!Number.isFinite(parsedHourlyRate) || parsedHourlyRate <= 0) {
+        return res.status(400).json({ error: { message: 'Valid hourly rate is required for hourly workers', status: 400 } });
+      }
+      wageUpdates['workerProfile.hourlyRate'] = parsedHourlyRate;
+      approvedRateLabel = `₹${parsedHourlyRate}/hr`;
+    }
+
+    if (normalizedWageType === 'daily') {
+      const parsedDailyWage = Number(dailyWage);
+      if (!Number.isFinite(parsedDailyWage) || parsedDailyWage <= 0) {
+        return res.status(400).json({ error: { message: 'Valid daily wage is required for daily workers', status: 400 } });
+      }
+      wageUpdates['workerProfile.dailyWage'] = parsedDailyWage;
+      approvedRateLabel = `₹${parsedDailyWage}/day`;
+    }
+
+    if (normalizedWageType === 'monthly') {
+      const parsedMonthlyWage = Number(monthlyWage);
+      if (!Number.isFinite(parsedMonthlyWage) || parsedMonthlyWage <= 0) {
+        return res.status(400).json({ error: { message: 'Valid monthly wage is required for monthly workers', status: 400 } });
+      }
+      wageUpdates['workerProfile.monthlyWage'] = parsedMonthlyWage;
+      approvedRateLabel = `₹${parsedMonthlyWage}/month`;
+    }
+
     const worker = await User.findOneAndUpdate(
-      { _id: req.params.id, role: 'worker' },
-      { 'workerProfile.accountStatus': 'active', isVerified: true },
+      { _id: req.params.id, role: 'worker', 'workerProfile.accountStatus': 'pending_review' },
+      {
+        'workerProfile.accountStatus': 'active',
+        'workerProfile.joinDate': new Date(),
+        isVerified: true,
+        ...wageUpdates
+      },
       { new: true }
     );
 
@@ -3049,13 +3096,26 @@ router.post('/worker-requests/:id/approve', authenticate, authorize('admin', 'su
     await Notification.create({
       recipient: worker._id,
       title: 'Application Approved!',
-      message: 'Your worker account has been approved. You can now log in and start accepting bookings.',
+      message: `Your worker account has been approved with ${normalizedWageType} pay (${approvedRateLabel}). You can now log in and start accepting bookings.`,
       type: 'system',
-      data: { type: 'account_approved' }
+      data: {
+        type: 'account_approved',
+        wageType: normalizedWageType,
+        payRate: approvedRateLabel
+      }
     });
 
     console.log(`✅ Worker approved: ${worker.name} (${worker._id}) by admin ${req.user._id}`);
-    res.json({ success: true, message: 'Worker approved successfully', worker: { id: worker._id, name: worker.name } });
+    res.json({
+      success: true,
+      message: 'Worker approved successfully',
+      worker: {
+        id: worker._id,
+        name: worker.name,
+        wageType: normalizedWageType,
+        payRate: approvedRateLabel
+      }
+    });
   } catch (error) {
     console.error('Approve worker error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });

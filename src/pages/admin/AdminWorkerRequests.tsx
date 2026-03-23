@@ -7,6 +7,15 @@ import { useEffect, useState } from "react";
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const UPLOADS_BASE = API_BASE_URL.replace("/api", "");
 
+type WageType = "hourly" | "daily" | "monthly";
+
+interface ApprovalForm {
+  wageType: WageType;
+  hourlyRate: string;
+  dailyWage: string;
+  monthlyWage: string;
+}
+
 interface PendingWorker {
   _id: string;
   name: string;
@@ -19,6 +28,10 @@ interface PendingWorker {
     specialization?: string[];
     experience?: number;
     accountStatus?: string;
+    wageType?: WageType;
+    hourlyRate?: number;
+    dailyWage?: number;
+    monthlyWage?: number;
     documents?: {
       aadhaarFront?: string;
       aadhaarBack?: string;
@@ -29,11 +42,18 @@ interface PendingWorker {
 const AdminWorkerRequests = () => {
   const { role, name } = useAdminRole();
   const [workers, setWorkers] = useState<PendingWorker[]>([]);
+  const [approvalForms, setApprovalForms] = useState<Record<string, ApprovalForm>>({});
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [selectedWorker, setSelectedWorker] = useState<PendingWorker | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  const getDefaultApprovalForm = (worker: PendingWorker): ApprovalForm => ({
+    wageType: worker.workerProfile?.wageType || "hourly",
+    hourlyRate: worker.workerProfile?.hourlyRate ? String(worker.workerProfile.hourlyRate) : "",
+    dailyWage: worker.workerProfile?.dailyWage ? String(worker.workerProfile.dailyWage) : "",
+    monthlyWage: worker.workerProfile?.monthlyWage ? String(worker.workerProfile.monthlyWage) : "",
+  });
 
   const fetchPending = async () => {
     try {
@@ -49,14 +69,83 @@ const AdminWorkerRequests = () => {
 
   useEffect(() => { fetchPending(); }, []);
 
+  useEffect(() => {
+    setApprovalForms((prev) => {
+      const next = { ...prev };
+      for (const worker of workers) {
+        if (!next[worker._id]) {
+          next[worker._id] = getDefaultApprovalForm(worker);
+        }
+      }
+      return next;
+    });
+  }, [workers]);
+
+  const setApprovalField = (workerId: string, updates: Partial<ApprovalForm>) => {
+    setApprovalForms((prev) => {
+      const existing = prev[workerId] || {
+        wageType: "hourly",
+        hourlyRate: "",
+        dailyWage: "",
+        monthlyWage: "",
+      };
+      return {
+        ...prev,
+        [workerId]: {
+          ...existing,
+          ...updates,
+        },
+      };
+    });
+  };
+
+  const getRequestedPayLabel = (worker: PendingWorker) => {
+    const requestedType = worker.workerProfile?.wageType || "hourly";
+    if (requestedType === "daily") return "Requested: Daily pay";
+    if (requestedType === "monthly") return "Requested: Monthly pay";
+    return "Requested: Hourly pay";
+  };
+
+  const getApprovedPaySummary = (form: ApprovalForm) => {
+    if (form.wageType === "daily") return `₹${form.dailyWage}/day`;
+    if (form.wageType === "monthly") return `₹${form.monthlyWage}/month`;
+    return `₹${form.hourlyRate}/hr`;
+  };
+
   const handleApprove = async (workerId: string, workerName: string) => {
+    const form = approvalForms[workerId] || approvalForms[workerId];
+    if (!form) {
+      setError("Approval settings are not ready yet. Please try again.");
+      return;
+    }
+
+    const selectedAmount = form.wageType === "hourly"
+      ? Number(form.hourlyRate)
+      : form.wageType === "daily"
+      ? Number(form.dailyWage)
+      : Number(form.monthlyWage);
+
+    if (!Number.isFinite(selectedAmount) || selectedAmount <= 0) {
+      setError(`Please enter a valid ${form.wageType} pay amount before approving ${workerName}.`);
+      return;
+    }
+
     setActionLoading(workerId);
     setError("");
     try {
-      await adminAPI.approveWorker(workerId);
-      setSuccess(`${workerName} has been approved!`);
+      await adminAPI.approveWorker(workerId, {
+        wageType: form.wageType,
+        hourlyRate: form.wageType === "hourly" ? selectedAmount : undefined,
+        dailyWage: form.wageType === "daily" ? selectedAmount : undefined,
+        monthlyWage: form.wageType === "monthly" ? selectedAmount : undefined,
+      });
+      setSuccess(`${workerName} has been approved with ${form.wageType} pay (${getApprovedPaySummary(form)}).`);
       setWorkers((prev) => prev.filter((w) => w._id !== workerId));
-      if (selectedWorker?._id === workerId) setSelectedWorker(null);
+      setApprovalForms((prev) => {
+        const next = { ...prev };
+        delete next[workerId];
+        return next;
+      });
       setTimeout(() => setSuccess(""), 4000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Approval failed");
@@ -74,7 +163,11 @@ const AdminWorkerRequests = () => {
       await adminAPI.rejectWorker(workerId, reason || undefined);
       setSuccess("Worker application rejected.");
       setWorkers((prev) => prev.filter((w) => w._id !== workerId));
-      if (selectedWorker?._id === workerId) setSelectedWorker(null);
+      setApprovalForms((prev) => {
+        const next = { ...prev };
+        delete next[workerId];
+        return next;
+      });
       setTimeout(() => setSuccess(""), 4000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Rejection failed");
@@ -85,6 +178,54 @@ const AdminWorkerRequests = () => {
 
   const formatDate = (date: string) =>
     new Date(date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
+  const renderPayInput = (workerId: string, form: ApprovalForm) => {
+    if (form.wageType === "daily") {
+      return (
+        <div>
+          <label className="block text-xs font-medium text-foreground mb-1">Final daily wage</label>
+          <input
+            type="number"
+            min="0"
+            value={form.dailyWage}
+            onChange={(e) => setApprovalField(workerId, { dailyWage: e.target.value })}
+            className="input-clean h-10 text-sm"
+            placeholder="e.g. 900"
+          />
+        </div>
+      );
+    }
+
+    if (form.wageType === "monthly") {
+      return (
+        <div>
+          <label className="block text-xs font-medium text-foreground mb-1">Final monthly wage</label>
+          <input
+            type="number"
+            min="0"
+            value={form.monthlyWage}
+            onChange={(e) => setApprovalField(workerId, { monthlyWage: e.target.value })}
+            className="input-clean h-10 text-sm"
+            placeholder="e.g. 18000"
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <label className="block text-xs font-medium text-foreground mb-1">Final hourly rate</label>
+        <input
+          type="number"
+          min="0"
+          value={form.hourlyRate}
+          onChange={(e) => setApprovalField(workerId, { hourlyRate: e.target.value })}
+          className="input-clean h-10 text-sm"
+          placeholder="e.g. 150"
+        />
+      </div>
+    );
+  };
 
   return (
     <AppLayout userType={role} userName={name}>
@@ -117,11 +258,15 @@ const AdminWorkerRequests = () => {
           </div>
         ) : (
           <div className="grid gap-4">
-            {workers.map((worker) => (
+            {workers.map((worker) => {
+              const approvalForm = approvalForms[worker._id] || getDefaultApprovalForm(worker);
+
+              return (
               <div
                 key={worker._id}
-                className="bg-card border border-border rounded-2xl p-5 shadow-card flex flex-col sm:flex-row gap-4"
+                className="bg-card border border-border rounded-2xl p-5 shadow-card flex flex-col gap-4"
               >
+                <div className="flex flex-col sm:flex-row gap-4">
                 {/* Avatar */}
                 <div className="shrink-0">
                   {worker.profileImage ? (
@@ -162,6 +307,13 @@ const AdminWorkerRequests = () => {
                     )}
                     {worker.gender && <span className="capitalize">{worker.gender.replace("_", " ")}</span>}
                     <span>Applied {formatDate(worker.createdAt)}</span>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                    <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 font-medium">
+                      {getRequestedPayLabel(worker)}
+                    </span>
+                    <span className="text-muted-foreground">Set the final approved pay below before approving.</span>
                   </div>
 
                   {/* Document links */}
@@ -213,7 +365,39 @@ const AdminWorkerRequests = () => {
                   </button>
                 </div>
               </div>
-            ))}
+
+                <div className="rounded-xl border border-border bg-muted/30 p-4">
+                  <div className="flex flex-col lg:flex-row gap-4 lg:items-end">
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-foreground mb-2">Approval pay setup</p>
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {(["hourly", "daily", "monthly"] as WageType[]).map((type) => (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => setApprovalField(worker._id, { wageType: type })}
+                            className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
+                              approvalForm.wageType === type
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-background border-border hover:bg-muted text-foreground"
+                            }`}
+                          >
+                            {type === "hourly" ? "Hourly" : type === "daily" ? "Daily" : "Monthly"}
+                          </button>
+                        ))}
+                      </div>
+                      {renderPayInput(worker._id, approvalForm)}
+                    </div>
+
+                    <div className="min-w-[220px] rounded-lg bg-background border border-border px-4 py-3 text-sm">
+                      <p className="text-muted-foreground mb-1">Worker will be approved as</p>
+                      <p className="font-semibold text-foreground capitalize">{approvalForm.wageType} pay</p>
+                      <p className="text-muted-foreground mt-1">{getApprovedPaySummary(approvalForm)}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )})}
           </div>
         )}
       </div>

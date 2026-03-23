@@ -1054,8 +1054,16 @@ export const adminAPI = {
     return apiCall('/admin/worker-requests');
   },
 
-  approveWorker: async (workerId: string) => {
-    return apiCall(`/admin/worker-requests/${workerId}/approve`, { method: 'POST' });
+  approveWorker: async (workerId: string, approvalData: {
+    wageType: 'hourly' | 'daily' | 'monthly';
+    hourlyRate?: number;
+    dailyWage?: number;
+    monthlyWage?: number;
+  }) => {
+    return apiCall(`/admin/worker-requests/${workerId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify(approvalData)
+    });
   },
 
   rejectWorker: async (workerId: string, reason?: string) => {
