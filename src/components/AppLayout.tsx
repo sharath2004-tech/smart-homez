@@ -13,19 +13,21 @@ interface AppLayoutProps {
   children: React.ReactNode;
   userType?: "customer" | "worker" | "admin" | "super_admin";
   userName?: string;
+  userImage?: string | null;
 }
 
-const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps) => {
+const AppLayout = ({ children, userType = "customer", userName, userImage }: AppLayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const storedUser = useMemo(() => {
+  const storedUser = (() => {
     try {
       return JSON.parse(localStorage.getItem('user') || '{}') as {
         name?: string;
+        profileImage?: string;
         needsPasswordSetup?: boolean;
         isFirstLogin?: boolean;
         hasCustomPassword?: boolean;
@@ -33,7 +35,7 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
     } catch {
       return {};
     }
-  }, []);
+  })();
 
   // Resolve display name: prop > localStorage cached user > "User"
   const resolvedName = useMemo(() =>
@@ -292,6 +294,13 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
     resolvedName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
   , [resolvedName]);
 
+  const resolvedAvatarUrl = useMemo(() => {
+    const rawImage = userImage ?? storedUser?.profileImage ?? null;
+    if (!rawImage) return null;
+    if (/^https?:\/\//i.test(rawImage)) return rawImage;
+    return `${api.baseURL?.replace('/api', '') || ''}${rawImage}`;
+  }, [storedUser?.profileImage, userImage]);
+
   const dashboardPath = useMemo(() =>
     userType === "admin" ? "/admin/dashboard"
     : userType === "super_admin" ? "/super-admin/dashboard"
@@ -400,6 +409,7 @@ const AppLayout = ({ children, userType = "customer", userName }: AppLayoutProps
           userType={userType}
           userName={resolvedName}
           initials={initials}
+          avatarUrl={resolvedAvatarUrl}
           dashboardPath={dashboardPath}
           onMobileMenuToggle={handleMobileMenuToggle}
           onLogout={handleLogout}

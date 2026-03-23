@@ -5,7 +5,7 @@ import { body, validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
 import twilio from 'twilio';
 import { authenticate } from '../middleware/auth.js';
-import { uploadWorkerFiles } from '../middleware/upload.js';
+import { uploadProfilePicture, uploadWorkerFiles } from '../middleware/upload.js';
 import Location from '../models/Location.js';
 import Notification from '../models/Notification.js';
 import Settings from '../models/Settings.js';
@@ -348,7 +348,7 @@ router.get('/me', authenticate, async (req, res) => {
 // @route   PATCH /api/auth/me
 // @desc    Update current user profile (name, phone, gender, religion)
 // @access  Private
-router.patch('/me', authenticate,
+router.patch('/me', authenticate, uploadProfilePicture,
   [
     body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
     body('email').optional().isEmail().withMessage('Valid email is required'),
@@ -369,6 +369,9 @@ router.patch('/me', authenticate,
       if (phone !== undefined) updateData.phone = phone;
       if (gender !== undefined) updateData.gender = gender;
       if (religion !== undefined) updateData.religion = religion;
+      if (req.file) {
+        updateData.profileImage = `/uploads/profile-pics/${req.file.filename}`;
+      }
 
       // Email change: check for duplicates before updating
       if (email !== undefined) {

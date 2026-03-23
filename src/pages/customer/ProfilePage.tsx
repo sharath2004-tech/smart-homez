@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
-import { authAPI, locationsAPI, usersAPI } from "@/lib/api";
-import { Bell, Check, ChevronRight, Edit2, Eye, EyeOff, Loader2, MapPin, Plus, Star, Trash2, User } from "lucide-react";
-import { useEffect, useState } from "react";
+import { API_BASE_URL, authAPI, locationsAPI, usersAPI } from "@/lib/api";
+import { Bell, Camera, Check, ChevronRight, Edit2, Eye, EyeOff, Loader2, MapPin, Plus, Star, Trash2, User } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 interface Address {
@@ -28,6 +28,7 @@ interface UserProfile {
   name: string;
   email: string;
   phone?: string;
+  profileImage?: string;
   addresses: Address[];
 }
 
@@ -70,6 +71,9 @@ const ProfilePage = () => {
   const [accountSaving, setAccountSaving] = useState(false);
   const [accountError, setAccountError] = useState('');
   const [accountSuccess, setAccountSuccess] = useState('');
+  const [selectedProfilePicture, setSelectedProfilePicture] = useState<File | null>(null);
+  const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
+  const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
   // Change password
   const [showPasswordSection, setShowPasswordSection] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' });
@@ -306,14 +310,30 @@ const ProfilePage = () => {
     }
     try {
       setAccountSaving(true);
-      await authAPI.updateProfile({ name: accountForm.name, email: accountForm.email, phone: accountForm.phone });
+      const payload = new FormData();
+      payload.append('name', accountForm.name);
+      payload.append('email', accountForm.email);
+      payload.append('phone', accountForm.phone);
+      if (selectedProfilePicture) {
+        payload.append('profilePicture', selectedProfilePicture);
+      }
+
+      const result = await authAPI.updateProfile(payload);
+      const updatedUser = result?.user;
       // Update localStorage
       try {
         const stored = JSON.parse(localStorage.getItem('user') || '{}');
-        localStorage.setItem('user', JSON.stringify({ ...stored, name: accountForm.name, email: accountForm.email }));
+        localStorage.setItem('user', JSON.stringify({
+          ...stored,
+          name: updatedUser?.name || accountForm.name,
+          email: updatedUser?.email || accountForm.email,
+          profileImage: updatedUser?.profileImage || stored?.profileImage || null
+        }));
       } catch (_e) {
         // localStorage unavailable
       }
+      setSelectedProfilePicture(null);
+      setProfilePicturePreview(null);
       setAccountSuccess(t('customer.profile.profileUpdated'));
       await fetchProfileData();
     } catch (err) {
@@ -367,6 +387,36 @@ const ProfilePage = () => {
     alert('Please enable location access and try again — use the GPS icon after allowing location permission.');
   };
 
+  const handleProfilePictureChange = (file: File | null) => {
+    setSelectedProfilePicture(file);
+    if (!file) {
+      setProfilePicturePreview(null);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => setProfilePicturePreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const openAccountModal = () => {
+    setAccountError('');
+    setAccountSuccess('');
+    setShowPasswordSection(false);
+    setSelectedProfilePicture(null);
+    setProfilePicturePreview(null);
+    setShowAccountModal(true);
+  };
+
+  const closeAccountModal = () => {
+    setShowAccountModal(false);
+    setAccountError('');
+    setAccountSuccess('');
+    setShowPasswordSection(false);
+    setSelectedProfilePicture(null);
+    setProfilePicturePreview(null);
+  };
+
   if (loading) {
     return (
       <AppLayout userType="customer" userName="Loading...">
@@ -393,18 +443,30 @@ const ProfilePage = () => {
   }
 
   const initials = profile.name.split(' ').map(n => n[0]).join('').toUpperCase();
+  const profileImageUrl = profile.profileImage
+    ? `${API_BASE_URL.replace('/api', '')}${profile.profileImage}`
+    : null;
+  const displayProfileImageUrl = profilePicturePreview || profileImageUrl;
 
   return (
-    <AppLayout userType="customer" userName={profile.name}>
+    <AppLayout userType="customer" userName={profile.name} userImage={profile.profileImage || null}>
       <div className="max-w-2xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 animate-fade-in pb-20 md:pb-0">
         {/* Profile header */}
         <div className="card-elevated p-4 sm:p-5 md:p-6 text-center relative">
-          <button onClick={() => setShowAccountModal(true)} className="absolute top-4 right-4 p-2 bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors" title="Edit profile">
+          <button onClick={openAccountModal} className="absolute top-4 right-4 p-2 bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors" title="Edit profile">
             <Edit2 className="w-4 h-4" />
           </button>
-          <div className="w-20 h-20 bg-primary-light rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-primary/20">
-            <span className="text-2xl font-bold text-primary">{initials}</span>
-          </div>
+          {displayProfileImageUrl ? (
+            <img
+              src={displayProfileImageUrl}
+              alt={profile.name}
+              className="w-20 h-20 rounded-full object-cover mx-auto mb-4 border-4 border-primary/20"
+            />
+          ) : (
+            <div className="w-20 h-20 bg-primary-light rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-primary/20">
+              <span className="text-2xl font-bold text-primary">{initials}</span>
+            </div>
+          )}
           <h2 className="text-xl font-bold font-heading text-foreground">{profile.name}</h2>
           <p className="text-muted-foreground text-sm mt-1">{profile.email}</p>
           {profile.phone && <p className="text-muted-foreground text-sm">{profile.phone}</p>}
@@ -661,7 +723,7 @@ const ProfilePage = () => {
         <div className="card-elevated overflow-hidden">
           {[
             { icon: Bell, label: t('customer.profile.notifications'), desc: t('customer.profile.notificationsDesc'), onClick: () => {} },
-            { icon: User, label: t('customer.profile.accountSettings'), desc: t('customer.profile.accountSettingsDesc'), onClick: () => setShowAccountModal(true) },
+            { icon: User, label: t('customer.profile.accountSettings'), desc: t('customer.profile.accountSettingsDesc'), onClick: openAccountModal },
           ].map((item, i) => (
             <button
               key={item.label}
@@ -686,7 +748,7 @@ const ProfilePage = () => {
             <div className="bg-card w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-4 animate-fade-in">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold font-heading text-foreground">{t('customer.profile.accountSettings')}</h3>
-                <button onClick={() => { setShowAccountModal(false); setAccountError(''); setAccountSuccess(''); setShowPasswordSection(false); }} className="text-muted-foreground hover:text-foreground p-1">
+                <button onClick={closeAccountModal} className="text-muted-foreground hover:text-foreground p-1">
                   ✕
                 </button>
               </div>
@@ -700,6 +762,38 @@ const ProfilePage = () => {
 
               {/* Only email and phone editable */}
               <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-2">Profile photo</label>
+                  <div className="flex items-center gap-4">
+                    {displayProfileImageUrl ? (
+                      <img src={displayProfileImageUrl} alt={profile.name} className="w-16 h-16 rounded-full object-cover border border-border" />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-primary-light flex items-center justify-center border border-border">
+                        <span className="text-lg font-bold text-primary">{initials}</span>
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <input
+                        ref={profilePictureInputRef}
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png,image/webp"
+                        className="hidden"
+                        onChange={(e) => handleProfilePictureChange(e.target.files?.[0] || null)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => profilePictureInputRef.current?.click()}
+                        className="w-full border border-dashed border-border rounded-xl px-4 py-3 text-left hover:border-primary transition-colors"
+                      >
+                        <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+                          <Camera className="w-4 h-4 text-primary" />
+                          {selectedProfilePicture?.name || 'Choose profile photo'}
+                        </span>
+                        <span className="block text-xs text-muted-foreground mt-1">JPEG, PNG or WEBP up to 5MB</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1">{t('customer.profile.fullName')}</label>
                   <input

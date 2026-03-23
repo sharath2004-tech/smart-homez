@@ -7,6 +7,7 @@ interface AppHeaderProps {
   userType: string;
   userName: string;
   initials: string;
+  avatarUrl?: string | null;
   dashboardPath: string;
   onMobileMenuToggle: () => void;
   onLogout: () => void;
@@ -21,6 +22,7 @@ export const AppHeader = memo(({
   userType,
   userName,
   initials,
+  avatarUrl,
   dashboardPath,
   onMobileMenuToggle,
   onLogout,
@@ -71,18 +73,26 @@ export const AppHeader = memo(({
 
         {/* User info */}
         <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
-          <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
-            {initials}
-          </div>
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={userName} className="w-7 h-7 rounded-full object-cover" />
+          ) : (
+            <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
+              {initials}
+            </div>
+          )}
           <span className="text-sm font-medium text-foreground md:max-w-[120px] line-clamp-1 break-words">
             {userName}
           </span>
         </div>
 
         {/* Mobile user avatar */}
-        <div className="sm:hidden w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
-          {initials}
-        </div>
+        {avatarUrl ? (
+          <img src={avatarUrl} alt={userName} className="sm:hidden w-8 h-8 rounded-full object-cover" />
+        ) : (
+          <div className="sm:hidden w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
+            {initials}
+          </div>
+        )}
 
         {/* Logout */}
         <button
@@ -100,6 +110,7 @@ export const AppHeader = memo(({
   return (
     prevProps.userName === nextProps.userName &&
     prevProps.initials === nextProps.initials &&
+    prevProps.avatarUrl === nextProps.avatarUrl &&
     prevProps.showBusinessHours === nextProps.showBusinessHours &&
     prevProps.businessHoursText === nextProps.businessHoursText
   );

@@ -82,6 +82,23 @@ export const uploadWorkerFiles = multer({
   fileFilter: docFileFilter
 });
 
+// ── Generic profile picture upload for self-service profile updates ─────────
+const profilePictureStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, profilePicsDir);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname);
+    cb(null, `profile-picture-${Date.now()}${ext}`);
+  }
+});
+
+export const uploadProfilePicture = multer({
+  storage: profilePictureStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: fileFilter
+}).single('profilePicture');
+
 // ── Admin ID document upload ──────────────────────────────────────────────────
 const adminDocsStorage = multer.diskStorage({
   destination: function (req, file, cb) {

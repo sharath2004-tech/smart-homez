@@ -88,7 +88,26 @@ export const authAPI = {
     return apiCall('/auth/me');
   },
 
-  updateProfile: async (userData: Record<string, unknown>) => {
+  updateProfile: async (userData: Record<string, unknown> | FormData) => {
+    if (userData instanceof FormData) {
+      const token = getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/auth/me`, {
+        method: 'PATCH',
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` })
+        },
+        body: userData
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error?.message || 'Failed to update profile');
+      }
+
+      return data;
+    }
+
     return apiCall('/auth/me', {
       method: 'PATCH',
       body: JSON.stringify(userData)
