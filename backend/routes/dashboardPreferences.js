@@ -16,7 +16,8 @@ router.get('/', async (req, res) => {
     // Return only active services sorted by sortOrder
     const activeServices = config.services
       .filter(service => service.isActive)
-      .sort((a, b) => a.sortOrder - b.sortOrder);
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .slice(0, config.maxServices);
 
     res.json({
       services: activeServices,

@@ -23,6 +23,8 @@ const initializeDashboardPreferences = async () => {
           icon: '⚡',
           nameKey: 'customer.dashboard.instaAdhoc',
           subtitleKey: 'customer.dashboard.instantBooking',
+          customName: '',
+          customSubtitle: '',
           badge: 'On demand',
           path: '/customer/services/insta',
           isActive: true,
@@ -34,6 +36,8 @@ const initializeDashboardPreferences = async () => {
           icon: '✨',
           nameKey: 'customer.dashboard.deepCleaning',
           subtitleKey: 'customer.dashboard.fullHomeClean',
+          customName: '',
+          customSubtitle: '',
           badge: 'Best value',
           path: '/customer/deep-cleaning',
           isActive: true,
@@ -45,6 +49,8 @@ const initializeDashboardPreferences = async () => {
           icon: '📅',
           nameKey: 'customer.dashboard.subscription',
           subtitleKey: 'customer.dashboard.recurringPlans',
+          customName: '',
+          customSubtitle: '',
           badge: 'Save 20%',
           path: '/customer/services/subscription',
           isActive: true,
@@ -56,14 +62,42 @@ const initializeDashboardPreferences = async () => {
           icon: '🚿',
           nameKey: 'customer.dashboard.intenseWashroom',
           subtitleKey: 'customer.dashboard.washroomDeepClean',
+          customName: '',
+          customSubtitle: '',
           badge: 'Sanitize',
           path: '/customer/services/spot-clean',
           isActive: true,
           sortOrder: 4,
           isDefault: false
+        },
+        {
+          id: 'kitchen_deep_clean',
+          icon: '🍽️',
+          nameKey: 'customer.dashboard.kitchenDeepClean',
+          subtitleKey: 'customer.dashboard.kitchenDeepCleanSubtitle',
+          customName: 'Kitchen Deep Clean',
+          customSubtitle: 'Grease · Appliances · Tiles',
+          badge: 'Popular',
+          path: '/customer/services/spot-clean',
+          isActive: true,
+          sortOrder: 5,
+          isDefault: false
+        },
+        {
+          id: 'window_deep_clean',
+          icon: '🪟',
+          nameKey: 'customer.dashboard.windowDeepClean',
+          subtitleKey: 'customer.dashboard.windowDeepCleanSubtitle',
+          customName: 'Window Deep Cleaning',
+          customSubtitle: 'Glass · Frames · Tracks',
+          badge: 'Spot clean',
+          path: '/customer/services/spot-clean',
+          isActive: true,
+          sortOrder: 6,
+          isDefault: false
         }
       ],
-      maxServices: 4
+      maxServices: 6
     });
 
     console.log('✅ Dashboard preferences created successfully!');

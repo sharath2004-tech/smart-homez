@@ -100,6 +100,22 @@ const CustomerDashboard = () => {
   const [showLocationSelector, setShowLocationSelector] = useState(false);
   const { latitude, longitude, error: locationError, loading: locationLoading, refetch } = useGeolocation();
 
+  const resolveDashboardServicePath = (service: any) => {
+    if (service.id === 'move_in_out_cleaning') {
+      return '/customer/deep-cleaning';
+    }
+
+    if (service.id === 'kitchen_deep_clean') {
+      return kitchenServiceId ? `/customer/book/${kitchenServiceId}` : service.path;
+    }
+
+    if (service.id === 'window_deep_clean') {
+      return windowServiceId ? `/customer/book/${windowServiceId}` : service.path;
+    }
+
+    return service.path;
+  };
+
   useEffect(() => {
     const stored = getStoredDashboardLocation();
     if (stored) {
@@ -147,11 +163,12 @@ const CustomerDashboard = () => {
 
         // Map backend service configuration to frontend format
         const mappedServices = services.map((service: any) => ({
+          id: service.id,
           icon: service.icon,
           name: service.customName || t(service.nameKey),
           subtitle: service.customSubtitle || t(service.subtitleKey),
           badge: service.badge,
-          path: service.id === 'move_in_out_cleaning' ? '/customer/deep-cleaning' : service.path
+          path: resolveDashboardServicePath(service)
         }));
 
         setQuickServices(mappedServices);
@@ -163,7 +180,7 @@ const CustomerDashboard = () => {
       }
     };
     fetchServices();
-  }, [t]);
+  }, [kitchenServiceId, t, windowServiceId]);
 
   useEffect(() => {
     const fetchCoreData = async () => {
@@ -561,34 +578,6 @@ const CustomerDashboard = () => {
                 </Link>
               </motion.div>
             ))}
-
-            {/* Kitchen Deep Clean — always visible; links to direct booking if service exists */}
-            <motion.div variants={itemVariants} whileHover="hover" whileTap="tap">
-              <Link
-                to={kitchenServiceId ? `/customer/book/${kitchenServiceId}` : `/customer/services/spot-clean`}
-                className="card-elevated-hover p-4 text-center group block flex flex-col items-center justify-center min-h-[130px]"
-              >
-                <motion.div className="text-3xl mb-2" whileHover={{ scale: 1.15 }} transition={{ duration: 0.2, ease: "easeOut" }}>
-                  🍽️
-                </motion.div>
-                <p className="text-xs font-semibold text-foreground leading-tight">Kitchen Deep Clean</p>
-                <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">Grease · Appliances · Tiles</p>
-              </Link>
-            </motion.div>
-
-            {/* Window Deep Cleaning — always visible; links to direct booking if service exists */}
-            <motion.div variants={itemVariants} whileHover="hover" whileTap="tap">
-              <Link
-                to={windowServiceId ? `/customer/book/${windowServiceId}` : `/customer/services/spot-clean`}
-                className="card-elevated-hover p-4 text-center group block flex flex-col items-center justify-center min-h-[130px]"
-              >
-                <motion.div className="text-3xl mb-2" whileHover={{ scale: 1.15 }} transition={{ duration: 0.2, ease: "easeOut" }}>
-                  🪟
-                </motion.div>
-                <p className="text-xs font-semibold text-foreground leading-tight">Window Deep Cleaning</p>
-                <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">Glass · Frames · Tracks</p>
-              </Link>
-            </motion.div>
           </motion.div>
         </motion.div>
         )}
