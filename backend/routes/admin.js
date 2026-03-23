@@ -1013,6 +1013,25 @@ router.get('/workers', authenticate, authorize('admin', 'super_admin'), async (r
       }
     }
 
+    workers = await Promise.all(
+      workers.map(async (worker) => {
+        const effectiveAvailability = await evaluateWorkerEffectiveAvailability(worker);
+        const workerObject = worker.toObject();
+
+        workerObject.workerProfile = {
+          ...workerObject.workerProfile,
+          manualAvailability: workerObject.workerProfile?.availability,
+          availability: effectiveAvailability.effectiveAvailability,
+          effectiveAvailability: effectiveAvailability.effectiveAvailability,
+          availabilityReason: effectiveAvailability.reason,
+          withinWorkingWindow: effectiveAvailability.withinWorkingWindow,
+          operationsCompleted: effectiveAvailability.operationsCompleted
+        };
+
+        return workerObject;
+      })
+    );
+
     console.log('✅ Returning', workers.length, 'workers to', req.user.role);
     console.log('==================== END GET /workers ====================\n');
 
@@ -1082,6 +1101,10 @@ router.put('/workers/:workerId',
 
       // Parse the request body (form-data sends JSON as strings)
       let updateData = {};
+      const previousAssignedLocationIds = (worker.workerProfile?.assignedApartments || [])
+        .map(apt => apt.locationId?.toString())
+        .filter(Boolean);
+      let nextAssignedLocationIds = null;
 
       // Basic fields
       if (req.body.name) updateData.name = req.body.name;
@@ -1245,12 +1268,76 @@ router.put('/workers/:workerId',
         updateData.addresses = addresses;
       }
 
+      if (req.body.assignedApartmentIds !== undefined) {
+        const parsedAssignedApartmentIds = typeof req.body.assignedApartmentIds === 'string'
+          ? JSON.parse(req.body.assignedApartmentIds)
+          : req.body.assignedApartmentIds;
+
+        if (!Array.isArray(parsedAssignedApartmentIds)) {
+          return res.status(400).json({
+            error: { message: 'assignedApartmentIds must be an array', status: 400 }
+          });
+        }
+
+        nextAssignedLocationIds = [...new Set(parsedAssignedApartmentIds.map(String).filter(Boolean))];
+
+        const assignedLocations = nextAssignedLocationIds.length > 0
+          ? await Location.find({ _id: { $in: nextAssignedLocationIds } })
+          : [];
+
+        if (assignedLocations.length !== nextAssignedLocationIds.length) {
+          return res.status(400).json({
+            error: { message: 'One or more selected locations were not found', status: 400 }
+          });
+        }
+
+        if (req.user.role === 'admin') {
+          const adminLocationIds = req.user.adminProfile?.assignedLocations?.map(loc => loc.locationId.toString()) || [];
+          const hasUnauthorizedLocation = nextAssignedLocationIds.some(locationId => !adminLocationIds.includes(locationId));
+
+          if (hasUnauthorizedLocation) {
+            return res.status(403).json({
+              error: { message: 'You can only assign workers to your permitted locations', status: 403 }
+            });
+          }
+        }
+
+        updateData['workerProfile.assignedApartments'] = assignedLocations.map(location => ({
+          locationId: location._id,
+          apartmentName: location.apartmentName,
+          building: location.building,
+          area: location.area,
+          city: location.city,
+          location: location.location,
+          maxWalkingDistance: location.maxServiceRadius
+        }));
+      }
+
       // Update worker
       const updatedWorker = await User.findByIdAndUpdate(
         workerId,
         { $set: updateData },
         { new: true, runValidators: true }
       ).select('-password -passwordResetToken -passwordResetExpires -temporaryPassword');
+
+      if (nextAssignedLocationIds !== null) {
+        const locationsToRemove = previousAssignedLocationIds.filter(locationId => !nextAssignedLocationIds.includes(locationId));
+        const locationsToAdd = nextAssignedLocationIds.filter(locationId => !previousAssignedLocationIds.includes(locationId));
+
+        if (locationsToRemove.length > 0) {
+          await Location.updateMany(
+            { _id: { $in: locationsToRemove } },
+            { $pull: { assignedWorkers: { worker: updatedWorker._id } } }
+          );
+        }
+
+        for (const locationId of locationsToAdd) {
+          await Location.updateOne(
+            { _id: locationId, 'assignedWorkers.worker': { $ne: updatedWorker._id } },
+            { $push: { assignedWorkers: { worker: updatedWorker._id, assignedAt: new Date() } } }
+          );
+        }
+      }
 
       console.log(`✅ Worker ${updatedWorker.name} (${workerId}) updated by ${req.user.role} ${req.user.name}`);
 
@@ -1279,6 +1366,7 @@ router.patch('/workers/:workerId/assign-location',
     try {
       const { workerId } = req.params;
       const { locationId } = req.body;
+      const replaceExisting = req.body.replaceExisting === true || req.body.replaceExisting === 'true';
 
       const worker = await User.findById(workerId);
       if (!worker || worker.role !== 'worker') {
@@ -1298,6 +1386,46 @@ router.patch('/workers/:workerId/assign-location',
         if (!hasAccess) {
           return res.status(403).json({ error: { message: 'No access to this location', status: 403 } });
         }
+      }
+
+      const existingAssignments = worker.workerProfile?.assignedApartments || [];
+      const existingLocationIds = existingAssignments.map(apt => apt.locationId?.toString()).filter(Boolean);
+
+      if (replaceExisting) {
+        const locationIdsToRemove = existingLocationIds.filter(existingLocationId => existingLocationId !== locationId);
+
+        if (locationIdsToRemove.length > 0) {
+          await Location.updateMany(
+            { _id: { $in: locationIdsToRemove } },
+            { $pull: { assignedWorkers: { worker: worker._id } } }
+          );
+        }
+
+        worker.workerProfile.assignedApartments = [{
+          locationId: location._id,
+          apartmentName: location.apartmentName,
+          building: location.building,
+          area: location.area,
+          city: location.city,
+          location: location.location,
+          maxWalkingDistance: location.maxServiceRadius
+        }];
+        await worker.save();
+
+        await Location.updateOne(
+          { _id: location._id, 'assignedWorkers.worker': { $ne: worker._id } },
+          { $push: { assignedWorkers: { worker: workerId, assignedAt: new Date() } } }
+        );
+
+        return res.json({
+          success: true,
+          message: 'Worker reassigned successfully',
+          worker: {
+            _id: worker._id,
+            name: worker.name,
+            assignedApartments: worker.workerProfile.assignedApartments
+          }
+        });
       }
 
       // Check if already assigned

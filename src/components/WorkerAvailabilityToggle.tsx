@@ -58,7 +58,8 @@ export default function WorkerAvailabilityToggle() {
     );
   }
 
-  const isOnline = profile?.workerProfile?.availability || false;
+  const manualAvailability = profile?.workerProfile?.manualAvailability ?? false;
+  const isOnline = profile?.workerProfile?.effectiveAvailability ?? profile?.workerProfile?.availability ?? false;
   const availabilityReason = profile?.workerProfile?.availabilityReason as string | undefined;
 
   return (
@@ -76,7 +77,7 @@ export default function WorkerAvailabilityToggle() {
           </p>
         </div>
         <Switch
-          checked={isOnline}
+          checked={manualAvailability}
           onCheckedChange={(checked) => toggleMutation.mutate(checked)}
           disabled={toggleMutation.isPending}
         />

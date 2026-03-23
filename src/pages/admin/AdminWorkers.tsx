@@ -30,6 +30,10 @@ interface Worker {
     completedJobs: number;
     totalEarnings: number;
     availability: boolean;
+    manualAvailability?: boolean;
+    effectiveAvailability?: boolean;
+    availabilityReason?: string | null;
+    withinWorkingWindow?: boolean;
     wageType?: string;
     hourlyRate?: number;
     dailyWage?: number;
@@ -124,6 +128,16 @@ const getSpecializationChoices = (selected: string[] = []) => {
 
   return [...specializationOptions, ...customSelected];
 };
+
+const isWorkerEffectivelyOnline = (worker: Worker) => {
+  if (!worker.isActive) {
+    return false;
+  }
+
+  return Boolean(worker.workerProfile?.effectiveAvailability ?? worker.workerProfile?.availability);
+};
+
+const getWorkerAvailabilityReason = (worker: Worker) => worker.workerProfile?.availabilityReason || null;
 
 const AdminWorkers = () => {
   const { role, name, isSuperAdmin } = useAdminRole();
@@ -406,6 +420,9 @@ const AdminWorkers = () => {
       // Worker profile as JSON
       if (editWorker.workerProfile) {
         const normalizedSpecializations = normalizeSpecializations(editWorker.workerProfile.specialization || []);
+        const assignedLocationIds = (editWorker.workerProfile.assignedApartments || [])
+          .map((apartment) => apartment.locationId)
+          .filter(Boolean);
         formData.append('workerProfile', JSON.stringify({
           specialization: normalizedSpecializations,
           experience: editWorker.workerProfile.experience || 0,
@@ -426,6 +443,7 @@ const AdminWorkers = () => {
             workingDays: [1, 2, 3, 4, 5, 6]
           }
         }));
+        formData.append('assignedApartmentIds', JSON.stringify(assignedLocationIds));
       }
 
       // Aadhaar number
@@ -637,18 +655,46 @@ const AdminWorkers = () => {
     }));
   };
 
+  const setEditAssignedLocations = (locationIds: string[]) => {
+    if (!editWorker?.workerProfile) return;
+
+    const uniqueLocationIds = [...new Set(locationIds.filter(Boolean))];
+    const currentAssignments = editWorker.workerProfile.assignedApartments || [];
+    const nextAssignments = uniqueLocationIds.map((locationId) => {
+      const location = locations.find((loc) => loc._id === locationId);
+      if (location) {
+        return {
+          locationId: location._id,
+          apartmentName: location.apartmentName,
+          area: location.area,
+          city: location.city
+        };
+      }
+
+      return currentAssignments.find((assignment) => assignment.locationId === locationId);
+    }).filter(Boolean) as NonNullable<Worker['workerProfile']>['assignedApartments'];
+
+    setEditWorker({
+      ...editWorker,
+      workerProfile: {
+        ...editWorker.workerProfile,
+        assignedApartments: nextAssignments
+      }
+    });
+  };
+
   const filtered = workers.filter((w) => {
     const matchSearch = w.name.toLowerCase().includes(search.toLowerCase()) ||
       w.email.toLowerCase().includes(search.toLowerCase());
 
     if (statusFilter === "all") return matchSearch;
 
-    const workerStatus = w.workerProfile?.availability ? 'available' : 'offline';
+    const workerStatus = isWorkerEffectivelyOnline(w) ? 'available' : 'offline';
     return matchSearch && workerStatus === statusFilter;
   });
 
-  const onlineCount = workers.filter(w => w.workerProfile?.availability && w.isActive).length;
-  const offlineCount = workers.filter(w => !w.workerProfile?.availability || !w.isActive).length;
+  const onlineCount = workers.filter((worker) => isWorkerEffectivelyOnline(worker)).length;
+  const offlineCount = workers.filter((worker) => !isWorkerEffectivelyOnline(worker)).length;
 
   if (loading) {
     return (
@@ -717,7 +763,8 @@ const AdminWorkers = () => {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {filtered.map((w) => {
-              const status = w.workerProfile?.availability ? 'available' : 'offline';
+              const status = isWorkerEffectivelyOnline(w) ? 'available' : 'offline';
+              const availabilityReason = getWorkerAvailabilityReason(w);
               return (
                 <div key={w._id} className="card-elevated p-3">
                   <div className="flex items-start gap-3 mb-3">
@@ -758,10 +805,16 @@ const AdminWorkers = () => {
                       <p className="text-sm font-bold text-foreground">₹{w.workerProfile?.totalEarnings || 0}</p>
                       <p className="text-xs text-muted-foreground">Earned</p>
                       <p className="text-xs text-purple-600">
-                        {w.workerProfile?.availability ? '🟢 Online' : '🔴 Offline'}
+                        {isWorkerEffectivelyOnline(w) ? '🟢 Online' : '🔴 Offline'}
                       </p>
                     </div>
                   </div>
+
+                  {availabilityReason && !isWorkerEffectivelyOnline(w) && (
+                    <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      Offline reason: {availabilityReason}
+                    </div>
+                  )}
 
                   {/* Enhanced Reliability Score */}
                   {w.workerProfile?.reliabilityScore !== undefined && (
@@ -1697,6 +1750,9 @@ const AdminWorkers = () => {
                               <p className="text-xs text-muted-foreground mt-2">
                                 Select the days when this worker is available for bookings
                               </p>
+                              <p className="text-xs text-muted-foreground mt-2">
+                                Worker goes online only during these slots, and only when the worker's own availability toggle is ON.
+                              </p>
                             </div>
                           </>
                         )}
@@ -1706,6 +1762,46 @@ const AdminWorkers = () => {
                             When disabled, worker is available 24/7 for bookings
                           </p>
                         )}
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <label className="block text-sm font-medium">Assigned Locations</label>
+                          <span className="text-xs text-muted-foreground">Reassign worker by updating the selected locations below</span>
+                        </div>
+                        <div className="space-y-2 max-h-40 overflow-y-auto border border-border rounded-lg p-3">
+                          {locations.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">No locations available</p>
+                          ) : (
+                            locations.map((location) => {
+                              const selectedLocationIds = (editWorker.workerProfile?.assignedApartments || [])
+                                .map((assignment) => assignment.locationId)
+                                .filter(Boolean);
+                              const isSelected = selectedLocationIds.includes(location._id);
+
+                              return (
+                                <button
+                                  key={location._id}
+                                  type="button"
+                                  onClick={() => {
+                                    const nextLocationIds = isSelected
+                                      ? selectedLocationIds.filter((locationId) => locationId !== location._id)
+                                      : [...selectedLocationIds, location._id];
+                                    setEditAssignedLocations(nextLocationIds);
+                                  }}
+                                  className={`w-full text-left text-xs px-3 py-2 rounded-lg border transition-colors ${
+                                    isSelected
+                                      ? 'bg-primary text-primary-foreground border-primary'
+                                      : 'bg-background border-border hover:bg-muted'
+                                  }`}
+                                >
+                                  {isSelected && <CheckCircle className="w-3 h-3 inline mr-1" />}
+                                  {location.apartmentName} - {location.area}, {location.city}
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
                       </div>
 
                       {/* Wage Configuration */}
