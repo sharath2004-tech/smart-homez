@@ -11,8 +11,9 @@ const uploadsDir = path.join(__dirname, '..', 'uploads', 'completion-photos');
 const profilePicsDir = path.join(__dirname, '..', 'uploads', 'profile-pics');
 const workerDocsDir = path.join(__dirname, '..', 'uploads', 'worker-docs');
 const adminDocsDir = path.join(__dirname, '..', 'uploads', 'admin-docs');
+const expenseProofsDir = path.join(__dirname, '..', 'uploads', 'expense-proofs');
 
-[uploadsDir, profilePicsDir, workerDocsDir, adminDocsDir].forEach(dir => {
+[uploadsDir, profilePicsDir, workerDocsDir, adminDocsDir, expenseProofsDir].forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
@@ -97,5 +98,22 @@ export const uploadAdminDoc = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: docFileFilter
 }).single('idDocument');
+
+// ── Expense proof uploads (bills, product photos, receipts) ─────────────────
+const expenseProofsStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, expenseProofsDir);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname);
+    cb(null, `expense-proof-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+  }
+});
+
+export const uploadExpenseProofs = multer({
+  storage: expenseProofsStorage,
+  limits: { fileSize: 7 * 1024 * 1024 },
+  fileFilter: docFileFilter
+});
 
 export default upload;

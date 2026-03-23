@@ -54,6 +54,24 @@ const businessExpenseSchema = new mongoose.Schema({
     enum: ['admin', 'super_admin'],
     required: true
   },
+  proofFiles: [{
+    url: {
+      type: String,
+      required: true
+    },
+    originalName: {
+      type: String,
+      default: null
+    },
+    mimeType: {
+      type: String,
+      default: null
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   receipt: {
     type: String,
     default: null

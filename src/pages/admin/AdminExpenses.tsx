@@ -1,9 +1,16 @@
 import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
-import { adminAPI, bookingsAPI, businessExpensesAPI } from "@/lib/api";
-import { DollarSign, Edit2, Plus, Trash2, TrendingDown, TrendingUp, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { API_BASE_URL, adminAPI, bookingsAPI, businessExpensesAPI } from "@/lib/api";
+import { DollarSign, Edit2, Plus, Trash2, TrendingDown, TrendingUp, Upload, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+
+interface ExpenseProofFile {
+  url: string;
+  originalName?: string | null;
+  mimeType?: string | null;
+  uploadedAt?: string;
+}
 
 interface Expense {
   _id: string;
@@ -47,6 +54,8 @@ interface Expense {
     area: string;
     city: string;
   };
+  proofFiles?: ExpenseProofFile[];
+  receipt?: string | null;
   createdAt: string;
 }
 
@@ -186,6 +195,8 @@ const AdminExpenses = () => {
   const [showAllRevenueServices, setShowAllRevenueServices] = useState(false);
   const [showAllWages, setShowAllWages] = useState(false);
   const [expandedWageBreakdowns, setExpandedWageBreakdowns] = useState<Record<string, boolean>>({});
+  const [selectedProofFiles, setSelectedProofFiles] = useState<File[]>([]);
+  const proofFileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -241,6 +252,22 @@ const AdminExpenses = () => {
   const activeLocationId = role === 'super_admin' && selectedLocationId !== 'all'
     ? selectedLocationId
     : undefined;
+
+  const getExpenseProofs = (expense: Expense): ExpenseProofFile[] => {
+    if (expense.proofFiles && expense.proofFiles.length > 0) {
+      return expense.proofFiles;
+    }
+    if (expense.receipt) {
+      return [{ url: expense.receipt, originalName: 'Expense proof' }];
+    }
+    return [];
+  };
+
+  const getProofUrl = (url: string) => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    return `${API_BASE_URL.replace('/api', '')}${url}`;
+  };
 
   const fetchExpenses = async () => {
     try {
@@ -330,16 +357,22 @@ const AdminExpenses = () => {
 
     try {
       setSubmitting(true);
-      const payload = {
-        title: formData.title,
-        amount: parseFloat(formData.amount),
-        category: formData.category,
-        customCategory: formData.category === 'other' ? formData.customCategory : undefined,
-        description: formData.description,
-        date: formData.date,
-        type: formData.type,
-        bookingId: formData.bookingId || undefined
-      };
+      const payload = new FormData();
+      payload.append('title', formData.title);
+      payload.append('amount', String(parseFloat(formData.amount)));
+      payload.append('category', formData.category);
+      if (formData.category === 'other' && formData.customCategory.trim()) {
+        payload.append('customCategory', formData.customCategory.trim());
+      }
+      if (formData.description.trim()) {
+        payload.append('description', formData.description.trim());
+      }
+      payload.append('date', formData.date);
+      payload.append('type', formData.type);
+      if (formData.bookingId) {
+        payload.append('bookingId', formData.bookingId);
+      }
+      selectedProofFiles.forEach((file) => payload.append('proofFiles', file));
 
       if (editingId) {
         await businessExpensesAPI.update(editingId, payload);
@@ -361,6 +394,10 @@ const AdminExpenses = () => {
 
   const handleEdit = (expense: Expense) => {
     setEditingId(expense._id);
+    setSelectedProofFiles([]);
+    if (proofFileInputRef.current) {
+      proofFileInputRef.current.value = '';
+    }
     setFormData({
       title: expense.title,
       amount: expense.amount.toString(),
@@ -399,6 +436,10 @@ const AdminExpenses = () => {
       bookingId: "",
       bookingSearch: ""
     });
+    setSelectedProofFiles([]);
+    if (proofFileInputRef.current) {
+      proofFileInputRef.current.value = '';
+    }
     setEditingId(null);
   };
 
@@ -760,6 +801,69 @@ const AdminExpenses = () => {
                     rows={3}
                     placeholder="Optional notes about this expense..."
                   />
+                </div>
+
+                <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-foreground mb-2">
+                      Expense Proofs
+                    </label>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Upload bills, receipts, or product photos for reference. You can attach up to 5 files at a time.
+                    </p>
+                    <input
+                      ref={proofFileInputRef}
+                      type="file"
+                      multiple
+                      accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
+                      className="hidden"
+                      onChange={(e) => setSelectedProofFiles(Array.from(e.target.files || []))}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => proofFileInputRef.current?.click()}
+                      className="flex w-full items-center gap-2 rounded-lg border border-dashed border-border bg-background px-3 py-2 text-sm hover:bg-muted transition-colors"
+                    >
+                      <Upload className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">
+                        {selectedProofFiles.length > 0
+                          ? `${selectedProofFiles.length} file${selectedProofFiles.length !== 1 ? 's' : ''} selected`
+                          : 'Click to upload proof files'}
+                      </span>
+                    </button>
+                  </div>
+
+                  {selectedProofFiles.length > 0 && (
+                    <div className="rounded-lg bg-background p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">New files to upload</p>
+                      <div className="space-y-1">
+                        {selectedProofFiles.map((file) => (
+                          <p key={`${file.name}-${file.lastModified}`} className="text-sm text-foreground break-all">
+                            • {file.name}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {editingId && getExpenseProofs(expenses.find((expense) => expense._id === editingId) || { _id: '', title: '', amount: 0, category: '', date: '', type: 'operational_expense', createdBy: { _id: '', name: '', email: '' }, createdAt: '' }).length > 0 && (
+                    <div className="rounded-lg bg-background p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Existing proofs</p>
+                      <div className="flex flex-wrap gap-2">
+                        {getExpenseProofs(expenses.find((expense) => expense._id === editingId) || { _id: '', title: '', amount: 0, category: '', date: '', type: 'operational_expense', createdBy: { _id: '', name: '', email: '' }, createdAt: '' }).map((proof, index) => (
+                          <a
+                            key={`${proof.url}-${index}`}
+                            href={getProofUrl(proof.url)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium text-foreground hover:bg-muted/70"
+                          >
+                            {proof.originalName || `Proof ${index + 1}`}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Buttons */}
@@ -1254,6 +1358,26 @@ const AdminExpenses = () => {
                         <p className="font-medium text-foreground">{expense.title}</p>
                         {expense.description && (
                           <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{expense.description}</p>
+                        )}
+                        {getExpenseProofs(expense).length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {getExpenseProofs(expense).slice(0, 2).map((proof, index) => (
+                              <a
+                                key={`${proof.url}-${index}`}
+                                href={getProofUrl(proof.url)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-100"
+                              >
+                                {proof.originalName || `Proof ${index + 1}`}
+                              </a>
+                            ))}
+                            {getExpenseProofs(expense).length > 2 && (
+                              <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                                +{getExpenseProofs(expense).length - 2} more proof{getExpenseProofs(expense).length - 2 !== 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
                     </td>

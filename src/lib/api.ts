@@ -1607,7 +1607,7 @@ export const expenseCategoriesAPI = {
 
 // ====== Business Expenses API ======
 export const businessExpensesAPI = {
-  create: async (data: {
+  create: async (data: FormData | {
     title: string;
     amount: number;
     category: string;
@@ -1618,6 +1618,22 @@ export const businessExpensesAPI = {
     bookingId?: string;
     type?: string;
   }) => {
+    if (data instanceof FormData) {
+      const token = getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/business-expenses`, {
+        method: 'POST',
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` })
+        },
+        body: data
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error?.message || result.message || 'Failed to create expense');
+      }
+      return result;
+    }
+
     return apiCall('/business-expenses', {
       method: 'POST',
       body: JSON.stringify(data)
@@ -1644,7 +1660,23 @@ export const businessExpensesAPI = {
     return apiCall(`/business-expenses${q.toString() ? `?${q.toString()}` : ''}`);
   },
 
-  update: async (id: string, data: Record<string, unknown>) => {
+  update: async (id: string, data: FormData | Record<string, unknown>) => {
+    if (data instanceof FormData) {
+      const token = getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/business-expenses/${id}`, {
+        method: 'PATCH',
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` })
+        },
+        body: data
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error?.message || result.message || 'Failed to update expense');
+      }
+      return result;
+    }
+
     return apiCall(`/business-expenses/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data)

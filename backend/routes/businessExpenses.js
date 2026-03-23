@@ -6,10 +6,18 @@
 import express from 'express';
 import { body, param, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { uploadExpenseProofs } from '../middleware/upload.js';
 import Booking from '../models/Booking.js';
 import BusinessExpense from '../models/BusinessExpense.js';
 
 const router = express.Router();
+
+const mapUploadedProofFiles = (files = []) => files.map((file) => ({
+  url: `/uploads/expense-proofs/${file.filename}`,
+  originalName: file.originalname,
+  mimeType: file.mimetype,
+  uploadedAt: new Date()
+}));
 
 /**
  * Create a business expense
@@ -19,6 +27,7 @@ router.post(
   '/',
   authenticate,
   authorize('admin', 'super_admin'),
+  uploadExpenseProofs.array('proofFiles', 5),
   [
     body('title').notEmpty().withMessage('Title is required'),
     body('amount').isFloat({ min: 0 }).withMessage('Amount must be a positive number'),
@@ -49,6 +58,8 @@ router.post(
         resolvedLocationId = linkedBooking.location?.locationId || null;
       }
 
+      const uploadedProofFiles = mapUploadedProofFiles(req.files);
+
       const expense = new BusinessExpense({
         title,
         amount: Number(amount),
@@ -60,7 +71,9 @@ router.post(
         bookingId: bookingId || null,
         type: type || 'operational_expense',
         createdBy: req.user._id,
-        createdByRole: req.user.role
+        createdByRole: req.user.role,
+        proofFiles: uploadedProofFiles,
+        receipt: uploadedProofFiles[0]?.url || null
       });
 
       await expense.save();
@@ -166,6 +179,7 @@ router.patch(
   '/:id',
   authenticate,
   authorize('admin', 'super_admin'),
+  uploadExpenseProofs.array('proofFiles', 5),
   [param('id').isMongoId().withMessage('Valid expense ID is required')],
   async (req, res) => {
     try {
@@ -176,6 +190,8 @@ router.patch(
       if (req.user.role !== 'super_admin' && expense.createdBy.toString() !== req.user._id.toString()) {
         return res.status(403).json({ error: { message: 'Not authorized to update this expense' } });
       }
+
+      const uploadedProofFiles = mapUploadedProofFiles(req.files);
 
       const { title, amount, category, customCategory, description, date, locationId, bookingId, type } = req.body;
 
@@ -203,6 +219,12 @@ router.patch(
       if (locationId !== undefined || bookingId !== undefined) expense.location = resolvedLocationId || null;
       if (bookingId !== undefined) expense.bookingId = bookingId || null;
       if (type) expense.type = type;
+      if (uploadedProofFiles.length > 0) {
+        expense.proofFiles = [...(expense.proofFiles || []), ...uploadedProofFiles];
+        if (!expense.receipt) {
+          expense.receipt = uploadedProofFiles[0].url;
+        }
+      }
 
       await expense.save();
       await expense.populate('createdBy', 'name email');
