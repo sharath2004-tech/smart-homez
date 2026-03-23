@@ -25,6 +25,7 @@
 
 import Booking from '../models/Booking.js';
 import User from '../models/User.js';
+import { isWorkerAvailableForTimeRange, isWorkerEligibleForAssignment } from './workerAvailability.js';
 
 /**
  * Calculate distance between two points using Haversine formula
@@ -263,6 +264,12 @@ export const assignWorkersWithBackup = async (bookingDetails) => {
 
     // Step 3: Filter workers on leave AND check online status
     const activeWorkers = workers.filter(worker => {
+      const eligibility = isWorkerEligibleForAssignment(worker);
+      if (!eligibility.eligible) {
+        console.log(`⛔ ${worker.name} - ${eligibility.reason}`);
+        return false;
+      }
+
       const notOnLeave = !isWorkerOnLeave(worker, bookingDate);
       const isOnline = worker.workerProfile?.availability === true;
       
@@ -273,6 +280,18 @@ export const assignWorkersWithBackup = async (bookingDetails) => {
       
       if (!isOnline) {
         console.log(`📴 ${worker.name} - offline (availability: ${worker.workerProfile?.availability})`);
+        return false;
+      }
+
+      const timeRangeAvailability = isWorkerAvailableForTimeRange(
+        worker,
+        bookingDate,
+        bookingStartTime,
+        bookingEndTime
+      );
+
+      if (!timeRangeAvailability.available) {
+        console.log(`🕒 ${worker.name} - ${timeRangeAvailability.reason}`);
         return false;
       }
       

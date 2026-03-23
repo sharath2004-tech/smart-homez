@@ -1101,10 +1101,14 @@ export const adminAPI = {
     return apiCall('/admin/workforce-status');
   },
 
-  manualAssign: async (bookingId: string, workerId: string) => {
+  getAvailableWorkersForBooking: async (bookingId: string) => {
+    return apiCall(`/admin/bookings/${bookingId}/available-workers`);
+  },
+
+  manualAssign: async (bookingId: string, workerId: string, reason?: string) => {
     return apiCall('/admin/manual-assign', {
       method: 'POST',
-      body: JSON.stringify({ bookingId, workerId })
+      body: JSON.stringify({ bookingId, workerId, reason })
     });
   },
 

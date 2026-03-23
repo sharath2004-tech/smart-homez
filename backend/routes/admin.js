@@ -14,7 +14,13 @@ import User from '../models/User.js';
 import WorkerEarnings from '../models/WorkerEarnings.js';
 import WorkerSalaryRequest from '../models/WorkerSalaryRequest.js';
 import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/emailService.js';
-import { evaluateWorkerEffectiveAvailability, isWorkerAssignedToBooking } from '../utils/workerAvailability.js';
+import { checkSlotAvailability } from '../utils/slotManagement.js';
+import {
+    evaluateWorkerEffectiveAvailability,
+    isWorkerAssignedToBooking,
+    isWorkerAvailableForTimeRange,
+    isWorkerEligibleForAssignment
+} from '../utils/workerAvailability.js';
 
 // Send temporary password via SMS (plain message, not Twilio Verify)
 async function sendTemporaryPasswordSMS(phone, name, temporaryPassword) {
@@ -2496,12 +2502,100 @@ router.get('/workforce-status', authenticate, authorize('admin', 'super_admin'),
 // @route   POST /api/admin/manual-assign
 // @desc    Manually assign a worker to a booking
 // @access  Private/Admin
+router.get('/bookings/:bookingId/available-workers', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.bookingId).populate('service');
+
+    if (!booking) {
+      return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
+    }
+
+    const bookingLocationId = booking.location?.locationId?.toString() || null;
+    const adminLocationIds = (req.user.adminProfile?.assignedLocations || [])
+      .map((location) => location.locationId?.toString())
+      .filter(Boolean);
+
+    if (req.user.role === 'admin') {
+      if (!bookingLocationId || !adminLocationIds.includes(bookingLocationId)) {
+        return res.status(403).json({ error: { message: 'You can only manage bookings in your assigned region', status: 403 } });
+      }
+    }
+
+    const workerQuery = {
+      role: 'worker',
+      isActive: true
+    };
+
+    if (booking.service?.category) {
+      workerQuery['workerProfile.specialization'] = { $in: [booking.service.category] };
+    }
+
+    if (bookingLocationId) {
+      workerQuery['workerProfile.assignedApartments.locationId'] = booking.location.locationId;
+    } else if (req.user.role === 'admin') {
+      workerQuery['workerProfile.assignedApartments.locationId'] = { $in: adminLocationIds };
+    }
+
+    const workers = await User.find(workerQuery)
+      .select('name email phone isFirstLogin workerProfile.specialization workerProfile.assignedApartments workerProfile.rating workerProfile.availability workerProfile.leaves workerProfile.workingTimeWindow')
+      .sort({ 'workerProfile.rating': -1, name: 1 });
+
+    const availableWorkers = [];
+
+    for (const worker of workers) {
+      if (booking.worker && booking.worker.toString() === worker._id.toString()) {
+        continue;
+      }
+
+      const eligibility = isWorkerEligibleForAssignment(worker);
+      if (!eligibility.eligible) {
+        continue;
+      }
+
+      const timeRangeAvailability = isWorkerAvailableForTimeRange(worker, booking.bookingDate, booking.startTime, booking.endTime);
+      if (!timeRangeAvailability.available) {
+        continue;
+      }
+
+      const slotAvailability = await checkSlotAvailability(
+        worker._id,
+        booking.bookingDate,
+        booking.startTime,
+        booking.endTime,
+        Booking,
+        15,
+        booking._id
+      );
+
+      if (!slotAvailability.available) {
+        continue;
+      }
+
+      availableWorkers.push({
+        _id: worker._id,
+        name: worker.name,
+        email: worker.email,
+        phone: worker.phone,
+        rating: worker.workerProfile?.rating || 0,
+        specialization: worker.workerProfile?.specialization || [],
+        assignedApartments: worker.workerProfile?.assignedApartments || []
+      });
+    }
+
+    res.json({ success: true, workers: availableWorkers, bookingId: booking._id });
+  } catch (error) {
+    console.error('Get available workers for booking error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
 router.post('/manual-assign',
   authenticate,
   authorize('admin', 'super_admin'),
   [
     body('bookingId').isMongoId().withMessage('Valid booking ID is required'),
-    body('workerId').isMongoId().withMessage('Valid worker ID is required')
+    body('workerId').isMongoId().withMessage('Valid worker ID is required'),
+    body('reason').optional().isString().trim().isLength({ max: 300 }).withMessage('Reason must be 300 characters or fewer')
   ],
   async (req, res) => {
     try {
@@ -2510,7 +2604,7 @@ router.post('/manual-assign',
         return res.status(400).json({ error: { message: errors.array()[0].msg, status: 400 } });
       }
 
-      const { bookingId, workerId } = req.body;
+      const { bookingId, workerId, reason } = req.body;
 
       const booking = await Booking.findById(bookingId)
         .populate('service')
@@ -2520,7 +2614,7 @@ router.post('/manual-assign',
         return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
       }
 
-      if (!['pending', 'confirmed'].includes(booking.status)) {
+      if (!['pending', 'confirmed', 'in-progress'].includes(booking.status)) {
         return res.status(400).json({ 
           error: { 
             message: `Cannot reassign booking with status: ${booking.status}`,
@@ -2529,75 +2623,72 @@ router.post('/manual-assign',
         });
       }
 
+      const bookingLocationId = booking.location?.locationId?.toString() || null;
+      const adminLocationIds = (req.user.adminProfile?.assignedLocations || [])
+        .map((location) => location.locationId?.toString())
+        .filter(Boolean);
+
+      if (req.user.role === 'admin' && (!bookingLocationId || !adminLocationIds.includes(bookingLocationId))) {
+        return res.status(403).json({ error: { message: 'You can only manage bookings in your assigned region', status: 403 } });
+      }
+
       const worker = await User.findById(workerId);
       if (!worker || worker.role !== 'worker') {
         return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
       }
 
-      // Check if worker has approved leave on booking date
-      const bookingDate = new Date(booking.bookingDate);
-      bookingDate.setHours(0, 0, 0, 0);
-      
-      const workerLeave = worker.workerProfile.leaves?.find(leave => {
-        const leaveDate = new Date(leave.date);
-        leaveDate.setHours(0, 0, 0, 0);
-        return leaveDate.getTime() === bookingDate.getTime() && leave.status === 'approved';
-      });
+      const workerLocationIds = (worker.workerProfile?.assignedApartments || [])
+        .map((apartment) => apartment.locationId?.toString())
+        .filter(Boolean);
 
-      if (workerLeave) {
+      if (bookingLocationId && !workerLocationIds.includes(bookingLocationId)) {
+        return res.status(400).json({ error: { message: 'Worker is not assigned to this booking location', status: 400 } });
+      }
+
+      if (req.user.role === 'admin' && !workerLocationIds.some((locationId) => adminLocationIds.includes(locationId))) {
+        return res.status(403).json({ error: { message: 'You can only assign workers from your region', status: 403 } });
+      }
+
+      if (booking.worker && booking.worker.toString() === workerId) {
+        return res.status(400).json({ error: { message: 'This worker is already assigned to the booking', status: 400 } });
+      }
+
+      const eligibility = isWorkerEligibleForAssignment(worker);
+      if (!eligibility.eligible) {
+        return res.status(400).json({ error: { message: eligibility.reason, status: 400 } });
+      }
+
+      const timeRangeAvailability = isWorkerAvailableForTimeRange(worker, booking.bookingDate, booking.startTime, booking.endTime);
+      if (!timeRangeAvailability.available) {
+        return res.status(400).json({ error: { message: timeRangeAvailability.reason, status: 400 } });
+      }
+
+      const slotAvailability = await checkSlotAvailability(
+        worker._id,
+        booking.bookingDate,
+        booking.startTime,
+        booking.endTime,
+        Booking,
+        15,
+        booking._id
+      );
+
+      if (!slotAvailability.available) {
         return res.status(400).json({ 
           error: { 
-            message: 'Worker has approved leave on this date',
+            message: slotAvailability.reason || 'Worker has a conflicting booking at this time',
             status: 400 
           } 
         });
       }
 
-      // Check for conflicts
-      const [startHours, startMinutes] = booking.startTime.split(':').map(Number);
-      const [endHours, endMinutes] = booking.endTime.split(':').map(Number);
-      
-      const conflictingBooking = await Booking.findOne({
-        worker: workerId,
-        bookingDate: booking.bookingDate,
-        status: { $in: ['confirmed', 'in-progress', 'pending'] },
-        _id: { $ne: bookingId },
-        $or: [
-          {
-            $and: [
-              { startTime: { $lte: booking.startTime } },
-              { endTime: { $gt: booking.startTime } }
-            ]
-          },
-          {
-            $and: [
-              { startTime: { $lt: booking.endTime } },
-              { endTime: { $gte: booking.endTime } }
-            ]
-          },
-          {
-            $and: [
-              { startTime: { $gte: booking.startTime } },
-              { endTime: { $lte: booking.endTime } }
-            ]
-          }
-        ]
-      });
+      const previousWorkerId = booking.worker?.toString() || null;
 
-      if (conflictingBooking) {
-        return res.status(400).json({ 
-          error: { 
-            message: 'Worker has a conflicting booking at this time',
-            status: 400 
-          } 
-        });
-      }
-
-      // Assign worker
       booking.worker = workerId;
       booking.assignmentMethod = 'manual';
       booking.assignedBy = req.user._id;
       booking.assignedAt = new Date();
+      booking.notes = `${booking.notes || ''}${booking.notes ? '\n' : ''}${previousWorkerId ? 'Reassigned' : 'Assigned'} by ${req.user.role}${reason ? `: ${reason}` : ''}`;
       
       if (booking.status === 'pending') {
         booking.status = 'confirmed';
@@ -2609,7 +2700,7 @@ router.post('/manual-assign',
 
       res.json({
         success: true,
-        message: 'Worker assigned successfully',
+        message: previousWorkerId ? 'Worker reassigned successfully' : 'Worker assigned successfully',
         booking: {
           _id: booking._id,
           worker: booking.worker,

@@ -65,6 +65,16 @@ interface Booking {
   status: string;
 }
 
+interface AvailableWorker {
+  _id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  rating: number;
+  specialization: string[];
+  assignedApartments: Apartment[];
+}
+
 const AdminWorkforce = () => {
   const { role, name } = useAdminRole();
   const [workers, setWorkers] = useState<Worker[]>([]);
@@ -76,6 +86,8 @@ const AdminWorkforce = () => {
   const [selectedBooking, setSelectedBooking] = useState<string | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [noRegionAssigned, setNoRegionAssigned] = useState(false);
+  const [availableWorkers, setAvailableWorkers] = useState<AvailableWorker[]>([]);
+  const [availableWorkersLoading, setAvailableWorkersLoading] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -117,6 +129,7 @@ const AdminWorkforce = () => {
       });
       setShowAssignModal(false);
       setSelectedBooking(null);
+      setAvailableWorkers([]);
       fetchData();
     } catch (error) {
       console.error('Error assigning worker:', error);
@@ -161,6 +174,33 @@ const AdminWorkforce = () => {
     const displayHour = hour % 12 || 12;
     return `${displayHour}:${minutes} ${ampm}`;
   };
+
+  useEffect(() => {
+    if (!selectedBooking) {
+      setAvailableWorkers([]);
+      return;
+    }
+
+    const loadAvailableWorkers = async () => {
+      try {
+        setAvailableWorkersLoading(true);
+        const response = await adminAPI.getAvailableWorkersForBooking(selectedBooking);
+        setAvailableWorkers(response.workers || []);
+      } catch (error) {
+        console.error('Error loading available workers for booking:', error);
+        setAvailableWorkers([]);
+        toast({
+          title: 'Error',
+          description: error instanceof Error ? error.message : 'Failed to load available workers for this booking',
+          variant: 'destructive'
+        });
+      } finally {
+        setAvailableWorkersLoading(false);
+      }
+    };
+
+    loadAvailableWorkers();
+  }, [selectedBooking]);
 
   if (loading) {
     return (
@@ -482,7 +522,12 @@ const AdminWorkforce = () => {
                         Available Workers
                       </h3>
                       <div className="space-y-3">
-                        {workers.filter(w => w.status === 'free').map((worker) => (
+                        {availableWorkersLoading && (
+                          <div className="text-center py-12 bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border-2 border-dashed border-slate-200">
+                            <p className="text-slate-600 font-medium">Loading available workers for this time slot...</p>
+                          </div>
+                        )}
+                        {!availableWorkersLoading && availableWorkers.map((worker) => (
                           <div 
                             key={worker._id}
                             className="p-5 border-2 border-gray-200 rounded-xl flex items-center justify-between hover:border-primary/50 hover:shadow-md transition-all duration-200"
@@ -501,6 +546,11 @@ const AdminWorkforce = () => {
                                   <span>•</span>
                                   <span className="font-medium">{worker.completedJobs} jobs</span>
                                 </div>
+                                {worker.assignedApartments?.length > 0 && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {worker.assignedApartments[0].apartmentName}, {worker.assignedApartments[0].area}
+                                  </p>
+                                )}
                               </div>
                             </div>
                             <button 
@@ -511,10 +561,10 @@ const AdminWorkforce = () => {
                             </button>
                           </div>
                         ))}
-                        {workers.filter(w => w.status === 'free').length === 0 && (
+                        {!availableWorkersLoading && availableWorkers.length === 0 && (
                           <div className="text-center py-12 bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border-2 border-dashed border-slate-200">
                             <UserX className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-                            <p className="text-slate-600 font-medium">No available workers at the moment</p>
+                            <p className="text-slate-600 font-medium">No workers are available for this booking time</p>
                           </div>
                         )}
                       </div>
@@ -528,6 +578,7 @@ const AdminWorkforce = () => {
                   onClick={() => {
                     setShowAssignModal(false);
                     setSelectedBooking(null);
+                    setAvailableWorkers([]);
                   }}
                   className="px-6 py-2.5 text-sm font-semibold rounded-xl border-2 border-gray-200 bg-white hover:bg-gray-50 transition-all duration-200 hover:shadow-md"
                 >

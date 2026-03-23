@@ -20,7 +20,12 @@ import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
 import { checkSlotAvailability } from '../utils/slotManagement.js';
 import { checkIfOnTime, updateWorkerStats } from '../utils/updateWorkerStats.js';
 import { assignWorkerToBooking, reassignWorker } from '../utils/workerAssignment.js';
-import { getWorkerBlockedTimeRanges, getWorkerOperationalAvailabilityFromBookings } from '../utils/workerAvailability.js';
+import {
+    getWorkerBlockedTimeRanges,
+    getWorkerOperationalAvailabilityFromBookings,
+    isWorkerAvailableForTimeRange,
+    isWorkerEligibleForAssignment
+} from '../utils/workerAvailability.js';
 import {
     getWorkerAvailabilityForecast,
     getWorkerCapacityStatus,
@@ -2011,7 +2016,8 @@ async function checkWorkerAvailability(workerId, scheduledDate, duration, exclud
   try {
     // Check if worker exists and is available
     const worker = await User.findById(workerId);
-    if (!worker || worker.isActive === false || worker.workerProfile?.availability !== true) {
+    const eligibility = isWorkerEligibleForAssignment(worker);
+    if (!eligibility.eligible) {
       return false;
     }
 
@@ -2020,6 +2026,17 @@ async function checkWorkerAvailability(workerId, scheduledDate, duration, exclud
 
     const startTimeString = `${String(startTime.getHours()).padStart(2, '0')}:${String(startTime.getMinutes()).padStart(2, '0')}`;
     const endTimeString = `${String(endTime.getHours()).padStart(2, '0')}:${String(endTime.getMinutes()).padStart(2, '0')}`;
+
+    const timeRangeAvailability = isWorkerAvailableForTimeRange(
+      worker,
+      startTime,
+      startTimeString,
+      endTimeString
+    );
+
+    if (!timeRangeAvailability.available) {
+      return false;
+    }
 
     const slotAvailability = await checkSlotAvailability(
       workerId,

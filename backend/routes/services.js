@@ -228,10 +228,27 @@ router.post('/',
       // Admins cannot create services directly — their request goes to super admin for approval
       if (req.user.role === 'admin') {
         const ServiceRequest = (await import('../models/ServiceRequest.js')).default;
+        const Location = (await import('../models/Location.js')).default;
+        const requestedLocationIds = (req.user.adminProfile?.assignedLocations || [])
+          .map((location) => location.locationId)
+          .filter(Boolean);
+        const requestedRegions = requestedLocationIds.length > 0
+          ? await Location.find({ _id: { $in: requestedLocationIds } })
+              .select('apartmentName area city')
+              .lean()
+          : [];
+
         const request = new ServiceRequest({
           serviceData: servicePayload,
           serviceTypeName: req.body.serviceTypeName || name,
-          requestedBy: req.user._id
+          requestedBy: req.user._id,
+          requestedLocationIds,
+          requestedRegions: requestedRegions.map((location) => ({
+            locationId: location._id,
+            apartmentName: location.apartmentName,
+            area: location.area,
+            city: location.city
+          }))
         });
         await request.save();
         await request.populate('requestedBy', 'name email');

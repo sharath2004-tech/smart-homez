@@ -1040,6 +1040,7 @@ router.get('/service-requests', async (req, res) => {
     const query = status === 'all' ? {} : { status };
     const requests = await ServiceRequest.find(query)
       .populate('requestedBy', 'name email')
+      .populate('requestedLocationIds', 'apartmentName area city')
       .populate('reviewedBy', 'name email')
       .sort({ createdAt: -1 });
     res.json({ requests, total: requests.length });
@@ -1060,12 +1061,44 @@ router.post('/service-requests/:id/approve', async (req, res) => {
     if (!request) return res.status(404).json({ error: { message: 'Request not found', status: 404 } });
     if (request.status !== 'pending') return res.status(400).json({ error: { message: `Request already ${request.status}`, status: 400 } });
 
+    const requester = await User.findById(request.requestedBy).select('role adminProfile.assignedLocations').lean();
+    const requestedLocationIds = (request.requestedLocationIds || []).map((locationId) => locationId?.toString()).filter(Boolean);
+    const fallbackAdminLocationIds = requester?.role === 'admin'
+      ? (requester.adminProfile?.assignedLocations || []).map((location) => location.locationId?.toString()).filter(Boolean)
+      : [];
+    const targetLocationIds = [...new Set((requestedLocationIds.length > 0 ? requestedLocationIds : fallbackAdminLocationIds).filter(Boolean))];
+
+    const serviceLocations = targetLocationIds.length > 0
+      ? await Location.find({ _id: { $in: targetLocationIds } }).select('apartmentName area city').lean()
+      : [];
+
     const service = new Service({
       ...request.serviceData,
       createdBy: request.requestedBy,
-      isActive: request.serviceData?.isActive ?? true
+      isActive: request.serviceData?.isActive ?? true,
+      availableInAllLocations: requester?.role === 'admin' ? false : (request.serviceData?.availableInAllLocations ?? false),
+      serviceLocations: requester?.role === 'admin'
+        ? serviceLocations.map((location) => ({
+            city: location.city,
+            area: location.area,
+            apartmentNames: [location.apartmentName],
+            isActive: true
+          }))
+        : (request.serviceData?.serviceLocations || [])
     });
     await service.save();
+
+    if (requester?.role === 'admin' && targetLocationIds.length > 0) {
+      await Location.updateMany(
+        { _id: { $in: targetLocationIds } },
+        { $pull: { availableServices: { service: service._id } } }
+      );
+
+      await Location.updateMany(
+        { _id: { $in: targetLocationIds } },
+        { $push: { availableServices: { service: service._id, isActive: true } } }
+      );
+    }
 
     request.status = 'approved';
     request.reviewedBy = req.user._id;

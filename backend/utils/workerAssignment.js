@@ -2,6 +2,7 @@ import Booking from '../models/Booking.js';
 import Location from '../models/Location.js';
 import User from '../models/User.js';
 import { checkSlotAvailability } from './slotManagement.js';
+import { isWorkerAvailableForTimeRange, isWorkerEligibleForAssignment } from './workerAvailability.js';
 
 /**
  * Worker Assignment Algorithm
@@ -181,7 +182,14 @@ export const findBestWorkers = async (bookingDetails, count = 3) => {
     }
 
     // ── 4. Online filter ───────────────────────────────────────────────────────
-    const onlineWorkers = workers.filter(w => w.workerProfile?.availability === true);
+    const onlineWorkers = workers.filter((worker) => {
+      const eligibility = isWorkerEligibleForAssignment(worker);
+      if (!eligibility.eligible) {
+        return false;
+      }
+
+      return worker.workerProfile?.availability === true;
+    });
     console.log(`✅ ${onlineWorkers.length} ONLINE / ${workers.length - onlineWorkers.length} OFFLINE`);
 
     if (onlineWorkers.length === 0) {
@@ -204,6 +212,17 @@ export const findBestWorkers = async (bookingDetails, count = 3) => {
 
     const workersToScore = [];
     for (const worker of workersToCheck) {
+      const timeRangeAvailability = isWorkerAvailableForTimeRange(
+        worker,
+        bookingDate,
+        startTime,
+        endTime
+      );
+
+      if (!timeRangeAvailability.available) {
+        continue;
+      }
+
       if (bookingDate && startTime && endTime) {
         const slotAvailability = await checkSlotAvailability(
           worker._id,
@@ -361,7 +380,12 @@ export const reassignWorker = async (bookingId, reason) => {
     if (booking.backupWorkers?.length > 0) {
       const backupWorker = booking.backupWorkers[0];
       const worker = await User.findById(backupWorker.worker);
-      if (worker && worker.isActive && worker.workerProfile?.availability) {
+      const eligibility = isWorkerEligibleForAssignment(worker);
+      const timeRangeAvailability = worker
+        ? isWorkerAvailableForTimeRange(worker, booking.bookingDate, booking.startTime, booking.endTime)
+        : { available: false };
+
+      if (worker && eligibility.eligible && timeRangeAvailability.available && worker.workerProfile?.availability) {
         booking.worker = backupWorker.worker;
         booking.backupWorkers = booking.backupWorkers.slice(1);
         booking.assignedAt = new Date();

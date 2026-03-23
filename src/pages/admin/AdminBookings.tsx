@@ -73,6 +73,16 @@ interface Location {
   city: string;
 }
 
+interface AvailableWorker {
+  _id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  rating: number;
+  specialization: string[];
+  assignedApartments?: Array<{ apartmentName: string; area: string; city: string }>;
+}
+
 const AdminBookings = () => {
   const { role, name, isSuperAdmin } = useAdminRole();
   const [search, setSearch] = useState("");
@@ -93,6 +103,10 @@ const AdminBookings = () => {
   const [teamActionLoading, setTeamActionLoading] = useState(false);
   const [workersLoading, setWorkersLoading] = useState(false);
   const [workerListError, setWorkerListError] = useState<string | null>(null);
+  const [reassignBooking, setReassignBooking] = useState<Booking | null>(null);
+  const [availableWorkers, setAvailableWorkers] = useState<AvailableWorker[]>([]);
+  const [availableWorkersLoading, setAvailableWorkersLoading] = useState(false);
+  const [reassignReason, setReassignReason] = useState('Admin reassignment');
 
   // Print state
   const [showPrintModal, setShowPrintModal] = useState(false);
@@ -275,6 +289,39 @@ const AdminBookings = () => {
       setBookings(prev => prev.map(b => b._id === selectedTeamBooking._id ? { ...b, worker: res.worker, supportStaff: res.supportStaff } : b));
     } catch (e) {
       alert((e as Error).message || 'Failed to set team head');
+    } finally {
+      setTeamActionLoading(false);
+    }
+  };
+
+  const openReassignModal = async (booking: Booking) => {
+    try {
+      setReassignBooking(booking);
+      setReassignReason('Admin reassignment');
+      setAvailableWorkers([]);
+      setAvailableWorkersLoading(true);
+      const res = await adminAPI.getAvailableWorkersForBooking(booking._id);
+      setAvailableWorkers(res.workers || []);
+    } catch (e) {
+      alert((e as Error).message || 'Failed to load available workers for this booking');
+      setReassignBooking(null);
+    } finally {
+      setAvailableWorkersLoading(false);
+    }
+  };
+
+  const handleReassignWorker = async (workerId: string) => {
+    if (!reassignBooking) return;
+
+    try {
+      setTeamActionLoading(true);
+      await adminAPI.manualAssign(reassignBooking._id, workerId, reassignReason);
+      await fetchBookings();
+      setReassignBooking(null);
+      setAvailableWorkers([]);
+      alert('Worker reassigned successfully');
+    } catch (e) {
+      alert((e as Error).message || 'Failed to reassign worker');
     } finally {
       setTeamActionLoading(false);
     }
@@ -478,6 +525,15 @@ const AdminBookings = () => {
                             Team ({(b.supportStaff?.length ?? 0) + (b.worker ? 1 : 0)})
                           </button>
                         )}
+                        {['pending', 'confirmed', 'in-progress'].includes(b.status) && b.worker && (
+                          <button
+                            onClick={() => openReassignModal(b)}
+                            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-sky-100 text-sky-700 hover:bg-sky-200 transition-colors"
+                          >
+                            <Users className="w-3.5 h-3.5" />
+                            Reassign
+                          </button>
+                        )}
                         {['confirmed', 'in-progress', 'pending-review', 'completed'].includes(b.status) && (
                           <button
                             onClick={() => openWorkforce(b)}
@@ -532,6 +588,85 @@ const AdminBookings = () => {
           )}
         </div>
       </div>
+
+      {/* Reassign Worker Modal */}
+      {reassignBooking && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-card rounded-2xl max-w-xl w-full my-8 shadow-2xl">
+            <div className="sticky top-0 bg-card border-b border-border p-4 flex items-center justify-between rounded-t-2xl">
+              <div>
+                <h2 className="font-bold text-foreground text-lg flex items-center gap-2">
+                  <Users className="w-5 h-5 text-sky-600" /> Reassign Worker
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {reassignBooking.service?.name || 'Booking'} · {formatDate(reassignBooking.bookingDate)} · {formatTime(reassignBooking.startTime)} - {formatTime(reassignBooking.endTime)}
+                </p>
+              </div>
+              <button onClick={() => setReassignBooking(null)} className="p-2 hover:bg-muted rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm">
+                <p><span className="font-semibold text-sky-800">Current worker:</span> {reassignBooking.worker?.name || 'Unassigned'}</p>
+                <p className="text-muted-foreground mt-1">Only workers available for this booking time and location are shown.</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Reason</label>
+                <input
+                  value={reassignReason}
+                  onChange={(e) => setReassignReason(e.target.value)}
+                  className="input-clean text-sm w-full"
+                  placeholder="Why are you reassigning this booking?"
+                  maxLength={300}
+                />
+              </div>
+
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {availableWorkersLoading && (
+                  <p className="text-sm text-muted-foreground text-center py-6">Loading available workers...</p>
+                )}
+
+                {!availableWorkersLoading && availableWorkers.map((worker) => (
+                  <div key={worker._id} className="flex items-center justify-between p-3 bg-muted/40 border border-border rounded-xl">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{worker.name}</p>
+                      <p className="text-xs text-muted-foreground">⭐ {worker.rating.toFixed(1)} · {worker.specialization?.join(', ') || 'General'}</p>
+                      {worker.assignedApartments?.[0] && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {worker.assignedApartments[0].apartmentName}, {worker.assignedApartments[0].area}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleReassignWorker(worker._id)}
+                      disabled={teamActionLoading}
+                      className="px-3 py-2 text-xs font-semibold rounded-lg bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-60"
+                    >
+                      {teamActionLoading ? 'Saving…' : 'Assign'}
+                    </button>
+                  </div>
+                ))}
+
+                {!availableWorkersLoading && availableWorkers.length === 0 && (
+                  <div className="border-2 border-dashed border-border rounded-xl p-6 text-center text-sm text-muted-foreground">
+                    No eligible workers are available for this booking time.
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={() => setReassignBooking(null)}
+                className="w-full py-3 border border-border rounded-xl text-foreground font-medium hover:bg-muted transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Proof Viewer Modal */}
       {selectedProofBooking && (

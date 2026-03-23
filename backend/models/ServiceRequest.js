@@ -16,6 +16,19 @@ const serviceRequestSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  requestedLocationIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Location'
+  }],
+  requestedRegions: [{
+    locationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Location'
+    },
+    apartmentName: String,
+    area: String,
+    city: String
+  }],
   status: {
     type: String,
     enum: ['pending', 'approved', 'rejected'],

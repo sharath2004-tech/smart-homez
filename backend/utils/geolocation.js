@@ -2,6 +2,8 @@
  * Geolocation utility functions for location-based services
  */
 
+import { isWorkerEligibleForAssignment } from './workerAvailability.js';
+
 /**
  * Calculate distance between two points using Haversine formula
  * @param {Number} lat1 - Latitude of point 1
@@ -109,6 +111,11 @@ export const findNearbyWorkers = async (
 
     // Filter workers by distance manually (since $near doesn't work well with nested arrays)
     const nearbyWorkers = workers.filter(worker => {
+      const eligibility = isWorkerEligibleForAssignment(worker);
+      if (!eligibility.eligible) {
+        return false;
+      }
+
       if (!worker.workerProfile?.assignedApartments?.length) {
         return false;
       }

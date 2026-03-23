@@ -14,7 +14,9 @@
     "check:accounts": "node checkAccounts.js",
     "activate": "node activateAccount.js",
     "deactivate": "node deactivateWorker.js",
-    "cleanup:db": "node utils/cleanupDatabase.js"
+    "cleanup:db": "node utils/cleanupDatabase.js",
+    "keep:superadmin": "node keepOnlySuperAdmin.js",
+    "migrate:worker-wages": "node scripts/migrateWorkerWagesToHourly.js"
   },
   "keywords": [
     "express",

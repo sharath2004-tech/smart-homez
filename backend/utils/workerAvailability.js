@@ -278,6 +278,41 @@ export const isWorkerAvailableForTimeRange = (worker, bookingDate, startTime, en
   };
 };
 
+export const isWorkerEligibleForAssignment = (worker) => {
+  if (!worker) {
+    return {
+      eligible: false,
+      reason: 'Worker not found'
+    };
+  }
+
+  if (worker.role && worker.role !== 'worker') {
+    return {
+      eligible: false,
+      reason: 'Selected user is not a worker'
+    };
+  }
+
+  if (worker.isActive === false) {
+    return {
+      eligible: false,
+      reason: 'Worker account is inactive'
+    };
+  }
+
+  if (worker.isFirstLogin === true) {
+    return {
+      eligible: false,
+      reason: 'Worker must sign in and change the system-generated password before taking bookings'
+    };
+  }
+
+  return {
+    eligible: true,
+    reason: null
+  };
+};
+
 export const getWorkerBlockedTimeRanges = (worker, bookingDate) => {
   const workingTimeWindow = worker?.workerProfile?.workingTimeWindow;
   if (!workingTimeWindow?.enabled) {
@@ -418,15 +453,16 @@ export const evaluateWorkerEffectiveAvailability = async (worker, { referenceDat
     };
   }
 
-  const manualAvailability = worker?.isActive !== false && worker?.workerProfile?.availability === true;
+  const assignmentEligibility = isWorkerEligibleForAssignment(worker);
+  const manualAvailability = assignmentEligibility.eligible && worker?.workerProfile?.availability === true;
   const onLeave = isWorkerOnLeaveForDate(worker, referenceDate);
   const windowStatus = getWorkerWorkingWindowStatus(worker, referenceDate);
   const dayBookings = Array.isArray(bookings) ? bookings : await fetchWorkerBookingsForDay(worker, referenceDate);
   const operationalStatus = getWorkerOperationalAvailabilityFromBookings(worker, dayBookings, referenceDate);
 
   let reason = null;
-  if (!worker?.isActive) {
-    reason = 'Worker account is inactive';
+  if (!assignmentEligibility.eligible) {
+    reason = assignmentEligibility.reason;
   } else if (worker?.workerProfile?.availability !== true) {
     reason = 'Worker is offline';
   } else if (onLeave) {
