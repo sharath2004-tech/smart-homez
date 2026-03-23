@@ -332,49 +332,37 @@ const ServicesPage = () => {
             transition={{ delay: 0.45 }}
             className="space-y-3"
           >
-            <h3 className="text-sm font-semibold text-foreground px-1">Room-Specific Deep Cleaning</h3>
+            <h3 className="text-sm font-semibold text-foreground px-1">Dedicated Deep-Clean Service Pages</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Bathroom DC */}
-              <button
-                onClick={() => handleQuickServiceAction((s) =>
-                  s.name.toLowerCase().includes('bathroom') &&
-                  (s.name.toLowerCase().includes('deep') || s.serviceType?.includes('bathroom'))
-                )}
+              <Link
+                to="/customer/services/intense-washroom-cleaning"
                 className="p-4 rounded-xl border-2 border-purple-300 bg-purple-50 hover:bg-purple-100 hover:border-purple-400 transition-all text-center group"
               >
                 <div className="text-3xl mb-2">🚿</div>
-                <p className="font-semibold text-purple-900 text-sm">Bathroom DC</p>
-                <p className="text-xs text-purple-700 mt-1">Professional cleaning</p>
-                <span className="inline-block mt-2 text-[10px] font-semibold bg-purple-600 text-white px-2 py-1 rounded-full">Quick Book</span>
-              </button>
+                <p className="font-semibold text-purple-900 text-sm">Intense Washroom Cleaning</p>
+                <p className="text-xs text-purple-700 mt-1">Tiles · fittings · stain removal</p>
+                <span className="inline-block mt-2 text-[10px] font-semibold bg-purple-600 text-white px-2 py-1 rounded-full">Open Page</span>
+              </Link>
 
-              {/* Kitchen DC */}
-              <button
-                onClick={() => handleQuickServiceAction((s) =>
-                  s.name.toLowerCase().includes('kitchen') &&
-                  (s.name.toLowerCase().includes('deep') || s.serviceType?.includes('kitchen'))
-                )}
+              <Link
+                to="/customer/services/kitchen-deep-clean"
                 className="p-4 rounded-xl border-2 border-orange-300 bg-orange-50 hover:bg-orange-100 hover:border-orange-400 transition-all text-center group"
               >
                 <div className="text-3xl mb-2">🍽️</div>
-                <p className="font-semibold text-orange-900 text-sm">Kitchen DC</p>
-                <p className="text-xs text-orange-700 mt-1">Professional cleaning</p>
-                <span className="inline-block mt-2 text-[10px] font-semibold bg-orange-600 text-white px-2 py-1 rounded-full">Quick Book</span>
-              </button>
+                <p className="font-semibold text-orange-900 text-sm">Kitchen Deep Clean</p>
+                <p className="text-xs text-orange-700 mt-1">Grease · appliances · tiles</p>
+                <span className="inline-block mt-2 text-[10px] font-semibold bg-orange-600 text-white px-2 py-1 rounded-full">Open Page</span>
+              </Link>
 
-              {/* Windows DC */}
-              <button
-                onClick={() => handleQuickServiceAction((s) =>
-                  s.name.toLowerCase().includes('window') &&
-                  (s.name.toLowerCase().includes('clean') || s.serviceType?.includes('window'))
-                )}
+              <Link
+                to="/customer/services/window-deep-cleaning"
                 className="p-4 rounded-xl border-2 border-blue-300 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 transition-all text-center group"
               >
                 <div className="text-3xl mb-2">🪟</div>
-                <p className="font-semibold text-blue-900 text-sm">Windows DC</p>
-                <p className="text-xs text-blue-700 mt-1">Professional cleaning</p>
-                <span className="inline-block mt-2 text-[10px] font-semibold bg-blue-600 text-white px-2 py-1 rounded-full">Quick Book</span>
-              </button>
+                <p className="font-semibold text-blue-900 text-sm">Window Deep Cleaning</p>
+                <p className="text-xs text-blue-700 mt-1">Glass · frames · tracks</p>
+                <span className="inline-block mt-2 text-[10px] font-semibold bg-blue-600 text-white px-2 py-1 rounded-full">Open Page</span>
+              </Link>
             </div>
           </motion.div>
 

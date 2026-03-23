@@ -3,14 +3,56 @@ import { authAPI, servicesAPI } from "@/lib/api";
 import { motion } from "framer-motion";
 import { ChevronLeft, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
-const MINI_SERVICE_TYPES =
+const ALL_MINI_SERVICE_TYPES =
   "deep_cleaning_kitchen,deep_cleaning_bathroom,fixed_sofa_cleaning,fixed_carpet_cleaning,fixed_window_cleaning,fixed_fan_cleaning,fixed_balcony_cleaning,fixed_fridge_cleaning,fixed_microwave_cleaning,fixed_oven_cleaning,fixed_stove_cleaning,fixed_chimney_cleaning,fixed_kitchen_platform_cleaning,fixed_sink_cleaning,kitchen_appliances_package,fixed_washbasin_cleaning,fixed_window_mesh_cleaning,fixed_washroom_basic,fixed_washroom_deep,fixed_dining_cleaning,fixed_cabinet_cleaning,fixed_utility_cleaning,fixed_cupboard_cleaning,bedroom_package,fixed_bed_cleaning,fixed_mirror_cleaning,fixed_ac_indoor_cleaning,fixed_ac_outdoor_cleaning,fixed_door_cleaning";
+
+const PAGE_CONFIG: Record<string, {
+  title: string;
+  subtitle: string;
+  icon: string;
+  serviceTypes: string;
+  featureChips: string[];
+  emptyMessage: string;
+}> = {
+  '/customer/services/spot-clean': {
+    title: 'Spot Cleaning',
+    subtitle: 'Book individual cleaning tasks — quick, fixed price',
+    icon: '🧹',
+    serviceTypes: ALL_MINI_SERVICE_TYPES,
+    featureChips: ['Fixed pricing', '1-person team', 'Same-day available', '30–90 min'],
+    emptyMessage: 'No spot-clean services available in your area yet.',
+  },
+  '/customer/services/intense-washroom-cleaning': {
+    title: 'Intense Washroom Cleaning',
+    subtitle: 'Deep washroom cleanup for tiles, fittings, and hard-water buildup',
+    icon: '🚿',
+    serviceTypes: 'fixed_washroom_basic,fixed_washroom_deep,deep_cleaning_bathroom,fixed_washbasin_cleaning',
+    featureChips: ['Deep sanitize', 'Bathroom specialists', 'Fixture detailing', '30–90 min'],
+    emptyMessage: 'No intense washroom cleaning services are active right now.',
+  },
+  '/customer/services/kitchen-deep-clean': {
+    title: 'Kitchen Deep Clean',
+    subtitle: 'Grease removal, appliance detailing, and kitchen surface restoration',
+    icon: '🍽️',
+    serviceTypes: 'deep_cleaning_kitchen,fixed_microwave_cleaning,fixed_oven_cleaning,fixed_stove_cleaning,fixed_chimney_cleaning,fixed_kitchen_platform_cleaning,fixed_sink_cleaning,kitchen_appliances_package',
+    featureChips: ['Grease removal', 'Appliance cleaning', 'Kitchen surfaces', '45–120 min'],
+    emptyMessage: 'No kitchen deep-clean services are active right now.',
+  },
+  '/customer/services/window-deep-cleaning': {
+    title: 'Window Deep Cleaning',
+    subtitle: 'Glass, frames, tracks, and mesh cleaning with fixed-price booking',
+    icon: '🪟',
+    serviceTypes: 'fixed_window_cleaning,fixed_window_mesh_cleaning',
+    featureChips: ['Glass polishing', 'Frame detailing', 'Track cleaning', '30–90 min'],
+    emptyMessage: 'No window deep-cleaning services are active right now.',
+  },
+};
 
 const SERVICE_ICONS: Record<string, string> = {
   kitchen: "🍳", bathroom: "🚿", sofa: "🛋️", carpet: "🪣",
-  window: "🪟", fan: "🌀", balcony: "🌿", fridge: "❄️",
+  window: "🪟", fan: "🌀", balcony: "🌿", fridge: "❄️", washroom: '🚿',
 };
 
 const getIcon = (name: string) => {
@@ -30,15 +72,17 @@ interface Service {
 }
 
 const SpotCleanPage = () => {
+  const location = useLocation();
   const [services, setServices] = useState<Service[]>([]);
   const [profile, setProfile] = useState<{ name: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const pageConfig = PAGE_CONFIG[location.pathname] || PAGE_CONFIG['/customer/services/spot-clean'];
 
   useEffect(() => {
     const fetch = async () => {
       try {
         const [svcData, profileData] = await Promise.all([
-          servicesAPI.getAll({ serviceType: MINI_SERVICE_TYPES, isActive: true, limit: 20 }),
+          servicesAPI.getAll({ serviceType: pageConfig.serviceTypes, isActive: true, limit: 20 }),
           authAPI.getProfile(),
         ]);
         setServices(svcData.services || []);
@@ -50,7 +94,7 @@ const SpotCleanPage = () => {
       }
     };
     fetch();
-  }, []);
+  }, [pageConfig.serviceTypes]);
 
   return (
     <AppLayout userType="customer" userName={profile?.name || "Guest"}>
@@ -66,16 +110,16 @@ const SpotCleanPage = () => {
           </Link>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-2xl">🧹</span>
-              <h1 className="text-xl font-bold text-foreground">Spot Cleaning</h1>
+              <span className="text-2xl">{pageConfig.icon}</span>
+              <h1 className="text-xl font-bold text-foreground">{pageConfig.title}</h1>
             </div>
-            <p className="text-xs text-muted-foreground">Book individual cleaning tasks — quick, fixed price</p>
+            <p className="text-xs text-muted-foreground">{pageConfig.subtitle}</p>
           </div>
         </motion.div>
 
         {/* Feature chips */}
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2 flex-wrap">
-          {["Fixed pricing", "1-person team", "Same-day available", "30–90 min"].map((f) => (
+          {pageConfig.featureChips.map((f) => (
             <span key={f} className="text-xs bg-cyan-50 border border-cyan-200 text-cyan-700 px-3 py-1 rounded-full font-medium">
               {f}
             </span>
@@ -93,8 +137,8 @@ const SpotCleanPage = () => {
           </div>
         ) : services.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
-            <p className="text-4xl mb-3">🧹</p>
-            <p className="font-medium">No spot-clean services available in your area yet.</p>
+            <p className="text-4xl mb-3">{pageConfig.icon}</p>
+            <p className="font-medium">{pageConfig.emptyMessage}</p>
           </div>
         ) : (
           <motion.div

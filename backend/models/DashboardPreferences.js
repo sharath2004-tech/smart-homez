@@ -88,7 +88,7 @@ const DEFAULT_SERVICES = [
     customName: '',
     customSubtitle: '',
     badge: 'Sanitize',
-    path: '/customer/services/spot-clean',
+    path: '/customer/services/intense-washroom-cleaning',
     isActive: true,
     sortOrder: 4,
     isDefault: false
@@ -102,7 +102,7 @@ const DEFAULT_SERVICES = [
     customName: 'Kitchen Deep Clean',
     customSubtitle: 'Grease · Appliances · Tiles',
     badge: 'Popular',
-    path: '/customer/services/spot-clean',
+    path: '/customer/services/kitchen-deep-clean',
     isActive: true,
     sortOrder: 5,
     isDefault: false
@@ -116,7 +116,7 @@ const DEFAULT_SERVICES = [
     customName: 'Window Deep Cleaning',
     customSubtitle: 'Glass · Frames · Tracks',
     badge: 'Spot clean',
-    path: '/customer/services/spot-clean',
+    path: '/customer/services/window-deep-cleaning',
     isActive: true,
     sortOrder: 6,
     isDefault: false
