@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { authAPI, workersAPI } from "@/lib/api";
-import { BarChart2, Calendar, Clock, Download, IndianRupee, TrendingUp } from "lucide-react";
+import { BarChart2, Calendar, Clock, Download, IndianRupee } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -35,7 +35,22 @@ interface Profile {
   name: string;
   email: string;
   role: string;
+  workerProfile?: {
+    wageType?: 'hourly' | 'daily' | 'monthly';
+    hourlyRate?: number;
+    dailyWage?: number;
+    monthlyWage?: number;
+  };
 }
+
+const getPayTypeLabel = (profile: Profile | null) => {
+  const workerProfile = profile?.workerProfile;
+  if (!workerProfile) return 'Not set yet';
+  if (workerProfile.wageType === 'daily' && workerProfile.dailyWage) return `Daily · ₹${workerProfile.dailyWage}/day`;
+  if (workerProfile.wageType === 'monthly' && workerProfile.monthlyWage) return `Monthly · ₹${workerProfile.monthlyWage}/month`;
+  if (workerProfile.hourlyRate) return `Hourly · ₹${workerProfile.hourlyRate}/hr`;
+  return 'Hourly · Rate pending';
+};
 
 // Helper functions (pure, stable references)
 const calculateHoursWorked = (earning: Earning): string => {
@@ -318,6 +333,16 @@ const WorkerEarnings = () => {
         <div>
           <h1 className="text-2xl font-bold font-heading text-foreground mb-1">{t('worker.earnings.salaryManagement')}</h1>
           <p className="text-muted-foreground text-sm">{t('worker.earnings.subtitle')}</p>
+        </div>
+
+        <div className="card-elevated p-4 sm:p-5 md:p-6 border-primary/20 bg-primary/5">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="text-sm text-muted-foreground">Approved pay type</p>
+              <p className="text-lg font-bold text-foreground">{getPayTypeLabel(profile)}</p>
+            </div>
+            <p className="text-xs text-muted-foreground">This is the pay structure approved by admin / super admin.</p>
+          </div>
         </div>
 
         {/* Period toggle */}

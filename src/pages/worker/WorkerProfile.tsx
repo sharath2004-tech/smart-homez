@@ -15,6 +15,10 @@ interface Profile {
     rating: number;
     specialization: string[];
     totalJobsCompleted?: number;
+    wageType?: 'hourly' | 'daily' | 'monthly';
+    hourlyRate?: number;
+    dailyWage?: number;
+    monthlyWage?: number;
     assignedApartments: Array<{
       apartmentName?: string;
       buildingName?: string;
@@ -36,6 +40,14 @@ interface WorkerDocuments {
   aadhaarNumber?: string;
   uploadedAt?: string;
 }
+
+const getWorkerPayLabel = (workerProfile?: Profile['workerProfile']) => {
+  if (!workerProfile) return 'Not set yet';
+  if (workerProfile.wageType === 'daily' && workerProfile.dailyWage) return `Daily · ₹${workerProfile.dailyWage}/day`;
+  if (workerProfile.wageType === 'monthly' && workerProfile.monthlyWage) return `Monthly · ₹${workerProfile.monthlyWage}/month`;
+  if (workerProfile.hourlyRate) return `Hourly · ₹${workerProfile.hourlyRate}/hr`;
+  return 'Hourly · Rate pending';
+};
 
 const WorkerProfile = () => {
   const { t } = useTranslation();
@@ -193,6 +205,15 @@ const WorkerProfile = () => {
               ) : (
                 <p className="text-muted-foreground text-sm">{t('worker.profile.noSpecializations')}</p>
               )}
+            </div>
+
+            <div className="card-elevated p-4 sm:p-5 md:p-6 border-primary/20 bg-primary/5">
+              <h3 className="font-bold font-heading text-foreground mb-2 flex items-center gap-2">
+                <Briefcase className="w-4 h-4 text-primary" />
+                Approved pay type
+              </h3>
+              <p className="text-lg font-bold text-foreground">{getWorkerPayLabel(profile.workerProfile)}</p>
+              <p className="text-sm text-muted-foreground mt-1">This is the payment structure approved for your account.</p>
             </div>
 
             {/* Assigned Locations */}

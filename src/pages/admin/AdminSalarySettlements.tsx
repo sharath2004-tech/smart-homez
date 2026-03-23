@@ -30,7 +30,12 @@ interface Worker {
   _id: string;
   name: string;
   email: string;
-  workerProfile?: { hourlyRate?: number };
+  workerProfile?: {
+    wageType?: 'hourly' | 'daily' | 'monthly';
+    hourlyRate?: number;
+    dailyWage?: number;
+    monthlyWage?: number;
+  };
 }
 
 interface TaskPreview {
@@ -47,7 +52,13 @@ interface SalaryPreview {
   periodTo: string;
   totalMinutesWorked: number;
   totalTasksCompleted: number;
+  wageType: 'hourly' | 'daily' | 'monthly';
   hourlyRate: number;
+  dailyWage?: number | null;
+  monthlyWage?: number | null;
+  rateAmount: number;
+  payUnitsWorked: number;
+  payUnitLabel: 'hour' | 'day' | 'month';
   requestedAmount: number;
   netAmount?: number;
   totalPenaltyAmount?: number;
@@ -77,13 +88,24 @@ interface SalaryRequest {
     name: string;
     email: string;
     phone?: string;
-    workerProfile?: { hourlyRate?: number };
+    workerProfile?: {
+      wageType?: 'hourly' | 'daily' | 'monthly';
+      hourlyRate?: number;
+      dailyWage?: number;
+      monthlyWage?: number;
+    };
   };
   periodFrom: string;
   periodTo: string;
   totalMinutesWorked: number;
   totalTasksCompleted: number;
+  wageType?: 'hourly' | 'daily' | 'monthly';
   hourlyRate: number;
+  dailyWage?: number | null;
+  monthlyWage?: number | null;
+  rateAmount?: number;
+  payUnitsWorked?: number;
+  payUnitLabel?: 'hour' | 'day' | 'month';
   requestedAmount: number;
   netAmount?: number | null;
   totalPenaltyAmount?: number;
@@ -131,6 +153,33 @@ function getSettlementAmount(amount: number, penaltyAmount: number, applyPenalty
 
 function getPaidAmount(request: SalaryRequest) {
   return request.netAmount ?? request.requestedAmount;
+}
+
+function getRateLabel(data: {
+  wageType?: 'hourly' | 'daily' | 'monthly';
+  hourlyRate?: number;
+  dailyWage?: number | null;
+  monthlyWage?: number | null;
+  rateAmount?: number;
+}) {
+  if (data.wageType === 'daily') {
+    return `₹${data.dailyWage ?? data.rateAmount ?? 0}/day`;
+  }
+  if (data.wageType === 'monthly') {
+    return `₹${data.monthlyWage ?? data.rateAmount ?? 0}/month`;
+  }
+  return `₹${data.hourlyRate ?? data.rateAmount ?? 0}/hr`;
+}
+
+function getWorkBasisLabel(data: { payUnitsWorked?: number; payUnitLabel?: 'hour' | 'day' | 'month'; totalMinutesWorked: number }) {
+  if (data.payUnitLabel === 'day') {
+    return `${data.payUnitsWorked ?? 0} worked day${(data.payUnitsWorked ?? 0) === 1 ? '' : 's'}`;
+  }
+  if (data.payUnitLabel === 'month') {
+    return `${data.payUnitsWorked ?? 0} month${(data.payUnitsWorked ?? 0) === 1 ? '' : 's'} covered`;
+  }
+  const hours = (data.payUnitsWorked ?? (data.totalMinutesWorked / 60));
+  return `${hours.toFixed(2)} worked hour${hours === 1 ? '' : 's'}`;
 }
 
 const STATUS_META = {
@@ -448,8 +497,12 @@ const AdminSalarySettlements = () => {
                         <p className="text-xl font-bold">{formatMinutes(sendPreview.totalMinutesWorked)}</p>
                       </div>
                       <div className="bg-background rounded-md p-3">
-                        <p className="text-xs text-muted-foreground">Rate / hr</p>
-                        <p className="text-xl font-bold">₹{sendPreview.hourlyRate}</p>
+                        <p className="text-xs text-muted-foreground">Rate</p>
+                        <p className="text-xl font-bold">{getRateLabel(sendPreview)}</p>
+                      </div>
+                      <div className="bg-background rounded-md p-3">
+                        <p className="text-xs text-muted-foreground">Pay basis</p>
+                        <p className="text-sm font-bold">{getWorkBasisLabel(sendPreview)}</p>
                       </div>
                     </div>
 
@@ -676,8 +729,12 @@ const AdminSalarySettlements = () => {
                             <p className="text-xl font-bold">{formatMinutes(req.totalMinutesWorked)}</p>
                           </div>
                           <div className="bg-muted/40 rounded-md p-3">
-                            <p className="text-xs text-muted-foreground">Rate / hr</p>
-                            <p className="text-xl font-bold">₹{req.hourlyRate}</p>
+                            <p className="text-xs text-muted-foreground">Rate</p>
+                            <p className="text-xl font-bold">{getRateLabel(req)}</p>
+                          </div>
+                          <div className="bg-muted/40 rounded-md p-3">
+                            <p className="text-xs text-muted-foreground">Pay basis</p>
+                            <p className="text-sm font-bold">{getWorkBasisLabel(req)}</p>
                           </div>
                         </div>
 
@@ -711,8 +768,12 @@ const AdminSalarySettlements = () => {
                             <span>{formatMinutes(req.totalMinutesWorked)}</span>
                           </div>
                           <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Hourly rate</span>
-                            <span>₹{req.hourlyRate}/hr</span>
+                            <span className="text-muted-foreground">Pay rate</span>
+                            <span>{getRateLabel(req)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Pay basis</span>
+                            <span>{getWorkBasisLabel(req)}</span>
                           </div>
                           {(req.totalPenaltyAmount || 0) > 0 && (
                             <>

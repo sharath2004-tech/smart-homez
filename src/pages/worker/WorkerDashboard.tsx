@@ -49,8 +49,20 @@ interface Profile {
     availability?: boolean;
     rating?: number;
     completedServices?: number;
+    wageType?: 'hourly' | 'daily' | 'monthly';
+    hourlyRate?: number;
+    dailyWage?: number;
+    monthlyWage?: number;
   };
 }
+
+const formatWorkerPay = (workerProfile?: Profile['workerProfile']) => {
+  if (!workerProfile) return 'Not set yet';
+  if (workerProfile.wageType === 'daily' && workerProfile.dailyWage) return `Daily · ₹${workerProfile.dailyWage}/day`;
+  if (workerProfile.wageType === 'monthly' && workerProfile.monthlyWage) return `Monthly · ₹${workerProfile.monthlyWage}/month`;
+  if (workerProfile.hourlyRate) return `Hourly · ₹${workerProfile.hourlyRate}/hr`;
+  return 'Hourly · Rate pending';
+};
 
 const WorkerDashboard = () => {
   const { t } = useTranslation();
@@ -226,6 +238,18 @@ const WorkerDashboard = () => {
                 <p className="text-base font-bold font-heading text-primary">{item.value}</p>
               </div>
             ))}
+          </div>
+        </div>
+
+        <div className="card-elevated p-4 sm:p-5 md:p-6 border-primary/20 bg-primary/5">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="text-sm text-muted-foreground">Approved pay type</p>
+              <p className="text-lg font-bold text-foreground">{formatWorkerPay(profile?.workerProfile)}</p>
+            </div>
+            <Link to="/worker/profile" className="text-sm font-medium text-primary hover:underline">
+              View in profile
+            </Link>
           </div>
         </div>
 

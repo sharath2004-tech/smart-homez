@@ -10,6 +10,10 @@ const router = express.Router();
 // Default hourly rate if not set on worker profile
 const DEFAULT_HOURLY_RATE = 90;
 
+function roundMoney(value) {
+  return Math.round(Number(value || 0) * 100) / 100;
+}
+
 function calculateBookingMinutes(booking) {
   if (!booking) return 0;
   if (booking.actualDurationMinutes > 0) {
@@ -71,6 +75,79 @@ function deriveLocationIdFromBookings(bookings = []) {
   return uniqueLocationIds.length === 1 ? uniqueLocationIds[0] : null;
 }
 
+function getWorkMetrics(bookings = []) {
+  let totalMinutes = 0;
+  const workedDays = new Set();
+  const workedMonths = new Set();
+
+  for (const booking of bookings) {
+    const minutesWorked = calculateBookingMinutes(booking);
+    totalMinutes += minutesWorked;
+
+    const referenceDate = booking.bookingDate || booking.completedAt || booking.actualEndTime || booking.actualStartTime;
+    if (!referenceDate) continue;
+
+    const parsedDate = new Date(referenceDate);
+    if (Number.isNaN(parsedDate.getTime())) continue;
+
+    const dayKey = parsedDate.toISOString().slice(0, 10);
+    const monthKey = `${parsedDate.getFullYear()}-${String(parsedDate.getMonth() + 1).padStart(2, '0')}`;
+    workedDays.add(dayKey);
+    workedMonths.add(monthKey);
+  }
+
+  return {
+    totalMinutes,
+    workedDays: workedDays.size,
+    workedMonths: workedMonths.size
+  };
+}
+
+function getCompensationSummary(workerProfile = {}, workMetrics = { totalMinutes: 0, workedDays: 0, workedMonths: 0 }) {
+  const wageType = workerProfile?.wageType || 'hourly';
+
+  if (wageType === 'daily') {
+    const dailyWage = Number(workerProfile.dailyWage) || 0;
+    return {
+      wageType,
+      hourlyRate: Number(workerProfile.hourlyRate) || 0,
+      dailyWage,
+      monthlyWage: null,
+      rateAmount: dailyWage,
+      payUnitsWorked: workMetrics.workedDays,
+      payUnitLabel: 'day',
+      requestedAmount: roundMoney(workMetrics.workedDays * dailyWage)
+    };
+  }
+
+  if (wageType === 'monthly') {
+    const monthlyWage = Number(workerProfile.monthlyWage) || 0;
+    return {
+      wageType,
+      hourlyRate: Number(workerProfile.hourlyRate) || 0,
+      dailyWage: null,
+      monthlyWage,
+      rateAmount: monthlyWage,
+      payUnitsWorked: workMetrics.workedMonths,
+      payUnitLabel: 'month',
+      requestedAmount: roundMoney(workMetrics.workedMonths * monthlyWage)
+    };
+  }
+
+  const hourlyRate = Number(workerProfile.hourlyRate) || DEFAULT_HOURLY_RATE;
+  const workedHours = roundMoney(workMetrics.totalMinutes / 60);
+  return {
+    wageType: 'hourly',
+    hourlyRate,
+    dailyWage: null,
+    monthlyWage: null,
+    rateAmount: hourlyRate,
+    payUnitsWorked: workedHours,
+    payUnitLabel: 'hour',
+    requestedAmount: roundMoney(workedHours * hourlyRate)
+  };
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // WORKER routes
 // ────────────────────────────────────────────────────────────────────────────
@@ -124,15 +201,8 @@ router.get('/preview', authenticate, authorize('worker'), async (req, res) => {
       .select('bookingDate startTime endTime actualStartTime actualEndTime actualDurationMinutes totalAmount service')
       .lean();
 
-    let totalMinutes = 0;
     const tasks = bookings.map(b => {
-      let mins = 0;
-      if (b.actualDurationMinutes > 0) {
-        mins = b.actualDurationMinutes;
-      } else if (b.actualStartTime && b.actualEndTime) {
-        mins = Math.floor((new Date(b.actualEndTime) - new Date(b.actualStartTime)) / 60000);
-      }
-      totalMinutes += mins;
+      const mins = calculateBookingMinutes(b);
       return {
         _id: b._id,
         date: b.bookingDate,
@@ -144,8 +214,8 @@ router.get('/preview', authenticate, authorize('worker'), async (req, res) => {
     });
 
     const workerProfile = req.user.workerProfile || {};
-    const hourlyRate = workerProfile.hourlyRate || DEFAULT_HOURLY_RATE;
-    const requestedAmount = Math.round((totalMinutes / 60) * hourlyRate * 100) / 100;
+    const workMetrics = getWorkMetrics(bookings);
+    const compensation = getCompensationSummary(workerProfile, workMetrics);
     const penaltySummary = await getLeavePenaltySummary(req.user._id, fromDate, toDate);
 
     res.json({
@@ -153,11 +223,17 @@ router.get('/preview', authenticate, authorize('worker'), async (req, res) => {
       preview: {
         periodFrom: fromDate,
         periodTo: toDate,
-        totalMinutesWorked: totalMinutes,
+        totalMinutesWorked: workMetrics.totalMinutes,
         totalTasksCompleted: bookings.length,
-        hourlyRate,
-        requestedAmount,
-        netAmount: calculateNetAmount(requestedAmount, penaltySummary.totalPenaltyAmount, true),
+        wageType: compensation.wageType,
+        hourlyRate: compensation.hourlyRate,
+        dailyWage: compensation.dailyWage,
+        monthlyWage: compensation.monthlyWage,
+        rateAmount: compensation.rateAmount,
+        payUnitsWorked: compensation.payUnitsWorked,
+        payUnitLabel: compensation.payUnitLabel,
+        requestedAmount: compensation.requestedAmount,
+        netAmount: calculateNetAmount(compensation.requestedAmount, penaltySummary.totalPenaltyAmount, true),
         totalPenaltyAmount: penaltySummary.totalPenaltyAmount,
         penaltyBreakdown: penaltySummary.penaltyBreakdown,
         tasks
@@ -216,18 +292,9 @@ router.post('/',
         bookingDate: { $gte: fromDate, $lte: toDate }
       }).select('_id actualDurationMinutes actualStartTime actualEndTime location').lean();
 
-      let totalMinutes = 0;
-      for (const b of bookings) {
-        if (b.actualDurationMinutes > 0) {
-          totalMinutes += b.actualDurationMinutes;
-        } else if (b.actualStartTime && b.actualEndTime) {
-          totalMinutes += Math.floor((new Date(b.actualEndTime) - new Date(b.actualStartTime)) / 60000);
-        }
-      }
-
       const workerProfile = req.user.workerProfile || {};
-      const hourlyRate = workerProfile.hourlyRate || DEFAULT_HOURLY_RATE;
-      const requestedAmount = Math.round((totalMinutes / 60) * hourlyRate * 100) / 100;
+      const workMetrics = getWorkMetrics(bookings);
+      const compensation = getCompensationSummary(workerProfile, workMetrics);
       const penaltySummary = await getLeavePenaltySummary(req.user._id, fromDate, toDate);
 
       // Find the admin responsible for this worker's location
@@ -256,11 +323,17 @@ router.post('/',
         location: locationId,
         periodFrom: fromDate,
         periodTo: toDate,
-        totalMinutesWorked: totalMinutes,
+        totalMinutesWorked: workMetrics.totalMinutes,
         totalTasksCompleted: bookings.length,
-        hourlyRate,
-        requestedAmount,
-        netAmount: requestedAmount,
+        wageType: compensation.wageType,
+        hourlyRate: compensation.hourlyRate,
+        dailyWage: compensation.dailyWage,
+        monthlyWage: compensation.monthlyWage,
+        rateAmount: compensation.rateAmount,
+        payUnitsWorked: compensation.payUnitsWorked,
+        payUnitLabel: compensation.payUnitLabel,
+        requestedAmount: compensation.requestedAmount,
+        netAmount: compensation.requestedAmount,
         totalPenaltyAmount: penaltySummary.totalPenaltyAmount,
         penaltyBreakdown: penaltySummary.penaltyBreakdown,
         bookings: bookings.map(b => b._id)
@@ -317,15 +390,8 @@ router.get('/admin/worker-preview', authenticate, authorize('admin', 'super_admi
       .select('bookingDate startTime endTime actualDurationMinutes actualStartTime actualEndTime service')
       .lean();
 
-    let totalMinutes = 0;
     const tasks = bookings.map(b => {
-      let mins = 0;
-      if (b.actualDurationMinutes > 0) {
-        mins = b.actualDurationMinutes;
-      } else if (b.actualStartTime && b.actualEndTime) {
-        mins = Math.floor((new Date(b.actualEndTime) - new Date(b.actualStartTime)) / 60000);
-      }
-      totalMinutes += mins;
+      const mins = calculateBookingMinutes(b);
       return {
         _id: b._id,
         date: b.bookingDate,
@@ -337,8 +403,8 @@ router.get('/admin/worker-preview', authenticate, authorize('admin', 'super_admi
     });
 
     const workerProfile = await User.findById(workerId).select('workerProfile').lean();
-    const hourlyRate = (workerProfile?.workerProfile?.hourlyRate) || DEFAULT_HOURLY_RATE;
-    const amount = Math.round((totalMinutes / 60) * hourlyRate * 100) / 100;
+    const workMetrics = getWorkMetrics(bookings);
+    const compensation = getCompensationSummary(workerProfile?.workerProfile || {}, workMetrics);
     const penaltySummary = await getLeavePenaltySummary(workerId, fromDate, toDate);
 
     res.json({
@@ -346,11 +412,17 @@ router.get('/admin/worker-preview', authenticate, authorize('admin', 'super_admi
       preview: {
         periodFrom: fromDate,
         periodTo: toDate,
-        totalMinutesWorked: totalMinutes,
+        totalMinutesWorked: workMetrics.totalMinutes,
         totalTasksCompleted: bookings.length,
-        hourlyRate,
-        requestedAmount: amount,
-        netAmount: calculateNetAmount(amount, penaltySummary.totalPenaltyAmount, true),
+        wageType: compensation.wageType,
+        hourlyRate: compensation.hourlyRate,
+        dailyWage: compensation.dailyWage,
+        monthlyWage: compensation.monthlyWage,
+        rateAmount: compensation.rateAmount,
+        payUnitsWorked: compensation.payUnitsWorked,
+        payUnitLabel: compensation.payUnitLabel,
+        requestedAmount: compensation.requestedAmount,
+        netAmount: calculateNetAmount(compensation.requestedAmount, penaltySummary.totalPenaltyAmount, true),
         totalPenaltyAmount: penaltySummary.totalPenaltyAmount,
         penaltyBreakdown: penaltySummary.penaltyBreakdown,
         tasks
@@ -401,19 +473,10 @@ router.post('/admin/send',
         bookingDate: { $gte: fromDate, $lte: toDate }
       }).select('_id actualDurationMinutes actualStartTime actualEndTime location').lean();
 
-      let totalMinutes = 0;
-      for (const b of bookings) {
-        if (b.actualDurationMinutes > 0) {
-          totalMinutes += b.actualDurationMinutes;
-        } else if (b.actualStartTime && b.actualEndTime) {
-          totalMinutes += Math.floor((new Date(b.actualEndTime) - new Date(b.actualStartTime)) / 60000);
-        }
-      }
-
-      const hourlyRate = worker.workerProfile?.hourlyRate || DEFAULT_HOURLY_RATE;
-      const requestedAmount = Math.round((totalMinutes / 60) * hourlyRate * 100) / 100;
+      const workMetrics = getWorkMetrics(bookings);
+      const compensation = getCompensationSummary(worker.workerProfile || {}, workMetrics);
       const penaltySummary = await getLeavePenaltySummary(workerId, fromDate, toDate);
-      const netAmount = calculateNetAmount(requestedAmount, penaltySummary.totalPenaltyAmount, applyPenaltyDeduction);
+      const netAmount = calculateNetAmount(compensation.requestedAmount, penaltySummary.totalPenaltyAmount, applyPenaltyDeduction);
       const derivedLocationId = deriveLocationIdFromBookings(bookings)
         || worker.workerProfile?.assignedApartments?.[0]?.locationId
         || null;
@@ -424,10 +487,16 @@ router.post('/admin/send',
         location: derivedLocationId,
         periodFrom: fromDate,
         periodTo: toDate,
-        totalMinutesWorked: totalMinutes,
+        totalMinutesWorked: workMetrics.totalMinutes,
         totalTasksCompleted: bookings.length,
-        hourlyRate,
-        requestedAmount,
+        wageType: compensation.wageType,
+        hourlyRate: compensation.hourlyRate,
+        dailyWage: compensation.dailyWage,
+        monthlyWage: compensation.monthlyWage,
+        rateAmount: compensation.rateAmount,
+        payUnitsWorked: compensation.payUnitsWorked,
+        payUnitLabel: compensation.payUnitLabel,
+        requestedAmount: compensation.requestedAmount,
         netAmount,
         totalPenaltyAmount: penaltySummary.totalPenaltyAmount,
         penaltyTreatment: applyPenaltyDeduction ? 'included' : 'excluded',

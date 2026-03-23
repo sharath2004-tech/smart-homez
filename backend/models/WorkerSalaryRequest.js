@@ -34,10 +34,40 @@ const workerSalaryRequestSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
+  wageType: {
+    type: String,
+    enum: ['hourly', 'daily', 'monthly'],
+    default: 'hourly'
+  },
   hourlyRate: {
     type: Number,
     required: true,
     min: 0
+  },
+  dailyWage: {
+    type: Number,
+    default: null,
+    min: 0
+  },
+  monthlyWage: {
+    type: Number,
+    default: null,
+    min: 0
+  },
+  rateAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  payUnitsWorked: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  payUnitLabel: {
+    type: String,
+    enum: ['hour', 'day', 'month'],
+    default: 'hour'
   },
   requestedAmount: {
     type: Number,

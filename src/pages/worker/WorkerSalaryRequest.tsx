@@ -15,7 +15,13 @@ interface SalaryRecord {
   periodTo: string;
   totalMinutesWorked: number;
   totalTasksCompleted: number;
+  wageType?: 'hourly' | 'daily' | 'monthly';
   hourlyRate: number;
+  dailyWage?: number | null;
+  monthlyWage?: number | null;
+  rateAmount?: number;
+  payUnitsWorked?: number;
+  payUnitLabel?: 'hour' | 'day' | 'month';
   requestedAmount: number;
   netAmount?: number | null;
   totalPenaltyAmount?: number;
@@ -31,6 +37,16 @@ interface SalaryRecord {
   status: 'pending' | 'approved' | 'rejected' | 'paid';
   paidAt?: string;
   adminNotes?: string;
+}
+
+interface WorkerProfileData {
+  name?: string;
+  workerProfile?: {
+    wageType?: 'hourly' | 'daily' | 'monthly';
+    hourlyRate?: number;
+    dailyWage?: number;
+    monthlyWage?: number;
+  };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -52,17 +68,45 @@ function getFinalPaidAmount(record: SalaryRecord) {
   return record.netAmount ?? record.requestedAmount;
 }
 
+function getSalaryRateLabel(record: SalaryRecord) {
+  if (record.wageType === 'daily') return `₹${record.dailyWage ?? record.rateAmount ?? 0}/day`;
+  if (record.wageType === 'monthly') return `₹${record.monthlyWage ?? record.rateAmount ?? 0}/month`;
+  return `₹${record.hourlyRate ?? record.rateAmount ?? 0}/hr`;
+}
+
+function getSalaryBasisLabel(record: SalaryRecord) {
+  if (record.payUnitLabel === 'day') {
+    return `${record.payUnitsWorked ?? 0} worked day${(record.payUnitsWorked ?? 0) === 1 ? '' : 's'}`;
+  }
+  if (record.payUnitLabel === 'month') {
+    return `${record.payUnitsWorked ?? 0} month${(record.payUnitsWorked ?? 0) === 1 ? '' : 's'} covered`;
+  }
+  const hours = record.payUnitsWorked ?? (record.totalMinutesWorked / 60);
+  return `${hours.toFixed(2)} worked hour${hours === 1 ? '' : 's'}`;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const WorkerSalaryHistory = () => {
   const { t } = useTranslation();
   const [userName, setUserName] = useState('Worker');
+  const [profile, setProfile] = useState<WorkerProfileData | null>(null);
   const [records, setRecords] = useState<SalaryRecord[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const getApprovedPayLabel = () => {
+    const workerProfile = profile?.workerProfile;
+    if (!workerProfile) return 'Not set yet';
+    if (workerProfile.wageType === 'daily' && workerProfile.dailyWage) return `Daily · ₹${workerProfile.dailyWage}/day`;
+    if (workerProfile.wageType === 'monthly' && workerProfile.monthlyWage) return `Monthly · ₹${workerProfile.monthlyWage}/month`;
+    if (workerProfile.hourlyRate) return `Hourly · ₹${workerProfile.hourlyRate}/hr`;
+    return 'Hourly · Rate pending';
+  };
 
   useEffect(() => {
     authAPI.getProfile().then(res => {
       const u = res?.user || res;
+      setProfile(u || null);
       if (u?.name) setUserName(u.name);
     }).catch(() => {});
     fetchRecords();
@@ -91,6 +135,13 @@ const WorkerSalaryHistory = () => {
           <h1 className="text-2xl font-bold text-foreground">{t('worker.salary.title')}</h1>
           <p className="text-sm text-muted-foreground mt-1">{t('worker.salary.subtitle')}</p>
         </div>
+
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">Approved pay type</p>
+            <p className="text-xl font-bold text-foreground mt-1">{getApprovedPayLabel()}</p>
+          </CardContent>
+        </Card>
 
         {/* Summary card */}
         {records.length > 0 && (
@@ -137,7 +188,7 @@ const WorkerSalaryHistory = () => {
                           {fmtDate(rec.periodFrom)} – {fmtDate(rec.periodTo)}
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {rec.totalTasksCompleted} {rec.totalTasksCompleted !== 1 ? t('worker.salary.tasks') : t('worker.salary.task')} · {formatMinutes(rec.totalMinutesWorked)} {t('worker.salary.worked')}
+                          {rec.totalTasksCompleted} {rec.totalTasksCompleted !== 1 ? t('worker.salary.tasks') : t('worker.salary.task')} · {getSalaryBasisLabel(rec)}
                         </p>
                       </div>
                       <Badge className="bg-green-100 text-green-800 flex items-center gap-1 text-xs shrink-0">
@@ -150,7 +201,7 @@ const WorkerSalaryHistory = () => {
 
                     <div className="space-y-2 text-sm">
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">{t('worker.salary.rate')}: ₹{rec.hourlyRate}/hr</span>
+                        <span className="text-muted-foreground">{t('worker.salary.rate')}: {getSalaryRateLabel(rec)}</span>
                         <span className="font-bold text-primary text-lg">₹{getFinalPaidAmount(rec).toFixed(2)}</span>
                       </div>
 
