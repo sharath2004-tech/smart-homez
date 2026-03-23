@@ -34,10 +34,7 @@ interface Worker {
     effectiveAvailability?: boolean;
     availabilityReason?: string | null;
     withinWorkingWindow?: boolean;
-    wageType?: string;
     hourlyRate?: number;
-    dailyWage?: number;
-    monthlyWage?: number;
     reliabilityScore?: number;
     joinDate?: string;
     resignedDate?: string;
@@ -191,10 +188,7 @@ const AdminWorkers = () => {
     specialization: [] as string[],
     selectedLocations: [] as string[],
     aadhaarNumber: "",
-    wageType: "hourly" as "hourly" | "daily" | "monthly",
     hourlyRate: "",
-    dailyWage: "",
-    monthlyWage: "",
   });
 
   const [docFiles, setDocFiles] = useState<{
@@ -427,10 +421,7 @@ const AdminWorkers = () => {
           specialization: normalizedSpecializations,
           experience: editWorker.workerProfile.experience || 0,
           languages: editWorker.workerProfile.languages || [],
-          wageType: editWorker.workerProfile.wageType || 'hourly',
           hourlyRate: editWorker.workerProfile.hourlyRate || 0,
-          dailyWage: editWorker.workerProfile.dailyWage || 0,
-          monthlyWage: editWorker.workerProfile.monthlyWage || 0,
           availability: editWorker.workerProfile.availability,
           accountStatus: editWorker.workerProfile.accountStatus || 'active',
           joinDate: editWorker.workerProfile.joinDate || null,
@@ -503,8 +494,8 @@ const AdminWorkers = () => {
     }
 
     // Credential delivery validation
-    if (credentialDelivery === 'email' && !workerForm.email) {
-      alert('Email is required for email credential delivery');
+    if (!workerForm.email) {
+      alert('Email is required to create a worker account');
       return;
     }
     if (credentialDelivery === 'phone' && !workerForm.phone) {
@@ -512,27 +503,10 @@ const AdminWorkers = () => {
       return;
     }
 
-    // Validate wage inputs
-    if (workerForm.wageType === 'hourly') {
-      const rate = Number(workerForm.hourlyRate);
-      if (!workerForm.hourlyRate || rate <= 0 || isNaN(rate)) {
-        alert('Please provide a valid hourly rate greater than 0');
-        return;
-      }
-    }
-    if (workerForm.wageType === 'daily') {
-      const wage = Number(workerForm.dailyWage);
-      if (!workerForm.dailyWage || wage <= 0 || isNaN(wage)) {
-        alert('Please provide a valid daily wage greater than 0');
-        return;
-      }
-    }
-    if (workerForm.wageType === 'monthly') {
-      const wage = Number(workerForm.monthlyWage);
-      if (!workerForm.monthlyWage || wage <= 0 || isNaN(wage)) {
-        alert('Please provide a valid monthly wage greater than 0');
-        return;
-      }
+    const rate = Number(workerForm.hourlyRate);
+    if (!workerForm.hourlyRate || rate <= 0 || isNaN(rate)) {
+      alert('Please provide a valid hourly rate greater than 0');
+      return;
     }
 
     // Validate gender and experience if provided
@@ -562,10 +536,7 @@ const AdminWorkers = () => {
       formData.append('specialization', JSON.stringify(normalizeSpecializations(workerForm.specialization)));
       formData.append('assignedApartmentIds', JSON.stringify(workerForm.selectedLocations));
       if (workerForm.aadhaarNumber) formData.append('aadhaarNumber', workerForm.aadhaarNumber.replace(/\s/g, ''));
-      formData.append('wageType', workerForm.wageType);
-      if (workerForm.wageType === 'hourly' && workerForm.hourlyRate) formData.append('hourlyRate', workerForm.hourlyRate);
-      if (workerForm.wageType === 'daily' && workerForm.dailyWage) formData.append('dailyWage', workerForm.dailyWage);
-      if (workerForm.wageType === 'monthly' && workerForm.monthlyWage) formData.append('monthlyWage', workerForm.monthlyWage);
+      formData.append('hourlyRate', workerForm.hourlyRate);
       formData.append('credentialDelivery', credentialDelivery);
       if (docFiles.profilePicture) formData.append('profilePicture', docFiles.profilePicture);
       if (docFiles.aadhaarFront) formData.append('aadhaarFront', docFiles.aadhaarFront);
@@ -596,10 +567,7 @@ const AdminWorkers = () => {
         specialization: [],
         selectedLocations: [],
         aadhaarNumber: "",
-        wageType: "hourly",
         hourlyRate: "",
-        dailyWage: "",
-        monthlyWage: "",
       });
       setCustomCreateSpecialization("");
       setDocFiles({ profilePicture: null, aadhaarFront: null, aadhaarBack: null });
@@ -854,14 +822,12 @@ const AdminWorkers = () => {
                   )}
 
                   {/* Wage Info */}
-                  {w.workerProfile?.wageType && (
+                  {w.workerProfile?.hourlyRate ? (
                     <div className="text-xs text-muted-foreground mb-3 flex items-center gap-1">
-                      <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded capitalize">{w.workerProfile.wageType} wage</span>
-                      {w.workerProfile.wageType === 'hourly' && w.workerProfile.hourlyRate && <span>₹{w.workerProfile.hourlyRate}/hr</span>}
-                      {w.workerProfile.wageType === 'daily' && w.workerProfile.dailyWage && <span>₹{w.workerProfile.dailyWage}/day</span>}
-                      {w.workerProfile.wageType === 'monthly' && w.workerProfile.monthlyWage && <span>₹{w.workerProfile.monthlyWage}/month</span>}
+                      <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded">Hourly wage</span>
+                      <span>₹{w.workerProfile.hourlyRate}/hr</span>
                     </div>
-                  )}
+                  ) : null}
 
                   {w.workerProfile?.specialization && w.workerProfile.specialization.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mb-4">
@@ -988,17 +954,17 @@ const AdminWorkers = () => {
 
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    Email {credentialDelivery === 'phone' ? <span className="text-muted-foreground font-normal">(Optional)</span> : <span className="text-destructive">*</span>}
+                    Email <span className="text-destructive">*</span>
                   </label>
                   <input
                     type="email"
-                    required={credentialDelivery !== 'phone'}
+                    required
                     className="input-clean"
                     placeholder="worker@example.com"
                     value={workerForm.email}
                     onChange={(e) => setWorkerForm({...workerForm, email: e.target.value})}
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Worker's login email address</p>
+                  <p className="text-xs text-muted-foreground mt-1">Worker login and password backup are always tied to email.</p>
                 </div>
 
                 <div>
@@ -1088,43 +1054,10 @@ const AdminWorkers = () => {
                   />
                 </div>
 
-                {/* Wage Type */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">Wage Type <span className="text-destructive">*</span></label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
-                    {(["hourly", "daily", "monthly"] as const).map((opt) => (
-                      <button
-                        key={opt}
-                        type="button"
-                        onClick={() => setWorkerForm({...workerForm, wageType: opt})}
-                        className={`py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
-                          workerForm.wageType === opt
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background border-border hover:bg-muted text-foreground"
-                        }`}
-                      >
-                        {opt === "hourly" ? "⏱ Hourly" : opt === "daily" ? "📅 Daily" : "🗓 Monthly"}
-                      </button>
-                    ))}
-                  </div>
-                  {workerForm.wageType === 'hourly' && (
-                    <div>
-                      <label className="block text-xs text-muted-foreground mb-1">Hourly Rate (₹)</label>
-                      <input type="number" min="0" className="input-clean" placeholder="e.g. 150" value={workerForm.hourlyRate} onChange={(e) => setWorkerForm({...workerForm, hourlyRate: e.target.value})} />
-                    </div>
-                  )}
-                  {workerForm.wageType === 'daily' && (
-                    <div>
-                      <label className="block text-xs text-muted-foreground mb-1">Daily Wage (₹)</label>
-                      <input type="number" min="0" className="input-clean" placeholder="e.g. 800" value={workerForm.dailyWage} onChange={(e) => setWorkerForm({...workerForm, dailyWage: e.target.value})} />
-                    </div>
-                  )}
-                  {workerForm.wageType === 'monthly' && (
-                    <div>
-                      <label className="block text-xs text-muted-foreground mb-1">Monthly Wage (₹)</label>
-                      <input type="number" min="0" className="input-clean" placeholder="e.g. 15000" value={workerForm.monthlyWage} onChange={(e) => setWorkerForm({...workerForm, monthlyWage: e.target.value})} />
-                    </div>
-                  )}
+                  <label className="block text-sm font-medium mb-2">Hourly Rate <span className="text-destructive">*</span></label>
+                  <input type="number" min="0" className="input-clean" placeholder="e.g. 150" value={workerForm.hourlyRate} onChange={(e) => setWorkerForm({...workerForm, hourlyRate: e.target.value})} />
+                  <p className="text-xs text-muted-foreground mt-1">Workers are now configured only with hourly pay.</p>
                 </div>
 
                 <div>
@@ -1806,73 +1739,22 @@ const AdminWorkers = () => {
 
                       {/* Wage Configuration */}
                       <div>
-                        <label className="block text-sm font-medium mb-2">Wage Type</label>
-                        <div className="flex gap-4 mb-3">
-                          {(['hourly', 'daily', 'monthly'] as const).map((type) => (
-                            <label key={type} className="flex items-center gap-2 text-sm">
-                              <input
-                                type="radio"
-                                name="wageType"
-                                value={type}
-                                checked={editWorker.workerProfile?.wageType === type}
-                                onChange={(e) => setEditWorker({
-                                  ...editWorker,
-                                  workerProfile: { ...editWorker.workerProfile!, wageType: e.target.value }
-                                })}
-                              />
-                              {type.charAt(0).toUpperCase() + type.slice(1)}
-                            </label>
-                          ))}
-                        </div>
+                        <label className="block text-sm font-medium mb-2">Hourly Rate</label>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                          {editWorker.workerProfile.wageType === 'hourly' && (
-                            <div>
-                              <label className="block text-sm font-medium mb-1">Hourly Rate (₹)</label>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                className="input-clean"
-                                value={editWorker.workerProfile.hourlyRate || 0}
-                                onChange={(e) => setEditWorker({
-                                  ...editWorker,
-                                  workerProfile: { ...editWorker.workerProfile!, hourlyRate: parseFloat(e.target.value) || 0 }
-                                })}
-                              />
-                            </div>
-                          )}
-                          {editWorker.workerProfile.wageType === 'daily' && (
-                            <div>
-                              <label className="block text-sm font-medium mb-1">Daily Wage (₹)</label>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                className="input-clean"
-                                value={editWorker.workerProfile.dailyWage || 0}
-                                onChange={(e) => setEditWorker({
-                                  ...editWorker,
-                                  workerProfile: { ...editWorker.workerProfile!, dailyWage: parseFloat(e.target.value) || 0 }
-                                })}
-                              />
-                            </div>
-                          )}
-                          {editWorker.workerProfile.wageType === 'monthly' && (
-                            <div>
-                              <label className="block text-sm font-medium mb-1">Monthly Wage (₹)</label>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                className="input-clean"
-                                value={editWorker.workerProfile.monthlyWage || 0}
-                                onChange={(e) => setEditWorker({
-                                  ...editWorker,
-                                  workerProfile: { ...editWorker.workerProfile!, monthlyWage: parseFloat(e.target.value) || 0 }
-                                })}
-                              />
-                            </div>
-                          )}
+                          <div>
+                            <label className="block text-sm font-medium mb-1">Hourly Rate (₹)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              className="input-clean"
+                              value={editWorker.workerProfile.hourlyRate || 0}
+                              onChange={(e) => setEditWorker({
+                                ...editWorker,
+                                workerProfile: { ...editWorker.workerProfile!, hourlyRate: parseFloat(e.target.value) || 0 }
+                              })}
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>

@@ -46,7 +46,6 @@ const WorkerSignUp = () => {
     experience: "",
     dateOfBirth: "",
     aadhaarNumber: "",
-    wageType: "hourly" as "hourly" | "daily" | "monthly",
   });
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [showPassword, setShowPassword] = useState(false);
@@ -297,7 +296,6 @@ const WorkerSignUp = () => {
       formData.append("contactMethod", contactMethod);
       formData.append("otpVerified", "true");
       formData.append("locationId", selectedLocationId);
-      formData.append("wageType", form.wageType || "hourly");
       if (form.dateOfBirth) formData.append("dateOfBirth", form.dateOfBirth);
       if (form.aadhaarNumber) formData.append("aadhaarNumber", form.aadhaarNumber.replace(/\s/g, ''));
 
@@ -500,30 +498,8 @@ const WorkerSignUp = () => {
                   </p>
                 </div>
 
-                {/* Wage Type */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Wage Preference</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {(["hourly", "daily", "monthly"] as const).map((opt) => (
-                      <button
-                        key={opt}
-                        type="button"
-                        onClick={() => setForm(prev => ({ ...prev, wageType: opt }))}
-                        className={`py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
-                          form.wageType === opt
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background border-border hover:bg-muted text-foreground"
-                        }`}
-                      >
-                        {opt === "hourly" ? "⏱ Hourly" : opt === "daily" ? "📅 Daily" : "🗓 Monthly"}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {form.wageType === 'hourly' && 'You will be paid based on hours worked'}
-                    {form.wageType === 'daily' && 'You will be paid based on days worked'}
-                    {form.wageType === 'monthly' && 'You will be paid a fixed monthly salary'}
-                  </p>
+                <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                  Worker accounts are approved with an hourly pay rate by admin after verification.
                 </div>
 
                 <div>

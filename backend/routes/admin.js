@@ -629,7 +629,7 @@ router.post('/workers',
   ]),
   [
     body('name').notEmpty().withMessage('Name is required'),
-    body('email').optional().isEmail().withMessage('Valid email format is invalid'),
+    body('email').isEmail().withMessage('Valid email is required'),
     body('phone').optional().notEmpty().withMessage('Phone cannot be empty'),
     body('gender').optional().isIn(['male', 'female', 'other', 'prefer_not_to_say']).withMessage('Invalid gender'),
     body('religion').optional().isString(),
@@ -648,12 +648,7 @@ router.post('/workers',
       }
       return false;
     }).withMessage('Assigned apartments must be an array'),
-    body().custom((value) => {
-      if (!value.email && !value.phone) {
-        throw new Error('Either email or phone is required');
-      }
-      return true;
-    })
+    body('hourlyRate').isFloat({ gt: 0 }).withMessage('Valid hourly rate is required')
   ],
   async (req, res) => {
     try {
@@ -662,7 +657,7 @@ router.post('/workers',
         return res.status(400).json({ error: { message: errors.array()[0].msg, status: 400 } });
       }
 
-      const { name, email, phone, gender, religion, experience, hourlyRate, aadhaarNumber, dateOfBirth, wageType, dailyWage, monthlyWage } = req.body;
+      const { name, email, phone, gender, religion, experience, hourlyRate, aadhaarNumber, dateOfBirth } = req.body;
 
       // Parse array fields that may come as JSON strings from multipart forms
       let specialization = req.body.specialization;
@@ -682,6 +677,10 @@ router.post('/workers',
         ? `/uploads/worker-docs/${files.aadhaarFront[0].filename}` : null;
       const aadhaarBackPath = files.aadhaarBack?.[0]
         ? `/uploads/worker-docs/${files.aadhaarBack[0].filename}` : null;
+
+      if (!email) {
+        return res.status(400).json({ error: { message: 'Email is required', status: 400 } });
+      }
 
       // Normalize email
       const normalizedEmail = email.toLowerCase().trim();
@@ -757,10 +756,10 @@ router.post('/workers',
         workerProfile: {
           specialization,
           experience: experience || 0,
-          hourlyRate: hourlyRate || 0,
-          wageType: wageType || 'hourly',
-          dailyWage: dailyWage ? Number(dailyWage) : null,
-          monthlyWage: monthlyWage ? Number(monthlyWage) : null,
+          hourlyRate: Number(hourlyRate) || 0,
+          wageType: 'hourly',
+          dailyWage: null,
+          monthlyWage: null,
           joinDate: new Date(),
           assignedApartments,
           availability: true,
@@ -1127,9 +1126,9 @@ router.put('/workers/:workerId',
         if (workerProfile.experience !== undefined) updateData['workerProfile.experience'] = Number(workerProfile.experience);
         if (workerProfile.languages) updateData['workerProfile.languages'] = workerProfile.languages;
         if (workerProfile.hourlyRate !== undefined) updateData['workerProfile.hourlyRate'] = Number(workerProfile.hourlyRate);
-        if (workerProfile.dailyWage !== undefined) updateData['workerProfile.dailyWage'] = Number(workerProfile.dailyWage);
-        if (workerProfile.monthlyWage !== undefined) updateData['workerProfile.monthlyWage'] = Number(workerProfile.monthlyWage);
-        if (workerProfile.wageType) updateData['workerProfile.wageType'] = workerProfile.wageType;
+        updateData['workerProfile.dailyWage'] = null;
+        updateData['workerProfile.monthlyWage'] = null;
+        updateData['workerProfile.wageType'] = 'hourly';
         if (workerProfile.availability !== undefined) updateData['workerProfile.availability'] = workerProfile.availability;
         if (workerProfile.accountStatus) updateData['workerProfile.accountStatus'] = workerProfile.accountStatus;
         if (workerProfile.serviceRadius !== undefined) updateData['workerProfile.serviceRadius'] = Number(workerProfile.serviceRadius);
@@ -3151,7 +3150,7 @@ router.get('/worker-requests', authenticate, authorize('admin', 'super_admin'), 
       role: 'worker',
       'workerProfile.accountStatus': 'pending_review'
     })
-      .select('name email phone gender profileImage workerProfile.specialization workerProfile.experience workerProfile.accountStatus workerProfile.documents workerProfile.wageType workerProfile.hourlyRate workerProfile.dailyWage workerProfile.monthlyWage createdAt')
+      .select('name email phone gender profileImage workerProfile.specialization workerProfile.experience workerProfile.accountStatus workerProfile.documents workerProfile.wageType workerProfile.hourlyRate createdAt')
       .sort({ createdAt: -1 });
 
     res.json({ success: true, workers: pendingWorkers });
@@ -3166,47 +3165,19 @@ router.get('/worker-requests', authenticate, authorize('admin', 'super_admin'), 
 // @access  Private/Admin
 router.post('/worker-requests/:id/approve', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
   try {
-    const { wageType, hourlyRate, dailyWage, monthlyWage } = req.body;
-    const normalizedWageType = typeof wageType === 'string' ? wageType.toLowerCase().trim() : '';
-
-    if (!['hourly', 'daily', 'monthly'].includes(normalizedWageType)) {
-      return res.status(400).json({ error: { message: 'Valid wage type is required for approval', status: 400 } });
+    const parsedHourlyRate = Number(req.body.hourlyRate);
+    if (!Number.isFinite(parsedHourlyRate) || parsedHourlyRate <= 0) {
+      return res.status(400).json({ error: { message: 'Valid hourly rate is required for approval', status: 400 } });
     }
 
-    let approvedRateLabel = '';
+    const normalizedWageType = 'hourly';
+    const approvedRateLabel = `₹${parsedHourlyRate}/hr`;
     const wageUpdates = {
       'workerProfile.wageType': normalizedWageType,
-      'workerProfile.hourlyRate': 0,
+      'workerProfile.hourlyRate': parsedHourlyRate,
       'workerProfile.dailyWage': null,
       'workerProfile.monthlyWage': null
     };
-
-    if (normalizedWageType === 'hourly') {
-      const parsedHourlyRate = Number(hourlyRate);
-      if (!Number.isFinite(parsedHourlyRate) || parsedHourlyRate <= 0) {
-        return res.status(400).json({ error: { message: 'Valid hourly rate is required for hourly workers', status: 400 } });
-      }
-      wageUpdates['workerProfile.hourlyRate'] = parsedHourlyRate;
-      approvedRateLabel = `₹${parsedHourlyRate}/hr`;
-    }
-
-    if (normalizedWageType === 'daily') {
-      const parsedDailyWage = Number(dailyWage);
-      if (!Number.isFinite(parsedDailyWage) || parsedDailyWage <= 0) {
-        return res.status(400).json({ error: { message: 'Valid daily wage is required for daily workers', status: 400 } });
-      }
-      wageUpdates['workerProfile.dailyWage'] = parsedDailyWage;
-      approvedRateLabel = `₹${parsedDailyWage}/day`;
-    }
-
-    if (normalizedWageType === 'monthly') {
-      const parsedMonthlyWage = Number(monthlyWage);
-      if (!Number.isFinite(parsedMonthlyWage) || parsedMonthlyWage <= 0) {
-        return res.status(400).json({ error: { message: 'Valid monthly wage is required for monthly workers', status: 400 } });
-      }
-      wageUpdates['workerProfile.monthlyWage'] = parsedMonthlyWage;
-      approvedRateLabel = `₹${parsedMonthlyWage}/month`;
-    }
 
     const worker = await User.findOneAndUpdate(
       { _id: req.params.id, role: 'worker', 'workerProfile.accountStatus': 'pending_review' },
@@ -3224,7 +3195,7 @@ router.post('/worker-requests/:id/approve', authenticate, authorize('admin', 'su
     await Notification.create({
       recipient: worker._id,
       title: 'Application Approved!',
-      message: `Your worker account has been approved with ${normalizedWageType} pay (${approvedRateLabel}). You can now log in and start accepting bookings.`,
+      message: `Your worker account has been approved with hourly pay (${approvedRateLabel}). You can now log in and start accepting bookings.`,
       type: 'system',
       data: {
         type: 'account_approved',
@@ -3453,10 +3424,7 @@ router.patch('/workers/:id/profile',
         phone,
         dateOfBirth,
         specialization,
-        wageType,
         hourlyRate,
-        dailyWage,
-        monthlyWage,
         isAvailable,
         addresses,
         aadhaarNumber
@@ -3480,10 +3448,10 @@ router.patch('/workers/:id/profile',
 
       // Worker profile fields
       if (specialization !== undefined) updates['workerProfile.specialization'] = specialization;
-      if (wageType !== undefined) updates['workerProfile.wageType'] = wageType;
+      updates['workerProfile.wageType'] = 'hourly';
       if (hourlyRate !== undefined) updates['workerProfile.hourlyRate'] = hourlyRate;
-      if (dailyWage !== undefined) updates['workerProfile.dailyWage'] = dailyWage;
-      if (monthlyWage !== undefined) updates['workerProfile.monthlyWage'] = monthlyWage;
+      updates['workerProfile.dailyWage'] = null;
+      updates['workerProfile.monthlyWage'] = null;
       if (isAvailable !== undefined) updates['workerProfile.isAvailable'] = isAvailable;
       if (aadhaarNumber !== undefined) updates['workerProfile.documents.aadhaarNumber'] = aadhaarNumber;
 

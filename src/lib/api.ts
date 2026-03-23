@@ -1074,10 +1074,7 @@ export const adminAPI = {
   },
 
   approveWorker: async (workerId: string, approvalData: {
-    wageType: 'hourly' | 'daily' | 'monthly';
-    hourlyRate?: number;
-    dailyWage?: number;
-    monthlyWage?: number;
+    hourlyRate: number;
   }) => {
     return apiCall(`/admin/worker-requests/${workerId}/approve`, {
       method: 'POST',

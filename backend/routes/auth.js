@@ -960,7 +960,7 @@ router.post('/register-worker',
   ]),
   async (req, res) => {
     try {
-      const { name, email, password, phone, gender, experience, skills, location, phoneVerified, emailVerified, contactMethod, otpVerified, wageType } = req.body;
+      const { name, email, password, phone, gender, experience, skills, location, phoneVerified, emailVerified, contactMethod, otpVerified } = req.body;
 
       // Validate OTP verification
       if (otpVerified !== 'true') {
@@ -1050,7 +1050,9 @@ router.post('/register-worker',
           experience: parseInt(experience) || 0,
           specialization: parsedSkills,
           accountStatus: 'pending_review',
-          wageType: ['hourly', 'daily', 'monthly'].includes(wageType) ? wageType : 'hourly',
+          wageType: 'hourly',
+          dailyWage: null,
+          monthlyWage: null,
           documents: {
             aadhaarFront: `/uploads/worker-docs/${aadhaarFrontFile.filename}`,
             aadhaarBack: aadhaarBackFile ? `/uploads/worker-docs/${aadhaarBackFile.filename}` : null,

@@ -360,7 +360,7 @@ router.post(
   ]),
   [
     body('name').notEmpty().withMessage('Name is required'),
-    body('email').optional().isEmail().withMessage('Valid email format is invalid'),
+    body('email').isEmail().withMessage('Valid email is required'),
     body('phone').optional().notEmpty().withMessage('Phone cannot be empty'),
     body('specialization').custom((value) => {
       if (Array.isArray(value)) return true;
@@ -376,12 +376,7 @@ router.post(
       }
       return false;
     }),
-    body().custom((value) => {
-      if (!value.email && !value.phone) {
-        throw new Error('Either email or phone is required');
-      }
-      return true;
-    })
+    body('hourlyRate').isFloat({ gt: 0 }).withMessage('Valid hourly rate is required')
   ],
   async (req, res) => {
     try {
@@ -410,6 +405,10 @@ router.post(
         ? `/uploads/worker-docs/${files.aadhaarFront[0].filename}` : null;
       const aadhaarBackPath = files.aadhaarBack?.[0]
         ? `/uploads/worker-docs/${files.aadhaarBack[0].filename}` : null;
+
+      if (!email) {
+        return res.status(400).json({ error: { message: 'Email is required', status: 400 } });
+      }
 
       const normalizedEmail = email.toLowerCase().trim();
 
@@ -454,7 +453,10 @@ router.post(
         workerProfile: {
           specialization,
           experience: experience || 0,
-          hourlyRate: hourlyRate || 0,
+          hourlyRate: Number(hourlyRate) || 0,
+          wageType: 'hourly',
+          dailyWage: null,
+          monthlyWage: null,
           assignedApartments,
           availability: true,
           serviceRadius: settings.booking.serviceRadius,
