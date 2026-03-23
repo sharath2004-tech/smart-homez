@@ -20,6 +20,7 @@ const initializeDashboardPreferences = async () => {
       services: [
         {
           id: 'insta_adhoc',
+          linkedServiceId: null,
           icon: '⚡',
           nameKey: 'customer.dashboard.instaAdhoc',
           subtitleKey: 'customer.dashboard.instantBooking',
@@ -33,6 +34,7 @@ const initializeDashboardPreferences = async () => {
         },
         {
           id: 'move_in_out_cleaning',
+          linkedServiceId: null,
           icon: '✨',
           nameKey: 'customer.dashboard.deepCleaning',
           subtitleKey: 'customer.dashboard.fullHomeClean',
@@ -46,6 +48,7 @@ const initializeDashboardPreferences = async () => {
         },
         {
           id: 'subscription',
+          linkedServiceId: null,
           icon: '📅',
           nameKey: 'customer.dashboard.subscription',
           subtitleKey: 'customer.dashboard.recurringPlans',
@@ -59,6 +62,7 @@ const initializeDashboardPreferences = async () => {
         },
         {
           id: 'intense_washroom',
+          linkedServiceId: null,
           icon: '🚿',
           nameKey: 'customer.dashboard.intenseWashroom',
           subtitleKey: 'customer.dashboard.washroomDeepClean',
@@ -72,6 +76,7 @@ const initializeDashboardPreferences = async () => {
         },
         {
           id: 'kitchen_deep_clean',
+          linkedServiceId: null,
           icon: '🍽️',
           nameKey: 'customer.dashboard.kitchenDeepClean',
           subtitleKey: 'customer.dashboard.kitchenDeepCleanSubtitle',
@@ -85,6 +90,7 @@ const initializeDashboardPreferences = async () => {
         },
         {
           id: 'window_deep_clean',
+          linkedServiceId: null,
           icon: '🪟',
           nameKey: 'customer.dashboard.windowDeepClean',
           subtitleKey: 'customer.dashboard.windowDeepCleanSubtitle',

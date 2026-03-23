@@ -5,8 +5,12 @@ const dashboardPreferencesSchema = new mongoose.Schema({
   services: [{
     id: {
       type: String,
-      required: true,
-      enum: ['insta_adhoc', 'move_in_out_cleaning', 'subscription', 'intense_washroom', 'kitchen_deep_clean', 'window_deep_clean']
+      required: true
+    },
+    linkedServiceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Service',
+      default: null
     },
     icon: { type: String, required: true },
     nameKey: { type: String, required: true }, // Translation key
@@ -35,6 +39,7 @@ dashboardPreferencesSchema.index({}, { unique: true });
 const DEFAULT_SERVICES = [
   {
     id: 'insta_adhoc',
+    linkedServiceId: null,
     icon: '⚡',
     nameKey: 'customer.dashboard.instaAdhoc',
     subtitleKey: 'customer.dashboard.instantBooking',
@@ -48,6 +53,7 @@ const DEFAULT_SERVICES = [
   },
   {
     id: 'move_in_out_cleaning',
+    linkedServiceId: null,
     icon: '✨',
     nameKey: 'customer.dashboard.deepCleaning',
     subtitleKey: 'customer.dashboard.fullHomeClean',
@@ -61,6 +67,7 @@ const DEFAULT_SERVICES = [
   },
   {
     id: 'subscription',
+    linkedServiceId: null,
     icon: '📅',
     nameKey: 'customer.dashboard.subscription',
     subtitleKey: 'customer.dashboard.recurringPlans',
@@ -74,6 +81,7 @@ const DEFAULT_SERVICES = [
   },
   {
     id: 'intense_washroom',
+    linkedServiceId: null,
     icon: '🚿',
     nameKey: 'customer.dashboard.intenseWashroom',
     subtitleKey: 'customer.dashboard.washroomDeepClean',
@@ -87,6 +95,7 @@ const DEFAULT_SERVICES = [
   },
   {
     id: 'kitchen_deep_clean',
+    linkedServiceId: null,
     icon: '🍽️',
     nameKey: 'customer.dashboard.kitchenDeepClean',
     subtitleKey: 'customer.dashboard.kitchenDeepCleanSubtitle',
@@ -100,6 +109,7 @@ const DEFAULT_SERVICES = [
   },
   {
     id: 'window_deep_clean',
+    linkedServiceId: null,
     icon: '🪟',
     nameKey: 'customer.dashboard.windowDeepClean',
     subtitleKey: 'customer.dashboard.windowDeepCleanSubtitle',
@@ -135,6 +145,11 @@ dashboardPreferencesSchema.statics.getDefaultConfig = async function() {
 
       if (typeof existingService.customName !== 'string') {
         existingService.customName = '';
+        hasChanges = true;
+      }
+
+      if (typeof existingService.linkedServiceId === 'undefined') {
+        existingService.linkedServiceId = null;
         hasChanges = true;
       }
 

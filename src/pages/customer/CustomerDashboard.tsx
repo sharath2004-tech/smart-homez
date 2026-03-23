@@ -37,6 +37,29 @@ interface UserProfile {
   };
 }
 
+interface DashboardConfiguredService {
+  id: string;
+  linkedServiceId?: string | null;
+  icon: string;
+  nameKey: string;
+  subtitleKey: string;
+  customName?: string;
+  customSubtitle?: string;
+  badge?: string;
+  path: string;
+}
+
+interface CustomerServiceRecord {
+  _id: string;
+  name: string;
+  serviceType?: string;
+  serviceCategory?: string;
+  isQuoteService?: boolean;
+  subscriptionOptions?: {
+    enabled?: boolean;
+  };
+}
+
 const getStoredDashboardLocation = (): LocationData | null => {
   if (typeof window === 'undefined') return null;
 
@@ -92,25 +115,56 @@ const CustomerDashboard = () => {
   const [serviceabilityMessage, setServiceabilityMessage] = useState('');
   const [nearestServiceArea, setNearestServiceArea] = useState<{ name?: string; distance?: number } | null>(null);
   const [quickServices, setQuickServices] = useState<any[]>([]);
-  const [kitchenServiceId, setKitchenServiceId] = useState<string | null>(null);
-  const [windowServiceId, setWindowServiceId] = useState<string | null>(null);
+  const [dashboardLinkedServices, setDashboardLinkedServices] = useState<CustomerServiceRecord[]>([]);
   const [deepCleaningRequestServiceId, setDeepCleaningRequestServiceId] = useState<string | null>(null);
   const [requestingDeepCleaning, setRequestingDeepCleaning] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   const [showLocationSelector, setShowLocationSelector] = useState(false);
   const { latitude, longitude, error: locationError, loading: locationLoading, refetch } = useGeolocation();
 
-  const resolveDashboardServicePath = (service: any) => {
+  const getDashboardLinkedService = (service: DashboardConfiguredService) => {
+    if (service.linkedServiceId) {
+      return dashboardLinkedServices.find((item) => item._id === service.linkedServiceId) || null;
+    }
+
+    const serviceByRule = dashboardLinkedServices.find((item) => {
+      const name = item.name.toLowerCase();
+
+      if (service.id === 'intense_washroom') {
+        return item.serviceType === 'fixed_washroom_deep'
+          || item.serviceType === 'fixed_washroom_basic'
+          || (name.includes('washroom') && (name.includes('intense') || name.includes('deep')));
+      }
+
+      if (service.id === 'kitchen_deep_clean') {
+        return item.serviceType === 'deep_cleaning_kitchen'
+          || (name.includes('kitchen') && name.includes('deep'));
+      }
+
+      if (service.id === 'window_deep_clean') {
+        return item.serviceType === 'fixed_window_cleaning'
+          || (name.includes('window') && name.includes('clean'));
+      }
+
+      return false;
+    });
+
+    return serviceByRule || null;
+  };
+
+  const resolveDashboardServicePath = (service: DashboardConfiguredService) => {
+    const linkedService = getDashboardLinkedService(service);
+
+    if (linkedService?.subscriptionOptions?.enabled) {
+      return `/customer/subscribe/${linkedService._id}`;
+    }
+
+    if (linkedService && !linkedService.isQuoteService) {
+      return `/customer/book/${linkedService._id}`;
+    }
+
     if (service.id === 'move_in_out_cleaning') {
       return '/customer/deep-cleaning';
-    }
-
-    if (service.id === 'kitchen_deep_clean') {
-      return kitchenServiceId ? `/customer/book/${kitchenServiceId}` : service.path;
-    }
-
-    if (service.id === 'window_deep_clean') {
-      return windowServiceId ? `/customer/book/${windowServiceId}` : service.path;
     }
 
     return service.path;
@@ -123,35 +177,25 @@ const CustomerDashboard = () => {
     }
   }, []);
 
-  // Fetch spot-clean service IDs for dashboard quick cards
+  // Fetch service records used to resolve direct dashboard links
   useEffect(() => {
-    const fetchSpotCleanServices = async () => {
+    const fetchDashboardLinkedServices = async () => {
       try {
         const response = await servicesAPI.getAll({ isActive: true, limit: 50 });
         const list = response.services || [];
-
-        const kitchen = list.find((s: any) =>
-          s.name.toLowerCase().includes('kitchen') &&
-          (s.name.toLowerCase().includes('deep') || s.serviceType?.includes('kitchen'))
-        );
-        const window = list.find((s: any) =>
-          s.name.toLowerCase().includes('window') &&
-          (s.name.toLowerCase().includes('clean') || s.serviceType?.includes('window'))
-        );
         const deepCleaning = list.find((s: any) =>
           s.serviceType === 'deep_cleaning_full_house' ||
           s.serviceCategory === 'deep_cleaning' ||
           s.name.toLowerCase().includes('deep cleaning')
         );
 
-        if (kitchen) setKitchenServiceId(kitchen._id);
-        if (window) setWindowServiceId(window._id);
+        setDashboardLinkedServices(list);
         if (deepCleaning) setDeepCleaningRequestServiceId(deepCleaning._id);
       } catch (error) {
         console.error('Error fetching spot-clean services:', error);
       }
     };
-    fetchSpotCleanServices();
+    fetchDashboardLinkedServices();
   }, []);
 
   // Only 3 service category cards - now fetched dynamically
@@ -162,7 +206,7 @@ const CustomerDashboard = () => {
         const services = response.services || [];
 
         // Map backend service configuration to frontend format
-        const mappedServices = services.map((service: any) => ({
+        const mappedServices = services.map((service: DashboardConfiguredService) => ({
           id: service.id,
           icon: service.icon,
           name: service.customName || t(service.nameKey),
@@ -180,7 +224,7 @@ const CustomerDashboard = () => {
       }
     };
     fetchServices();
-  }, [kitchenServiceId, t, windowServiceId]);
+  }, [dashboardLinkedServices, t]);
 
   useEffect(() => {
     const fetchCoreData = async () => {

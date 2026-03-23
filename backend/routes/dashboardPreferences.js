@@ -60,6 +60,10 @@ router.get('/admin', authenticate, authorize('admin', 'super_admin'), async (req
 router.put('/', authenticate, authorize('admin', 'super_admin'), [
   body('services').isArray().withMessage('Services must be an array'),
   body('services.*.id').notEmpty().withMessage('Service ID is required'),
+  body('services.*.linkedServiceId').optional({ nullable: true }).custom((value) => {
+    if (value === null || value === undefined || value === '') return true;
+    return /^[0-9a-fA-F]{24}$/.test(String(value));
+  }).withMessage('Linked service ID must be a valid service reference'),
   body('services.*.icon').notEmpty().withMessage('Service icon is required'),
   body('services.*.nameKey').notEmpty().withMessage('Service name key is required'),
   body('services.*.subtitleKey').notEmpty().withMessage('Service subtitle key is required'),
@@ -80,9 +84,13 @@ router.put('/', authenticate, authorize('admin', 'super_admin'), [
     }
 
     const { services, maxServices } = req.body;
+    const normalizedServices = services.map((service) => ({
+      ...service,
+      linkedServiceId: service.linkedServiceId || null,
+    }));
 
     // Validate that at least one service is active
-    const activeServices = services.filter(s => s.isActive);
+    const activeServices = normalizedServices.filter(s => s.isActive);
     if (activeServices.length === 0) {
       return res.status(400).json({
         error: { message: 'At least one service must be active', status: 400 }
@@ -97,7 +105,7 @@ router.put('/', authenticate, authorize('admin', 'super_admin'), [
     }
 
     // Validate sort order uniqueness
-    const sortOrders = services.map(s => s.sortOrder);
+    const sortOrders = normalizedServices.map(s => s.sortOrder);
     if (new Set(sortOrders).size !== sortOrders.length) {
       return res.status(400).json({
         error: { message: 'Sort orders must be unique', status: 400 }
@@ -106,7 +114,7 @@ router.put('/', authenticate, authorize('admin', 'super_admin'), [
 
     // Update configuration
     const config = await DashboardPreferences.getDefaultConfig();
-    config.services = services;
+    config.services = normalizedServices;
     if (maxServices) config.maxServices = maxServices;
     config.lastUpdatedBy = req.user._id;
     config.lastUpdatedAt = new Date();

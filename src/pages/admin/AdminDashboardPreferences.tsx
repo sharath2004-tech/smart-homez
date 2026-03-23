@@ -1,12 +1,13 @@
 import AppLayout from "@/components/AppLayout";
 import { toast } from "@/hooks/use-toast";
 import { useAdminRole } from "@/hooks/useAdminRole";
-import { dashboardPreferencesAPI } from "@/lib/api";
-import { AlertCircle, ArrowDown, ArrowUp, Eye, EyeOff, RotateCcw, Save, Settings2 } from "lucide-react";
+import { dashboardPreferencesAPI, servicesAPI } from "@/lib/api";
+import { AlertCircle, ArrowDown, ArrowUp, Eye, EyeOff, Plus, RotateCcw, Save, Settings2, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface DashboardService {
   id: string;
+  linkedServiceId?: string | null;
   icon: string;
   nameKey: string;
   subtitleKey: string;
@@ -19,10 +20,67 @@ interface DashboardService {
   isDefault?: boolean;
 }
 
+interface AvailableService {
+  _id: string;
+  name: string;
+  description?: string;
+  serviceType?: string;
+  isQuoteService?: boolean;
+  subscriptionOptions?: {
+    enabled?: boolean;
+  };
+}
+
+const getSuggestedIcon = (service: AvailableService) => {
+  const haystack = `${service.name} ${service.serviceType || ''}`.toLowerCase();
+
+  if (haystack.includes('kitchen')) return '🍽️';
+  if (haystack.includes('washroom') || haystack.includes('bathroom')) return '🚿';
+  if (haystack.includes('window')) return '🪟';
+  if (haystack.includes('sofa')) return '🛋️';
+  if (haystack.includes('fridge')) return '❄️';
+  if (haystack.includes('fan')) return '🌀';
+  if (haystack.includes('balcony')) return '🌿';
+  if (haystack.includes('subscription')) return '📅';
+  if (haystack.includes('deep')) return '✨';
+  if (haystack.includes('insta') || haystack.includes('hourly')) return '⚡';
+
+  return '🧹';
+};
+
+const getLinkedServicePath = (service: AvailableService) => {
+  if (service.subscriptionOptions?.enabled) {
+    return `/customer/subscribe/${service._id}`;
+  }
+
+  if (service.isQuoteService) {
+    return '/customer/deep-cleaning';
+  }
+
+  return `/customer/book/${service._id}`;
+};
+
+const buildDashboardCardFromService = (service: AvailableService, sortOrder: number, isActive: boolean): DashboardService => ({
+  id: `service_${service._id}`,
+  linkedServiceId: service._id,
+  icon: getSuggestedIcon(service),
+  nameKey: service.name,
+  subtitleKey: service.description || 'Book this service directly',
+  customName: service.name,
+  customSubtitle: service.description || 'Book this service directly',
+  badge: service.subscriptionOptions?.enabled ? 'Subscription' : service.isQuoteService ? 'Quote' : 'Book now',
+  path: getLinkedServicePath(service),
+  isActive,
+  sortOrder,
+  isDefault: false,
+});
+
 const AdminDashboardPreferences = () => {
   const { role, name } = useAdminRole();
   const [services, setServices] = useState<DashboardService[]>([]);
-  const [maxServices, setMaxServices] = useState(4);
+  const [availableServices, setAvailableServices] = useState<AvailableService[]>([]);
+  const [selectedCatalogServiceId, setSelectedCatalogServiceId] = useState('');
+  const [maxServices, setMaxServices] = useState(6);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -34,9 +92,14 @@ const AdminDashboardPreferences = () => {
   const fetchConfig = async () => {
     try {
       setLoading(true);
-      const response = await dashboardPreferencesAPI.getAdminConfig();
+      const [response, servicesResponse] = await Promise.all([
+        dashboardPreferencesAPI.getAdminConfig(),
+        servicesAPI.getAll({ isActive: true, limit: 200 }),
+      ]);
+
       setServices(response.services || []);
-      setMaxServices(response.maxServices || 4);
+      setAvailableServices(servicesResponse.services || []);
+      setMaxServices(response.maxServices || 6);
     } catch (error) {
       console.error('Error fetching dashboard config:', error);
       toast({
@@ -122,6 +185,89 @@ const AdminDashboardPreferences = () => {
     setServices((prev) => prev.map((service) =>
       service.id === serviceId ? { ...service, [field]: value } : service
     ));
+    setHasChanges(true);
+  };
+
+  const handleLinkedServiceChange = (dashboardServiceId: string, linkedServiceId: string) => {
+    const selectedService = availableServices.find((service) => service._id === linkedServiceId);
+
+    setServices((prev) => prev.map((service) => {
+      if (service.id !== dashboardServiceId) return service;
+
+      if (!selectedService) {
+        return {
+          ...service,
+          linkedServiceId: null,
+        };
+      }
+
+      return {
+        ...service,
+        linkedServiceId,
+        path: getLinkedServicePath(selectedService),
+        customName: service.customName?.trim() ? service.customName : selectedService.name,
+        customSubtitle: service.customSubtitle?.trim() ? service.customSubtitle : (selectedService.description || 'Book this service directly'),
+        icon: service.icon?.trim() ? service.icon : getSuggestedIcon(selectedService),
+      };
+    }));
+
+    setHasChanges(true);
+  };
+
+  const handleAddServiceCard = () => {
+    const selectedService = availableServices.find((service) => service._id === selectedCatalogServiceId);
+
+    if (!selectedService) {
+      toast({
+        title: 'Pick a service',
+        description: 'Choose a service to add to the customer dashboard.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const alreadyLinked = services.some((service) => service.linkedServiceId === selectedService._id);
+    if (alreadyLinked) {
+      toast({
+        title: 'Already added',
+        description: `${selectedService.name} is already configured on the dashboard.`,
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const hasActiveSlot = services.filter((service) => service.isActive).length < maxServices;
+
+    setServices((prev) => ([
+      ...prev,
+      buildDashboardCardFromService(selectedService, prev.length + 1, hasActiveSlot)
+    ]));
+    setSelectedCatalogServiceId('');
+    setHasChanges(true);
+
+    if (!hasActiveSlot) {
+      toast({
+        title: 'Added as inactive',
+        description: `You've already reached the ${maxServices}-card active limit. Activate it after disabling another card.`,
+        variant: 'default'
+      });
+    }
+  };
+
+  const handleRemoveService = (serviceId: string) => {
+    const target = services.find((service) => service.id === serviceId);
+    if (!target || target.isDefault) {
+      return;
+    }
+
+    const updatedServices = services
+      .filter((service) => service.id !== serviceId)
+      .map((service, index) => ({
+        ...service,
+        sortOrder: index + 1,
+      }));
+
+    setServices(updatedServices);
     setHasChanges(true);
   };
 
@@ -219,6 +365,8 @@ const AdminDashboardPreferences = () => {
                 <option value={4}>4 Services</option>
                 <option value={5}>5 Services</option>
                 <option value={6}>6 Services</option>
+                <option value={7}>7 Services</option>
+                <option value={8}>8 Services</option>
               </select>
             </div>
 
@@ -241,6 +389,36 @@ const AdminDashboardPreferences = () => {
         </div>
 
         <div className="bg-card border rounded-xl p-6">
+          <div className="rounded-xl border border-dashed border-border bg-muted/20 p-4 mb-6">
+            <div className="flex flex-col lg:flex-row lg:items-end gap-3">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-foreground mb-2">Add any live service to the customer dashboard</label>
+                <select
+                  value={selectedCatalogServiceId}
+                  onChange={(e) => setSelectedCatalogServiceId(e.target.value)}
+                  className="w-full p-3 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
+                >
+                  <option value="">Select a service</option>
+                  {availableServices.map((service) => (
+                    <option key={service._id} value={service._id}>
+                      {service.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={handleAddServiceCard}
+                className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-colors"
+                type="button"
+              >
+                <Plus className="w-4 h-4" /> Add card
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Super admins can feature any active service here. Linked cards open the exact booking flow for that service.
+            </p>
+          </div>
+
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-lg font-semibold text-foreground">Service Management</h2>
@@ -357,6 +535,21 @@ const AdminDashboardPreferences = () => {
                         />
                       </div>
                       <div className="md:col-span-2">
+                        <label className="block text-xs font-medium text-muted-foreground mb-1">Linked service</label>
+                        <select
+                          value={service.linkedServiceId || ''}
+                          onChange={(e) => handleLinkedServiceChange(service.id, e.target.value)}
+                          className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm"
+                        >
+                          <option value="">Use manual path only</option>
+                          {availableServices.map((availableService) => (
+                            <option key={availableService._id} value={availableService._id}>
+                              {availableService.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="md:col-span-2">
                         <label className="block text-xs font-medium text-muted-foreground mb-1">Path</label>
                         <input
                           type="text"
@@ -384,6 +577,16 @@ const AdminDashboardPreferences = () => {
                   >
                     {service.isActive ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
                   </button>
+                  {!service.isDefault && (
+                    <button
+                      onClick={() => handleRemoveService(service.id)}
+                      className="p-2 rounded-lg transition-colors text-destructive bg-destructive/5 hover:bg-destructive/10"
+                      title="Remove service card"
+                      type="button"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
