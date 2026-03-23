@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
-import { authAPI, workersAPI } from "@/lib/api";
-import { Briefcase, CheckCircle, Clock, FileText, Download, Mail, MapPin, Phone, Star, User } from "lucide-react";
+import { API_BASE_URL, authAPI, workersAPI } from "@/lib/api";
+import { Briefcase, CheckCircle, Clock, Download, FileText, Mail, MapPin, Phone, Star, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -95,6 +95,11 @@ const WorkerProfile = () => {
   const initials = profile.name.split(' ').map((n: string) => n[0]).join('').toUpperCase();
   const rating = profile.workerProfile?.rating || 0;
   const totalJobs = profile.workerProfile?.totalJobsCompleted || stats.thisMonth || 0;
+  const profileImageUrl = profile.profileImage
+    ? `${API_BASE_URL.replace('/api', '')}${profile.profileImage}`
+    : documents?.profileImage
+      ? `${API_BASE_URL.replace('/api', '')}${documents.profileImage}`
+      : null;
 
   return (
     <AppLayout userType="worker" userName={profile.name}>
@@ -107,9 +112,17 @@ const WorkerProfile = () => {
         {/* Profile Header Card */}
         <div className="card-elevated p-4 sm:p-5 md:p-6">
           <div className="flex items-start gap-5">
-            <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-2xl font-bold shrink-0">
-              {initials}
-            </div>
+            {profileImageUrl ? (
+              <img
+                src={profileImageUrl}
+                alt={profile.name}
+                className="w-20 h-20 rounded-full object-cover border border-border shrink-0"
+              />
+            ) : (
+              <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-2xl font-bold shrink-0">
+                {initials}
+              </div>
+            )}
             <div className="flex-1">
               <h2 className="text-2xl font-bold font-heading text-foreground mb-1">{profile.name}</h2>
               <div className="flex items-center gap-3 flex-wrap">

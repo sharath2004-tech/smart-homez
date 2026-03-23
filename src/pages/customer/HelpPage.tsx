@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { authAPI, helpAPI } from "@/lib/api";
 import { SUPPORT_PHONE_NUMBER } from "@/lib/constants";
-import { CheckCircle, ChevronDown, ChevronUp, HelpCircle, Phone, Send } from "lucide-react";
+import { CheckCircle, ChevronDown, ChevronUp, HelpCircle, MessageSquareQuote, Phone, Send } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -24,6 +24,16 @@ interface HelpPageProps {
   userType?: "customer" | "worker";
 }
 
+interface HelpThread {
+  _id: string;
+  subject: string;
+  message: string;
+  status: 'new' | 'read' | 'resolved';
+  adminReply?: string;
+  repliedAt?: string;
+  createdAt: string;
+}
+
 const HelpPage = ({ userType = "customer" }: HelpPageProps) => {
   const { t } = useTranslation();
   const [profile, setProfile] = useState<{ name: string } | null>(null);
@@ -34,17 +44,34 @@ const HelpPage = ({ userType = "customer" }: HelpPageProps) => {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
+  const [threads, setThreads] = useState<HelpThread[]>([]);
+  const [loadingThreads, setLoadingThreads] = useState(true);
 
   // Fetch current user profile
   useEffect(() => {
     authAPI.getProfile()
-      .then((res: any) => {
-        setProfile(res.user || res);
+      .then((res: { user?: { name: string }; name?: string }) => {
+        const resolvedProfile = res.user || (res.name ? { name: res.name } : null);
+        setProfile(resolvedProfile);
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         console.error('Error fetching profile:', err);
       });
+
+    fetchThreads();
   }, []);
+
+  const fetchThreads = async () => {
+    try {
+      setLoadingThreads(true);
+      const res = await helpAPI.getMyMessages();
+      setThreads(res.messages || []);
+    } catch (err) {
+      console.error('Error fetching help messages:', err);
+    } finally {
+      setLoadingThreads(false);
+    }
+  };
 
   const toggle = (index: number) => {
     setOpenIndex((prev) => (prev === index ? null : index));
@@ -60,6 +87,7 @@ const HelpPage = ({ userType = "customer" }: HelpPageProps) => {
       setSubmitted(true);
       setSubject("");
       setMessage("");
+      await fetchThreads();
     } catch (err) {
       setError((err as Error).message || "Failed to send message. Please try again.");
     } finally {
@@ -133,6 +161,75 @@ const HelpPage = ({ userType = "customer" }: HelpPageProps) => {
             ))}
           </div>
         </div>
+
+        <div>
+          <h2 className="text-base font-bold font-heading text-foreground mb-3 flex items-center gap-2">
+            <MessageSquareQuote className="w-4 h-4 text-primary" />
+            Your support conversations
+          </h2>
+
+          {loadingThreads ? (
+            <div className="card-elevated p-5 text-sm text-muted-foreground">
+              Loading your support history...
+            </div>
+          ) : threads.length === 0 ? (
+            <div className="card-elevated p-5 text-sm text-muted-foreground">
+              No support conversations yet. Send a message below and it will appear here.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {threads.map((thread) => {
+                const statusStyles = {
+                  new: 'bg-amber-50 text-amber-700 border-amber-200',
+                  read: 'bg-blue-50 text-blue-700 border-blue-200',
+                  resolved: 'bg-green-50 text-green-700 border-green-200'
+                } as const;
+
+                return (
+                  <div key={thread._id} className="card-elevated p-4 sm:p-5 space-y-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="font-semibold text-foreground">{thread.subject || 'General Enquiry'}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Sent on {new Date(thread.createdAt).toLocaleString('en-IN')}
+                        </p>
+                      </div>
+                      <span className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-medium capitalize ${statusStyles[thread.status]}`}>
+                        {thread.status}
+                      </span>
+                    </div>
+
+                    <div className="rounded-xl bg-muted/50 p-3">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+                        Your message
+                      </p>
+                      <p className="text-sm text-foreground whitespace-pre-wrap">{thread.message}</p>
+                    </div>
+
+                    {thread.adminReply ? (
+                      <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+                        <p className="text-xs font-medium uppercase tracking-wide text-primary mb-1">
+                          Admin reply
+                        </p>
+                        <p className="text-sm text-foreground whitespace-pre-wrap">{thread.adminReply}</p>
+                        {thread.repliedAt && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Replied on {new Date(thread.repliedAt).toLocaleString('en-IN')}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        We have received your query and will reply here once it is reviewed.
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         {/* Contact form */}
         <div>
           <h2 className="text-base font-bold font-heading text-foreground mb-3">
@@ -147,7 +244,10 @@ const HelpPage = ({ userType = "customer" }: HelpPageProps) => {
                 {t('customer.help.messageSentDesc')}
               </p>
               <button
-                onClick={() => setSubmitted(false)}
+                onClick={() => {
+                  setSubmitted(false);
+                  fetchThreads();
+                }}
                 className="text-sm text-primary underline mt-1"
               >
                 {t('customer.help.sendAnother')}

@@ -2,6 +2,7 @@ import express from 'express';
 import { body, param, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
 import HelpMessage from '../models/HelpMessage.js';
+import Notification from '../models/Notification.js';
 
 const router = express.Router();
 
@@ -181,6 +182,19 @@ router.patch(
       msg.repliedBy = req.user._id;
       msg.status = 'resolved';
       await msg.save();
+
+      await Notification.create({
+        recipient: msg.user,
+        type: 'system',
+        title: 'Support replied to your query',
+        message: `We replied to your help request${msg.subject ? `: ${msg.subject}` : ''}. Open Help & Support to read the response.`,
+        data: {
+          helpMessageId: msg._id,
+          subject: msg.subject,
+          repliedAt: msg.repliedAt
+        },
+        priority: 'medium'
+      });
 
       res.json({ success: true, message: 'Reply saved and message resolved' });
     } catch (error) {

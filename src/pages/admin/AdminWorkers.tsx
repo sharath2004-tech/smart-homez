@@ -146,6 +146,15 @@ const AdminWorkers = () => {
   // Edit worker state
   const [editWorker, setEditWorker] = useState<Worker | null>(null);
   const [updatingWorker, setUpdatingWorker] = useState(false);
+  const [editDocFiles, setEditDocFiles] = useState<{
+    profilePicture: File | null;
+    aadhaarFront: File | null;
+    aadhaarBack: File | null;
+  }>({
+    profilePicture: null,
+    aadhaarFront: null,
+    aadhaarBack: null
+  });
 
   // Worker analytics state
   const [workerReliabilityData, setWorkerReliabilityData] = useState<any>(null);
@@ -187,6 +196,9 @@ const AdminWorkers = () => {
   const profilePicRef = useRef<HTMLInputElement>(null);
   const aadhaarFrontRef = useRef<HTMLInputElement>(null);
   const aadhaarBackRef = useRef<HTMLInputElement>(null);
+  const editProfilePicRef = useRef<HTMLInputElement>(null);
+  const editAadhaarFrontRef = useRef<HTMLInputElement>(null);
+  const editAadhaarBackRef = useRef<HTMLInputElement>(null);
 
   // Helper function to convert document paths to full URLs
   const getDocumentUrl = (path: string | undefined) => {
@@ -279,6 +291,7 @@ const AdminWorkers = () => {
       }
 
       setEditWorker(worker);
+      setEditDocFiles({ profilePicture: null, aadhaarFront: null, aadhaarBack: null });
 
       // Clear previous analytics data
       setWorkerReliabilityData(null);
@@ -367,6 +380,7 @@ const AdminWorkers = () => {
       }
       
       setEditWorker(worker);
+      setEditDocFiles({ profilePicture: null, aadhaarFront: null, aadhaarBack: null });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load worker details';
       alert(message);
@@ -419,9 +433,14 @@ const AdminWorkers = () => {
         formData.append('aadhaarNumber', editWorker.workerProfile.documents.aadhaarNumber);
       }
 
-      await adminAPI.updateWorker(editWorker._id, formData);
+      if (editDocFiles.profilePicture) formData.append('profilePicture', editDocFiles.profilePicture);
+      if (editDocFiles.aadhaarFront) formData.append('aadhaarFront', editDocFiles.aadhaarFront);
+      if (editDocFiles.aadhaarBack) formData.append('aadhaarBack', editDocFiles.aadhaarBack);
+
+      const response = await adminAPI.updateWorker(editWorker._id, formData);
       alert('Worker updated successfully!');
-      setEditWorker(null);
+      setEditDocFiles({ profilePicture: null, aadhaarFront: null, aadhaarBack: null });
+      setEditWorker(response.worker || null);
       fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to update worker';
@@ -1989,6 +2008,71 @@ const AdminWorkers = () => {
                     <div className="space-y-4">
                       <h3 className="text-sm font-bold text-foreground border-b pb-2">Documents</h3>
                       <div className="space-y-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          <div className="rounded-xl border border-dashed border-border p-3">
+                            <label className="block text-sm font-medium mb-2">Update Profile Picture</label>
+                            <input
+                              ref={editProfilePicRef}
+                              type="file"
+                              accept="image/jpeg,image/jpg,image/png,image/webp"
+                              className="hidden"
+                              onChange={(e) => setEditDocFiles((prev) => ({ ...prev, profilePicture: e.target.files?.[0] || null }))}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => editProfilePicRef.current?.click()}
+                              className="flex w-full items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-xs hover:bg-muted transition-colors"
+                            >
+                              <Upload className="w-3.5 h-3.5 text-muted-foreground" />
+                              <span className={editDocFiles.profilePicture ? 'text-foreground' : 'text-muted-foreground'}>
+                                {editDocFiles.profilePicture?.name || 'Choose a new profile photo'}
+                              </span>
+                            </button>
+                          </div>
+
+                          <div className="rounded-xl border border-dashed border-border p-3">
+                            <label className="block text-sm font-medium mb-2">Update Aadhaar Front</label>
+                            <input
+                              ref={editAadhaarFrontRef}
+                              type="file"
+                              accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
+                              className="hidden"
+                              onChange={(e) => setEditDocFiles((prev) => ({ ...prev, aadhaarFront: e.target.files?.[0] || null }))}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => editAadhaarFrontRef.current?.click()}
+                              className="flex w-full items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-xs hover:bg-muted transition-colors"
+                            >
+                              <Upload className="w-3.5 h-3.5 text-muted-foreground" />
+                              <span className={editDocFiles.aadhaarFront ? 'text-foreground' : 'text-muted-foreground'}>
+                                {editDocFiles.aadhaarFront?.name || 'Choose Aadhaar front file'}
+                              </span>
+                            </button>
+                          </div>
+
+                          <div className="rounded-xl border border-dashed border-border p-3 sm:col-span-2">
+                            <label className="block text-sm font-medium mb-2">Update Aadhaar Back</label>
+                            <input
+                              ref={editAadhaarBackRef}
+                              type="file"
+                              accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
+                              className="hidden"
+                              onChange={(e) => setEditDocFiles((prev) => ({ ...prev, aadhaarBack: e.target.files?.[0] || null }))}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => editAadhaarBackRef.current?.click()}
+                              className="flex w-full items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-xs hover:bg-muted transition-colors"
+                            >
+                              <Upload className="w-3.5 h-3.5 text-muted-foreground" />
+                              <span className={editDocFiles.aadhaarBack ? 'text-foreground' : 'text-muted-foreground'}>
+                                {editDocFiles.aadhaarBack?.name || 'Choose Aadhaar back file'}
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+
                         <div>
                           <label className="block text-sm font-medium mb-1">Aadhaar Number</label>
                           <input
@@ -2181,7 +2265,10 @@ const AdminWorkers = () => {
                 <div className="flex gap-3 pt-4">
                   <button
                     type="button"
-                    onClick={() => setEditWorker(null)}
+                    onClick={() => {
+                      setEditWorker(null);
+                      setEditDocFiles({ profilePicture: null, aadhaarFront: null, aadhaarBack: null });
+                    }}
                     className="flex-1 py-2 border border-border rounded-xl text-sm"
                     disabled={updatingWorker}
                   >
