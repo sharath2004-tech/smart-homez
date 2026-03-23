@@ -1739,13 +1739,14 @@ router.get('/profit-stats', authenticate, authorize('super_admin'), async (req, 
         const matchedMinutes = matchedBookings.reduce((sum, item) => sum + item.minutesWorked, 0);
         const relevantBookings = locationIdStr ? matchedBookings : bookingsWithMinutes;
 
-        let allocatedAmount = request.requestedAmount || 0;
+        const settledAmount = request.netAmount ?? request.requestedAmount ?? 0;
+        let allocatedAmount = settledAmount;
         let allocatedMinutes = request.totalMinutesWorked || 0;
         let allocatedTasks = request.totalTasksCompleted || bookings.length;
 
         if (locationIdStr) {
           if (matchedBookings.length > 0 && requestMinutes > 0) {
-            allocatedAmount = Number((((request.requestedAmount || 0) * matchedMinutes) / requestMinutes).toFixed(2));
+            allocatedAmount = Number(((settledAmount * matchedMinutes) / requestMinutes).toFixed(2));
             allocatedMinutes = matchedMinutes;
             allocatedTasks = matchedBookings.length;
           } else if (matchedBookings.length > 0) {

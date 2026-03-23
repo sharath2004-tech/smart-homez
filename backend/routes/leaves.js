@@ -11,6 +11,31 @@ import User from '../models/User.js';
 import { handleWorkerReassignment } from '../utils/preferenceAssignment.js';
 
 const router = express.Router();
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const parseLeaveDate = (value, { endOfDay = false } = {}) => {
+  if (typeof value === 'string' && DATE_ONLY_PATTERN.test(value)) {
+    const [year, month, day] = value.split('-').map(Number);
+
+    return endOfDay
+      ? new Date(year, month - 1, day, 23, 59, 59, 999)
+      : new Date(year, month - 1, day, 0, 0, 0, 0);
+  }
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  if (endOfDay) {
+    parsed.setHours(23, 59, 59, 999);
+  } else {
+    parsed.setHours(0, 0, 0, 0);
+  }
+
+  return parsed;
+};
 
 /**
  * Apply for leave (Worker only)
@@ -41,8 +66,10 @@ router.post(
       }
 
       // Check if already have leave on this date
-      const leaveDate = new Date(date);
-      leaveDate.setHours(0, 0, 0, 0);
+      const leaveDate = parseLeaveDate(date);
+      if (!leaveDate) {
+        return res.status(400).json({ message: 'Valid date is required' });
+      }
 
       // Enforce 24-hour advance notice rule
       const now = new Date();
@@ -461,10 +488,12 @@ router.post(
       const { fromDate, toDate, reason } = req.body;
       const adminId = req.user._id;
 
-      const from = new Date(fromDate);
-      const to = new Date(toDate);
-      from.setHours(0, 0, 0, 0);
-      to.setHours(23, 59, 59, 999);
+      const from = parseLeaveDate(fromDate);
+      const to = parseLeaveDate(toDate, { endOfDay: true });
+
+      if (!from || !to) {
+        return res.status(400).json({ message: 'Valid fromDate and toDate are required' });
+      }
 
       if (to < from) {
         return res.status(400).json({ message: 'toDate must be on or after fromDate' });

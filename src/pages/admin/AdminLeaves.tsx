@@ -56,6 +56,17 @@ interface LeaveStatistics {
   }>;
 }
 
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const formatDateValue = (value: string, options: Intl.DateTimeFormatOptions) => {
+  if (DATE_ONLY_PATTERN.test(value)) {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString('en-IN', options);
+  }
+
+  return new Date(value).toLocaleDateString('en-IN', options);
+};
+
 // â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const AdminLeaves = () => {
@@ -138,7 +149,7 @@ const AdminLeaves = () => {
   }, [fetchAll]); // re-fetch when role resolves or changes
 
   const formatDate = (ds: string) =>
-    new Date(ds).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    formatDateValue(ds, { day: 'numeric', month: 'short', year: 'numeric' });
 
   const formatDateTime = (ds: string) =>
     new Date(ds).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });

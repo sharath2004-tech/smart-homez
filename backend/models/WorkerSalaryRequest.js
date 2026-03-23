@@ -44,6 +44,55 @@ const workerSalaryRequestSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
+  netAmount: {
+    type: Number,
+    default: null,
+    min: 0
+  },
+  totalPenaltyAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  penaltyTreatment: {
+    type: String,
+    enum: ['included', 'excluded'],
+    default: 'excluded'
+  },
+  penaltyBreakdown: [{
+    leaveDate: {
+      type: Date,
+      required: true
+    },
+    requestedAt: {
+      type: Date,
+      default: null
+    },
+    reason: {
+      type: String,
+      maxlength: 200,
+      default: ''
+    },
+    amount: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+    leaveStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending'
+    }
+  }],
+  penaltyDecidedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  penaltyDecidedAt: {
+    type: Date,
+    default: null
+  },
   bookings: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Booking'

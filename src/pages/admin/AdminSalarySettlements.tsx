@@ -49,6 +49,15 @@ interface SalaryPreview {
   totalTasksCompleted: number;
   hourlyRate: number;
   requestedAmount: number;
+  netAmount?: number;
+  totalPenaltyAmount?: number;
+  penaltyBreakdown?: Array<{
+    leaveDate: string;
+    requestedAt?: string;
+    reason?: string;
+    amount: number;
+    leaveStatus?: 'pending' | 'approved' | 'rejected';
+  }>;
   tasks: TaskPreview[];
 }
 
@@ -76,6 +85,17 @@ interface SalaryRequest {
   totalTasksCompleted: number;
   hourlyRate: number;
   requestedAmount: number;
+  netAmount?: number | null;
+  totalPenaltyAmount?: number;
+  penaltyTreatment?: 'included' | 'excluded';
+  penaltyBreakdown?: Array<{
+    leaveDate: string;
+    requestedAt?: string;
+    reason?: string;
+    amount: number;
+    leaveStatus?: 'pending' | 'approved' | 'rejected';
+  }>;
+  penaltyDecidedBy?: { name?: string; role?: string } | string;
   status: 'pending' | 'approved' | 'rejected' | 'paid';
   createdAt: string;
   approvedBy?: { name: string };
@@ -99,6 +119,18 @@ function formatMinutes(mins: number): string {
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function getSettlementAmount(amount: number, penaltyAmount: number, applyPenaltyDeduction: boolean) {
+  if (!applyPenaltyDeduction) {
+    return amount;
+  }
+
+  return Math.max(0, Number((amount - penaltyAmount).toFixed(2)));
+}
+
+function getPaidAmount(request: SalaryRequest) {
+  return request.netAmount ?? request.requestedAmount;
 }
 
 const STATUS_META = {
@@ -132,6 +164,7 @@ const AdminSalarySettlements = () => {
   const [sendPreview, setSendPreview] = useState<SalaryPreview | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [sending, setSending] = useState(false);
+  const [applyPenaltyDeduction, setApplyPenaltyDeduction] = useState(true);
   // Partial payment state
   const [isPartialPayment, setIsPartialPayment] = useState(false);
   const [partialAmount, setPartialAmount] = useState('');
@@ -201,6 +234,7 @@ const AdminSalarySettlements = () => {
         `/salary-requests/admin/worker-preview?workerId=${selectedWorker._id}&from=${sendFrom}&to=${sendTo}`
       );
       setSendPreview(data.preview);
+      setApplyPenaltyDeduction((data.preview?.totalPenaltyAmount || 0) > 0);
     } catch (err) {
       toast({
         title: 'Preview failed',
@@ -214,13 +248,19 @@ const AdminSalarySettlements = () => {
 
   const handleSendSalary = async () => {
     if (!selectedWorker || !sendPreview) return;
+    const finalSettlementAmount = getSettlementAmount(
+      sendPreview.requestedAmount,
+      sendPreview.totalPenaltyAmount || 0,
+      applyPenaltyDeduction
+    );
+
     if (isPartialPayment) {
       const amt = Number(partialAmount);
       if (!amt || amt <= 0) {
         toast({ title: 'Invalid amount', description: 'Please enter a valid partial payment amount', variant: 'destructive' });
         return;
       }
-      if (amt >= sendPreview.requestedAmount) {
+      if (amt >= finalSettlementAmount) {
         toast({ title: 'Invalid amount', description: 'Partial amount must be less than the total requested amount', variant: 'destructive' });
         return;
       }
@@ -231,6 +271,7 @@ const AdminSalarySettlements = () => {
         workerId: selectedWorker._id,
         periodFrom: sendFrom,
         periodTo: sendTo,
+        applyPenaltyDeduction,
         isPartialPayment,
         partialAmount: isPartialPayment ? Number(partialAmount) : undefined
       });
@@ -241,6 +282,7 @@ const AdminSalarySettlements = () => {
       setSendFrom('');
       setSendTo('');
       setSendPreview(null);
+      setApplyPenaltyDeduction(true);
       setIsPartialPayment(false);
       setPartialAmount('');
       await fetchRequests();
@@ -258,6 +300,11 @@ const AdminSalarySettlements = () => {
   const toggleExpand = (id: string) => {
     setExpandedId(prev => prev === id ? null : id);
   };
+
+  const previewPenaltyAmount = sendPreview?.totalPenaltyAmount || 0;
+  const previewFinalAmount = sendPreview
+    ? getSettlementAmount(sendPreview.requestedAmount, previewPenaltyAmount, applyPenaltyDeduction)
+    : 0;
 
   return (
     <AppLayout userType={role} userName={name}>
@@ -277,7 +324,11 @@ const AdminSalarySettlements = () => {
         <Card>
           <div
             className="p-4 cursor-pointer flex items-center justify-between hover:bg-muted/30 transition-colors"
-            onClick={() => { setSendOpen(o => !o); setSendPreview(null); }}
+            onClick={() => {
+              setSendOpen(o => !o);
+              setSendPreview(null);
+              setApplyPenaltyDeduction(true);
+            }}
           >
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
@@ -403,9 +454,67 @@ const AdminSalarySettlements = () => {
                     </div>
 
                     <div className="bg-primary rounded-lg p-4 text-center">
-                      <p className="text-sm text-primary-foreground/80">Salary Amount</p>
-                      <p className="text-3xl font-bold text-primary-foreground mt-1">₹{sendPreview.requestedAmount.toFixed(2)}</p>
+                      <p className="text-sm text-primary-foreground/80">Settlement Amount</p>
+                      <p className="text-3xl font-bold text-primary-foreground mt-1">₹{previewFinalAmount.toFixed(2)}</p>
+                      {(sendPreview.totalPenaltyAmount || 0) > 0 && (
+                        <p className="text-xs text-primary-foreground/80 mt-2">
+                          Base ₹{sendPreview.requestedAmount.toFixed(2)} · Penalties ₹{(sendPreview.totalPenaltyAmount || 0).toFixed(2)} {applyPenaltyDeduction ? 'deducted' : 'waived'}
+                        </p>
+                      )}
                     </div>
+
+                    {previewPenaltyAmount > 0 && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-amber-900">Late leave penalties found</p>
+                            <p className="text-xs text-amber-800">Admin or super admin can decide whether to deduct them in this settlement.</p>
+                          </div>
+                          <div className="text-sm font-bold text-amber-900">₹{previewPenaltyAmount.toFixed(2)}</div>
+                        </div>
+
+                        <div className="space-y-2">
+                          {sendPreview.penaltyBreakdown?.map((penalty, index) => (
+                            <div key={`preview-penalty-${index}`} className="flex items-center justify-between rounded-md bg-white/80 px-3 py-2 text-xs sm:text-sm">
+                              <div>
+                                <p className="font-medium text-foreground">{fmtDate(penalty.leaveDate)}</p>
+                                <p className="text-muted-foreground">{penalty.reason || 'Late leave penalty'}{penalty.leaveStatus ? ` · ${penalty.leaveStatus}` : ''}</p>
+                              </div>
+                              <span className="font-semibold text-red-700">₹{penalty.amount.toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <label className={`flex items-start gap-3 rounded-md border px-3 py-3 cursor-pointer transition-colors ${applyPenaltyDeduction ? 'border-red-300 bg-red-50' : 'border-border bg-background'}`}>
+                            <input
+                              type="radio"
+                              name="penaltyTreatment"
+                              checked={applyPenaltyDeduction}
+                              onChange={() => setApplyPenaltyDeduction(true)}
+                              className="mt-1"
+                            />
+                            <div>
+                              <p className="font-medium text-foreground">Include penalties</p>
+                              <p className="text-xs text-muted-foreground">Deduct ₹{previewPenaltyAmount.toFixed(2)} from this salary settlement.</p>
+                            </div>
+                          </label>
+                          <label className={`flex items-start gap-3 rounded-md border px-3 py-3 cursor-pointer transition-colors ${!applyPenaltyDeduction ? 'border-green-300 bg-green-50' : 'border-border bg-background'}`}>
+                            <input
+                              type="radio"
+                              name="penaltyTreatment"
+                              checked={!applyPenaltyDeduction}
+                              onChange={() => setApplyPenaltyDeduction(false)}
+                              className="mt-1"
+                            />
+                            <div>
+                              <p className="font-medium text-foreground">Exclude penalties</p>
+                              <p className="text-xs text-muted-foreground">Do not deduct the penalty from this salary settlement.</p>
+                            </div>
+                          </label>
+                        </div>
+                      </div>
+                    )}
 
                     {sendPreview.tasks.length > 0 && (
                       <div className="space-y-1.5 max-h-40 overflow-y-auto">
@@ -451,16 +560,16 @@ const AdminSalarySettlements = () => {
                       {isPartialPayment && (
                         <div>
                           <Label className="text-xs text-muted-foreground mb-1 block">
-                            Partial Amount (₹) — must be less than ₹{sendPreview.requestedAmount.toFixed(2)}
+                            Partial Amount (₹) — must be less than ₹{previewFinalAmount.toFixed(2)}
                           </Label>
                           <Input
                             type="number"
                             min={1}
-                            max={sendPreview.requestedAmount - 1}
+                            max={Math.max(previewFinalAmount - 1, 1)}
                             step="0.01"
                             value={partialAmount}
                             onChange={(e) => setPartialAmount(e.target.value)}
-                            placeholder={`e.g. ${(sendPreview.requestedAmount / 2).toFixed(0)}`}
+                            placeholder={`e.g. ${(previewFinalAmount / 2).toFixed(0)}`}
                           />
                         </div>
                       )}
@@ -475,7 +584,7 @@ const AdminSalarySettlements = () => {
                         ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending...</>
                         : isPartialPayment && partialAmount
                           ? <><IndianRupee className="w-4 h-4 mr-2" />Pay ₹{Number(partialAmount).toFixed(2)} (Partial) to {selectedWorker?.name}</>
-                          : <><IndianRupee className="w-4 h-4 mr-2" />Send ₹{sendPreview.requestedAmount.toFixed(2)} to {selectedWorker?.name}</>}
+                          : <><IndianRupee className="w-4 h-4 mr-2" />Send ₹{previewFinalAmount.toFixed(2)} to {selectedWorker?.name}</>}
                     </Button>
                   </div>
                 )}
@@ -545,7 +654,7 @@ const AdminSalarySettlements = () => {
                         <Icon className="w-3 h-3" />
                         {meta.label}
                       </Badge>
-                      <span className="text-base font-bold text-primary">₹{req.requestedAmount.toFixed(2)}</span>
+                      <span className="text-base font-bold text-primary">₹{getPaidAmount(req).toFixed(2)}</span>
                       {isExpanded
                         ? <ChevronUp className="w-4 h-4 text-muted-foreground" />
                         : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
@@ -605,12 +714,55 @@ const AdminSalarySettlements = () => {
                             <span className="text-muted-foreground">Hourly rate</span>
                             <span>₹{req.hourlyRate}/hr</span>
                           </div>
+                          {(req.totalPenaltyAmount || 0) > 0 && (
+                            <>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">Base salary</span>
+                                <span>₹{req.requestedAmount.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">Penalty treatment</span>
+                                <span className={req.penaltyTreatment === 'included' ? 'text-red-700 font-medium' : 'text-green-700 font-medium'}>
+                                  {req.penaltyTreatment === 'included' ? 'Included in settlement' : 'Excluded from settlement'}
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">Penalty total</span>
+                                <span>₹{(req.totalPenaltyAmount || 0).toFixed(2)}</span>
+                              </div>
+                            </>
+                          )}
                           <Separator />
                           <div className="flex justify-between font-semibold text-primary">
-                            <span>Amount to Settle</span>
-                            <span>₹{req.requestedAmount.toFixed(2)}</span>
+                            <span>Amount Settled</span>
+                            <span>₹{getPaidAmount(req).toFixed(2)}</span>
                           </div>
                         </div>
+
+                        {(req.totalPenaltyAmount || 0) > 0 && req.penaltyBreakdown && req.penaltyBreakdown.length > 0 && (
+                          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-sm font-semibold text-amber-900">Penalty breakdown</p>
+                              <span className={`text-xs font-semibold ${req.penaltyTreatment === 'included' ? 'text-red-700' : 'text-green-700'}`}>
+                                {req.penaltyTreatment === 'included' ? 'Deducted' : 'Excluded'}
+                              </span>
+                            </div>
+                            {req.penaltyBreakdown.map((penalty, index) => (
+                              <div key={`${req._id}-penalty-${index}`} className="flex items-center justify-between rounded-md bg-white/80 px-3 py-2 text-xs sm:text-sm">
+                                <div>
+                                  <p className="font-medium text-foreground">{fmtDate(penalty.leaveDate)}</p>
+                                  <p className="text-muted-foreground">{penalty.reason || 'Late leave penalty'}{penalty.leaveStatus ? ` · ${penalty.leaveStatus}` : ''}</p>
+                                </div>
+                                <span className="font-semibold text-red-700">₹{penalty.amount.toFixed(2)}</span>
+                              </div>
+                            ))}
+                            {req.penaltyDecidedBy && typeof req.penaltyDecidedBy !== 'string' && req.penaltyDecidedBy.name && (
+                              <p className="text-xs text-muted-foreground">
+                                Decision made by {req.penaltyDecidedBy.name}{req.penaltyDecidedBy.role ? ` (${req.penaltyDecidedBy.role.replace('_', ' ')})` : ''}
+                              </p>
+                            )}
+                          </div>
+                        )}
 
                         {/* Rejection reason / notes */}
                         {req.status === 'rejected' && req.rejectionReason && (

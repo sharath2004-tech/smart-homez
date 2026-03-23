@@ -10,6 +10,55 @@ const router = express.Router();
 // Default hourly rate if not set on worker profile
 const DEFAULT_HOURLY_RATE = 90;
 
+function calculateBookingMinutes(booking) {
+  if (!booking) return 0;
+  if (booking.actualDurationMinutes > 0) {
+    return booking.actualDurationMinutes;
+  }
+  if (booking.actualStartTime && booking.actualEndTime) {
+    return Math.max(0, Math.floor((new Date(booking.actualEndTime) - new Date(booking.actualStartTime)) / 60000));
+  }
+  return 0;
+}
+
+async function getLeavePenaltySummary(workerId, fromDate, toDate) {
+  const worker = await User.findById(workerId).select('workerProfile.leaves').lean();
+  const leaves = worker?.workerProfile?.leaves || [];
+
+  const penaltyBreakdown = leaves
+    .filter((leave) => {
+      if (!leave?.penaltyApplied || !leave?.penaltyAmount || leave.status === 'rejected' || !leave.date) {
+        return false;
+      }
+
+      const leaveDate = new Date(leave.date);
+      return leaveDate >= fromDate && leaveDate <= toDate;
+    })
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .map((leave) => ({
+      leaveDate: leave.date,
+      requestedAt: leave.requestedAt || null,
+      reason: leave.reason || '',
+      amount: leave.penaltyAmount || 0,
+      leaveStatus: leave.status || 'pending'
+    }));
+
+  const totalPenaltyAmount = penaltyBreakdown.reduce((sum, penalty) => sum + (penalty.amount || 0), 0);
+
+  return {
+    penaltyBreakdown,
+    totalPenaltyAmount
+  };
+}
+
+function calculateNetAmount(grossAmount, totalPenaltyAmount, applyPenaltyDeduction) {
+  if (!applyPenaltyDeduction) {
+    return grossAmount;
+  }
+
+  return Math.max(0, Number((grossAmount - totalPenaltyAmount).toFixed(2)));
+}
+
 function deriveLocationIdFromBookings(bookings = []) {
   const uniqueLocationIds = [
     ...new Set(
@@ -97,6 +146,7 @@ router.get('/preview', authenticate, authorize('worker'), async (req, res) => {
     const workerProfile = req.user.workerProfile || {};
     const hourlyRate = workerProfile.hourlyRate || DEFAULT_HOURLY_RATE;
     const requestedAmount = Math.round((totalMinutes / 60) * hourlyRate * 100) / 100;
+    const penaltySummary = await getLeavePenaltySummary(req.user._id, fromDate, toDate);
 
     res.json({
       success: true,
@@ -107,6 +157,9 @@ router.get('/preview', authenticate, authorize('worker'), async (req, res) => {
         totalTasksCompleted: bookings.length,
         hourlyRate,
         requestedAmount,
+        netAmount: calculateNetAmount(requestedAmount, penaltySummary.totalPenaltyAmount, true),
+        totalPenaltyAmount: penaltySummary.totalPenaltyAmount,
+        penaltyBreakdown: penaltySummary.penaltyBreakdown,
         tasks
       }
     });
@@ -175,6 +228,7 @@ router.post('/',
       const workerProfile = req.user.workerProfile || {};
       const hourlyRate = workerProfile.hourlyRate || DEFAULT_HOURLY_RATE;
       const requestedAmount = Math.round((totalMinutes / 60) * hourlyRate * 100) / 100;
+      const penaltySummary = await getLeavePenaltySummary(req.user._id, fromDate, toDate);
 
       // Find the admin responsible for this worker's location
       let adminId = null;
@@ -206,6 +260,9 @@ router.post('/',
         totalTasksCompleted: bookings.length,
         hourlyRate,
         requestedAmount,
+        netAmount: requestedAmount,
+        totalPenaltyAmount: penaltySummary.totalPenaltyAmount,
+        penaltyBreakdown: penaltySummary.penaltyBreakdown,
         bookings: bookings.map(b => b._id)
       });
 
@@ -282,6 +339,7 @@ router.get('/admin/worker-preview', authenticate, authorize('admin', 'super_admi
     const workerProfile = await User.findById(workerId).select('workerProfile').lean();
     const hourlyRate = (workerProfile?.workerProfile?.hourlyRate) || DEFAULT_HOURLY_RATE;
     const amount = Math.round((totalMinutes / 60) * hourlyRate * 100) / 100;
+    const penaltySummary = await getLeavePenaltySummary(workerId, fromDate, toDate);
 
     res.json({
       success: true,
@@ -292,6 +350,9 @@ router.get('/admin/worker-preview', authenticate, authorize('admin', 'super_admi
         totalTasksCompleted: bookings.length,
         hourlyRate,
         requestedAmount: amount,
+        netAmount: calculateNetAmount(amount, penaltySummary.totalPenaltyAmount, true),
+        totalPenaltyAmount: penaltySummary.totalPenaltyAmount,
+        penaltyBreakdown: penaltySummary.penaltyBreakdown,
         tasks
       }
     });
@@ -319,7 +380,7 @@ router.post('/admin/send',
         return res.status(400).json({ error: { message: errors.array()[0].msg, status: 400 } });
       }
 
-      const { workerId, periodFrom, periodTo, notes } = req.body;
+      const { workerId, periodFrom, periodTo, notes, applyPenaltyDeduction = false } = req.body;
 
       const worker = await User.findById(workerId).select('name email workerProfile role').lean();
       if (!worker || worker.role !== 'worker') {
@@ -351,6 +412,8 @@ router.post('/admin/send',
 
       const hourlyRate = worker.workerProfile?.hourlyRate || DEFAULT_HOURLY_RATE;
       const requestedAmount = Math.round((totalMinutes / 60) * hourlyRate * 100) / 100;
+      const penaltySummary = await getLeavePenaltySummary(workerId, fromDate, toDate);
+      const netAmount = calculateNetAmount(requestedAmount, penaltySummary.totalPenaltyAmount, applyPenaltyDeduction);
       const derivedLocationId = deriveLocationIdFromBookings(bookings)
         || worker.workerProfile?.assignedApartments?.[0]?.locationId
         || null;
@@ -365,6 +428,12 @@ router.post('/admin/send',
         totalTasksCompleted: bookings.length,
         hourlyRate,
         requestedAmount,
+        netAmount,
+        totalPenaltyAmount: penaltySummary.totalPenaltyAmount,
+        penaltyTreatment: applyPenaltyDeduction ? 'included' : 'excluded',
+        penaltyBreakdown: penaltySummary.penaltyBreakdown,
+        penaltyDecidedBy: req.user._id,
+        penaltyDecidedAt: new Date(),
         bookings: bookings.map(b => b._id),
         status: 'paid',
         approvedBy: req.user._id,
@@ -377,11 +446,12 @@ router.post('/admin/send',
       await record.save();
       await record.populate('worker', 'name email');
       await record.populate('paidBy', 'name email');
+      await record.populate('penaltyDecidedBy', 'name email role');
       await record.populate('location', 'apartmentName area city');
 
       res.status(201).json({
         success: true,
-        message: `Salary of ₹${requestedAmount.toFixed(2)} sent to ${worker.name}`,
+        message: `Salary of ₹${netAmount.toFixed(2)} sent to ${worker.name}`,
         request: record
       });
     } catch (error) {
@@ -422,6 +492,7 @@ router.get('/admin', authenticate, authorize('admin', 'super_admin'), async (req
       .populate('admin', 'name email')
       .populate('approvedBy', 'name')
       .populate('paidBy', 'name email')
+      .populate('penaltyDecidedBy', 'name email role')
       .populate('rejectedBy', 'name')
       .populate('location', 'apartmentName area city')
       .populate({
@@ -518,15 +589,25 @@ router.patch('/:id/mark-paid', authenticate, authorize('admin', 'super_admin'), 
       return res.status(400).json({ error: { message: 'Only approved requests can be marked as paid', status: 400 } });
     }
 
-    const { notes } = req.body;
+    const { notes, applyPenaltyDeduction = false } = req.body;
+    const fromDate = new Date(request.periodFrom);
+    const toDate = new Date(request.periodTo);
+    const penaltySummary = await getLeavePenaltySummary(request.worker, fromDate, toDate);
     request.status = 'paid';
     request.paidAt = new Date();
     request.paidBy = req.user._id;
+    request.totalPenaltyAmount = penaltySummary.totalPenaltyAmount;
+    request.penaltyBreakdown = penaltySummary.penaltyBreakdown;
+    request.penaltyTreatment = applyPenaltyDeduction ? 'included' : 'excluded';
+    request.penaltyDecidedBy = req.user._id;
+    request.penaltyDecidedAt = new Date();
+    request.netAmount = calculateNetAmount(request.requestedAmount || 0, penaltySummary.totalPenaltyAmount, applyPenaltyDeduction);
     if (notes) request.adminNotes = String(notes).slice(0, 500);
 
     await request.save();
     await request.populate('worker', 'name email');
     await request.populate('paidBy', 'name email');
+    await request.populate('penaltyDecidedBy', 'name email role');
 
     res.json({ success: true, message: 'Salary marked as paid', request });
   } catch (error) {

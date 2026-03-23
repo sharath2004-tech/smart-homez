@@ -18,12 +18,51 @@ interface Leave {
   status: 'pending' | 'approved' | 'rejected';
   requestedAt: string;
   approvedBy?: string;
+  penaltyApplied?: boolean;
+  penaltyAmount?: number;
 }
 
 interface WorkerProfile {
   monthlyLeaveQuota: number;
   leavesUsedThisMonth: number;
 }
+
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const toLocalDateValue = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+};
+
+const toStoredLeaveDateKey = (value: string) => {
+  if (DATE_ONLY_PATTERN.test(value)) {
+    return value;
+  }
+
+  return toLocalDateValue(new Date(value));
+};
+
+const formatLeaveDate = (value: string) => {
+  if (DATE_ONLY_PATTERN.test(value)) {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  }
+
+  return new Date(value).toLocaleDateString('en-US', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+};
 
 const WorkerLeaves = () => {
   const { t } = useTranslation();
@@ -97,7 +136,7 @@ const WorkerLeaves = () => {
 
     setIsSubmitting(true);
     try {
-      const response = await leavesAPI.applyLeave(selectedDate.toISOString(), reason.trim());
+      const response = await leavesAPI.applyLeave(toLocalDateValue(selectedDate), reason.trim());
 
       if (response.penaltyApplied) {
         toast({
@@ -159,9 +198,9 @@ const WorkerLeaves = () => {
     if (date < today) return true;
 
     // Disable dates that already have a leave request
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = toLocalDateValue(date);
     return leaves.some(leave => {
-      const leaveDate = new Date(leave.date).toISOString().split('T')[0];
+      const leaveDate = toStoredLeaveDateKey(leave.date);
       return leaveDate === dateStr;
     });
   };
@@ -271,12 +310,7 @@ const WorkerLeaves = () => {
                           <div className="flex items-center gap-2">
                             <CalendarIcon className="w-4 h-4 text-muted-foreground" />
                             <span className="font-medium">
-                              {new Date(leave.date).toLocaleDateString('en-US', {
-                                weekday: 'short',
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric'
-                              })}
+                              {formatLeaveDate(leave.date)}
                             </span>
                           </div>
                           {getStatusBadge(leave.status)}
@@ -285,6 +319,12 @@ const WorkerLeaves = () => {
                         {leave.reason && (
                           <p className="text-sm text-muted-foreground">
                             <strong>{t('worker.leaves.reasonLabel')}</strong> {leave.reason}
+                          </p>
+                        )}
+
+                        {leave.penaltyApplied && (leave.penaltyAmount || 0) > 0 && (
+                          <p className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5 inline-flex items-center gap-1">
+                            ⚠️ Late leave penalty: ₹{(leave.penaltyAmount || 0).toLocaleString('en-IN')}
                           </p>
                         )}
 

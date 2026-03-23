@@ -17,6 +17,17 @@ interface SalaryRecord {
   totalTasksCompleted: number;
   hourlyRate: number;
   requestedAmount: number;
+  netAmount?: number | null;
+  totalPenaltyAmount?: number;
+  penaltyTreatment?: 'included' | 'excluded';
+  penaltyBreakdown?: Array<{
+    leaveDate: string;
+    requestedAt?: string;
+    reason?: string;
+    amount: number;
+    leaveStatus?: 'pending' | 'approved' | 'rejected';
+  }>;
+  penaltyDecidedBy?: { name?: string; role?: string } | string;
   status: 'pending' | 'approved' | 'rejected' | 'paid';
   paidAt?: string;
   adminNotes?: string;
@@ -35,6 +46,10 @@ function formatMinutes(mins: number): string {
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function getFinalPaidAmount(record: SalaryRecord) {
+  return record.netAmount ?? record.requestedAmount;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -67,7 +82,7 @@ const WorkerSalaryHistory = () => {
     }
   };
 
-  const totalEarned = records.reduce((sum, r) => sum + r.requestedAmount, 0);
+  const totalEarned = records.reduce((sum, r) => sum + getFinalPaidAmount(r), 0);
 
   return (
     <AppLayout userType="worker" userName={userName}>
@@ -133,13 +148,44 @@ const WorkerSalaryHistory = () => {
 
                     <Separator />
 
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{t('worker.salary.rate')}: ₹{rec.hourlyRate}/hr</span>
-                      <span className="font-bold text-primary text-lg">₹{rec.requestedAmount.toFixed(2)}</span>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">{t('worker.salary.rate')}: ₹{rec.hourlyRate}/hr</span>
+                        <span className="font-bold text-primary text-lg">₹{getFinalPaidAmount(rec).toFixed(2)}</span>
+                      </div>
+
+                      {(rec.totalPenaltyAmount || 0) > 0 && (
+                        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 space-y-1.5">
+                          <div className="flex items-center justify-between text-xs sm:text-sm">
+                            <span className="font-medium text-amber-900">Leave penalties</span>
+                            <span className={`font-semibold ${rec.penaltyTreatment === 'included' ? 'text-red-700' : 'text-green-700'}`}>
+                              {rec.penaltyTreatment === 'included'
+                                ? `Deducted ₹${(rec.totalPenaltyAmount || 0).toFixed(2)}`
+                                : `Waived ₹${(rec.totalPenaltyAmount || 0).toFixed(2)}`}
+                            </span>
+                          </div>
+
+                          {rec.penaltyBreakdown && rec.penaltyBreakdown.length > 0 && (
+                            <div className="space-y-1">
+                              {rec.penaltyBreakdown.map((penalty, index) => (
+                                <div key={`${rec._id}-penalty-${index}`} className="flex items-center justify-between text-xs text-amber-900/90">
+                                  <span>{fmtDate(penalty.leaveDate)}{penalty.reason ? ` · ${penalty.reason}` : ''}</span>
+                                  <span>₹{penalty.amount.toFixed(2)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {rec.paidAt && (
                       <p className="text-xs text-green-700">{t('worker.salary.receivedOn')} {fmtDate(rec.paidAt)}</p>
+                    )}
+                    {rec.penaltyDecidedBy && typeof rec.penaltyDecidedBy !== 'string' && rec.penaltyDecidedBy.name && (
+                      <p className="text-xs text-muted-foreground">
+                        Penalty decision by {rec.penaltyDecidedBy.name}{rec.penaltyDecidedBy.role ? ` (${rec.penaltyDecidedBy.role.replace('_', ' ')})` : ''}
+                      </p>
                     )}
                     {rec.adminNotes && (
                       <p className="text-xs text-muted-foreground italic">{t('worker.salary.note')} {rec.adminNotes}</p>
