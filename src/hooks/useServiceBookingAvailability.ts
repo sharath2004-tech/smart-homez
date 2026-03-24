@@ -1,8 +1,8 @@
 import {
-  getStoredCustomerLocation,
-  locationsAPI,
-  serviceAreasAPI,
-  USER_LOCATION_EVENT_NAME,
+    getStoredCustomerLocation,
+    locationsAPI,
+    serviceAreasAPI,
+    USER_LOCATION_EVENT_NAME,
 } from "@/lib/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
