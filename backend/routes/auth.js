@@ -67,6 +67,30 @@ const isMatchingTemporaryPassword = (submittedPassword, temporaryPassword) => {
   return trimmedSubmittedPassword.length > 0 && trimmedSubmittedPassword === temporaryPassword;
 };
 
+const BCRYPT_HASH_PATTERN = /^\$2[aby]\$\d{2}\$/;
+
+const looksLikeBcryptHash = (value) => (
+  typeof value === 'string' && BCRYPT_HASH_PATTERN.test(value)
+);
+
+const resolveFirstLoginPasswordFallback = (submittedPassword, user) => {
+  if (!user?.isFirstLogin) {
+    return null;
+  }
+
+  if (isMatchingTemporaryPassword(submittedPassword, user.temporaryPassword)) {
+    return user.temporaryPassword;
+  }
+
+  if (typeof user?.password === 'string' && !looksLikeBcryptHash(user.password)) {
+    if (isMatchingTemporaryPassword(submittedPassword, user.password)) {
+      return user.password;
+    }
+  }
+
+  return null;
+};
+
 // Rate limiter for sensitive auth endpoints (OTP / password reset)
 const sensitiveAuthLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -301,12 +325,17 @@ router.post('/login',
       let isMatch = await user.comparePassword(password);
       let usedTemporaryPasswordFallback = false;
 
-      if (!isMatch && user.isFirstLogin && isMatchingTemporaryPassword(password, user.temporaryPassword)) {
+      const fallbackPassword = resolveFirstLoginPasswordFallback(password, user);
+
+      if (!isMatch && fallbackPassword) {
         isMatch = true;
         usedTemporaryPasswordFallback = true;
 
         try {
-          user.password = user.temporaryPassword;
+          user.password = fallbackPassword;
+          if (!user.temporaryPassword) {
+            user.temporaryPassword = fallbackPassword;
+          }
           await user.save({ validateBeforeSave: false });
           console.warn(`⚠️ Repaired password hash for first-login user ${user.email} using temporary password fallback.`);
         } catch (repairError) {
