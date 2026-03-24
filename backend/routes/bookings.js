@@ -140,6 +140,13 @@ const addMinutesToTimeString = (startTime, durationMinutes) => {
   return minutesToTimeString(startMinutes + durationMinutes);
 };
 
+const clampMinutesToTimeString = (minutes) => {
+  const clampedMinutes = Math.max(0, Math.min(1439, minutes));
+  const hours = Math.floor(clampedMinutes / 60);
+  const mins = clampedMinutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+};
+
 const startOfDay = (value) => {
   const date = new Date(value);
   date.setHours(0, 0, 0, 0);
@@ -827,7 +834,19 @@ router.get('/booked-slots', authenticate, async (req, res) => {
 
     const now = new Date();
     const isRequestedDateToday = startOfDay.toDateString() === now.toDateString();
-    const availableWorkers = leaveEligibleWorkers.filter(worker => {
+    const dailyPrimaryBookingCounts = new Map();
+    workerDayBookings.forEach((booking) => {
+      if (!booking?.worker) return;
+      const workerId = booking.worker.toString();
+      dailyPrimaryBookingCounts.set(workerId, (dailyPrimaryBookingCounts.get(workerId) || 0) + 1);
+    });
+
+    const nonOverloadedWorkers = leaveEligibleWorkers.filter((worker) => {
+      const dailyBookings = dailyPrimaryBookingCounts.get(worker._id.toString()) || 0;
+      return dailyBookings < 8;
+    });
+
+    const availableWorkers = nonOverloadedWorkers.filter(worker => {
       if (!isRequestedDateToday) {
         return true;
       }
@@ -853,8 +872,8 @@ router.get('/booked-slots', authenticate, async (req, res) => {
       .map(b => ({
         workerId: b.worker.toString(),
         workerGender: workerGenderMap.get(b.worker.toString()) ?? null,
-        startTime: b.startTime,
-        endTime: b.endTime
+        startTime: clampMinutesToTimeString((timeStringToMinutes(b.startTime) ?? 0) - 15),
+        endTime: clampMinutesToTimeString((timeStringToMinutes(b.endTime) ?? 0) + 15)
       }));
 
     availableWorkers.forEach(worker => {
@@ -1462,6 +1481,7 @@ router.post('/',
       // Uses advanced assignment system with primary + 2 backup workers
       let populatedBooking;
       const shouldAutoAssign = autoAssign !== false; // Default to true unless explicitly disabled
+      const mustAssignImmediately = !booking.subscription?.isSubscription && ['adhoc', 'oneTime'].includes(booking.bookingType);
       
       if (!worker && shouldAutoAssign) {
         try {
@@ -1517,6 +1537,17 @@ router.post('/',
             }).lean();
             if (raceConflict) {
               console.warn(`⚠️ Race-condition double-booking detected for worker ${booking.worker}. Unassigning.`);
+              if (mustAssignImmediately) {
+                await Booking.findByIdAndDelete(booking._id);
+                return res.status(409).json({
+                  error: {
+                    message: 'That time slot was just taken by another booking. Please choose another time.',
+                    status: 409,
+                    code: 'SLOT_JUST_FILLED'
+                  }
+                });
+              }
+
               booking.worker = undefined;
               booking.backupWorkers = [];
               booking.status = 'pending';
@@ -1563,6 +1594,17 @@ router.post('/',
               await booking.save();
               console.log(`✅ Fallback worker assigned: ${fallbackResult.worker.name}`);
             } else {
+              if (mustAssignImmediately) {
+                await Booking.findByIdAndDelete(booking._id);
+                return res.status(409).json({
+                  error: {
+                    message: 'No workers are available for the selected time slot. Please choose another slot.',
+                    status: 409,
+                    code: 'NO_WORKER_AVAILABLE_FOR_SLOT'
+                  }
+                });
+              }
+
               console.log(`⚠️ No worker assigned. Booking remains pending for manual assignment.`);
             }
           }
@@ -1574,6 +1616,17 @@ router.post('/',
             .populate('service', 'name description price duration allowBreakRequests');
         } catch (assignError) {
           console.error('Worker assignment error:', assignError);
+          if (mustAssignImmediately) {
+            await Booking.findByIdAndDelete(booking._id);
+            return res.status(409).json({
+              error: {
+                message: 'Unable to assign a worker for the selected slot right now. Please choose another time.',
+                status: 409,
+                code: 'WORKER_ASSIGNMENT_FAILED'
+              }
+            });
+          }
+
           // Booking created but no worker assigned yet - will need manual assignment
           populatedBooking = await Booking.findById(booking._id)
             .populate('customer', 'name email phone')
