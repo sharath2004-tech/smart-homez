@@ -176,8 +176,10 @@ const PlumbingServicePage = () => {
         return;
       }
 
-      const userLocation = localStorage.getItem('userLocation');
-      const location = userLocation ? JSON.parse(userLocation) : null;
+      if (!resolvedLocation) {
+        toast.error('Please pin your selected service location or enable auto location before booking.');
+        return;
+      }
 
       // Calculate end time based on service duration (default 1.5 hours for plumbing)
       const durationMinutes = service?.duration || 90; // 1.5 hours default
@@ -204,14 +206,16 @@ const PlumbingServicePage = () => {
         },
         totalAmount: calculateTotalPrice(),
         estimatedDuration: service?.duration,
-        location: location ? {
+        location: {
           type: 'Point',
-          coordinates: [location.lng, location.lat],
-          address: location.address || '',
-          city: location.city || '',
-          state: location.state || '',
-          zipCode: location.zipCode || ''
-        } : undefined
+          coordinates: [resolvedLocation.longitude, resolvedLocation.latitude],
+          apartmentName: resolvedLocation.apartmentName || '',
+          address: resolvedLocation.address || '',
+          area: resolvedLocation.area || '',
+          city: resolvedLocation.city || '',
+          state: resolvedLocation.state || '',
+          zipCode: resolvedLocation.zipCode || ''
+        }
       };
 
       await bookingsAPI.create(bookingData);

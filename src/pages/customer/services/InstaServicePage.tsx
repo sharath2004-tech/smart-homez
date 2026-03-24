@@ -321,15 +321,19 @@ const InstaServicePage = () => {
       toast.error('No maid service is currently available in your area. Please contact support.');
       return;
     }
-    const defaultAddr =
-      profile?.addresses?.find((a) => a.isDefault) || profile?.addresses?.[0];
     const coords = resolvedLocation
       ? [resolvedLocation.longitude, resolvedLocation.latitude]
-      : defaultAddr?.location?.coordinates;
+      : null;
     const hasValidCoords =
       Array.isArray(coords) &&
       coords.length === 2 &&
       coords.every((c) => typeof c === "number" && !isNaN(c));
+
+    if (!hasValidCoords || !resolvedLocation) {
+      toast.error("Please pin your selected service location or enable auto location before booking.");
+      return;
+    }
+
     try {
       setBooking(true);
       await bookingsAPI.create({
@@ -344,9 +348,12 @@ const InstaServicePage = () => {
         ...(hasValidCoords && {
           location: {
             coordinates: coords,
-            apartmentName: resolvedLocation?.apartmentName || defaultAddr?.apartmentName || "",
-            area: resolvedLocation?.area || defaultAddr?.area || "",
-            city: resolvedLocation?.city || defaultAddr?.city || "",
+            apartmentName: resolvedLocation.apartmentName || "",
+            address: resolvedLocation.address || "",
+            area: resolvedLocation.area || "",
+            city: resolvedLocation.city || "",
+            state: resolvedLocation.state || "",
+            zipCode: resolvedLocation.zipCode || "",
           },
         }),
         notes,
@@ -814,10 +821,21 @@ const InstaServicePage = () => {
                   </p>
                 </div>
               </div>
-              {profile?.addresses?.find((a) => a.isDefault)?.area && (
+              {resolvedLocation ? (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground border-t pt-3">
                   <MapPin className="w-3.5 h-3.5" />
-                  <span>{profile.addresses?.find((a) => a.isDefault)?.area}</span>
+                  <span>
+                    {[
+                      resolvedLocation.apartmentName,
+                      resolvedLocation.area,
+                      resolvedLocation.city,
+                    ].filter(Boolean).join(", ") || resolvedLocation.address || "Selected location"}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs text-amber-700 border-t pt-3">
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>Please pin your service location or enable auto location before confirming.</span>
                 </div>
               )}
             </div>

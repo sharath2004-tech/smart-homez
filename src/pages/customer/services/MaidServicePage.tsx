@@ -215,8 +215,10 @@ const MaidServicePage = () => {
         return;
       }
 
-      const userLocation = localStorage.getItem('userLocation');
-      const location = userLocation ? JSON.parse(userLocation) : null;
+      if (!resolvedLocation) {
+        toast.error('Please pin your selected service location or enable auto location before booking.');
+        return;
+      }
 
       // Calculate end time based on hours
       const [startHour, startMinute] = maidDetails.preferredTimeSlot.split(':').map(Number);
@@ -244,14 +246,16 @@ const MaidServicePage = () => {
         preferences: {
           workerGenderPreference: maidDetails.workerGenderPreference
         },
-        location: location ? {
+        location: {
           type: 'Point',
-          coordinates: [location.lng, location.lat],
-          address: location.address || '',
-          city: location.city || '',
-          state: location.state || '',
-          zipCode: location.zipCode || ''
-        } : undefined
+          coordinates: [resolvedLocation.longitude, resolvedLocation.latitude],
+          apartmentName: resolvedLocation.apartmentName || '',
+          address: resolvedLocation.address || '',
+          area: resolvedLocation.area || '',
+          city: resolvedLocation.city || '',
+          state: resolvedLocation.state || '',
+          zipCode: resolvedLocation.zipCode || ''
+        }
       };
 
       await bookingsAPI.create(bookingData);

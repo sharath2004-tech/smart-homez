@@ -70,6 +70,8 @@ const getStoredLocation = (): ResolvedBookingLocation | null => {
     const parsed = JSON.parse(raw) as {
       lat?: number;
       lng?: number;
+      latitude?: number;
+      longitude?: number;
       apartmentName?: string;
       address?: string;
       area?: string;
@@ -78,13 +80,16 @@ const getStoredLocation = (): ResolvedBookingLocation | null => {
       zipCode?: string;
     };
 
-    if (typeof parsed.lat !== "number" || typeof parsed.lng !== "number") {
+    const latitude = parsed.latitude ?? parsed.lat;
+    const longitude = parsed.longitude ?? parsed.lng;
+
+    if (typeof latitude !== "number" || typeof longitude !== "number") {
       return null;
     }
 
     return {
-      latitude: parsed.lat,
-      longitude: parsed.lng,
+      latitude,
+      longitude,
       apartmentName: parsed.apartmentName,
       address: parsed.address,
       area: parsed.area,
@@ -131,9 +136,13 @@ export const useServiceBookingAvailability = (
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [requestingService, setRequestingService] = useState(false);
 
+  const storedLocationSnapshot = typeof window === "undefined"
+    ? ""
+    : (window.localStorage.getItem("userLocation") || "");
+
   const resolvedLocation = useMemo(
     () => resolveBookingLocation(profile),
-    [profile],
+    [profile, storedLocationSnapshot],
   );
 
   const refreshAvailability = useCallback(async () => {

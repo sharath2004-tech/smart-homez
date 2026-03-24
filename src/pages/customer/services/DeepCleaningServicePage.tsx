@@ -170,7 +170,10 @@ const DeepCleaningServicePage = () => {
     if (!bookingDate) return toast.error("Please select a date");
     if (!service?._id) return toast.error("No deep cleaning service available in your area");
 
-    const defaultAddr = profile?.addresses?.find((a) => a.isDefault) || profile?.addresses?.[0];
+    if (!resolvedLocation) {
+      toast.error("Please pin your selected service location or enable auto location before booking.");
+      return;
+    }
 
     try {
       setBooking(true);
@@ -190,14 +193,15 @@ const DeepCleaningServicePage = () => {
           areas: selectedAddOns,
           addOns: selectedAddOns,
         },
-        location: defaultAddr
-          ? {
-              apartmentName: defaultAddr.apartmentName || "",
-              area: defaultAddr.area || "",
-              city: defaultAddr.city || "",
-              coordinates: defaultAddr.location?.coordinates || [],
-            }
-          : undefined,
+        location: {
+          apartmentName: resolvedLocation.apartmentName || "",
+          address: resolvedLocation.address || "",
+          area: resolvedLocation.area || "",
+          city: resolvedLocation.city || "",
+          state: resolvedLocation.state || "",
+          zipCode: resolvedLocation.zipCode || "",
+          coordinates: [resolvedLocation.longitude, resolvedLocation.latitude],
+        },
         notes: `Package: ${selectedPackage.label}. Add-ons: ${selectedAddOns.join(", ") || "None"}. ${specialInstructions}`,
       } as Record<string, unknown>);
       toast.success("Deep cleaning booked! A team will arrive on the scheduled date 🎉", {

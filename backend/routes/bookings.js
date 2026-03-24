@@ -290,6 +290,16 @@ const getUserCoordinates = (user) => {
   return { longitude, latitude };
 };
 
+const hasValidCoordinatePair = (coordinates) => (
+  Array.isArray(coordinates)
+  && coordinates.length === 2
+  && coordinates.every(value => typeof value === 'number' && !Number.isNaN(value))
+  && coordinates[0] >= -180
+  && coordinates[0] <= 180
+  && coordinates[1] >= -90
+  && coordinates[1] <= 90
+);
+
 const resolveStrictLocationFromCoordinates = async ({ longitude, latitude, minRadiusMeters = 0 }) => {
   const nearestLocation = await Location.findOne({
     location: {
@@ -711,21 +721,6 @@ router.get('/booked-slots', authenticate, async (req, res) => {
       }
     }
 
-    if (!targetLocationId) {
-      const currentUser = await User.findById(req.user._id).select('addresses currentLocation').lean();
-      const userCoordinates = getUserCoordinates(currentUser);
-      if (userCoordinates) {
-        const nearbyLocation = await resolveStrictLocationFromCoordinates({
-          ...userCoordinates,
-          minRadiusMeters: serviceSearchRadiusMeters
-        });
-        if (nearbyLocation) {
-          targetLocation = nearbyLocation;
-          targetLocationId = nearbyLocation._id.toString();
-        }
-      }
-    }
-
     if (!targetLocation && targetLocationId) {
       targetLocation = await Location.findById(targetLocationId)
         .select('_id assignedWorkers location maxServiceRadius')
@@ -733,7 +728,7 @@ router.get('/booked-slots', authenticate, async (req, res) => {
     }
 
     if (!targetLocationId) {
-      console.log('⚠️ booked-slots: No location resolved for customer coordinates. Returning 0 workers.');
+      console.log('⚠️ booked-slots: No explicit booking location received. Returning 0 workers.');
       return res.json({
         success: true,
         bookedRanges: [],
@@ -745,7 +740,7 @@ router.get('/booked-slots', authenticate, async (req, res) => {
         slotDurationMinutes,
         isDayActive,
         locationId: null,
-        _debug: { reason: 'No serviceable location found near your address' }
+        _debug: { reason: 'Please pin your selected service location or enable auto location before checking slots.' }
       });
     }
 
@@ -1126,83 +1121,24 @@ router.post('/',
       }
       // ───────────────────────────────────────────────────────────────────
 
-      // ⚠️ IMPORTANT: Get customer location with fallback to saved addresses
+      // ⚠️ IMPORTANT: Use only the explicitly selected booking location.
+      // Never silently fall back to a saved/default profile address here,
+      // otherwise a stale profile location can override the user-selected pin.
       let customerLocation = location;
       let customerLng, customerLat;
 
-      // Check if location coordinates are provided and valid
-      const hasValidCoordinates = 
-        location?.coordinates && 
-        location.coordinates.length === 2 &&
-        location.coordinates[0] !== null && 
-        location.coordinates[0] !== undefined &&
-        location.coordinates[1] !== null && 
-        location.coordinates[1] !== undefined &&
-        !isNaN(location.coordinates[0]) && 
-        !isNaN(location.coordinates[1]) &&
-        location.coordinates[0] >= -180 && 
-        location.coordinates[0] <= 180 &&
-        location.coordinates[1] >= -90 && 
-        location.coordinates[1] <= 90;
-
-      if (!hasValidCoordinates) {
-        // Fallback: Try to use customer's saved location
-        console.log('⚠️ Invalid or missing coordinates, fetching customer saved location...');
-        const customer = await User.findById(req.user._id);
-        
-        if (!customer) {
-          return res.status(400).json({ 
-            error: { 
-              message: 'Customer not found.', 
-              status: 400,
-              code: 'CUSTOMER_NOT_FOUND'
-            } 
-          });
-        }
-
-        // Try to use default address first
-        const defaultAddress = customer.addresses?.find(addr => addr.isDefault);
-        const fallbackAddress = defaultAddress || customer.addresses?.[0];
-        
-        if (fallbackAddress?.location?.coordinates?.length === 2) {
-          customerLng = fallbackAddress.location.coordinates[0];
-          customerLat = fallbackAddress.location.coordinates[1];
-          customerLocation = {
-            coordinates: [customerLng, customerLat],
-            address: fallbackAddress.street || '',
-            area: fallbackAddress.area || '',
-            city: fallbackAddress.city || '',
-            apartment: fallbackAddress.apartment || '',
-            building: fallbackAddress.building || ''
-          };
-          console.log(`✅ Using customer's saved address: ${fallbackAddress.area}, ${fallbackAddress.city}`);
-        } 
-        // Try currentLocation as last resort
-        else if (customer.currentLocation?.coordinates?.length === 2) {
-          customerLng = customer.currentLocation.coordinates[0];
-          customerLat = customer.currentLocation.coordinates[1];
-          customerLocation = {
-            coordinates: [customerLng, customerLat],
-            address: location?.address || '',
-            area: location?.area || '',
-            city: location?.city || ''
-          };
-          console.log(`✅ Using customer's current location`);
-        } 
-        // No valid location found
-        else {
-          return res.status(400).json({ 
-            error: { 
-              message: 'No valid location found. Please add your address in your profile or select a location on the map.', 
-              status: 400,
-              code: 'NO_LOCATION_AVAILABLE'
-            } 
-          });
-        }
-      } else {
-        customerLng = location.coordinates[0];
-        customerLat = location.coordinates[1];
+      if (!hasValidCoordinatePair(location?.coordinates)) {
+        return res.status(400).json({ 
+          error: { 
+            message: 'Please pin your selected service location or enable auto location before booking.', 
+            status: 400,
+            code: 'BOOKING_LOCATION_REQUIRED'
+          } 
+        });
       }
+
+      customerLng = location.coordinates[0];
+      customerLat = location.coordinates[1];
 
       // Fetch service radius — use admin-configured workerSearchRadiusKm as the search perimeter
       const serviceRadiusMeters = (serviceConfig?.workerSearchRadiusKm ?? 10) * 1000;

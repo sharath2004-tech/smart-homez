@@ -293,8 +293,10 @@ const CleaningServicePage = () => {
       setBooking(true);
       if (!service) { toast.error('Service not found'); return; }
 
-      const userLocation = localStorage.getItem('userLocation');
-      const location = userLocation ? JSON.parse(userLocation) : null;
+      if (!resolvedLocation) {
+        toast.error('Please pin your selected service location or enable auto location before booking.');
+        return;
+      }
 
       const bookingData: Record<string, unknown> = {
         service: service._id,
@@ -305,14 +307,16 @@ const CleaningServicePage = () => {
         },
         totalAmount: calculateTotalPrice(),
         estimatedDuration: service.duration,
-        location: location ? {
+        location: {
           type: 'Point',
-          coordinates: [location.lng, location.lat],
-          address: location.address || '',
-          city: location.city || '',
-          state: location.state || '',
-          zipCode: location.zipCode || ''
-        } : undefined
+          coordinates: [resolvedLocation.longitude, resolvedLocation.latitude],
+          apartmentName: resolvedLocation.apartmentName || '',
+          address: resolvedLocation.address || '',
+          area: resolvedLocation.area || '',
+          city: resolvedLocation.city || '',
+          state: resolvedLocation.state || '',
+          zipCode: resolvedLocation.zipCode || ''
+        }
       };
 
       if (bookingType === 'oneTime') {

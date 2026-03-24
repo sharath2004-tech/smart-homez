@@ -192,7 +192,10 @@ const SubscriptionServicePage = () => {
     if (!selectedService) return toast.error("Please select a service");
     if (!startDate) return toast.error("Please select a start date");
 
-    const defaultAddr = profile?.addresses?.find(a => a.isDefault) || profile?.addresses?.[0];
+    if (!resolvedLocation) {
+      toast.error("Please pin your selected service location or enable auto location before booking.");
+      return;
+    }
 
     try {
       setBooking(true);
@@ -222,14 +225,15 @@ const SubscriptionServicePage = () => {
         },
         serviceDetails: { sessionDurationHours: sessionHours },
         preferences: { workerGenderPreference: genderPref, specialInstructions },
-        location: defaultAddr
-          ? {
-              apartmentName: defaultAddr.apartmentName || "",
-              area: defaultAddr.area || "",
-              city: defaultAddr.city || "",
-              coordinates: defaultAddr.location?.coordinates || [],
-            }
-          : undefined,
+        location: {
+          apartmentName: resolvedLocation.apartmentName || "",
+          address: resolvedLocation.address || "",
+          area: resolvedLocation.area || "",
+          city: resolvedLocation.city || "",
+          state: resolvedLocation.state || "",
+          zipCode: resolvedLocation.zipCode || "",
+          coordinates: [resolvedLocation.longitude, resolvedLocation.latitude],
+        },
         notes: specialInstructions,
       } as Record<string, unknown>);
       toast.success("Subscription created! A dedicated maid will be assigned 🎉", { duration: 5000 });
