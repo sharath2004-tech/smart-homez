@@ -451,6 +451,12 @@ export const bookingsAPI = {
     });
   },
 
+  retryAssignment: async (id: string) => {
+    return apiCall(`/bookings/${id}/retry-assignment`, {
+      method: 'POST'
+    });
+  },
+
   getUpcoming: async () => {
     return apiCall('/bookings?status=confirmed,pending');
   },

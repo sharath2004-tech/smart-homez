@@ -15,7 +15,11 @@ import {
     assignWorkersWithBackup,
     checkBackupActivationNeeded
 } from '../utils/advancedWorkerAssignment.js';
-import { processQueuedBookings, updateBookingStatuses } from '../utils/bookingStatusUpdater.js';
+import {
+    processQueuedBookings,
+    retryPendingBookingAssignment,
+    updateBookingStatuses
+} from '../utils/bookingStatusUpdater.js';
 import { calculateDistance } from '../utils/geolocation.js';
 import notificationService from '../utils/notificationService.js';
 import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
@@ -2309,6 +2313,70 @@ router.post('/:id/assign-worker', authenticate, authorize('admin', 'super_admin'
 
   } catch (error) {
     console.error('Assign worker error:', error);
+    res.status(500).json({ error: { message: error.message || 'Server error', status: 500 } });
+  }
+});
+
+// @route   POST /api/bookings/:id/retry-assignment
+// @desc    Retry automatic worker assignment for a stuck pending booking
+// @access  Private/Admin
+router.post('/:id/retry-assignment', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id).select('status worker location.locationId');
+
+    if (!booking) {
+      return res.status(404).json({
+        error: { message: 'Booking not found', status: 404 }
+      });
+    }
+
+    const bookingLocationId = booking.location?.locationId?.toString() || null;
+    const adminLocationIds = (req.user.adminProfile?.assignedLocations || [])
+      .map((location) => location.locationId?.toString())
+      .filter(Boolean);
+
+    if (req.user.role === 'admin' && (!bookingLocationId || !adminLocationIds.includes(bookingLocationId))) {
+      return res.status(403).json({
+        error: { message: 'You can only retry bookings in your assigned region', status: 403 }
+      });
+    }
+
+    if (booking.worker) {
+      return res.status(400).json({
+        error: { message: 'Booking already has an assigned worker', status: 400 }
+      });
+    }
+
+    if (booking.status !== 'pending') {
+      return res.status(400).json({
+        error: { message: `Only pending bookings can be retried. Current status: ${booking.status}`, status: 400 }
+      });
+    }
+
+    const retryResult = await retryPendingBookingAssignment(req.params.id, { notifyCustomer: true });
+
+    if (!retryResult.success) {
+      return res.status(409).json({
+        error: {
+          message: retryResult.reason || 'No worker is available for this booking yet',
+          status: 409
+        }
+      });
+    }
+
+    const updatedBooking = await Booking.findById(req.params.id)
+      .populate('customer', 'name email phone')
+      .populate('worker', 'name email phone gender religion workerProfile profileImage')
+      .populate('backupWorkers.worker', 'name email phone workerProfile profileImage')
+      .populate('service', 'name description price duration allowBreakRequests');
+
+    res.json({
+      success: true,
+      message: 'Worker assignment retried successfully',
+      booking: updatedBooking
+    });
+  } catch (error) {
+    console.error('Retry assignment error:', error);
     res.status(500).json({ error: { message: error.message || 'Server error', status: 500 } });
   }
 });

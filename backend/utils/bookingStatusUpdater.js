@@ -4,6 +4,8 @@ import { assignWorkersWithBackup } from './advancedWorkerAssignment.js';
 import notificationService from './notificationService.js';
 import { checkSlotAvailability } from './slotManagement.js';
 
+let pendingAssignmentRetryInProgress = false;
+
 const DAY_INDEX_BY_NAME = {
   sunday: 0,
   monday: 1,
@@ -166,6 +168,78 @@ const resolveAssignedWorkerForOccurrence = async (booking, occurrenceDate) => {
     backupWorkers: [],
     assignmentMethod: booking.assignmentMethod || 'auto',
     status: 'pending'
+  };
+};
+
+const getPendingAssignmentBaseQuery = (now = new Date()) => ({
+  status: 'pending',
+  $or: [{ worker: null }, { worker: { $exists: false } }],
+  bookingDate: { $gte: startOfDay(now) }
+});
+
+const isBookingStillAssignable = (booking, now = new Date()) => {
+  if (!booking?.bookingDate || !booking?.endTime) {
+    return false;
+  }
+
+  const bookingEnd = new Date(booking.bookingDate);
+  const [endHours, endMinutes] = String(booking.endTime || '00:00').split(':').map(Number);
+  bookingEnd.setHours(endHours || 0, endMinutes || 0, 0, 0);
+  return bookingEnd > now;
+};
+
+const tryAssignPendingBooking = async (pendingBooking, { notifyCustomer = true } = {}) => {
+  const assignmentResult = await assignWorkersWithBackup({
+    customerId: pendingBooking.customer?._id || pendingBooking.customer,
+    service: pendingBooking.service?._id || pendingBooking.service,
+    bookingDate: pendingBooking.bookingDate,
+    startTime: pendingBooking.startTime,
+    endTime: pendingBooking.endTime,
+    location: pendingBooking.location,
+    bookingType: pendingBooking.bookingType,
+    preferences: pendingBooking.preferences || {}
+  });
+
+  if (!assignmentResult.success) {
+    return {
+      success: false,
+      reason: assignmentResult.error || 'No worker available for this booking yet'
+    };
+  }
+
+  pendingBooking.worker = assignmentResult.primaryWorker;
+  pendingBooking.backupWorkers = assignmentResult.backupWorkers || [];
+  pendingBooking.assignmentMethod = assignmentResult.assignmentMethod;
+  pendingBooking.assignedAt = new Date();
+  pendingBooking.status = 'confirmed';
+  pendingBooking.confirmedAt = new Date();
+
+  if (pendingBooking.subscription?.isSubscription && !pendingBooking.subscription.fixedWorker) {
+    pendingBooking.subscription.fixedWorker = assignmentResult.primaryWorker;
+  }
+
+  await pendingBooking.save();
+
+  if (notifyCustomer) {
+    try {
+      await notificationService.sendNotification({
+        userId: pendingBooking.customer?._id || pendingBooking.customer,
+        type: 'booking',
+        title: 'Booking Confirmed',
+        message: 'Great news! A worker has been assigned to your booking. Your service is now confirmed.',
+        priority: 'high',
+        data: { bookingId: pendingBooking._id }
+      });
+    } catch (notifErr) {
+      console.error(`Notification error for booking ${pendingBooking._id}:`, notifErr.message);
+    }
+  }
+
+  return {
+    success: true,
+    assignmentMethod: assignmentResult.assignmentMethod,
+    bookingId: pendingBooking._id,
+    workerId: assignmentResult.primaryWorker
   };
 };
 
@@ -354,76 +428,158 @@ export const scheduleRecurringBookings = async () => {
 export const runBookingUpdates = async () => {
   await updateBookingStatuses();
   await scheduleRecurringBookings();
+  await retryPendingBookingAssignments();
+};
+
+export const retryPendingBookingAssignment = async (bookingId, { notifyCustomer = true } = {}) => {
+  const pendingBooking = await Booking.findOne({
+    _id: bookingId,
+    ...getPendingAssignmentBaseQuery(new Date())
+  })
+    .populate('service')
+    .populate('customer', 'name email preferences');
+
+  if (!pendingBooking) {
+    return {
+      success: false,
+      reason: 'Pending unassigned booking not found or no longer eligible for retry'
+    };
+  }
+
+  if (!isBookingStillAssignable(pendingBooking)) {
+    return {
+      success: false,
+      reason: 'Booking time has already passed and can no longer be assigned'
+    };
+  }
+
+  return tryAssignPendingBooking(pendingBooking, { notifyCustomer });
+};
+
+export const retryPendingBookingAssignments = async () => {
+  if (pendingAssignmentRetryInProgress) {
+    return {
+      success: true,
+      skipped: true,
+      processed: 0,
+      confirmed: 0,
+      message: 'Pending booking retry already running'
+    };
+  }
+
+  pendingAssignmentRetryInProgress = true;
+
+  try {
+    const now = new Date();
+    const pendingBookings = await Booking.find(getPendingAssignmentBaseQuery(now))
+      .select('_id bookingDate startTime endTime location.locationId')
+      .sort({ bookingDate: 1, startTime: 1, createdAt: 1 })
+      .limit(100)
+      .lean();
+
+    const assignableBookings = pendingBookings.filter((booking) => isBookingStillAssignable(booking, now));
+
+    if (assignableBookings.length === 0) {
+      return {
+        success: true,
+        processed: 0,
+        confirmed: 0,
+        message: 'No eligible pending bookings to retry'
+      };
+    }
+
+    const uniqueLocationIds = [
+      ...new Set(
+        assignableBookings
+          .map((booking) => booking.location?.locationId?.toString?.() || null)
+          .filter(Boolean)
+      )
+    ];
+
+    let processed = 0;
+    let confirmed = 0;
+
+    for (const locationId of uniqueLocationIds) {
+      const result = await processQueuedBookings(locationId, { now, notifyCustomer: true });
+      processed += result.processed || 0;
+      confirmed += result.confirmed || 0;
+    }
+
+    const locationlessBookingIds = assignableBookings
+      .filter((booking) => !booking.location?.locationId)
+      .map((booking) => booking._id);
+
+    for (const bookingId of locationlessBookingIds) {
+      const result = await retryPendingBookingAssignment(bookingId, { notifyCustomer: true });
+      processed += 1;
+      if (result.success) {
+        confirmed += 1;
+      }
+    }
+
+    if (confirmed > 0) {
+      console.log(`✅ Pending booking retry job confirmed ${confirmed} booking(s)`);
+    }
+
+    return {
+      success: true,
+      processed,
+      confirmed,
+      message: confirmed > 0
+        ? `Confirmed ${confirmed} pending booking(s)`
+        : 'Retried pending bookings but no workers were available yet'
+    };
+  } catch (error) {
+    console.error('Error retrying pending booking assignments:', error);
+    return {
+      success: false,
+      processed: 0,
+      confirmed: 0,
+      error: error.message
+    };
+  } finally {
+    pendingAssignmentRetryInProgress = false;
+  }
 };
 
 /**
  * Process queued (pending/unassigned) bookings for a location when a worker slot opens up.
  * Called after booking completion or cancellation to automatically confirm waiting bookings.
  */
-export const processQueuedBookings = async (locationId) => {
+export const processQueuedBookings = async (locationId, { now = new Date(), notifyCustomer = true } = {}) => {
   if (!locationId) return { processed: 0, confirmed: 0 };
   try {
     const pendingBookings = await Booking.find({
-      'location.locationId': locationId,
-      status: 'pending',
-      $or: [{ worker: null }, { worker: { $exists: false } }]
+      ...getPendingAssignmentBaseQuery(now),
+      'location.locationId': locationId
     })
       .populate('service')
       .populate('customer', 'name email preferences')
       .sort({ createdAt: 1 }) // FIFO - oldest pending first
       .limit(10);
 
-    if (pendingBookings.length === 0) return { processed: 0, confirmed: 0 };
+    const eligiblePendingBookings = pendingBookings.filter((booking) => isBookingStillAssignable(booking, now));
 
-    console.log(`🔄 Processing ${pendingBookings.length} queued booking(s) at location ${locationId}`);
+    if (eligiblePendingBookings.length === 0) return { processed: 0, confirmed: 0 };
+
+    console.log(`🔄 Processing ${eligiblePendingBookings.length} queued booking(s) at location ${locationId}`);
     let confirmed = 0;
 
-    for (const pendingBooking of pendingBookings) {
+    for (const pendingBooking of eligiblePendingBookings) {
       try {
-        const assignmentResult = await assignWorkersWithBackup({
-          customerId: pendingBooking.customer._id || pendingBooking.customer,
-          service: pendingBooking.service?._id || pendingBooking.service,
-          bookingDate: pendingBooking.bookingDate,
-          startTime: pendingBooking.startTime,
-          endTime: pendingBooking.endTime,
-          location: pendingBooking.location,
-          bookingType: pendingBooking.bookingType,
-          preferences: pendingBooking.preferences || {}
-        });
-
-        if (assignmentResult.success) {
-          pendingBooking.worker = assignmentResult.primaryWorker;
-          pendingBooking.backupWorkers = assignmentResult.backupWorkers || [];
-          pendingBooking.assignmentMethod = assignmentResult.assignmentMethod;
-          pendingBooking.assignedAt = new Date();
-          pendingBooking.status = 'confirmed';
-          pendingBooking.confirmedAt = new Date();
-          await pendingBooking.save();
+        const result = await tryAssignPendingBooking(pendingBooking, { notifyCustomer });
+        if (result.success) {
           confirmed++;
 
           console.log(`✅ Queued booking ${pendingBooking._id} confirmed — worker assigned from queue`);
-
-          // Notify customer that their queued booking is now confirmed
-          try {
-            await notificationService.sendNotification({
-              userId: pendingBooking.customer._id || pendingBooking.customer,
-              type: 'booking',
-              title: 'Booking Confirmed',
-              message: `Great news! A worker has been assigned to your booking. Your service is now confirmed.`,
-              priority: 'high',
-              data: { bookingId: pendingBooking._id }
-            });
-          } catch (notifErr) {
-            console.error(`Notification error for booking ${pendingBooking._id}:`, notifErr.message);
-          }
         }
       } catch (err) {
         console.error(`Failed to process queued booking ${pendingBooking._id}:`, err.message);
       }
     }
 
-    console.log(`📊 Queue result: ${confirmed}/${pendingBookings.length} booking(s) confirmed`);
-    return { processed: pendingBookings.length, confirmed };
+    console.log(`📊 Queue result: ${confirmed}/${eligiblePendingBookings.length} booking(s) confirmed`);
+    return { processed: eligiblePendingBookings.length, confirmed };
   } catch (error) {
     console.error('Error in processQueuedBookings:', error);
     return { processed: 0, confirmed: 0 };
