@@ -93,6 +93,9 @@ const CleaningServicePage = () => {
   const [selectedWorker, setSelectedWorker] = useState<string>('auto-assign');
   const [availableWorkers, setAvailableWorkers] = useState<Worker[]>([]);
   const [loadingWorkers, setLoadingWorkers] = useState(false);
+  const [bookedRanges, setBookedRanges] = useState<Array<{ workerId: string | null; startTime: string; endTime: string }>>([]);
+  const [totalWorkersCount, setTotalWorkersCount] = useState(0);
+  const [checkingSlots, setCheckingSlots] = useState(false);
 
   const {
     availability,
@@ -146,6 +149,82 @@ const CleaningServicePage = () => {
     };
     fetchWorkers();
   }, [bookingType, service]);
+
+  const toMinutes = (time: string) => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return (hours * 60) + minutes;
+  };
+
+  const getEndTimeFromStart = (startTime: string, durationMinutes: number) => {
+    const startMinutes = toMinutes(startTime);
+    const endMinutes = startMinutes + durationMinutes;
+    const endHours = Math.floor(endMinutes / 60) % 24;
+    const remainingMinutes = endMinutes % 60;
+    return `${String(endHours).padStart(2, '0')}:${String(remainingMinutes).padStart(2, '0')}`;
+  };
+
+  const getAvailableWorkersForSlot = (
+    startTime: string,
+    endTime: string,
+    ranges: Array<{ workerId: string | null; startTime: string; endTime: string }> = bookedRanges,
+    totalWorkers: number = totalWorkersCount,
+  ) => {
+    if (totalWorkers <= 0) {
+      return 0;
+    }
+
+    const requestedStart = toMinutes(startTime);
+    const requestedEnd = toMinutes(endTime);
+    const busyWorkerIds = new Set<string>();
+
+    for (const range of ranges) {
+      if (!range.workerId) continue;
+      const rangeStart = toMinutes(range.startTime);
+      const rangeEnd = toMinutes(range.endTime);
+
+      if (requestedStart < rangeEnd && requestedEnd > rangeStart) {
+        busyWorkerIds.add(range.workerId);
+      }
+    }
+
+    return Math.max(0, totalWorkers - busyWorkerIds.size);
+  };
+
+  useEffect(() => {
+    const fetchBookedSlots = async () => {
+      if (
+        bookingType !== 'oneTime'
+        || !selectedDate
+        || !service?._id
+        || !resolvedLocation
+        || !canBookService
+      ) {
+        setBookedRanges([]);
+        setTotalWorkersCount(0);
+        return;
+      }
+
+      try {
+        setCheckingSlots(true);
+        const data = await bookingsAPI.getBookedSlots(
+          selectedDate,
+          { lng: resolvedLocation.longitude, lat: resolvedLocation.latitude },
+          { service: service._id }
+        );
+
+        setBookedRanges(data.bookedRanges || []);
+        setTotalWorkersCount(data.totalWorkers || 0);
+      } catch (error) {
+        console.error('Failed to fetch slot availability:', error);
+        setBookedRanges([]);
+        setTotalWorkersCount(0);
+      } finally {
+        setCheckingSlots(false);
+      }
+    };
+
+    fetchBookedSlots();
+  }, [bookingType, selectedDate, service?._id, resolvedLocation, canBookService]);
 
   const toggleDay = (day: string) => {
     setSelectedDays(prev =>
@@ -237,12 +316,37 @@ const CleaningServicePage = () => {
       };
 
       if (bookingType === 'oneTime') {
-        const [sh, sm] = selectedTime.split(':').map(Number);
-        const endMins = sh * 60 + sm + service.duration;
-        const endTime = `${String(Math.floor(endMins / 60) % 24).padStart(2, '0')}:${String(endMins % 60).padStart(2, '0')}`;
+        const endTime = getEndTimeFromStart(selectedTime, service.duration);
+
+        const latestSlotData = await bookingsAPI.getBookedSlots(
+          selectedDate,
+          resolvedLocation ? { lng: resolvedLocation.longitude, lat: resolvedLocation.latitude } : null,
+          { service: service._id }
+        );
+
+        const latestBookedRanges = latestSlotData.bookedRanges || [];
+        const latestTotalWorkers = latestSlotData.totalWorkers || 0;
+        const availableWorkersForSlot = getAvailableWorkersForSlot(
+          selectedTime,
+          endTime,
+          latestBookedRanges,
+          latestTotalWorkers,
+        );
+
+        if (latestTotalWorkers <= 0) {
+          toast.error('No workers are available in your service region for this date. Please choose another date or time.');
+          return;
+        }
+
+        if (availableWorkersForSlot <= 0) {
+          toast.error('That time slot is already full. Please choose another time.');
+          return;
+        }
+
         bookingData.bookingDate = selectedDate;
         bookingData.startTime = selectedTime;
         bookingData.endTime = endTime;
+        bookingData.autoAssign = true;
       } else {
         bookingData.subscriptionDetails = {
           startDate: subscriptionStartDate,
@@ -255,7 +359,7 @@ const CleaningServicePage = () => {
           autoRenewal,
           allowPause,
         };
-        if (selectedWorker !== 'auto-assign') bookingData.assignedWorker = selectedWorker;
+        if (selectedWorker !== 'auto-assign') bookingData.worker = selectedWorker;
       }
 
       await bookingsAPI.create(bookingData);
@@ -391,6 +495,15 @@ const CleaningServicePage = () => {
                   <Label htmlFor="time">Select Time</Label>
                   <Input id="time" type="time" value={selectedTime}
                     onChange={e => setSelectedTime(e.target.value)} required />
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {checkingSlots
+                      ? 'Checking live worker availability for this date...'
+                      : selectedDate && totalWorkersCount > 0
+                      ? `${getAvailableWorkersForSlot(selectedTime, getEndTimeFromStart(selectedTime, service?.duration || 0))} of ${totalWorkersCount} workers currently free for this time.`
+                      : selectedDate && !checkingSlots
+                      ? 'No workers are currently free in this region for the selected date.'
+                      : 'Select a date to check live worker availability.'}
+                  </p>
                 </div>
               </div>
             </div>
