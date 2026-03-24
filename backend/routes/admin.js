@@ -1175,6 +1175,176 @@ router.get('/workers/:workerId', authenticate, authorize('admin', 'super_admin')
   }
 });
 
+// @route   GET /api/admin/workers/:workerId/performance
+// @desc    Get worker performance summary including work types and revenue generated
+// @access  Private/Admin/SuperAdmin
+router.get('/workers/:workerId/performance', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { workerId } = req.params;
+    const { from, to } = req.query;
+
+    const worker = await User.findById(workerId)
+      .select('name role workerProfile.assignedApartments')
+      .lean();
+
+    if (!worker || worker.role !== 'worker') {
+      return res.status(404).json({
+        error: { message: 'Worker not found', status: 404 }
+      });
+    }
+
+    if (req.user.role === 'admin') {
+      const adminLocationIds = (req.user.adminProfile?.assignedLocations || [])
+        .map((location) => location.locationId?.toString())
+        .filter(Boolean);
+      const workerLocationIds = (worker.workerProfile?.assignedApartments || [])
+        .map((assignment) => assignment.locationId?.toString())
+        .filter(Boolean);
+
+      const hasLocationAccess = workerLocationIds.some((locationId) => adminLocationIds.includes(locationId));
+      if (!hasLocationAccess) {
+        return res.status(403).json({ error: { message: 'You can only view workers assigned to your locations', status: 403 } });
+      }
+    }
+
+    const bookingDateQuery = {};
+    if (from || to) {
+      const fromDate = from ? new Date(from) : new Date('2000-01-01T00:00:00.000Z');
+      const toDate = to ? new Date(to) : new Date();
+      toDate.setHours(23, 59, 59, 999);
+
+      if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+        return res.status(400).json({ error: { message: 'Invalid date format', status: 400 } });
+      }
+
+      bookingDateQuery.bookingDate = { $gte: fromDate, $lte: toDate };
+    }
+
+    const bookings = await Booking.find({
+      worker: workerId,
+      status: 'completed',
+      ...bookingDateQuery
+    })
+      .populate('service', 'name category')
+      .select('bookingId bookingDate bookingType startTime endTime actualDurationMinutes actualStartTime actualEndTime totalAmount service location createdAt')
+      .sort({ bookingDate: -1, startTime: -1 })
+      .lean();
+
+    const calculateBookingMinutes = (booking) => {
+      if (!booking) return 0;
+      if (booking.actualDurationMinutes > 0) {
+        return booking.actualDurationMinutes;
+      }
+      if (booking.actualStartTime && booking.actualEndTime) {
+        return Math.max(0, Math.floor((new Date(booking.actualEndTime) - new Date(booking.actualStartTime)) / 60000));
+      }
+      return 0;
+    };
+
+    const formatWorkTypeLabel = (value) => {
+      if (!value) return 'General Service';
+      return String(value)
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase())
+        .trim();
+    };
+
+    const getServiceName = (booking) => {
+      if (booking?.service?.name) return booking.service.name;
+      if (booking?.bookingType === 'deep-cleaning-cart') return 'Move In / Move Out — Commercial & Residential';
+      return 'Service';
+    };
+
+    const getWorkType = (booking) => {
+      if (booking?.service?.category) return formatWorkTypeLabel(booking.service.category);
+      if (booking?.bookingType === 'deep-cleaning-cart') return 'Move In / Move Out';
+      if (booking?.bookingType) return formatWorkTypeLabel(booking.bookingType);
+      return 'General Service';
+    };
+
+    const normalizedBookings = bookings.map((booking) => {
+      const minutesWorked = calculateBookingMinutes(booking);
+      const revenueGenerated = Number((booking.totalAmount || 0).toFixed(2));
+      const serviceName = getServiceName(booking);
+      const workType = getWorkType(booking);
+      return {
+        booking,
+        serviceName,
+        workType,
+        minutesWorked,
+        revenueGenerated,
+      };
+    });
+
+    const serviceBreakdownMap = new Map();
+    let totalMinutesWorked = 0;
+    let totalRevenueGenerated = 0;
+
+    normalizedBookings.forEach(({ serviceName, workType, minutesWorked, revenueGenerated }) => {
+      const serviceKey = `${serviceName}__${workType}`;
+
+      totalMinutesWorked += minutesWorked;
+      totalRevenueGenerated += revenueGenerated;
+
+      const existing = serviceBreakdownMap.get(serviceKey) || {
+        serviceName,
+        workType,
+        tasksCompleted: 0,
+        minutesWorked: 0,
+        revenueGenerated: 0,
+      };
+
+      existing.tasksCompleted += 1;
+      existing.minutesWorked += minutesWorked;
+      existing.revenueGenerated = Number((existing.revenueGenerated + revenueGenerated).toFixed(2));
+      serviceBreakdownMap.set(serviceKey, existing);
+    });
+
+    const recentTasks = normalizedBookings.slice(0, 12).map(({ booking, serviceName, workType, minutesWorked, revenueGenerated }) => ({
+      _id: booking._id,
+      bookingId: booking.bookingId || null,
+      bookingDate: booking.bookingDate,
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      serviceName,
+      workType,
+      minutesWorked,
+      revenueGenerated,
+      location: booking.location
+        ? {
+            apartmentName: booking.location.apartmentName,
+            area: booking.location.area,
+            city: booking.location.city,
+          }
+        : null,
+    }));
+
+    const serviceBreakdown = Array.from(serviceBreakdownMap.values()).sort((left, right) => {
+      if (right.revenueGenerated !== left.revenueGenerated) {
+        return right.revenueGenerated - left.revenueGenerated;
+      }
+
+      return right.tasksCompleted - left.tasksCompleted;
+    });
+
+    res.json({
+      success: true,
+      summary: {
+        totalTasksCompleted: bookings.length,
+        totalMinutesWorked,
+        totalRevenueGenerated: Number(totalRevenueGenerated.toFixed(2)),
+        averageRevenuePerTask: bookings.length > 0 ? Number((totalRevenueGenerated / bookings.length).toFixed(2)) : 0,
+        serviceTypesWorked: serviceBreakdown.length,
+        serviceBreakdown,
+      },
+      recentTasks,
+    });
+  } catch (error) {
+    console.error('Get worker performance error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
 // @route   POST /api/admin/workers/:workerId/reset-password
 // @desc    Generate a fresh temporary password for a worker account
 // @access  Private/Admin/SuperAdmin

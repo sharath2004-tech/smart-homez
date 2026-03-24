@@ -44,7 +44,24 @@ interface TaskPreview {
   startTime: string;
   endTime: string;
   serviceName: string;
+  workType?: string;
   minutesWorked: number;
+  revenueGenerated?: number;
+}
+
+interface PerformanceSummary {
+  totalRevenueGenerated: number;
+  totalMinutesWorked: number;
+  totalTasksCompleted: number;
+  averageRevenuePerTask: number;
+  serviceTypesWorked: number;
+  serviceBreakdown: Array<{
+    serviceName: string;
+    workType: string;
+    tasksCompleted: number;
+    minutesWorked: number;
+    revenueGenerated: number;
+  }>;
 }
 
 interface SalaryPreview {
@@ -69,16 +86,19 @@ interface SalaryPreview {
     amount: number;
     leaveStatus?: 'pending' | 'approved' | 'rejected';
   }>;
+  performanceSummary?: PerformanceSummary;
   tasks: TaskPreview[];
 }
 
 interface BookingDetail {
   _id: string;
   bookingDate: string;
+  bookingType?: string;
   startTime: string;
   endTime: string;
   actualDurationMinutes?: number;
-  service?: { name: string };
+  totalAmount?: number;
+  service?: { name: string; category?: string };
 }
 
 interface SalaryRequest {
@@ -126,6 +146,7 @@ interface SalaryRequest {
   adminNotes?: string;
   paidAt?: string;
   bookings: BookingDetail[];
+  performanceSummary?: PerformanceSummary;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -180,6 +201,75 @@ function getWorkBasisLabel(data: { payUnitsWorked?: number; payUnitLabel?: 'hour
   }
   const hours = (data.payUnitsWorked ?? (data.totalMinutesWorked / 60));
   return `${hours.toFixed(2)} worked hour${hours === 1 ? '' : 's'}`;
+}
+
+function formatWorkTypeLabel(value?: string | null) {
+  if (!value) return 'General Service';
+
+  return String(value)
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .trim();
+}
+
+function getBookingServiceName(booking: BookingDetail) {
+  if (booking.service?.name) return booking.service.name;
+  if (booking.bookingType === 'deep-cleaning-cart') return 'Move In / Move Out — Commercial & Residential';
+  return 'Service';
+}
+
+function getBookingWorkType(booking: BookingDetail) {
+  if (booking.service?.category) return formatWorkTypeLabel(booking.service.category);
+  if (booking.bookingType === 'deep-cleaning-cart') return 'Move In / Move Out';
+  if (booking.bookingType) return formatWorkTypeLabel(booking.bookingType);
+  return 'General Service';
+}
+
+function buildPerformanceSummaryFromBookings(bookings: BookingDetail[] = []): PerformanceSummary {
+  const serviceMap = new Map<string, PerformanceSummary['serviceBreakdown'][number]>();
+  let totalRevenueGenerated = 0;
+  let totalMinutesWorked = 0;
+
+  bookings.forEach((booking) => {
+    const serviceName = getBookingServiceName(booking);
+    const workType = getBookingWorkType(booking);
+    const revenueGenerated = Number((booking.totalAmount || 0).toFixed(2));
+    const minutesWorked = booking.actualDurationMinutes || 0;
+    const key = `${serviceName}__${workType}`;
+
+    totalRevenueGenerated += revenueGenerated;
+    totalMinutesWorked += minutesWorked;
+
+    const existing = serviceMap.get(key) || {
+      serviceName,
+      workType,
+      tasksCompleted: 0,
+      minutesWorked: 0,
+      revenueGenerated: 0,
+    };
+
+    existing.tasksCompleted += 1;
+    existing.minutesWorked += minutesWorked;
+    existing.revenueGenerated = Number((existing.revenueGenerated + revenueGenerated).toFixed(2));
+    serviceMap.set(key, existing);
+  });
+
+  const serviceBreakdown = Array.from(serviceMap.values()).sort((left, right) => {
+    if (right.revenueGenerated !== left.revenueGenerated) {
+      return right.revenueGenerated - left.revenueGenerated;
+    }
+
+    return right.tasksCompleted - left.tasksCompleted;
+  });
+
+  return {
+    totalRevenueGenerated: Number(totalRevenueGenerated.toFixed(2)),
+    totalMinutesWorked,
+    totalTasksCompleted: bookings.length,
+    averageRevenuePerTask: bookings.length > 0 ? Number((totalRevenueGenerated / bookings.length).toFixed(2)) : 0,
+    serviceTypesWorked: serviceBreakdown.length,
+    serviceBreakdown,
+  };
 }
 
 const STATUS_META = {
@@ -504,7 +594,36 @@ const AdminSalarySettlements = () => {
                         <p className="text-xs text-muted-foreground">Pay basis</p>
                         <p className="text-sm font-bold">{getWorkBasisLabel(sendPreview)}</p>
                       </div>
+                      <div className="bg-background rounded-md p-3">
+                        <p className="text-xs text-muted-foreground">Revenue Generated</p>
+                        <p className="text-xl font-bold">₹{(sendPreview.performanceSummary?.totalRevenueGenerated || 0).toFixed(2)}</p>
+                      </div>
+                      <div className="bg-background rounded-md p-3">
+                        <p className="text-xs text-muted-foreground">Service Types</p>
+                        <p className="text-xl font-bold">{sendPreview.performanceSummary?.serviceTypesWorked || 0}</p>
+                      </div>
+                      <div className="bg-background rounded-md p-3">
+                        <p className="text-xs text-muted-foreground">Avg Revenue / Task</p>
+                        <p className="text-xl font-bold">₹{(sendPreview.performanceSummary?.averageRevenuePerTask || 0).toFixed(2)}</p>
+                      </div>
                     </div>
+
+                    {sendPreview.performanceSummary && sendPreview.performanceSummary.serviceBreakdown.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Work Type & Revenue Breakdown</p>
+                        <div className="space-y-2">
+                          {sendPreview.performanceSummary.serviceBreakdown.map((item, index) => (
+                            <div key={`preview-service-${index}`} className="flex items-center justify-between rounded-md bg-background px-3 py-2 text-sm gap-3">
+                              <div>
+                                <p className="font-medium text-foreground">{item.serviceName}</p>
+                                <p className="text-xs text-muted-foreground">{item.workType} · {item.tasksCompleted} task{item.tasksCompleted === 1 ? '' : 's'} · {formatMinutes(item.minutesWorked)}</p>
+                              </div>
+                              <span className="font-semibold text-emerald-700">₹{item.revenueGenerated.toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="bg-primary rounded-lg p-4 text-center">
                       <p className="text-sm text-primary-foreground/80">Settlement Amount</p>
@@ -580,8 +699,14 @@ const AdminSalarySettlements = () => {
                                 {new Date(task.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
                                 {' · '}{task.startTime} – {task.endTime}
                               </p>
+                              {task.workType && (
+                                <p className="text-xs text-muted-foreground">{task.workType}</p>
+                              )}
                             </div>
-                            <span className="text-xs text-muted-foreground">{formatMinutes(task.minutesWorked)}</span>
+                            <div className="text-right">
+                              <span className="block text-xs text-muted-foreground">{formatMinutes(task.minutesWorked)}</span>
+                              <span className="block text-xs font-semibold text-emerald-700">₹{(task.revenueGenerated || 0).toFixed(2)}</span>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -682,6 +807,7 @@ const AdminSalarySettlements = () => {
               const meta = STATUS_META[req.status];
               const Icon = meta.icon;
               const isExpanded = expandedId === req._id;
+              const performanceSummary = req.performanceSummary || buildPerformanceSummaryFromBookings(req.bookings || []);
 
               return (
                 <Card key={req._id} className="overflow-hidden">
@@ -736,7 +862,36 @@ const AdminSalarySettlements = () => {
                             <p className="text-xs text-muted-foreground">Pay basis</p>
                             <p className="text-sm font-bold">{getWorkBasisLabel(req)}</p>
                           </div>
+                          <div className="bg-muted/40 rounded-md p-3">
+                            <p className="text-xs text-muted-foreground">Revenue Generated</p>
+                            <p className="text-xl font-bold">₹{performanceSummary.totalRevenueGenerated.toFixed(2)}</p>
+                          </div>
+                          <div className="bg-muted/40 rounded-md p-3">
+                            <p className="text-xs text-muted-foreground">Service Types</p>
+                            <p className="text-xl font-bold">{performanceSummary.serviceTypesWorked}</p>
+                          </div>
+                          <div className="bg-muted/40 rounded-md p-3">
+                            <p className="text-xs text-muted-foreground">Avg Revenue / Task</p>
+                            <p className="text-xl font-bold">₹{performanceSummary.averageRevenuePerTask.toFixed(2)}</p>
+                          </div>
                         </div>
+
+                        {performanceSummary.serviceBreakdown.length > 0 && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Service Performance Breakdown</p>
+                            <div className="space-y-1.5">
+                              {performanceSummary.serviceBreakdown.map((item, index) => (
+                                <div key={`${req._id}-service-${index}`} className="flex items-center justify-between bg-muted/30 rounded px-3 py-2 text-sm gap-3">
+                                  <div>
+                                    <p className="font-medium">{item.serviceName}</p>
+                                    <p className="text-xs text-muted-foreground">{item.workType} · {item.tasksCompleted} task{item.tasksCompleted === 1 ? '' : 's'} · {formatMinutes(item.minutesWorked)}</p>
+                                  </div>
+                                  <span className="font-semibold text-emerald-700">₹{item.revenueGenerated.toFixed(2)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Task breakdown */}
                         {req.bookings && req.bookings.length > 0 && (
@@ -748,12 +903,16 @@ const AdminSalarySettlements = () => {
                                 return (
                                   <div key={b._id} className="flex items-center justify-between bg-muted/30 rounded px-3 py-2 text-sm">
                                     <div>
-                                      <p className="font-medium">{b.service?.name || 'Service'}</p>
+                                        <p className="font-medium">{getBookingServiceName(b)}</p>
                                       <p className="text-xs text-muted-foreground">
                                         {fmtDate(b.bookingDate)} · {b.startTime} – {b.endTime}
                                       </p>
+                                        <p className="text-xs text-muted-foreground">{getBookingWorkType(b)}</p>
                                     </div>
-                                    <span className="text-xs text-muted-foreground">{formatMinutes(mins)}</span>
+                                      <div className="text-right">
+                                        <span className="block text-xs text-muted-foreground">{formatMinutes(mins)}</span>
+                                        <span className="block text-xs font-semibold text-emerald-700">₹{(b.totalAmount || 0).toFixed(2)}</span>
+                                      </div>
                                   </div>
                                 );
                               })}
@@ -774,6 +933,14 @@ const AdminSalarySettlements = () => {
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Pay basis</span>
                             <span>{getWorkBasisLabel(req)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Revenue generated</span>
+                            <span>₹{performanceSummary.totalRevenueGenerated.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Average revenue per task</span>
+                            <span>₹{performanceSummary.averageRevenuePerTask.toFixed(2)}</span>
                           </div>
                           {(req.totalPenaltyAmount || 0) > 0 && (
                             <>

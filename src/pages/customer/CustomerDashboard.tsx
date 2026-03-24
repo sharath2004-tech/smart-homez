@@ -565,21 +565,21 @@ const CustomerDashboard = () => {
 
 
 
-        {/* Move In / Move Out Promo Banner */}
+        {/* Move In / Move Out Commercial & Residential Banner */}
         {serviceableStatus === 'available' && (
         <motion.div variants={itemVariants}>
           <Link
-            to="/customer/deep-cleaning"
+            to="/deep-cleaning-quote"
             className="flex items-center gap-4 p-4 rounded-2xl border-2 border-green-300 bg-gradient-to-r from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 hover:border-green-400 transition-all group block"
           >
             <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform text-3xl">
               ✨
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-green-900 text-sm leading-tight">Move In / Move Out Cleaning</p>
-              <p className="text-xs text-green-700 mt-0.5">Enter your home area and get the amount instantly</p>
+              <p className="font-bold text-green-900 text-sm leading-tight">Move In / Move Out — Commercial &amp; Residential</p>
+              <p className="text-xs text-green-700 mt-0.5">Get a custom quote for villas, offices, restaurants, bungalows and handover cleaning.</p>
             </div>
-            <span className="shrink-0 text-xs font-semibold bg-green-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">Open</span>
+            <span className="shrink-0 text-xs font-semibold bg-green-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">Get Quote</span>
           </Link>
         </motion.div>
         )}

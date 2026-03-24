@@ -84,6 +84,38 @@ interface Worker {
   isArchived?: boolean;
 }
 
+interface WorkerPerformanceSummary {
+  totalTasksCompleted: number;
+  totalMinutesWorked: number;
+  totalRevenueGenerated: number;
+  averageRevenuePerTask: number;
+  serviceTypesWorked: number;
+  serviceBreakdown: Array<{
+    serviceName: string;
+    workType: string;
+    tasksCompleted: number;
+    minutesWorked: number;
+    revenueGenerated: number;
+  }>;
+}
+
+interface WorkerPerformanceTask {
+  _id: string;
+  bookingId?: string | null;
+  bookingDate: string;
+  startTime: string;
+  endTime: string;
+  serviceName: string;
+  workType: string;
+  minutesWorked: number;
+  revenueGenerated: number;
+  location?: {
+    apartmentName?: string;
+    area?: string;
+    city?: string;
+  } | null;
+}
+
 const statusConfig: Record<string, { label: string; class: string }> = {
   available: { label: "Available", class: "badge-success" },
   offline: { label: "Offline", class: "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold bg-muted text-muted-foreground" },
@@ -136,6 +168,15 @@ const isWorkerEffectivelyOnline = (worker: Worker) => {
 
 const getWorkerAvailabilityReason = (worker: Worker) => worker.workerProfile?.availabilityReason || null;
 
+const formatMinutes = (mins: number) => {
+  if (mins <= 0) return '0m';
+  const hours = Math.floor(mins / 60);
+  const minutes = mins % 60;
+  if (hours === 0) return `${minutes}m`;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
+};
+
 const AdminWorkers = () => {
   const { role, name, isSuperAdmin } = useAdminRole();
   const [search, setSearch] = useState("");
@@ -170,6 +211,8 @@ const AdminWorkers = () => {
   // Worker analytics state
   const [workerReliabilityData, setWorkerReliabilityData] = useState<any>(null);
   const [workerRatingAnalytics, setWorkerRatingAnalytics] = useState<any>(null);
+  const [workerPerformanceSummary, setWorkerPerformanceSummary] = useState<WorkerPerformanceSummary | null>(null);
+  const [workerRecentTasks, setWorkerRecentTasks] = useState<WorkerPerformanceTask[]>([]);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
   // Credential management (superadmin only)
@@ -252,12 +295,15 @@ const AdminWorkers = () => {
     try {
       setLoadingAnalytics(true);
 
-      const [reliabilityRes, ratingAnalyticsRes] = await Promise.all([
+      const [reliabilityRes, ratingAnalyticsRes, performanceRes] = await Promise.all([
         // Fetch reliability score and history using new API
         reliabilityAPI.getWorkerScore(workerId),
 
         // Fetch rating analytics using new API
-        reviewAnalyticsAPI.getWorkerAnalytics(workerId)
+        reviewAnalyticsAPI.getWorkerAnalytics(workerId),
+
+        // Fetch revenue and work-type analytics
+        adminAPI.getWorkerPerformance(workerId)
       ]);
 
       // Set reliability data if successful
@@ -268,6 +314,12 @@ const AdminWorkers = () => {
       // Set rating analytics data if successful
       if (ratingAnalyticsRes && !ratingAnalyticsRes.error) {
         setWorkerRatingAnalytics(ratingAnalyticsRes.analytics);
+      }
+
+      if (performanceRes && typeof performanceRes === 'object' && 'summary' in (performanceRes as Record<string, unknown>)) {
+        const typedPerformanceRes = performanceRes as { summary?: WorkerPerformanceSummary; recentTasks?: WorkerPerformanceTask[] };
+        setWorkerPerformanceSummary(typedPerformanceRes.summary || null);
+        setWorkerRecentTasks(typedPerformanceRes.recentTasks || []);
       }
     } catch (error) {
       console.error('Error fetching worker analytics:', error);
@@ -309,6 +361,8 @@ const AdminWorkers = () => {
       // Clear previous analytics data
       setWorkerReliabilityData(null);
       setWorkerRatingAnalytics(null);
+      setWorkerPerformanceSummary(null);
+      setWorkerRecentTasks([]);
 
       // Fetch analytics data for this worker
       fetchWorkerAnalytics(workerId);
@@ -2270,6 +2324,68 @@ const AdminWorkers = () => {
                       </div>
                     </div>
                   </div>
+
+                  {workerPerformanceSummary && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
+                        <div className="text-center">
+                          <div className="text-lg font-bold text-gray-900 mb-1">₹{workerPerformanceSummary.totalRevenueGenerated.toFixed(2)}</div>
+                          <p className="text-xs text-gray-600">Revenue Generated</p>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-lg font-bold text-gray-900 mb-1">{workerPerformanceSummary.serviceTypesWorked}</div>
+                          <p className="text-xs text-gray-600">Work Types Handled</p>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-lg font-bold text-gray-900 mb-1">₹{workerPerformanceSummary.averageRevenuePerTask.toFixed(2)}</div>
+                          <p className="text-xs text-gray-600">Avg Revenue / Task</p>
+                        </div>
+                      </div>
+
+                      {workerPerformanceSummary.serviceBreakdown.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-semibold text-foreground">Type of Work & Revenue</h4>
+                          <div className="space-y-2">
+                            {workerPerformanceSummary.serviceBreakdown.map((item, index) => (
+                              <div key={`worker-performance-${index}`} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 px-3 py-3">
+                                <div>
+                                  <p className="text-sm font-semibold text-foreground">{item.serviceName}</p>
+                                  <p className="text-xs text-muted-foreground">{item.workType} · {item.tasksCompleted} task{item.tasksCompleted === 1 ? '' : 's'} · {formatMinutes(item.minutesWorked)}</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-sm font-bold text-emerald-700">₹{item.revenueGenerated.toFixed(2)}</p>
+                                  <p className="text-xs text-muted-foreground">Generated revenue</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {workerRecentTasks.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-semibold text-foreground">Recent Completed Work</h4>
+                          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                            {workerRecentTasks.map((task) => (
+                              <div key={task._id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background px-3 py-3">
+                                <div>
+                                  <p className="text-sm font-semibold text-foreground">{task.serviceName}</p>
+                                  <p className="text-xs text-muted-foreground">{task.workType} · {new Date(task.bookingDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} · {task.startTime} – {task.endTime}</p>
+                                  {task.location && (
+                                    <p className="text-xs text-muted-foreground">{[task.location.apartmentName, task.location.area, task.location.city].filter(Boolean).join(' · ')}</p>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-xs text-muted-foreground">{formatMinutes(task.minutesWorked)}</p>
+                                  <p className="text-sm font-bold text-emerald-700">₹{task.revenueGenerated.toFixed(2)}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Action Buttons */}

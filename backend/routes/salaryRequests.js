@@ -148,6 +148,100 @@ function getCompensationSummary(workerProfile = {}, workMetrics = { totalMinutes
   };
 }
 
+function formatWorkTypeLabel(value) {
+  if (!value) return 'General Service';
+
+  return String(value)
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .trim();
+}
+
+function getBookingServiceName(booking) {
+  if (booking?.service?.name) {
+    return booking.service.name;
+  }
+
+  if (booking?.bookingType === 'deep-cleaning-cart') {
+    return 'Move In / Move Out — Commercial & Residential';
+  }
+
+  return 'Service';
+}
+
+function getBookingWorkType(booking) {
+  if (booking?.service?.category) {
+    return formatWorkTypeLabel(booking.service.category);
+  }
+
+  if (booking?.bookingType === 'deep-cleaning-cart') {
+    return 'Move In / Move Out';
+  }
+
+  if (booking?.bookingType) {
+    return formatWorkTypeLabel(booking.bookingType);
+  }
+
+  return 'General Service';
+}
+
+function buildWorkerPerformanceSummary(bookings = []) {
+  const normalizedBookings = bookings.map((booking) => {
+    const minutesWorked = calculateBookingMinutes(booking);
+    const revenueGenerated = roundMoney(booking?.totalAmount || 0);
+
+    return {
+      booking,
+      minutesWorked,
+      revenueGenerated,
+      serviceName: getBookingServiceName(booking),
+      workType: getBookingWorkType(booking)
+    };
+  });
+
+  const serviceMap = new Map();
+  let totalRevenueGenerated = 0;
+  let totalMinutesWorked = 0;
+
+  normalizedBookings.forEach(({ serviceName, workType, minutesWorked, revenueGenerated }) => {
+    totalRevenueGenerated += revenueGenerated;
+    totalMinutesWorked += minutesWorked;
+
+    const key = `${serviceName}__${workType}`;
+    const existing = serviceMap.get(key) || {
+      serviceName,
+      workType,
+      tasksCompleted: 0,
+      minutesWorked: 0,
+      revenueGenerated: 0,
+    };
+
+    existing.tasksCompleted += 1;
+    existing.minutesWorked += minutesWorked;
+    existing.revenueGenerated = roundMoney(existing.revenueGenerated + revenueGenerated);
+    serviceMap.set(key, existing);
+  });
+
+  const serviceBreakdown = Array.from(serviceMap.values()).sort((left, right) => {
+    if (right.revenueGenerated !== left.revenueGenerated) {
+      return right.revenueGenerated - left.revenueGenerated;
+    }
+
+    return right.tasksCompleted - left.tasksCompleted;
+  });
+
+  return {
+    totalRevenueGenerated: roundMoney(totalRevenueGenerated),
+    totalMinutesWorked,
+    totalTasksCompleted: normalizedBookings.length,
+    averageRevenuePerTask: normalizedBookings.length > 0
+      ? roundMoney(totalRevenueGenerated / normalizedBookings.length)
+      : 0,
+    serviceTypesWorked: serviceBreakdown.length,
+    serviceBreakdown
+  };
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // WORKER routes
 // ────────────────────────────────────────────────────────────────────────────
@@ -197,9 +291,11 @@ router.get('/preview', authenticate, authorize('worker'), async (req, res) => {
       status: 'completed',
       bookingDate: { $gte: fromDate, $lte: toDate }
     })
-      .populate('service', 'name')
-      .select('bookingDate startTime endTime actualStartTime actualEndTime actualDurationMinutes totalAmount service')
+      .populate('service', 'name category')
+      .select('bookingDate bookingType startTime endTime actualStartTime actualEndTime actualDurationMinutes totalAmount service')
       .lean();
+
+    const performanceSummary = buildWorkerPerformanceSummary(bookings);
 
     const tasks = bookings.map(b => {
       const mins = calculateBookingMinutes(b);
@@ -208,8 +304,10 @@ router.get('/preview', authenticate, authorize('worker'), async (req, res) => {
         date: b.bookingDate,
         startTime: b.startTime,
         endTime: b.endTime,
-        serviceName: b.service?.name || 'Service',
-        minutesWorked: mins
+        serviceName: getBookingServiceName(b),
+        workType: getBookingWorkType(b),
+        minutesWorked: mins,
+        revenueGenerated: roundMoney(b.totalAmount || 0)
       };
     });
 
@@ -236,6 +334,7 @@ router.get('/preview', authenticate, authorize('worker'), async (req, res) => {
         netAmount: calculateNetAmount(compensation.requestedAmount, penaltySummary.totalPenaltyAmount, true),
         totalPenaltyAmount: penaltySummary.totalPenaltyAmount,
         penaltyBreakdown: penaltySummary.penaltyBreakdown,
+        performanceSummary,
         tasks
       }
     });
@@ -386,9 +485,11 @@ router.get('/admin/worker-preview', authenticate, authorize('admin', 'super_admi
       status: 'completed',
       bookingDate: { $gte: fromDate, $lte: toDate }
     })
-      .populate('service', 'name')
-      .select('bookingDate startTime endTime actualDurationMinutes actualStartTime actualEndTime service')
+      .populate('service', 'name category')
+      .select('bookingDate bookingType startTime endTime actualDurationMinutes actualStartTime actualEndTime totalAmount service')
       .lean();
+
+    const performanceSummary = buildWorkerPerformanceSummary(bookings);
 
     const tasks = bookings.map(b => {
       const mins = calculateBookingMinutes(b);
@@ -397,8 +498,10 @@ router.get('/admin/worker-preview', authenticate, authorize('admin', 'super_admi
         date: b.bookingDate,
         startTime: b.startTime,
         endTime: b.endTime,
-        serviceName: b.service?.name || 'Service',
-        minutesWorked: mins
+        serviceName: getBookingServiceName(b),
+        workType: getBookingWorkType(b),
+        minutesWorked: mins,
+        revenueGenerated: roundMoney(b.totalAmount || 0)
       };
     });
 
@@ -425,6 +528,7 @@ router.get('/admin/worker-preview', authenticate, authorize('admin', 'super_admi
         netAmount: calculateNetAmount(compensation.requestedAmount, penaltySummary.totalPenaltyAmount, true),
         totalPenaltyAmount: penaltySummary.totalPenaltyAmount,
         penaltyBreakdown: penaltySummary.penaltyBreakdown,
+        performanceSummary,
         tasks
       }
     });
@@ -566,12 +670,17 @@ router.get('/admin', authenticate, authorize('admin', 'super_admin'), async (req
       .populate('location', 'apartmentName area city')
       .populate({
         path: 'bookings',
-        select: 'bookingId bookingDate startTime endTime actualDurationMinutes actualStartTime actualEndTime service location',
-        populate: { path: 'service', select: 'name' }
+        select: 'bookingId bookingDate bookingType startTime endTime actualDurationMinutes actualStartTime actualEndTime totalAmount service location',
+        populate: { path: 'service', select: 'name category' }
       })
       .lean();
 
-    res.json({ success: true, requests });
+    const requestsWithPerformance = requests.map((request) => ({
+      ...request,
+      performanceSummary: buildWorkerPerformanceSummary(request.bookings || [])
+    }));
+
+    res.json({ success: true, requests: requestsWithPerformance });
   } catch (error) {
     console.error('Get admin salary requests error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });

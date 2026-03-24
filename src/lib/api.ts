@@ -1265,6 +1265,13 @@ export const adminAPI = {
     return apiCall(`/admin/workers/${workerId}`);
   },
 
+  getWorkerPerformance: async (workerId: string, params?: { from?: string; to?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.from) query.append('from', params.from);
+    if (params?.to) query.append('to', params.to);
+    return apiCall(`/admin/workers/${workerId}/performance${query.toString() ? `?${query.toString()}` : ''}`);
+  },
+
   resetWorkerPassword: async (workerId: string, credentialDelivery?: 'email' | 'phone' | 'both') => {
     return apiCall(`/admin/workers/${workerId}/reset-password`, {
       method: 'POST',
