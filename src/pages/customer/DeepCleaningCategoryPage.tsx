@@ -19,7 +19,10 @@ const getPrimaryAction = (category: DeepCleaningCategory | null) => {
   const mode = meta.mode || "customize";
 
   if (mode === "package") {
-    return { href: "/customer/services/deep-cleaning", label: meta.primaryActionLabel || "Continue to packages" };
+    return {
+      href: `/customer/deep-cleaning/customize?category=${encodeURIComponent(categoryId)}`,
+      label: "Start booking",
+    };
   }
   if (mode === "quote") {
     return { href: "/deep-cleaning-quote", label: meta.primaryActionLabel || "Request custom quote" };
@@ -45,6 +48,29 @@ const getSecondaryAction = (category: DeepCleaningCategory | null) => {
     return { href: "/customer/deep-cleaning", label: meta.secondaryActionLabel || "Browse all deep-cleaning types" };
   }
   return { href: "/customer/services/deep-cleaning", label: meta.secondaryActionLabel || "See full-home packages" };
+};
+
+const getItemAction = (categoryId: string, item: ConfigItem) => {
+  const href = `/customer/deep-cleaning/customize?category=${encodeURIComponent(categoryId)}&item=${encodeURIComponent(item.id)}`;
+
+  if (item.pricingType === "per_sqft") {
+    return {
+      href,
+      label: "Enter area & order",
+    };
+  }
+
+  if (item.pricingType === "tiered") {
+    return {
+      href,
+      label: "Choose package & order",
+    };
+  }
+
+  return {
+    href,
+    label: "Order this service",
+  };
 };
 
 const priceLabel = (item: ConfigItem) => {
@@ -185,7 +211,7 @@ const DeepCleaningCategoryPage = () => {
             <div>
               <h2 className="text-xl font-bold text-foreground">{meta?.inclusionsTitle || "What this includes"}</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                See the active services available in this category and continue with booking.
+                See the active services in this category and start ordering directly from here.
               </p>
             </div>
 
@@ -203,6 +229,11 @@ const DeepCleaningCategoryPage = () => {
                     transition={{ delay: index * 0.05 }}
                     className="rounded-2xl border border-border bg-card p-4 shadow-sm"
                   >
+                    {(() => {
+                      const itemAction = getItemAction(categoryId, item);
+
+                      return (
+                        <>
                     <div className="flex items-start justify-between gap-3">
                       <div className="text-2xl">{item.icon || category?.emoji}</div>
                       <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
@@ -215,6 +246,15 @@ const DeepCleaningCategoryPage = () => {
                       <span className="text-sm font-bold text-green-700">{priceLabel(item)}</span>
                       <CheckCircle2 className="h-4 w-4 text-green-600" />
                     </div>
+                    <Link
+                      to={itemAction.href}
+                      className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-95 transition-opacity"
+                    >
+                      {itemAction.label} <ArrowRight className="h-4 w-4" />
+                    </Link>
+                        </>
+                      );
+                    })()}
                   </motion.div>
                 ))}
               </div>
@@ -247,7 +287,7 @@ const DeepCleaningCategoryPage = () => {
                 to={primaryAction.href}
                 className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
               >
-                {primaryAction.label} <ArrowRight className="h-4 w-4" />
+                Open full booking builder <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </section>

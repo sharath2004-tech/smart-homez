@@ -102,6 +102,7 @@ const AnimatedTotal = ({ value }: { value: number }) => (
 export default function DeepCleaningPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const requestedItemId = searchParams.get("item");
   const [config, setConfig] = useState<DeepCleaningConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("bathroom");
@@ -121,6 +122,7 @@ export default function DeepCleaningPage() {
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [requestingService, setRequestingService] = useState(false);
   const prevCat = useRef("bathroom");
+  const autoOpenedItemRef = useRef<string | null>(null);
 
   const customerAddresses = profile?.addresses ?? profile?.customerProfile?.addresses ?? [];
 
@@ -359,6 +361,77 @@ export default function DeepCleaningPage() {
   const handleCategoryChange = (id: string) => { prevCat.current = activeCategory; setActiveCategory(id); };
   const direction = categories.findIndex(c => c.id === activeCategory) > categories.findIndex(c => c.id === prevCat.current) ? 1 : -1;
   const items = (config?.items ?? []).filter(i => i.isActive && i.category === activeCategory).sort((a, b) => a.sortOrder - b.sortOrder);
+
+  useEffect(() => {
+    if (!requestedItemId || !items.length) return;
+
+    const item = items.find((entry) => entry.id === requestedItemId);
+    if (!item) return;
+
+    const highlightItem = () => {
+      setPulsedItem(item.id);
+      window.setTimeout(() => setPulsedItem(null), 700);
+
+      if (typeof document !== "undefined") {
+        window.requestAnimationFrame(() => {
+          const element = document.getElementById(`deep-cleaning-item-${item.id}`);
+          element?.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+      }
+    };
+
+    if (autoOpenedItemRef.current === requestedItemId) {
+      highlightItem();
+      return;
+    }
+
+    autoOpenedItemRef.current = requestedItemId;
+
+    setCart((prev) => {
+      if (prev[item.id]) {
+        return prev;
+      }
+
+      if (item.pricingType === "fixed" || item.pricingType === "per_unit") {
+        return {
+          ...prev,
+          [item.id]: {
+            itemId: item.id,
+            name: item.name,
+            category: item.category,
+            qty: 1,
+            unitPrice: item.price,
+            totalPrice: item.price,
+          }
+        };
+      }
+
+      if (item.pricingType === "tiered") {
+        const selectedTierIndex = tierSelects[item.id] ?? 0;
+        const tier = item.tiers?.[selectedTierIndex];
+        if (!tier) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          [item.id]: {
+            itemId: item.id,
+            name: `${item.name} — ${tier.label}`,
+            category: item.category,
+            qty: 1,
+            unitPrice: tier.price,
+            totalPrice: tier.price,
+            selectedTier: tier.label,
+          }
+        };
+      }
+
+      return prev;
+    });
+
+    highlightItem();
+  }, [items, requestedItemId, tierSelects]);
 
   if (loading) return (
     <AppLayout userType="customer" userName={profile?.name}>
@@ -753,6 +826,7 @@ function ItemCard({ item, idx, cart, sqftValues, tierSelects, pulsedItem,
 
   return (
     <motion.div
+      id={`deep-cleaning-item-${item.id}`}
       initial={{ opacity: 0, y: 22, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: pulsed ? 1.025 : 1 }}
       transition={{ delay: idx * 0.07, type: "spring", stiffness: 240, damping: 22 }}
