@@ -1,5 +1,5 @@
 import AppLayout from "@/components/AppLayout";
-import { adminAPI, authAPI, locationRequestsAPI, locationsAPI } from "@/lib/api";
+import { adminAPI, authAPI, locationRequestsAPI, locationsAPI, superAdminAPI } from "@/lib/api";
 import { cropQRFromImage } from "@/utils/cropQRFromImage";
 import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -188,6 +188,8 @@ const AdminLocations = () => {
 
   const isSuperAdmin = profile?.role === 'super_admin';
 
+  const locationApi = isSuperAdmin ? superAdminAPI : adminAPI;
+
   const handleCloseLocationForm = () => {
     setShowLocationForm(false);
     setShowMap(false);
@@ -216,7 +218,7 @@ const AdminLocations = () => {
     }
 
     try {
-      await adminAPI.deleteLocation(locationId);
+      await locationApi.deleteLocation(locationId);
       alert('Location deleted successfully!');
       fetchData();
     } catch (error) {
@@ -456,8 +458,9 @@ const AdminLocations = () => {
       setLoading(true);
       const profileRes = await authAPI.getProfile();
       setProfile(profileRes.user || profileRes);
-      
-      const locationsRes = await adminAPI.getLocations();
+
+      const roleIsSuperAdmin = profileRes.user?.role === 'super_admin' || profileRes.role === 'super_admin';
+      const locationsRes = await (roleIsSuperAdmin ? superAdminAPI.getLocations() : adminAPI.getLocations());
       setLocations(locationsRes.locations || []);
 
       // Only super admin can see admins
@@ -487,10 +490,10 @@ const AdminLocations = () => {
       };
 
       if (editingLocation) {
-        await adminAPI.updateLocation(editingLocation._id, payload);
+        await locationApi.updateLocation(editingLocation._id, payload);
         alert('Location updated successfully!');
       } else {
-        await adminAPI.createLocation(payload);
+        await locationApi.createLocation(payload);
         alert('Location created successfully!');
       }
 

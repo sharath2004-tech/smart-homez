@@ -713,9 +713,57 @@ router.post(
 // @route   PATCH /api/super-admin/locations/:locationId
 router.patch('/locations/:locationId', async (req, res) => {
   try {
+    const {
+      apartmentName,
+      building,
+      area,
+      city,
+      state,
+      zipCode,
+      coordinates,
+      maxServiceRadius,
+      isServiceAvailable
+    } = req.body;
+
+    const updates = {};
+
+    if (apartmentName !== undefined) updates.apartmentName = apartmentName;
+    if (building !== undefined) updates.building = building;
+    if (area !== undefined) updates.area = area;
+    if (state !== undefined) updates.state = state;
+    if (zipCode !== undefined) updates.zipCode = zipCode;
+    if (maxServiceRadius !== undefined) updates.maxServiceRadius = maxServiceRadius;
+    if (isServiceAvailable !== undefined) updates.isServiceAvailable = isServiceAvailable;
+
+    if (city !== undefined) {
+      updates.city = VALID_INDIAN_CITIES.find(
+        (c) => c.toLowerCase() === String(city).trim().toLowerCase()
+      ) || String(city).trim();
+    }
+
+    if (coordinates !== undefined) {
+      if (!Array.isArray(coordinates) || coordinates.length !== 2) {
+        return res.status(400).json({
+          error: { message: 'Coordinates must be an array of exactly 2 values [longitude, latitude]', status: 400 }
+        });
+      }
+
+      const [lng, lat] = coordinates.map(Number);
+      if (Number.isNaN(lng) || Number.isNaN(lat) || lng < -180 || lng > 180 || lat < -90 || lat > 90) {
+        return res.status(400).json({
+          error: { message: 'Coordinates must contain valid longitude and latitude values', status: 400 }
+        });
+      }
+
+      updates.location = {
+        type: 'Point',
+        coordinates: [lng, lat]
+      };
+    }
+
     const location = await Location.findByIdAndUpdate(
       req.params.locationId,
-      { $set: req.body },
+      { $set: updates },
       { new: true, runValidators: true }
     ).populate('assignedAdmin', 'name email');
 
