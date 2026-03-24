@@ -62,6 +62,11 @@ const VALID_INDIAN_CITIES = [
 
 const router = express.Router();
 
+const REVENUE_BOOKING_MATCH = {
+  status: 'completed',
+  cancellationDate: null
+};
+
 // Apply authenticate + super_admin guard to every route in this file
 router.use(authenticate, authorize('super_admin'));
 
@@ -147,7 +152,12 @@ router.get('/overview', async (req, res) => {
                 $expr: {
                   $and: [
                     { $in: ['$worker', '$$workerIds'] },
-                    { $eq: ['$status', 'completed'] }
+                    {
+                      $and: [
+                        { $eq: ['$status', REVENUE_BOOKING_MATCH.status] },
+                        { $eq: ['$cancellationDate', REVENUE_BOOKING_MATCH.cancellationDate] }
+                      ]
+                    }
                   ]
                 }
               }
@@ -167,7 +177,12 @@ router.get('/overview', async (req, res) => {
                 $expr: {
                   $and: [
                     { $in: ['$worker', '$$workerIds'] },
-                    { $eq: ['$status', 'completed'] }
+                    {
+                      $and: [
+                        { $eq: ['$status', REVENUE_BOOKING_MATCH.status] },
+                        { $eq: ['$cancellationDate', REVENUE_BOOKING_MATCH.cancellationDate] }
+                      ]
+                    }
                   ]
                 }
               }
@@ -262,7 +277,7 @@ router.get('/stats', async (req, res) => {
         {
           $match: {
             ...(workerIds.length ? { worker: { $in: workerIds } } : {}),
-            status: 'completed'
+            ...REVENUE_BOOKING_MATCH
           }
         },
         {
@@ -281,7 +296,7 @@ router.get('/stats', async (req, res) => {
         {
           $match: {
             ...(workerIds.length ? { worker: { $in: workerIds } } : {}),
-            status: 'completed'
+            ...REVENUE_BOOKING_MATCH
           }
         },
         {

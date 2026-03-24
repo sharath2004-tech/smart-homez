@@ -874,6 +874,10 @@ router.get('/worker/earnings', authenticate, authorize('worker'), async (req, re
 router.get('/admin/dashboard-stats', authenticate, authorize('admin'), async (req, res) => {
   try {
     const Booking = (await import('../models/Booking.js')).default;
+    const revenueBookingMatch = {
+      status: 'completed',
+      cancellationDate: null
+    };
     
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -909,7 +913,7 @@ router.get('/admin/dashboard-stats', authenticate, authorize('admin'), async (re
     const todayRevenue = await Booking.aggregate([
       {
         $match: {
-          status: 'completed',
+          ...revenueBookingMatch,
           completedAt: { $gte: today }
         }
       },
@@ -925,7 +929,7 @@ router.get('/admin/dashboard-stats', authenticate, authorize('admin'), async (re
     const yesterdayRevenue = await Booking.aggregate([
       {
         $match: {
-          status: 'completed',
+          ...revenueBookingMatch,
           completedAt: { $gte: yesterday, $lt: today }
         }
       },
@@ -947,7 +951,7 @@ router.get('/admin/dashboard-stats', authenticate, authorize('admin'), async (re
     
     const last7DaysCompleted = await Booking.countDocuments({
       createdAt: { $gte: sevenDaysAgo },
-      status: 'completed'
+      ...revenueBookingMatch
     });
     
     const fulfillmentRate = last7DaysBookings > 0 
@@ -964,7 +968,7 @@ router.get('/admin/dashboard-stats', authenticate, authorize('admin'), async (re
     
     const previous7DaysCompleted = await Booking.countDocuments({
       createdAt: { $gte: fourteenDaysAgo, $lt: sevenDaysAgo },
-      status: 'completed'
+      ...revenueBookingMatch
     });
     
     const previousFulfillmentRate = previous7DaysBookings > 0
