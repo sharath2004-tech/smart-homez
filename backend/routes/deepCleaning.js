@@ -37,6 +37,43 @@ const DEFAULT_PAGE_CONTENT = {
   miniServicesSubtitle: 'Add-on services for specific areas and appliances.',
 };
 
+const normalizeDurationMinutes = (value) => {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || numericValue <= 0) {
+    return 180;
+  }
+  return Math.max(15, Math.round(numericValue));
+};
+
+const normalizeTierLabel = (label, index) => {
+  const normalized = typeof label === 'string' ? label.trim() : '';
+  return normalized || `Option ${index + 1}`;
+};
+
+const normalizeDeepCleaningItems = (items = []) => (Array.isArray(items) ? items : []).map((item, itemIndex) => ({
+  ...item,
+  id: String(item?.id || item?.name || `deep_cleaning_item_${itemIndex + 1}`).trim(),
+  category: String(item?.category || 'bathroom').trim(),
+  name: String(item?.name || `Deep Cleaning Item ${itemIndex + 1}`).trim(),
+  description: String(item?.description || ''),
+  pricingType: ['fixed', 'per_unit', 'per_sqft', 'tiered'].includes(item?.pricingType) ? item.pricingType : 'fixed',
+  price: Number.isFinite(Number(item?.price)) ? Number(item.price) : 0,
+  durationMinutes: normalizeDurationMinutes(item?.durationMinutes),
+  tiers: Array.isArray(item?.tiers)
+    ? item.tiers
+        .filter((tier) => tier && (tier.label != null || tier.price != null))
+        .map((tier, tierIndex) => ({
+          label: normalizeTierLabel(tier?.label, tierIndex),
+          price: Number.isFinite(Number(tier?.price)) ? Number(tier.price) : 0,
+        }))
+    : [],
+  maxQty: Number.isFinite(Number(item?.maxQty)) ? Math.max(1, Number(item.maxQty)) : 20,
+  unit: String(item?.unit || 'unit'),
+  icon: String(item?.icon || '✨'),
+  isActive: item?.isActive !== false,
+  sortOrder: Number.isFinite(Number(item?.sortOrder)) ? Number(item.sortOrder) : itemIndex + 1,
+}));
+
 async function ensureConfig() {
   const existing = await DeepCleaningConfig.findOne();
   if (!existing) {
@@ -136,7 +173,7 @@ const DEFAULT_ITEMS = [
 ];
 
 const buildDeepCleaningSnapshot = (source = {}) => ({
-  items: source.items || [],
+  items: normalizeDeepCleaningItems(source.items || []),
   categories: source.categories || [],
   pageContent: { ...DEFAULT_PAGE_CONTENT, ...(source.pageContent || {}) },
   minimumCartValue: Number(source.minimumCartValue ?? 0),
@@ -171,6 +208,7 @@ const buildVerifiedCartItems = (cartItems, config) => {
         : configItem.name,
       category: configItem.category,
       qty,
+      durationMinutes: normalizeDurationMinutes(configItem.durationMinutes),
       unitPrice: configItem.price,
       totalPrice,
       selectedTier: configItem.pricingType === 'tiered'
@@ -274,7 +312,7 @@ router.put('/config', authenticate, authorize('super_admin'), async (req, res) =
     let config = await DeepCleaningConfig.findOne();
     if (!config) config = new DeepCleaningConfig();
 
-    if (items !== undefined) config.items = items;
+    if (items !== undefined) config.items = normalizeDeepCleaningItems(items);
     if (minimumCartValue !== undefined) config.minimumCartValue = Number(minimumCartValue);
     if (categories !== undefined) config.categories = categories;
     if (pageContent !== undefined) config.pageContent = { ...DEFAULT_PAGE_CONTENT, ...pageContent };
@@ -399,6 +437,7 @@ router.post('/estimate', authenticate, authorize('customer'), async (req, res) =
 
     const config = await ensureConfig();
     const { verifiedCartItems, calculatedTotal } = buildVerifiedCartItems(cartItems, config);
+    const estimatedDurationMinutes = verifiedCartItems.reduce((sum, item) => sum + normalizeDurationMinutes(item.durationMinutes), 0);
 
     if (verifiedCartItems.length === 0) {
       return res.status(400).json({ error: { message: 'No valid items in cart', status: 400 } });
@@ -408,6 +447,7 @@ router.post('/estimate', authenticate, authorize('customer'), async (req, res) =
       success: true,
       verifiedCartItems,
       totalAmount: calculatedTotal,
+      estimatedDurationMinutes,
       minimumCartValue: config.minimumCartValue,
     });
   } catch (err) {
@@ -513,10 +553,14 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
       });
     }
 
-    // Build endTime: deep cleaning sessions default to 3 hours
+    const scheduledDurationMinutes = verifiedCartItems.reduce((sum, item) => sum + normalizeDurationMinutes(item.durationMinutes), 0);
+
+    // Build endTime from configured deep-cleaning duration
     const [h, m] = startTime.split(':').map(Number);
-    const endH = (h + 3) % 24;
-    const endTime = `${String(endH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    const totalMinutes = (h * 60) + m + scheduledDurationMinutes;
+    const endH = Math.floor(totalMinutes / 60) % 24;
+    const endM = totalMinutes % 60;
+    const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
 
     // Get customer location
     const customer = await User.findById(req.user._id)
@@ -579,6 +623,7 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
       bookingDate:  new Date(bookingDate),
       startTime,
       endTime,
+      scheduledDurationMinutes,
       totalAmount:  calculatedTotal,
       cartItems:    verifiedCartItems,
       location:     locationData,

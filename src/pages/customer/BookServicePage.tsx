@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import SubscriptionPaymentStep from "@/components/SubscriptionPaymentStep";
 import WorkerProfilePreviewDialog from "@/components/WorkerProfilePreviewDialog";
 import { useServiceBookingAvailability } from "@/hooks/useServiceBookingAvailability";
 import { authAPI, bookingsAPI, servicesAPI, settingsAPI } from "@/lib/api";
@@ -69,9 +70,15 @@ interface Preferences {
 type TimePeriod = 'morning' | 'afternoon' | 'evening';
 type BookingMode = 'now' | 'schedule';
 
+interface PendingPaymentBooking {
+  bookingId: string;
+  amount: number;
+}
+
 const BookServicePage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [pendingPaymentBooking, setPendingPaymentBooking] = useState<PendingPaymentBooking | null>(null);
   const [searchParams] = useSearchParams();
   const preferredWorkerId = searchParams.get('preferredWorker') ?? null;
   const preferredWorkerName = searchParams.get('preferredWorkerName') ?? null;
@@ -471,8 +478,17 @@ const BookServicePage = () => {
       const workerName = response.booking?.worker?.name;
       
       if (bookingType !== 'oneTime') {
+        const createdBookingId = response?.booking?._id;
+        if (!createdBookingId) {
+          throw new Error('Subscription booking was created but booking ID is missing');
+        }
+
+        setPendingPaymentBooking({
+          bookingId: createdBookingId,
+          amount: calculatePrice(),
+        });
         toast.success(
-          `Subscription created! ${workerName} is assigned to all your bookings.`,
+          `Subscription created! ${workerName || 'Your assigned worker'} is linked. Complete payment and upload the screenshot here.`,
           { duration: 5000 }
         );
       } else if (wasAssigned) {
@@ -481,13 +497,13 @@ const BookServicePage = () => {
             ? `Booking confirmed! ${workerName} is on the way.`
             : `Booking confirmed! ${workerName} assigned to your service.`
         );
+        navigate('/customer/bookings');
       } else {
         toast.success(
           'Booking created! We are finding the best available worker for you.'
         );
+        navigate('/customer/bookings');
       }
-      
-      navigate('/customer/bookings');
     } catch (error: unknown) {
       console.error('Booking error:', error);
       const rawMsg = error instanceof Error ? error.message : 'Failed to create booking';
@@ -1514,7 +1530,16 @@ const BookServicePage = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-3">
+          {pendingPaymentBooking ? (
+            <SubscriptionPaymentStep
+              bookingId={pendingPaymentBooking.bookingId}
+              amount={pendingPaymentBooking.amount}
+              title="Complete subscription payment"
+              description="For subscription services, payment is completed inside the booking flow. Use the direct UPI option or QR code and then upload the payment screenshot here."
+              successLabel="Payment screenshot uploaded"
+              onPaymentSubmitted={() => navigate('/customer/bookings')}
+            />
+          ) : <div className="flex gap-3">
             <Link 
               to="/customer/services"
               className="flex-1 py-3 border-2 border-border rounded-xl text-center font-semibold hover:bg-muted transition-colors"
@@ -1545,7 +1570,7 @@ const BookServicePage = () => {
                   : `Confirm Booking - ₹${calculatePrice()}`}
               </button>
             )}
-          </div>
+          </div>}
         </form>
 
         <WorkerProfilePreviewDialog

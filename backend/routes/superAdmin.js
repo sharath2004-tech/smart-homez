@@ -661,9 +661,10 @@ router.get('/bookings', authenticate, authorize('super_admin', 'admin'), async (
     const { locationId, status, limit = 50 } = req.query;
 
     let bookings = await Booking.find()
-      .populate('customer', 'name email')
-      .populate('worker', 'name email')
-      .populate('service', 'name category')
+      .populate('customer', 'name email phone')
+      .populate('worker', 'name email phone')
+      .populate('supportStaff.worker', 'name email phone')
+      .populate('service', 'name category price duration')
       .sort({ createdAt: -1 })
       .limit(parseInt(limit) * 3);
 

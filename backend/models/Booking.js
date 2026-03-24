@@ -400,6 +400,7 @@ const bookingSchema = new mongoose.Schema({
     name:         { type: String },
     category:     { type: String },
     qty:          { type: Number, default: 1 },
+    durationMinutes: { type: Number, default: 0 },
     unitPrice:    { type: Number, default: 0 },
     totalPrice:   { type: Number, default: 0 },
     selectedTier: { type: String, default: null },

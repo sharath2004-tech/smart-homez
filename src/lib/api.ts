@@ -755,7 +755,7 @@ export const bookingsAPI = {
   rejectBreak: (bookingId: string, breakId: string) =>
     apiCall(`/bookings/${bookingId}/break-reject/${breakId}`, { method: 'PATCH' }),
 
-  updateWorkforce: (bookingId: string, data: { workerCount?: number }) =>
+  updateWorkforce: (bookingId: string, data: { workerCount?: number; scheduledDurationMinutes?: number }) =>
     apiCall(`/bookings/${bookingId}/workforce`, {
       method: 'PATCH',
       body: JSON.stringify(data)

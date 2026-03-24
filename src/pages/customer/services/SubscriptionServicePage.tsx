@@ -1,18 +1,19 @@
 import AppLayout from "@/components/AppLayout";
 import ServiceLocationCard from "@/components/ServiceLocationCard";
+import SubscriptionPaymentStep from "@/components/SubscriptionPaymentStep";
 import { useServiceBookingAvailability } from "@/hooks/useServiceBookingAvailability";
 import { authAPI, bookingsAPI, servicesAPI } from "@/lib/api";
 import { motion } from "framer-motion";
 import {
-    AlertCircle,
-    Calendar,
-    CheckCircle,
-    ChevronLeft,
-    Clock,
-    RefreshCw,
-    Star,
-    User,
-    Zap,
+  AlertCircle,
+  Calendar,
+  CheckCircle,
+  ChevronLeft,
+  Clock,
+  RefreshCw,
+  Star,
+  User,
+  Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -39,6 +40,12 @@ interface UserProfile {
   }[];
 }
 
+interface PendingPaymentBooking {
+  bookingId: string;
+  amount: number;
+  serviceName: string;
+}
+
 const FREQUENCY_OPTIONS = [
   { id: "daily",     label: "Daily",      icon: "📆", desc: "Every day",      visits: 30 },
   { id: "alt-days",  label: "Alt Days",   icon: "📅", desc: "Mon/Wed/Fri",    visits: 13 },
@@ -62,6 +69,7 @@ const SubscriptionServicePage = () => {
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [pendingPaymentBooking, setPendingPaymentBooking] = useState<PendingPaymentBooking | null>(null);
 
   // Booking params
   const [frequency, setFrequency] = useState("daily");
@@ -199,7 +207,7 @@ const SubscriptionServicePage = () => {
 
     try {
       setBooking(true);
-      await bookingsAPI.create({
+      const response = await bookingsAPI.create({
         service: selectedService._id,
         bookingDate: startDate,
         startTime: preferredTime,
@@ -236,8 +244,17 @@ const SubscriptionServicePage = () => {
         },
         notes: specialInstructions,
       } as Record<string, unknown>);
-      toast.success("Subscription created! A dedicated maid will be assigned 🎉", { duration: 5000 });
-      navigate("/customer/subscriptions");
+      const createdBookingId = response?.booking?._id;
+      if (!createdBookingId) {
+        throw new Error("Subscription booking was created but booking ID is missing");
+      }
+
+      setPendingPaymentBooking({
+        bookingId: createdBookingId,
+        amount: monthlyPrice,
+        serviceName: selectedService.name,
+      });
+      toast.success("Subscription created. Complete payment here and upload the payment screenshot.", { duration: 5000 });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Booking failed");
     } finally {
@@ -299,23 +316,43 @@ const SubscriptionServicePage = () => {
           resolvedLocation={resolvedLocation}
         />
 
-        {/* Step indicator */}
-        <div className="flex items-center gap-2">
-          {[1, 2, 3].map((s) => (
-            <div key={s} className="flex items-center gap-2">
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${step >= s ? "bg-blue-500 text-white" : "bg-muted text-muted-foreground"}`}>
-                {step > s ? <CheckCircle className="w-4 h-4" /> : s}
-              </div>
-              {s < 3 && <div className={`h-0.5 w-12 rounded transition-all ${step > s ? "bg-blue-500" : "bg-muted"}`} />}
+        {pendingPaymentBooking ? (
+          <div className="space-y-4">
+            <SubscriptionPaymentStep
+              bookingId={pendingPaymentBooking.bookingId}
+              amount={pendingPaymentBooking.amount}
+              title={`Complete payment for ${pendingPaymentBooking.serviceName}`}
+              description="For subscription services, payment is completed inside the booking workflow. Use the company UPI details or QR code below, then upload the payment screenshot."
+              successLabel="Payment screenshot uploaded"
+              onPaymentSubmitted={() => navigate('/customer/subscriptions')}
+            />
+            <button
+              type="button"
+              onClick={() => navigate('/customer/subscriptions')}
+              className="w-full rounded-2xl border border-border px-4 py-3 text-sm font-semibold text-foreground hover:bg-muted"
+            >
+              Go to my subscriptions
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Step indicator */}
+            <div className="flex items-center gap-2">
+              {[1, 2, 3].map((s) => (
+                <div key={s} className="flex items-center gap-2">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${step >= s ? "bg-blue-500 text-white" : "bg-muted text-muted-foreground"}`}>
+                    {step > s ? <CheckCircle className="w-4 h-4" /> : s}
+                  </div>
+                  {s < 3 && <div className={`h-0.5 w-12 rounded transition-all ${step > s ? "bg-blue-500" : "bg-muted"}`} />}
+                </div>
+              ))}
+              <span className="ml-2 text-xs text-muted-foreground">
+                {step === 1 ? "Choose Plan" : step === 2 ? "Schedule & Preferences" : "Review & Confirm"}
+              </span>
             </div>
-          ))}
-          <span className="ml-2 text-xs text-muted-foreground">
-            {step === 1 ? "Choose Plan" : step === 2 ? "Schedule & Preferences" : "Review & Confirm"}
-          </span>
-        </div>
 
-        {/* ── STEP 1 — Choose Plan ── */}
-        {step === 1 && (
+            {/* ── STEP 1 — Choose Plan ── */}
+            {step === 1 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
 
             {/* Service selection */}
@@ -501,10 +538,10 @@ const SubscriptionServicePage = () => {
               Continue →
             </button>
           </motion.div>
-        )}
+          )}
 
         {/* ── STEP 2 — Schedule & Preferences ── */}
-        {step === 2 && (
+            {step === 2 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -657,10 +694,10 @@ const SubscriptionServicePage = () => {
               </button>
             </div>
           </motion.div>
-        )}
+          )}
 
         {/* ── STEP 3 — Confirm ── */}
-        {step === 3 && (
+            {step === 3 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
             <h2 className="font-semibold text-foreground">Subscription Summary</h2>
 
@@ -743,6 +780,8 @@ const SubscriptionServicePage = () => {
               </button>
             </div>
           </motion.div>
+            )}
+          </>
         )}
       </div>
     </AppLayout>

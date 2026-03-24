@@ -4,6 +4,7 @@ import React, { forwardRef } from "react";
 interface CartItem {
   name: string;
   qty?: number;
+  unitPrice?: number;
   totalPrice: number;
 }
 
@@ -39,6 +40,7 @@ interface BookingPrintData {
   bookingType?: string;
   cartItems?: CartItem[];
   worker?: Worker;
+  supportStaff?: Array<{ worker?: Worker; name?: string }>;
   customer: {
     _id: string;
     name: string;
@@ -53,8 +55,24 @@ interface BookingPrintData {
   totalAmount: number;
   actualStartTime?: string;
   actualEndTime?: string;
+  scheduledDurationMinutes?: number | null;
+  actualDurationMinutes?: number | null;
+  overtimeMinutes?: number;
   overtimeCharges?: number;
   paymentStatus?: string;
+  paymentMethod?: string;
+  paymentProof?: {
+    transactionId?: string | null;
+    transactionTime?: string | null;
+  };
+  assignmentMethod?: string;
+  notes?: string;
+  workforce?: {
+    workerCount?: number;
+    wageType?: string;
+    wageRate?: number;
+    totalWorkerWage?: number;
+  };
 }
 
 interface BookingOrderPrintProps {
@@ -66,6 +84,11 @@ interface BookingOrderPrintProps {
 const BookingOrderPrint = forwardRef<HTMLDivElement, BookingOrderPrintProps>(
   ({ booking, companyName = "Healthy Homez", companyPhone = "+91 84658 93790" }, ref) => {
     const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString();
+    const formatDateTime = (dateStr?: string | null) => {
+      if (!dateStr) return '—';
+      const value = new Date(dateStr);
+      return Number.isNaN(value.getTime()) ? String(dateStr) : value.toLocaleString('en-IN');
+    };
     const formatTime = (timeStr: string) => {
       try {
         const [hours, minutes] = timeStr.split(":");
@@ -73,6 +96,14 @@ const BookingOrderPrint = forwardRef<HTMLDivElement, BookingOrderPrintProps>(
       } catch {
         return timeStr;
       }
+    };
+    const formatMinutes = (minutes?: number | null) => {
+      const safeMinutes = Number(minutes ?? 0);
+      if (!Number.isFinite(safeMinutes) || safeMinutes <= 0) return '—';
+      if (safeMinutes < 60) return `${safeMinutes} min`;
+      const hours = Math.floor(safeMinutes / 60);
+      const remaining = safeMinutes % 60;
+      return remaining ? `${hours}h ${remaining}m` : `${hours}h`;
     };
 
     const getServiceName = () => {
@@ -88,7 +119,11 @@ const BookingOrderPrint = forwardRef<HTMLDivElement, BookingOrderPrintProps>(
 
     const itemsTotal = calculateItemsTotal();
     const overtimeCharges = booking.overtimeCharges || 0;
-    const baseTotal = itemsTotal + overtimeCharges;
+    const workerWage = booking.workforce?.totalWorkerWage || 0;
+    const estimatedRevenue = Math.round(((booking.totalAmount || 0) - workerWage) * 100) / 100;
+    const supportStaffNames = (booking.supportStaff || [])
+      .map((member) => member?.worker?.name || member?.name)
+      .filter(Boolean);
 
     return (
       <div
@@ -106,7 +141,7 @@ const BookingOrderPrint = forwardRef<HTMLDivElement, BookingOrderPrintProps>(
             {companyName}
           </h1>
           <p style={{ fontSize: "14px", color: "#666", margin: "0" }}>
-            Service Order Receipt
+            Booking Revenue Bill
           </p>
         </div>
 
@@ -178,6 +213,9 @@ const BookingOrderPrint = forwardRef<HTMLDivElement, BookingOrderPrintProps>(
               <p style={{ fontSize: "14px", margin: "0", fontWeight: "600" }}>
                 {booking.paymentStatus?.toUpperCase() || "PENDING"}
               </p>
+              <p style={{ fontSize: "12px", color: "#666", margin: "6px 0 0 0" }}>
+                Method: {(booking.paymentMethod || 'qr-upi').toUpperCase()}
+              </p>
             </div>
           </div>
         </div>
@@ -225,10 +263,10 @@ const BookingOrderPrint = forwardRef<HTMLDivElement, BookingOrderPrintProps>(
         {booking.worker && (
           <div style={{ marginBottom: "32px", padding: "16px", backgroundColor: "#f0f7ff", borderRadius: "8px", border: "1px solid #e0f0ff" }}>
             <h3 style={{ fontSize: "12px", fontWeight: "700", margin: "0 0 12px 0", color: "#0066cc", textTransform: "uppercase" }}>
-              Assigned Professional
+              Assigned Team
             </h3>
             <p style={{ fontSize: "14px", fontWeight: "600", margin: "0 0 4px 0" }}>
-              {booking.worker.name}
+              Team Head: {booking.worker.name}
             </p>
             {booking.worker.phone && (
               <p style={{ fontSize: "13px", color: "#666", margin: "0 0 4px 0" }}>
@@ -240,8 +278,39 @@ const BookingOrderPrint = forwardRef<HTMLDivElement, BookingOrderPrintProps>(
                 Email: {booking.worker.email}
               </p>
             )}
+            {supportStaffNames.length > 0 && (
+              <p style={{ fontSize: "13px", color: "#666", margin: "8px 0 0 0" }}>
+                Support Staff: {supportStaffNames.join(', ')}
+              </p>
+            )}
           </div>
         )}
+
+        <div style={{ marginBottom: "32px", padding: "16px", backgroundColor: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+          <h3 style={{ fontSize: "12px", fontWeight: "700", margin: "0 0 12px 0", color: "#475569", textTransform: "uppercase" }}>
+            Timing Snapshot
+          </h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", fontSize: "13px" }}>
+            <div>
+              <strong>Scheduled:</strong> {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
+            </div>
+            <div>
+              <strong>Scheduled Duration:</strong> {formatMinutes(booking.scheduledDurationMinutes)}
+            </div>
+            <div>
+              <strong>Actual Start:</strong> {formatDateTime(booking.actualStartTime)}
+            </div>
+            <div>
+              <strong>Actual End:</strong> {formatDateTime(booking.actualEndTime)}
+            </div>
+            <div>
+              <strong>Actual Duration:</strong> {formatMinutes(booking.actualDurationMinutes)}
+            </div>
+            <div>
+              <strong>Overtime:</strong> {formatMinutes(booking.overtimeMinutes || 0)}
+            </div>
+          </div>
+        </div>
 
         {/* Items Breakdown */}
         {booking.cartItems && booking.cartItems.length > 0 && (
@@ -296,6 +365,13 @@ const BookingOrderPrint = forwardRef<HTMLDivElement, BookingOrderPrintProps>(
               </>
             )}
 
+            {!booking.cartItems?.length && booking.service?.price !== undefined && (
+              <>
+                <span>Service Amount:</span>
+                <span>₹{Number(booking.service.price || 0).toLocaleString()}</span>
+              </>
+            )}
+
             {overtimeCharges > 0 && (
               <>
                 <span>Overtime Charges:</span>
@@ -303,15 +379,44 @@ const BookingOrderPrint = forwardRef<HTMLDivElement, BookingOrderPrintProps>(
               </>
             )}
 
+            <>
+              <span>Worker Wage:</span>
+              <span>₹{workerWage.toLocaleString()}</span>
+            </>
+
+            <>
+              <span>Estimated Revenue:</span>
+              <span>₹{estimatedRevenue.toLocaleString()}</span>
+            </>
+
             <div style={{ gridColumn: "1 / -1", height: "1px", backgroundColor: "#ddd", margin: "8px 0" }}></div>
 
             <span style={{ fontWeight: "700", fontSize: "16px" }}>
-              Total Amount:
+              Customer Billed Amount:
             </span>
             <span style={{ fontWeight: "700", fontSize: "16px", color: "#2d5f2e" }}>
               ₹{booking.totalAmount.toLocaleString()}
             </span>
           </div>
+        </div>
+
+        <div style={{ marginBottom: "32px", padding: "16px", backgroundColor: "#fff7ed", borderRadius: "8px", border: "1px solid #fed7aa" }}>
+          <h3 style={{ fontSize: "12px", fontWeight: "700", margin: "0 0 12px 0", color: "#9a3412", textTransform: "uppercase" }}>
+            Payment & Audit Details
+          </h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", fontSize: "13px" }}>
+            <div><strong>Assignment Method:</strong> {booking.assignmentMethod || '—'}</div>
+            <div><strong>Payment Status:</strong> {booking.paymentStatus || 'pending'}</div>
+            <div><strong>Transaction ID:</strong> {booking.paymentProof?.transactionId || '—'}</div>
+            <div><strong>Transaction Time:</strong> {formatDateTime(booking.paymentProof?.transactionTime || null)}</div>
+            <div><strong>Worker Count:</strong> {booking.workforce?.workerCount || (booking.worker ? 1 : 0)}</div>
+            <div><strong>Wage Type:</strong> {booking.workforce?.wageType || '—'}</div>
+          </div>
+          {booking.notes && (
+            <p style={{ fontSize: "13px", color: "#7c2d12", margin: "12px 0 0 0" }}>
+              <strong>Notes:</strong> {booking.notes}
+            </p>
+          )}
         </div>
 
         {/* Terms & Footer */}

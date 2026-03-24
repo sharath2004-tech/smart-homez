@@ -20,7 +20,7 @@ interface PageContent {
 interface ConfigItem {
   id: string; category: string; name: string; description: string;
   pricingType: "fixed" | "per_unit" | "per_sqft" | "tiered";
-  price: number; tiers: Tier[]; maxQty: number; unit: string; icon: string;
+  price: number; tiers: Tier[]; durationMinutes?: number; maxQty: number; unit: string; icon: string;
   isActive: boolean; sortOrder: number;
 }
 interface DeepCleaningCategory {
@@ -96,6 +96,7 @@ const PRICING_TYPES = [
 const BLANK_ITEM: ConfigItem = {
   id: "", category: "bathroom", name: "", description: "",
   pricingType: "per_unit", price: 0, tiers: [{ label: "", price: 0 }],
+  durationMinutes: 180,
   maxQty: 10, unit: "unit", icon: "✨", isActive: true, sortOrder: 99,
 };
 
@@ -175,6 +176,25 @@ const statusClasses: Record<ChangeRequest["status"], string> = {
 
 const toLines = (values?: string[]) => (values || []).join("\n");
 const fromLines = (value: string) => value.split("\n").map((entry) => entry.trim()).filter(Boolean);
+const normalizeDurationMinutes = (value?: number) => {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || numericValue <= 0) return 180;
+  return Math.max(15, Math.round(numericValue));
+};
+const sanitizeTierLabel = (label: string, index: number) => label.trim() || `Option ${index + 1}`;
+const sanitizeConfigItem = (item: ConfigItem): ConfigItem => ({
+  ...item,
+  id: item.id.trim(),
+  name: item.name.trim(),
+  description: item.description || "",
+  durationMinutes: normalizeDurationMinutes(item.durationMinutes),
+  tiers: (item.tiers || [])
+    .filter((tier) => tier && (tier.label.trim() || Number.isFinite(Number(tier.price))))
+    .map((tier, index) => ({
+      label: sanitizeTierLabel(tier.label || "", index),
+      price: Number.isFinite(Number(tier.price)) ? Number(tier.price) : 0,
+    })),
+});
 
 export default function AdminDeepCleaningConfig() {
   const { name, role, isSuperAdmin } = useAdminRole();
@@ -378,7 +398,7 @@ export default function AdminDeepCleaningConfig() {
 
   const saveAll = async (nextItems: ConfigItem[], nextMin = minCart, nextCats = categories) => {
     const snapshot = {
-      ...getSnapshot(nextItems, nextMin, nextCats),
+      ...getSnapshot(nextItems.map(sanitizeConfigItem), nextMin, nextCats),
       pageContent: config?.pageContent || DEFAULT_PAGE_CONTENT,
     };
 
@@ -478,13 +498,17 @@ export default function AdminDeepCleaningConfig() {
 
   const startEdit = (item: ConfigItem) => {
     setEditingId(item.id);
-    setEditForm({ ...item, tiers: item.tiers?.length ? [...item.tiers.map(t => ({ ...t }))] : [{ label: "", price: 0 }] });
+    setEditForm({
+      ...item,
+      durationMinutes: normalizeDurationMinutes(item.durationMinutes),
+      tiers: item.tiers?.length ? [...item.tiers.map(t => ({ ...t }))] : [{ label: "", price: 0 }]
+    });
   };
 
   const saveEdit = () => {
     if (!config || !editForm) return;
     const id = editForm.id.trim() || editForm.name.toLowerCase().replace(/\s+/g, "_");
-    const updated = { ...editForm, id };
+    const updated = sanitizeConfigItem({ ...editForm, id });
     const next = config.items.map(i => i.id === editingId ? updated : i);
     saveAll(next);
     setEditingId(null); setEditForm(null);
@@ -493,7 +517,7 @@ export default function AdminDeepCleaningConfig() {
   const addItem = () => {
     if (!config || !addForm.name.trim()) return;
     const id = addForm.id.trim() || addForm.name.toLowerCase().replace(/\s+/g, "_") + "_" + Date.now();
-    const newItem = { ...addForm, id };
+    const newItem = sanitizeConfigItem({ ...addForm, id });
     saveAll([...config.items, newItem]);
     setShowAddForm(false);
     setAddForm({ ...BLANK_ITEM });
@@ -1389,6 +1413,7 @@ export default function AdminDeepCleaningConfig() {
                           ? `₹${item.price}/sqft`
                           : `₹${item.price}${item.pricingType === "per_unit" ? ` / ${item.unit}` : ""}`}
                     </p>
+                    <p className="text-xs text-muted-foreground mt-1">Time: {normalizeDurationMinutes(item.durationMinutes)} min</p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     {/* Active toggle */}
@@ -1536,6 +1561,11 @@ function ItemEditForm({
             {PRICING_TYPES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
         </div>
+      </div>
+
+      <div>
+        <label className="label-clean">Estimated Time (minutes)</label>
+        <input type="number" min="15" step="15" value={form.durationMinutes ?? 180} onChange={e => set("durationMinutes", Number(e.target.value) || 180)} className="input-clean text-sm" />
       </div>
 
       {/* Price field (for non-tiered) */}

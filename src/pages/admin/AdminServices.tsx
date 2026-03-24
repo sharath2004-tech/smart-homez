@@ -1206,11 +1206,11 @@ const AdminServices = () => {
                     onChange={(e) => handlePriceChange(Number(e.target.value))}
                     className="input-clean"
                     min="0"
-                    step="10"
+                    step="any"
                     required
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    This is the base price used for calculations. Changing it will auto-recalculate all plan prices below.
+                    This is the base price used for calculations. You can enter any amount, and changing it will auto-recalculate all plan prices below.
                   </p>
                 </div>
 
@@ -1226,7 +1226,7 @@ const AdminServices = () => {
                     onChange={(e) => setFormData({ ...formData, originalPrice: Number(e.target.value) } as any)}
                     className="input-clean"
                     min="0"
-                    step="10"
+                    step="any"
                     placeholder="e.g. 190"
                   />
                   {(formData as any).originalPrice > formData.price && (
@@ -1706,7 +1706,7 @@ const AdminServices = () => {
                                     >/mo</button>
                                   </div>
                                   <input
-                                    type="number" min="0" step="10" value={displayOurPrice}
+                                    type="number" min="0" step="any" value={displayOurPrice}
                                     onChange={e => {
                                       const updated = [...(formData.durationOptions || [])];
                                       updated[index] = { ...updated[index], price: Number(e.target.value) };
@@ -1722,7 +1722,7 @@ const AdminServices = () => {
                                 </div>
                                 <div className="col-span-3 space-y-1">
                                   <input
-                                    type="number" min="0" step="10" value={displayMrp}
+                                    type="number" min="0" step="any" value={displayMrp}
                                     onChange={e => {
                                       const updated = [...(formData.durationOptions || [])];
                                       updated[index] = { ...updated[index], originalPrice: Number(e.target.value) } as any;
@@ -1873,7 +1873,7 @@ const AdminServices = () => {
                               <input
                                 type="number"
                                 min="0"
-                                step="50"
+                                step="any"
                                 value={opt.price}
                                 onChange={e => {
                                   const opts = [...(formData.sizeParameters?.options || [])];

@@ -13,6 +13,7 @@ const itemSchema = new mongoose.Schema({
   pricingType: { type: String, enum: ['fixed', 'per_unit', 'per_sqft', 'tiered'], required: true },
   price:       { type: Number, default: 0, min: 0 },
   tiers:       [tierSchema],
+  durationMinutes: { type: Number, default: 180, min: 15 },
   maxQty:      { type: Number, default: 20 },
   unit:        { type: String, default: 'unit' },
   icon:        { type: String, default: '✨' },

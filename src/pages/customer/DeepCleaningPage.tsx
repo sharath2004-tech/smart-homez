@@ -16,6 +16,7 @@ interface ConfigItem {
   pricingType: "fixed" | "per_unit" | "per_sqft" | "tiered";
   price: number;
   tiers?: { label: string; price: number }[];
+  durationMinutes?: number;
   maxQty: number;
   unit: string;
   icon: string;
@@ -59,6 +60,15 @@ type AvailabilityState = {
     area?: string;
     city?: string;
   } | null;
+};
+
+const formatDuration = (minutes?: number) => {
+  const safeMinutes = Number(minutes || 0);
+  if (!Number.isFinite(safeMinutes) || safeMinutes <= 0) return '3h';
+  if (safeMinutes < 60) return `${safeMinutes} min`;
+  const hours = Math.floor(safeMinutes / 60);
+  const remainingMinutes = safeMinutes % 60;
+  return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 };
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -850,6 +860,7 @@ function ItemCard({ item, idx, cart, sqftValues, tierSelects, pulsedItem,
             <div>
               <h3 className="font-semibold text-foreground text-sm leading-tight">{item.name}</h3>
               <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
+              <p className="text-xs font-medium text-primary mt-1">Estimated time: {formatDuration(item.durationMinutes)}</p>
             </div>
             <AnimatePresence>
               {inCart && (

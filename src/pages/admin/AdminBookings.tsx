@@ -29,22 +29,32 @@ interface BreakRequest {
 
 interface Booking {
   _id: string;
-  customer: { _id: string; name: string; email: string } | null;
-  worker?: { _id: string; name: string; email: string } | null;
-  supportStaff?: { worker: { _id: string; name: string }; name?: string }[];
-  service: { _id: string; name: string; category: string } | null;
+  bookingId?: string;
+  customer: { _id: string; name: string; email: string; phone?: string } | null;
+  worker?: { _id: string; name: string; email: string; phone?: string } | null;
+  supportStaff?: { worker: { _id: string; name: string; email?: string; phone?: string }; name?: string }[];
+  service: { _id: string; name: string; category: string; price?: number; duration?: number } | null;
   bookingType?: string;
-  location?: { address?: string; city?: string; state?: string; zipCode?: string } | null;
+  assignmentMethod?: string;
+  location?: { apartmentName?: string; address?: string; area?: string; city?: string; state?: string; zipCode?: string } | null;
   bookingDate: string;
   startTime: string;
   endTime: string;
   status: string;
   totalAmount: number;
   createdAt: string;
+  paymentStatus?: string;
+  paymentMethod?: string;
   completionPhoto?: ProofPhoto;
   completionPhotos?: ProofPhoto[];
   paymentProof?: ProofPhoto;
+  actualStartTime?: string;
+  actualEndTime?: string;
   actualDurationMinutes?: number;
+  overtimeMinutes?: number;
+  overtimeCharges?: number;
+  cartItems?: Array<{ name: string; qty?: number; unitPrice?: number; totalPrice: number }>;
+  notes?: string;
   breakRequests?: BreakRequest[];
   isOnBreak?: boolean;
   totalBreakMinutes?: number;
@@ -55,6 +65,7 @@ interface Booking {
     totalWorkerWage: number;
     updatedAt?: string;
   };
+  scheduledDurationMinutes?: number;
 }
 
 const statusConfig: Record<string, string> = {
@@ -114,7 +125,7 @@ const AdminBookings = () => {
 
   // Workforce state
   const [workforceBooking, setWorkforceBooking] = useState<Booking | null>(null);
-  const [workforceForm, setWorkforceForm] = useState({ workerCount: 1 });
+  const [workforceForm, setWorkforceForm] = useState({ workerCount: 1, scheduledDurationMinutes: 180 });
   const [workforceLoading, setWorkforceLoading] = useState(false);
 
   useEffect(() => {
@@ -190,6 +201,28 @@ const AdminBookings = () => {
     });
   };
 
+  const formatCurrency = (amount?: number | null) => `₹${Number(amount || 0).toLocaleString('en-IN')}`;
+
+  const formatMinutes = (minutes?: number | null) => {
+    const safeMinutes = Number(minutes ?? 0);
+    if (!Number.isFinite(safeMinutes) || safeMinutes <= 0) return '—';
+    if (safeMinutes < 60) return `${safeMinutes} min`;
+    const hours = Math.floor(safeMinutes / 60);
+    const remaining = safeMinutes % 60;
+    return remaining ? `${hours}h ${remaining}m` : `${hours}h`;
+  };
+
+  const getServiceName = (booking: Booking) => booking.service?.name || (booking.bookingType === 'deep-cleaning-cart' ? 'Deep Cleaning' : 'Unknown');
+
+  const getWorkerWage = (booking: Booking) => Number(booking.workforce?.totalWorkerWage || 0);
+
+  const getEstimatedRevenue = (booking: Booking) => Math.round((Number(booking.totalAmount || 0) - getWorkerWage(booking)) * 100) / 100;
+
+  const getSupportStaffNames = (booking: Booking) => (booking.supportStaff || [])
+    .map((member) => member.worker?.name || member.name)
+    .filter(Boolean)
+    .join(', ');
+
   const hasProofs = (b: Booking) => !!(b.completionPhoto?.url || b.paymentProof?.url || (b.completionPhotos && b.completionPhotos.length > 0));
 
   const handleApproveBooking = async (bookingId: string) => {
@@ -210,6 +243,7 @@ const AdminBookings = () => {
     setWorkforceBooking(booking);
     setWorkforceForm({
       workerCount: booking.workforce?.workerCount ?? 1,
+      scheduledDurationMinutes: booking.scheduledDurationMinutes ?? booking.actualDurationMinutes ?? 180,
     });
   };
 
@@ -217,10 +251,14 @@ const AdminBookings = () => {
     if (!workforceBooking) return;
     try {
       setWorkforceLoading(true);
-      const res = await bookingsAPI.updateWorkforce(workforceBooking._id, { workerCount: workforceForm.workerCount });
-      setWorkforceBooking(prev => prev ? { ...prev, workforce: res.workforce, actualDurationMinutes: res.actualDurationMinutes } : prev);
+      const payload: { workerCount?: number; scheduledDurationMinutes?: number } = { workerCount: workforceForm.workerCount };
+      if (workforceBooking.bookingType === 'deep-cleaning-cart') {
+        payload.scheduledDurationMinutes = workforceForm.scheduledDurationMinutes;
+      }
+      const res = await bookingsAPI.updateWorkforce(workforceBooking._id, payload);
+      setWorkforceBooking(prev => prev ? { ...prev, workforce: res.workforce, actualDurationMinutes: res.actualDurationMinutes, scheduledDurationMinutes: res.scheduledDurationMinutes, endTime: res.endTime } : prev);
       setBookings(prev => prev.map(b => b._id === workforceBooking._id
-        ? { ...b, workforce: res.workforce, actualDurationMinutes: res.actualDurationMinutes }
+        ? { ...b, workforce: res.workforce, actualDurationMinutes: res.actualDurationMinutes, scheduledDurationMinutes: res.scheduledDurationMinutes, endTime: res.endTime }
         : b));
     } catch (e) {
       alert((e as Error).message || 'Failed to update workforce');
@@ -328,9 +366,9 @@ const AdminBookings = () => {
   };
 
   const handlePrintToPDF = () => {
-    if (!printRef.current || !selectedProofBooking) return;
+    if (!isSuperAdmin || !printRef.current || !selectedProofBooking) return;
 
-    const filename = `booking-order-${selectedProofBooking.bookingId || selectedProofBooking._id.slice(-8)}.pdf`;
+    const filename = `booking-revenue-bill-${selectedProofBooking.bookingId || selectedProofBooking._id.slice(-8)}.pdf`;
 
     const opt = {
       margin: 10,
@@ -363,36 +401,101 @@ const AdminBookings = () => {
   };
 
   const handleExport = async () => {
+    if (!isSuperAdmin) return;
+
     try {
       setExporting(true);
       const wb = new ExcelJS.Workbook();
+      const summaryWs = wb.addWorksheet('Revenue Summary');
       const ws = wb.addWorksheet('Bookings');
+
+      const totalCustomerAmount = filtered.reduce((sum, booking) => sum + Number(booking.totalAmount || 0), 0);
+      const totalWorkerWage = filtered.reduce((sum, booking) => sum + getWorkerWage(booking), 0);
+      const totalRevenue = filtered.reduce((sum, booking) => sum + getEstimatedRevenue(booking), 0);
+      const totalOvertime = filtered.reduce((sum, booking) => sum + Number(booking.overtimeCharges || 0), 0);
+
+      summaryWs.columns = [
+        { header: 'Metric', key: 'metric', width: 32 },
+        { header: 'Value', key: 'value', width: 26 },
+      ];
+      const selectedLocationLabel = selectedLocation
+        ? locations.find((location) => location._id === selectedLocation)?.apartmentName || selectedLocation
+        : 'All Locations';
+      [
+        { metric: 'Location Filter', value: selectedLocationLabel },
+        { metric: 'Status Filter', value: filter },
+        { metric: 'Bookings Exported', value: filtered.length },
+        { metric: 'Customer Billed Amount', value: totalCustomerAmount },
+        { metric: 'Worker Wage Total', value: totalWorkerWage },
+        { metric: 'Estimated Revenue', value: totalRevenue },
+        { metric: 'Overtime Charges', value: totalOvertime },
+        { metric: 'Generated At', value: new Date().toLocaleString('en-IN') },
+      ].forEach((row) => summaryWs.addRow(row));
+
       ws.columns = [
         { header: 'Booking ID', key: 'id', width: 15 },
+        { header: 'Booking Type', key: 'bookingType', width: 20 },
+        { header: 'Assignment Method', key: 'assignmentMethod', width: 18 },
         { header: 'Customer', key: 'customer', width: 22 },
+        { header: 'Customer Phone', key: 'customerPhone', width: 16 },
+        { header: 'Customer Email', key: 'customerEmail', width: 28 },
         { header: 'Worker', key: 'worker', width: 22 },
+        { header: 'Support Staff', key: 'supportStaff', width: 28 },
+        { header: 'Worker Count', key: 'workerCount', width: 14 },
         { header: 'Service', key: 'service', width: 28 },
         { header: 'Date', key: 'date', width: 14 },
         { header: 'Start Time', key: 'startTime', width: 12 },
         { header: 'End Time', key: 'endTime', width: 12 },
+        { header: 'Scheduled Duration', key: 'scheduledDuration', width: 18 },
+        { header: 'Actual Duration', key: 'actualDuration', width: 18 },
+        { header: 'Actual Start', key: 'actualStart', width: 22 },
+        { header: 'Actual End', key: 'actualEnd', width: 22 },
+        { header: 'Address', key: 'address', width: 34 },
+        { header: 'Area', key: 'area', width: 18 },
         { header: 'City', key: 'city', width: 18 },
-        { header: 'Amount (₹)', key: 'amount', width: 14 },
+        { header: 'Customer Billed (₹)', key: 'amount', width: 18 },
+        { header: 'Worker Wage (₹)', key: 'workerWage', width: 16 },
+        { header: 'Estimated Revenue (₹)', key: 'estimatedRevenue', width: 20 },
+        { header: 'Overtime Charges (₹)', key: 'overtimeCharges', width: 20 },
+        { header: 'Payment Status', key: 'paymentStatus', width: 16 },
+        { header: 'Transaction ID', key: 'transactionId', width: 22 },
         { header: 'Status', key: 'status', width: 15 },
+        { header: 'Notes', key: 'notes', width: 42 },
         { header: 'Created At', key: 'createdAt', width: 22 },
       ];
       filtered.forEach(b => ws.addRow({
         id: b._id.slice(-8).toUpperCase(),
+        bookingType: b.bookingType || 'adhoc',
+        assignmentMethod: b.assignmentMethod || '—',
         customer: b.customer?.name || 'Unknown',
+        customerPhone: b.customer?.phone || '—',
+        customerEmail: b.customer?.email || '—',
         worker: b.worker?.name || '—',
-        service: b.service?.name || (b.bookingType === 'deep-cleaning-cart' ? 'Deep Cleaning' : 'Unknown'),
+        supportStaff: getSupportStaffNames(b) || '—',
+        workerCount: b.workforce?.workerCount || (b.worker ? 1 : 0),
+        service: getServiceName(b),
         date: b.bookingDate ? new Date(b.bookingDate).toLocaleDateString('en-IN') : '—',
         startTime: b.startTime,
         endTime: b.endTime,
+        scheduledDuration: formatMinutes(b.scheduledDurationMinutes),
+        actualDuration: formatMinutes(b.actualDurationMinutes),
+        actualStart: formatDateTime(b.actualStartTime || ''),
+        actualEnd: formatDateTime(b.actualEndTime || ''),
+        address: b.location ? [b.location.apartmentName, b.location.address].filter(Boolean).join(', ') : '—',
+        area: b.location?.area || '—',
         city: b.location ? [b.location.city, b.location.state].filter(Boolean).join(', ') : '—',
         amount: b.totalAmount,
+        workerWage: getWorkerWage(b),
+        estimatedRevenue: getEstimatedRevenue(b),
+        overtimeCharges: b.overtimeCharges || 0,
+        paymentStatus: b.paymentStatus || 'pending',
+        transactionId: b.paymentProof?.transactionId || '—',
         status: b.status.charAt(0).toUpperCase() + b.status.slice(1).replace('-', ' '),
+        notes: b.notes || '—',
         createdAt: formatDateTime(b.createdAt),
       }));
+      summaryWs.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      summaryWs.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0f766e' } };
       ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
       ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1e293b' } };
       const buffer = await wb.xlsx.writeBuffer();
@@ -433,9 +536,11 @@ const AdminBookings = () => {
             </h1>
             <p className="text-muted-foreground text-sm mt-1">{bookings.length} total bookings</p>
           </div>
-          <button onClick={handleExport} disabled={exporting} className="flex items-center gap-2 btn-brand text-sm py-2.5 px-4 disabled:opacity-60">
-            <Download className="w-4 h-4" /> {exporting ? 'Exporting…' : 'Export Excel'}
-          </button>
+          {isSuperAdmin && (
+            <button onClick={handleExport} disabled={exporting} className="flex items-center gap-2 btn-brand text-sm py-2.5 px-4 disabled:opacity-60">
+              <Download className="w-4 h-4" /> {exporting ? 'Exporting…' : 'Export Revenue Excel'}
+            </button>
+          )}
         </div>
 
         {/* Filters */}
@@ -681,13 +786,15 @@ const AdminBookings = () => {
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => setShowPrintModal(true)}
-                  className="p-2 hover:bg-muted rounded-lg transition-colors"
-                  title="Print booking order"
-                >
-                  <Printer className="w-5 h-5" />
-                </button>
+                {isSuperAdmin && (
+                  <button
+                    onClick={() => setShowPrintModal(true)}
+                    className="p-2 hover:bg-muted rounded-lg transition-colors"
+                    title="Open revenue bill"
+                  >
+                    <Printer className="w-5 h-5" />
+                  </button>
+                )}
                 <button
                   onClick={() => setSelectedProofBooking(null)}
                   className="p-2 hover:bg-muted rounded-lg transition-colors"
@@ -714,9 +821,46 @@ const AdminBookings = () => {
                 </div>
                 <div>
                   <p className="text-muted-foreground text-xs">Amount</p>
-                  <p className="font-semibold text-foreground">₹{selectedProofBooking.totalAmount}</p>
+                  <p className="font-semibold text-foreground">{formatCurrency(selectedProofBooking.totalAmount)}</p>
+                </div>
+                {isSuperAdmin && (
+                  <>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Worker Wage</p>
+                      <p className="font-medium text-foreground">{formatCurrency(getWorkerWage(selectedProofBooking))}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Estimated Revenue</p>
+                      <p className="font-medium text-emerald-700">{formatCurrency(getEstimatedRevenue(selectedProofBooking))}</p>
+                    </div>
+                  </>
+                )}
+                <div>
+                  <p className="text-muted-foreground text-xs">Payment</p>
+                  <p className="font-medium text-foreground">{selectedProofBooking.paymentStatus || 'pending'}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Timing</p>
+                  <p className="font-medium text-foreground">{formatMinutes(selectedProofBooking.scheduledDurationMinutes)}</p>
                 </div>
               </div>
+
+              {isSuperAdmin && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-emerald-800 font-semibold">Finance Snapshot</p>
+                    <p className="text-muted-foreground mt-1">Customer billed: {formatCurrency(selectedProofBooking.totalAmount)}</p>
+                    <p className="text-muted-foreground">Worker wage: {formatCurrency(getWorkerWage(selectedProofBooking))}</p>
+                    <p className="text-muted-foreground">Estimated revenue: {formatCurrency(getEstimatedRevenue(selectedProofBooking))}</p>
+                  </div>
+                  <div>
+                    <p className="text-emerald-800 font-semibold">Team Snapshot</p>
+                    <p className="text-muted-foreground mt-1">Team head: {selectedProofBooking.worker?.name || '—'}</p>
+                    <p className="text-muted-foreground">Support staff: {getSupportStaffNames(selectedProofBooking) || '—'}</p>
+                    <p className="text-muted-foreground">Worker count: {selectedProofBooking.workforce?.workerCount || (selectedProofBooking.worker ? 1 : 0)}</p>
+                  </div>
+                </div>
+              )}
 
               {/* Completion Photos */}
               <div className="space-y-3">
@@ -1024,6 +1168,8 @@ const AdminBookings = () => {
                     <span className="font-medium">₹{workforceBooking.workforce.wageRate}{workforceBooking.workforce.wageType === 'per_hour' ? '/hr' : '/session'}</span>
                     <span className="text-muted-foreground">Duration (mins):</span>
                     <span className="font-medium">{workforceBooking.actualDurationMinutes ?? '—'}</span>
+                    <span className="text-muted-foreground">Scheduled (mins):</span>
+                    <span className="font-medium">{workforceBooking.scheduledDurationMinutes ?? '—'}</span>
                     <span className="text-muted-foreground font-semibold">Total Wage:</span>
                     <span className="font-bold text-emerald-700 text-base">₹{workforceBooking.workforce.totalWorkerWage}</span>
                   </div>
@@ -1033,7 +1179,7 @@ const AdminBookings = () => {
               {/* Edit fields */}
               <div className="space-y-3">
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  Wage and duration are locked after booking. Start/end scans and break approvals control duration, and any wage change must go through super-admin service price approval. Only extra worker count can be increased here.
+                  Wage and actual duration are locked after booking. Start/end scans and break approvals control actual duration. For deep cleaning, admin and super admin can still extend the scheduled time if the work is bigger than expected.
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-foreground mb-1">Workers Needed</label>
@@ -1045,6 +1191,23 @@ const AdminBookings = () => {
                     className="input-clean text-sm w-full"
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">Scheduled Duration (minutes)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={workforceForm.scheduledDurationMinutes}
+                    onChange={e => setWorkforceForm(f => ({ ...f, scheduledDurationMinutes: Math.max(1, parseInt(e.target.value) || 180) }))}
+                    disabled={workforceBooking.bookingType !== 'deep-cleaning-cart'}
+                    className="input-clean text-sm w-full disabled:opacity-60 disabled:cursor-not-allowed"
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {workforceBooking.bookingType === 'deep-cleaning-cart'
+                      ? 'Editable only for deep-cleaning bookings. The assigned team stays blocked for the full scheduled time window.'
+                      : 'Duration changes are available only for deep-cleaning bookings.'}
+                  </p>
+                </div>
               </div>
 
               <div className="flex gap-3 pt-2">
@@ -1053,7 +1216,7 @@ const AdminBookings = () => {
                   disabled={workforceLoading}
                   className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-semibold text-sm hover:bg-emerald-700 transition-colors disabled:opacity-60"
                 >
-                  {workforceLoading ? 'Saving…' : 'Save worker count'}
+                  {workforceLoading ? 'Saving…' : 'Save workforce details'}
                 </button>
                 <button
                   onClick={() => setWorkforceBooking(null)}

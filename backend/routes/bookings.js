@@ -11,14 +11,14 @@ import SubscriptionWorkerChangeRequest from '../models/SubscriptionWorkerChangeR
 import User from '../models/User.js';
 import WorkerEarnings from '../models/WorkerEarnings.js';
 import {
-    activateBackupWorker,
-    assignWorkersWithBackup,
-    checkBackupActivationNeeded
+  activateBackupWorker,
+  assignWorkersWithBackup,
+  checkBackupActivationNeeded
 } from '../utils/advancedWorkerAssignment.js';
 import {
-    processQueuedBookings,
-    retryPendingBookingAssignment,
-    updateBookingStatuses
+  processQueuedBookings,
+  retryPendingBookingAssignment,
+  updateBookingStatuses
 } from '../utils/bookingStatusUpdater.js';
 import { calculateDistance } from '../utils/geolocation.js';
 import notificationService from '../utils/notificationService.js';
@@ -27,14 +27,14 @@ import { checkSlotAvailability } from '../utils/slotManagement.js';
 import { checkIfOnTime, updateWorkerStats } from '../utils/updateWorkerStats.js';
 import { assignWorkerToBooking, reassignWorker } from '../utils/workerAssignment.js';
 import {
-    getWorkerBlockedTimeRanges,
-    isWorkerAvailableForTimeRange,
-    isWorkerEligibleForAssignment
+  getWorkerBlockedTimeRanges,
+  isWorkerAvailableForTimeRange,
+  isWorkerEligibleForAssignment
 } from '../utils/workerAvailability.js';
 import {
-    getWorkerAvailabilityForecast,
-    getWorkerCapacityStatus,
-    monitorWorkerPool
+  getWorkerAvailabilityForecast,
+  getWorkerCapacityStatus,
+  monitorWorkerPool
 } from '../utils/workerPoolManager.js';
 
 const router = express.Router();
@@ -137,6 +137,54 @@ const addMinutesToTimeString = (startTime, durationMinutes) => {
   }
 
   return minutesToTimeString(startMinutes + durationMinutes);
+};
+
+const getAssignedWorkerIdsForBooking = (booking) => {
+  const workerIds = [
+    booking?.worker,
+    ...(Array.isArray(booking?.supportStaff) ? booking.supportStaff.map((member) => member?.worker) : []),
+  ]
+    .filter(Boolean)
+    .map((value) => value.toString());
+
+  return [...new Set(workerIds)];
+};
+
+const getWorkerConflictDetailsForWindow = async ({ booking, workerIds, startTime, endTime, excludeBookingId = null }) => {
+  const uniqueWorkerIds = [...new Set((workerIds || []).filter(Boolean).map((value) => value.toString()))];
+  if (uniqueWorkerIds.length === 0) {
+    return [];
+  }
+
+  const workerDocs = await User.find({ _id: { $in: uniqueWorkerIds } })
+    .select('name')
+    .lean();
+  const workerNameById = new Map(workerDocs.map((worker) => [worker._id.toString(), worker.name || 'Worker']));
+
+  const conflictChecks = await Promise.all(uniqueWorkerIds.map(async (workerId) => {
+    const availability = await checkSlotAvailability(
+      workerId,
+      booking.bookingDate,
+      startTime,
+      endTime,
+      Booking,
+      15,
+      excludeBookingId || booking._id,
+    );
+
+    if (availability.available) {
+      return null;
+    }
+
+    return {
+      workerId,
+      workerName: workerNameById.get(workerId) || 'Worker',
+      reason: availability.reason || 'Worker has a conflicting booking',
+      conflictingBooking: availability.conflictingBooking || null,
+    };
+  }));
+
+  return conflictChecks.filter(Boolean);
 };
 
 const clampMinutesToTimeString = (minutes) => {
@@ -2470,6 +2518,26 @@ router.post('/:id/support-staff', authenticate, authorize('admin', 'super_admin'
       return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
     }
 
+    const availability = await checkSlotAvailability(
+      workerId,
+      booking.bookingDate,
+      booking.startTime,
+      booking.endTime,
+      Booking,
+      15,
+      booking._id,
+    );
+
+    if (!availability.available) {
+      return res.status(400).json({
+        error: {
+          message: availability.reason || 'Worker is not available for the full deep-cleaning window',
+          status: 400,
+          conflictingBooking: availability.conflictingBooking || null,
+        }
+      });
+    }
+
     booking.supportStaff.push({ worker: workerId, name: worker.name });
     await booking.save();
     await booking.populate('supportStaff.worker', 'name email phone');
@@ -2534,6 +2602,26 @@ router.patch('/:id/team-head', authenticate, authorize('admin', 'super_admin'), 
     const worker = await User.findById(workerId).select('name email phone');
     if (!worker) {
       return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
+    }
+
+    const availability = await checkSlotAvailability(
+      workerId,
+      booking.bookingDate,
+      booking.startTime,
+      booking.endTime,
+      Booking,
+      15,
+      booking._id,
+    );
+
+    if (!availability.available) {
+      return res.status(400).json({
+        error: {
+          message: availability.reason || 'Worker is not available for the full deep-cleaning window',
+          status: 400,
+          conflictingBooking: availability.conflictingBooking || null,
+        }
+      });
     }
 
     const previousHead = booking.worker ? booking.worker.toString() : null;
@@ -3257,7 +3345,7 @@ router.post('/:id/add-completion-photo',
 // @access  Private/Worker
 router.post('/:id/upload-payment-proof',
   authenticate,
-  authorize('worker', 'admin'),
+  authorize('worker', 'admin', 'customer'),
   (req, res, next) => {
     upload.single('paymentProof')(req, res, (err) => {
       if (err) {
@@ -3276,15 +3364,25 @@ router.post('/:id/upload-payment-proof',
         });
       }
 
-      // Verify worker is assigned to this booking
-      if (!booking.worker || (booking.worker.toString() !== req.user._id.toString() && req.user.role !== 'admin')) {
+      const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
+      const isWorker = req.user.role === 'worker';
+      const isCustomer = req.user.role === 'customer';
+      const isAssignedWorker = Boolean(booking.worker && booking.worker.toString() === req.user._id.toString());
+      const isBookingCustomer = booking.customer?.toString() === req.user._id.toString();
+      const isSubscriptionBooking = booking.subscription?.isSubscription || ['daily', 'weekly', 'biweekly', 'monthly', 'monthly-subscription'].includes(booking.bookingType);
+
+      if (!(isAdmin || (isWorker && isAssignedWorker) || (isCustomer && isBookingCustomer && isSubscriptionBooking))) {
         return res.status(403).json({ 
-          error: { message: 'You are not assigned to this booking', status: 403 } 
+          error: { message: 'You are not authorized to upload payment proof for this booking', status: 403 } 
         });
       }
 
-      // Check if service is completed or pending admin review
-      if (booking.status !== 'completed' && booking.status !== 'pending-review') {
+      // Customer can upload subscription payment proof during booking flow; worker/admin remain completion-flow only
+      if (
+        !(isCustomer && isBookingCustomer && isSubscriptionBooking)
+        && booking.status !== 'completed'
+        && booking.status !== 'pending-review'
+      ) {
         return res.status(400).json({ 
           error: { message: 'Service must be completed or pending review to upload payment proof', status: 400 } 
         });
@@ -3307,14 +3405,18 @@ router.post('/:id/upload-payment-proof',
         url: photoUrl,
         timestamp: new Date(),
         uploadedBy: req.user._id,
-        verified: true,
+        verified: isCustomer && isSubscriptionBooking ? false : true,
         transactionId: transactionId ? transactionId.trim() : null,
         transactionTime: transactionTime ? new Date(transactionTime) : new Date()
       };
 
+      if (isCustomer && isSubscriptionBooking) {
+        booking.paymentStatus = 'pending';
+      }
+
       await booking.save();
 
-      console.log(`✅ Worker ${isReupload ? 're-uploaded' : 'uploaded'} payment proof:`, photoUrl, transactionId ? `| TxnID: ${transactionId}` : '');
+      console.log(`✅ ${req.user.role} ${isReupload ? 're-uploaded' : 'uploaded'} payment proof:`, photoUrl, transactionId ? `| TxnID: ${transactionId}` : '');
 
       res.json({ 
         message: 'Payment proof uploaded successfully',
@@ -4472,11 +4574,11 @@ router.patch('/:id/checklist/:itemId/toggle', authenticate, authorize('worker'),
 });
 
 // @route   PATCH /api/bookings/:id/workforce
-// @desc    Admin/super_admin can only add extra workers after booking; duration comes from QR flow and wage is locked from service snapshot
+// @desc    Admin/super_admin can add extra workers and adjust deep-cleaning scheduled duration; actual duration and wage stay locked
 // @access  Private/Admin, Private/SuperAdmin
 router.patch('/:id/workforce', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
   try {
-    const { workerCount, actualDurationMinutes, wageRate } = req.body;
+    const { workerCount, actualDurationMinutes, wageRate, scheduledDurationMinutes } = req.body;
     const booking = await Booking.findById(req.params.id);
 
     if (!booking) {
@@ -4491,15 +4593,15 @@ router.patch('/:id/workforce', authenticate, authorize('admin', 'super_admin'), 
     if (actualDurationMinutes !== undefined || wageRate !== undefined) {
       return res.status(403).json({
         error: {
-          message: 'Post-booking duration and wage are locked. Team-head scan flow controls duration, and wage changes must be requested through service price change approval.',
+          message: 'Post-booking actual duration and wage are locked. Team-head scan flow controls actual duration, and wage changes must be requested through service price change approval.',
           status: 403
         }
       });
     }
 
-    if (workerCount === undefined) {
+    if (workerCount === undefined && scheduledDurationMinutes === undefined) {
       return res.status(400).json({
-        error: { message: 'Only workerCount can be updated after booking', status: 400 }
+        error: { message: 'Provide workerCount or scheduledDurationMinutes to update workforce details', status: 400 }
       });
     }
 
@@ -4513,13 +4615,55 @@ router.patch('/:id/workforce', authenticate, authorize('admin', 'super_admin'), 
       };
     }
 
-    if (typeof workerCount !== 'number' || workerCount < 1) {
-      return res.status(400).json({ error: { message: 'workerCount must be a positive number', status: 400 } });
+    if (workerCount !== undefined) {
+      if (typeof workerCount !== 'number' || workerCount < 1) {
+        return res.status(400).json({ error: { message: 'workerCount must be a positive number', status: 400 } });
+      }
+      if (workerCount < (current.workerCount || 1)) {
+        return res.status(400).json({ error: { message: 'Worker count can only be increased, not decreased', status: 400 } });
+      }
+      booking.workforce.workerCount = workerCount;
     }
-    if (workerCount < (current.workerCount || 1)) {
-      return res.status(400).json({ error: { message: 'Worker count can only be increased, not decreased', status: 400 } });
+
+    if (scheduledDurationMinutes !== undefined) {
+      if (booking.bookingType !== 'deep-cleaning-cart') {
+        return res.status(400).json({ error: { message: 'Scheduled duration can only be changed for deep-cleaning bookings', status: 400 } });
+      }
+
+      if (typeof scheduledDurationMinutes !== 'number' || !Number.isFinite(scheduledDurationMinutes) || scheduledDurationMinutes < 1) {
+        return res.status(400).json({ error: { message: 'scheduledDurationMinutes must be at least 1 minute', status: 400 } });
+      }
+
+      const normalizedScheduledDurationMinutes = Math.max(1, Math.round(scheduledDurationMinutes));
+      const nextEndTime = addMinutesToTimeString(booking.startTime, normalizedScheduledDurationMinutes);
+      const assignedWorkerIds = getAssignedWorkerIdsForBooking(booking);
+      const workerConflicts = await getWorkerConflictDetailsForWindow({
+        booking,
+        workerIds: assignedWorkerIds,
+        startTime: booking.startTime,
+        endTime: nextEndTime,
+        excludeBookingId: booking._id,
+      });
+
+      if (workerConflicts.length > 0) {
+        const firstConflict = workerConflicts[0];
+        const conflictWindow = firstConflict.conflictingBooking
+          ? ` (${firstConflict.conflictingBooking.startTime}-${firstConflict.conflictingBooking.endTime})`
+          : '';
+
+        return res.status(409).json({
+          error: {
+            message: `${firstConflict.workerName} already has another booking${conflictWindow}. Extend the deep-cleaning time only after reassigning that worker's conflicting work.`,
+            status: 409,
+            code: 'WORKER_BOOKING_CONFLICT',
+            conflicts: workerConflicts,
+          }
+        });
+      }
+
+      booking.scheduledDurationMinutes = normalizedScheduledDurationMinutes;
+      booking.endTime = nextEndTime;
     }
-    booking.workforce.workerCount = workerCount;
 
     // Recalculate totalWorkerWage
     const count = booking.workforce.workerCount || 1;
@@ -4539,9 +4683,11 @@ router.patch('/:id/workforce', authenticate, authorize('admin', 'super_admin'), 
     await booking.save();
 
     res.json({
-      message: 'Extra worker count updated successfully',
+      message: 'Workforce details updated successfully',
       workforce: booking.workforce,
-      actualDurationMinutes: booking.actualDurationMinutes
+      actualDurationMinutes: booking.actualDurationMinutes,
+      scheduledDurationMinutes: booking.scheduledDurationMinutes,
+      endTime: booking.endTime
     });
   } catch (error) {
     console.error('Update workforce error:', error);
