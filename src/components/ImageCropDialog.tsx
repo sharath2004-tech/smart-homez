@@ -6,9 +6,8 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { Slider } from "@/components/ui/slider";
 import { Loader2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface ImageCropDialogProps {
   open: boolean;
@@ -21,6 +20,52 @@ interface ImageCropDialogProps {
 }
 
 const PREVIEW_SIZE = 280;
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 3;
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+const getPanBounds = (
+  naturalSize: { width: number; height: number },
+  zoom: number,
+) => {
+  if (!naturalSize.width || !naturalSize.height) {
+    return { maxOffsetX: 0, maxOffsetY: 0, renderedWidth: PREVIEW_SIZE, renderedHeight: PREVIEW_SIZE };
+  }
+
+  const coverScale = Math.max(PREVIEW_SIZE / naturalSize.width, PREVIEW_SIZE / naturalSize.height);
+  const renderedWidth = naturalSize.width * coverScale * zoom;
+  const renderedHeight = naturalSize.height * coverScale * zoom;
+
+  return {
+    renderedWidth,
+    renderedHeight,
+    maxOffsetX: Math.max(0, (renderedWidth - PREVIEW_SIZE) / 2),
+    maxOffsetY: Math.max(0, (renderedHeight - PREVIEW_SIZE) / 2),
+  };
+};
+
+const computePreviewMetrics = (
+  naturalSize: { width: number; height: number },
+  zoom: number,
+  panX: number,
+  panY: number,
+) => {
+  const { renderedWidth, renderedHeight, maxOffsetX, maxOffsetY } = getPanBounds(naturalSize, zoom);
+  const clampedPanX = clamp(panX, -maxOffsetX, maxOffsetX);
+  const clampedPanY = clamp(panY, -maxOffsetY, maxOffsetY);
+
+  return {
+    width: renderedWidth,
+    height: renderedHeight,
+    left: (PREVIEW_SIZE - renderedWidth) / 2 + clampedPanX,
+    top: (PREVIEW_SIZE - renderedHeight) / 2 + clampedPanY,
+    maxOffsetX,
+    maxOffsetY,
+    panX: clampedPanX,
+    panY: clampedPanY,
+  };
+};
 
 const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
   const image = new Image();
@@ -44,6 +89,8 @@ export const ImageCropDialog = ({
   const [panY, setPanY] = useState(0);
   const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
   const [saving, setSaving] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStateRef = useRef<{ pointerId: number; startX: number; startY: number; panX: number; panY: number } | null>(null);
 
   useEffect(() => {
     if (!open || !imageFile) {
@@ -75,30 +122,75 @@ export const ImageCropDialog = ({
   }, [open, imageFile]);
 
   const previewMetrics = useMemo(() => {
-    if (!naturalSize.width || !naturalSize.height) {
-      return {
-        width: PREVIEW_SIZE,
-        height: PREVIEW_SIZE,
-        left: 0,
-        top: 0,
-      };
+    return computePreviewMetrics(naturalSize, zoom, panX, panY);
+  }, [naturalSize, panX, panY, zoom]);
+
+  useEffect(() => {
+    if (panX !== previewMetrics.panX) {
+      setPanX(previewMetrics.panX);
+    }
+    if (panY !== previewMetrics.panY) {
+      setPanY(previewMetrics.panY);
+    }
+  }, [panX, panY, previewMetrics.panX, previewMetrics.panY]);
+
+  const updateZoom = (nextZoom: number) => {
+    const clampedZoom = clamp(nextZoom, MIN_ZOOM, MAX_ZOOM);
+    const nextMetrics = computePreviewMetrics(naturalSize, clampedZoom, panX, panY);
+    setZoom(clampedZoom);
+    setPanX(nextMetrics.panX);
+    setPanY(nextMetrics.panY);
+  };
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!imageUrl) {
+      return;
     }
 
-    const coverScale = Math.max(PREVIEW_SIZE / naturalSize.width, PREVIEW_SIZE / naturalSize.height);
-    const renderedWidth = naturalSize.width * coverScale * zoom;
-    const renderedHeight = naturalSize.height * coverScale * zoom;
-    const maxOffsetX = Math.max(0, (renderedWidth - PREVIEW_SIZE) / 2);
-    const maxOffsetY = Math.max(0, (renderedHeight - PREVIEW_SIZE) / 2);
-    const offsetX = maxOffsetX * (panX / 100);
-    const offsetY = maxOffsetY * (panY / 100);
-
-    return {
-      width: renderedWidth,
-      height: renderedHeight,
-      left: (PREVIEW_SIZE - renderedWidth) / 2 + offsetX,
-      top: (PREVIEW_SIZE - renderedHeight) / 2 + offsetY,
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      panX,
+      panY,
     };
-  }, [naturalSize.height, naturalSize.width, panX, panY, zoom]);
+    setIsDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const dragState = dragStateRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const deltaX = event.clientX - dragState.startX;
+    const deltaY = event.clientY - dragState.startY;
+    const nextMetrics = computePreviewMetrics(
+      naturalSize,
+      zoom,
+      dragState.panX + deltaX,
+      dragState.panY + deltaY,
+    );
+
+    setPanX(nextMetrics.panX);
+    setPanY(nextMetrics.panY);
+  };
+
+  const handlePointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (dragStateRef.current?.pointerId === event.pointerId) {
+      dragStateRef.current = null;
+      setIsDragging(false);
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    }
+  };
+
+  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    updateZoom(zoom + (event.deltaY < 0 ? 0.12 : -0.12));
+  };
 
   const handleConfirm = async () => {
     if (!imageFile || !imageUrl || !naturalSize.width || !naturalSize.height) {
@@ -159,43 +251,64 @@ export const ImageCropDialog = ({
         <div className="space-y-5">
           <div className="mx-auto h-[280px] w-[280px] overflow-hidden rounded-2xl border border-border bg-muted relative shadow-inner">
             {imageUrl ? (
-              <img
-                src={imageUrl}
-                alt="Crop preview"
-                className="absolute left-0 top-0 max-w-none select-none pointer-events-none"
-                style={{
-                  width: `${previewMetrics.width}px`,
-                  height: `${previewMetrics.height}px`,
-                  transform: `translate(${previewMetrics.left}px, ${previewMetrics.top}px)`,
-                }}
-              />
+              <div
+                className={`absolute inset-0 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} touch-none`}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerEnd}
+                onPointerCancel={handlePointerEnd}
+                onPointerLeave={handlePointerEnd}
+                onWheel={handleWheel}
+              >
+                <img
+                  src={imageUrl}
+                  alt="Crop preview"
+                  className="absolute left-0 top-0 max-w-none select-none pointer-events-none"
+                  style={{
+                    width: `${previewMetrics.width}px`,
+                    height: `${previewMetrics.height}px`,
+                    transform: `translate(${previewMetrics.left}px, ${previewMetrics.top}px)`,
+                  }}
+                />
+              </div>
             ) : null}
             <div className="absolute inset-0 rounded-2xl border-[3px] border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.22)] pointer-events-none" />
           </div>
 
-          <div className="space-y-4">
-            <div>
-              <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-                <span>Zoom</span>
-                <span>{zoom.toFixed(1)}×</span>
-              </div>
-              <Slider min={1} max={3} step={0.1} value={[zoom]} onValueChange={([value]) => setZoom(value)} />
-            </div>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground text-center">
+              Drag the photo directly with your finger or mouse to position it. Use the zoom buttons if needed.
+            </p>
 
-            <div>
-              <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-                <span>Move left / right</span>
-                <span>{panX}%</span>
+            <div className="flex items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => updateZoom(zoom - 0.15)}
+                className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+              >
+                −
+              </button>
+              <div className="min-w-20 rounded-lg bg-muted px-3 py-2 text-center text-sm font-medium text-foreground">
+                {zoom.toFixed(1)}×
               </div>
-              <Slider min={-100} max={100} step={1} value={[panX]} onValueChange={([value]) => setPanX(value)} />
-            </div>
-
-            <div>
-              <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-                <span>Move up / down</span>
-                <span>{panY}%</span>
-              </div>
-              <Slider min={-100} max={100} step={1} value={[panY]} onValueChange={([value]) => setPanY(value)} />
+              <button
+                type="button"
+                onClick={() => updateZoom(zoom + 0.15)}
+                className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPanX(0);
+                  setPanY(0);
+                  setZoom(1);
+                }}
+                className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+              >
+                Reset
+              </button>
             </div>
           </div>
         </div>

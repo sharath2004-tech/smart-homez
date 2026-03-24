@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { ImageCropDialog } from "@/components/ImageCropDialog";
-import { API_BASE_URL, authAPI, workersAPI } from "@/lib/api";
+import { API_ORIGIN, authAPI, workersAPI } from "@/lib/api";
 import { Briefcase, Camera, CheckCircle, Clock, Download, FileText, Loader2, Mail, MapPin, Phone, Star, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -43,6 +43,18 @@ interface WorkerDocuments {
   aadhaarNumber?: string;
   uploadedAt?: string;
 }
+
+const resolveAssetUrl = (value?: string | null) => {
+  if (!value) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(value)) {
+    return value;
+  }
+
+  return `${API_ORIGIN}${value}`;
+};
 
 const getWorkerPayLabel = (workerProfile?: Profile['workerProfile']) => {
   if (!workerProfile) return 'Not set yet';
@@ -123,11 +135,7 @@ const WorkerProfile = () => {
   const initials = profile.name.split(' ').map((n: string) => n[0]).join('').toUpperCase();
   const rating = profile.workerProfile?.rating || 0;
   const totalJobs = profile.workerProfile?.totalJobsCompleted || stats.thisMonth || 0;
-  const profileImageUrl = profile.profileImage
-    ? `${API_BASE_URL.replace('/api', '')}${profile.profileImage}`
-    : documents?.profileImage
-      ? `${API_BASE_URL.replace('/api', '')}${documents.profileImage}`
-      : null;
+  const profileImageUrl = resolveAssetUrl(profile.profileImage) || resolveAssetUrl(documents?.profileImage);
   const displayProfileImageUrl = profilePicturePreview || profileImageUrl;
 
   const handleProfilePictureSelection = (file: File | null) => {
@@ -425,12 +433,12 @@ const WorkerProfile = () => {
                   <div className="flex-1">
                     <p className="font-medium text-foreground mb-1">Profile Picture</p>
                     <img 
-                      src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${documents.profileImage}`}
+                      src={resolveAssetUrl(documents.profileImage) || undefined}
                       alt="Profile"
                       className="w-32 h-32 object-cover rounded-lg mb-2"
                     />
                     <a
-                      href={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${documents.profileImage}`}
+                      href={resolveAssetUrl(documents.profileImage) || undefined}
                       download
                       target="_blank"
                       rel="noopener noreferrer"
@@ -455,12 +463,12 @@ const WorkerProfile = () => {
                       </p>
                     )}
                     <img 
-                      src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${documents.aadhaarFront}`}
+                      src={resolveAssetUrl(documents.aadhaarFront) || undefined}
                       alt="Aadhaar Front"
                       className="w-full max-w-md h-auto object-contain rounded-lg mb-2"
                     />
                     <a
-                      href={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${documents.aadhaarFront}`}
+                      href={resolveAssetUrl(documents.aadhaarFront) || undefined}
                       download
                       target="_blank"
                       rel="noopener noreferrer"
@@ -480,12 +488,12 @@ const WorkerProfile = () => {
                   <div className="flex-1">
                     <p className="font-medium text-foreground mb-1">Aadhaar Card (Back)</p>
                     <img 
-                      src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${documents.aadhaarBack}`}
+                      src={resolveAssetUrl(documents.aadhaarBack) || undefined}
                       alt="Aadhaar Back"
                       className="w-full max-w-md h-auto object-contain rounded-lg mb-2"
                     />
                     <a
-                      href={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${documents.aadhaarBack}`}
+                      href={resolveAssetUrl(documents.aadhaarBack) || undefined}
                       download
                       target="_blank"
                       rel="noopener noreferrer"

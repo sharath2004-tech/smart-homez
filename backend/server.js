@@ -65,19 +65,27 @@ const PORT = process.env.PORT || 5000;
 app.set('trust proxy', 1);
 
 // CORS Configuration
-const configuredOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : [
-      'http://localhost:5173',
-      'http://localhost:8080',
-      'http://localhost:8081',
-      'http://localhost:8082',
-      'https://smart-homez.vercel.app',
-      'https://*.vercel.app'
-    ];
+const defaultAllowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:8080',
+  'http://localhost:8081',
+  'http://localhost:8082',
+  'https://smart-homez.vercel.app',
+  'https://*.vercel.app'
+];
+
+const configuredOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean)
+  : [];
+
+const envConfiguredFrontendOrigins = [process.env.FRONTEND_URL, process.env.CLIENT_URL]
+  .map((origin) => origin?.trim())
+  .filter(Boolean);
 
 const allowedOrigins = Array.from(new Set([
+  ...defaultAllowedOrigins,
   ...configuredOrigins,
+  ...envConfiguredFrontendOrigins,
   'http://localhost:5173',
   'http://localhost:8080',
   'http://localhost:8081',
@@ -122,7 +130,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With']
 }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));

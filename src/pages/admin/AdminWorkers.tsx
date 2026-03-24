@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { ReliabilityScoreCard } from "@/components/ReliabilityScoreCard";
 import { WorkerRatingAnalytics } from "@/components/WorkerRatingAnalytics";
 import { useAdminRole } from "@/hooks/useAdminRole";
-import { adminAPI, API_BASE_URL, reliabilityAPI, reviewAnalyticsAPI } from "@/lib/api";
+import { adminAPI, API_BASE_URL, reliabilityAPI, reviewAnalyticsAPI, superAdminAPI } from "@/lib/api";
 import { AlertTriangle, Archive, ArchiveRestore, BarChart3, CheckCircle, Clock, Edit, Eye, EyeOff, FileText, Info, Loader2, MapPin, Plus, Search, Star, TrendingUp, Upload, X, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -137,7 +137,7 @@ const isWorkerEffectivelyOnline = (worker: Worker) => {
 const getWorkerAvailabilityReason = (worker: Worker) => worker.workerProfile?.availabilityReason || null;
 
 const AdminWorkers = () => {
-  const { role, name } = useAdminRole();
+  const { role, name, isSuperAdmin } = useAdminRole();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [workers, setWorkers] = useState<Worker[]>([]);
@@ -218,16 +218,19 @@ const AdminWorkers = () => {
     return `${baseUrl}${path}`;
   };
 
+  const workerCollectionApi = isSuperAdmin ? superAdminAPI : adminAPI;
+  const locationApi = isSuperAdmin ? superAdminAPI : adminAPI;
+
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [isSuperAdmin]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
       const [workersRes, locationsRes] = await Promise.all([
-        adminAPI.getWorkers(),
-        adminAPI.getLocations()
+        workerCollectionApi.getWorkers(),
+        locationApi.getLocations()
       ]);
       console.log('📊 Workers fetched:', workersRes.workers?.length || 0, 'workers');
       console.log('📍 Locations fetched:', locationsRes.locations?.length || 0, 'locations');
@@ -343,7 +346,7 @@ const AdminWorkers = () => {
     }
 
     try {
-      await adminAPI.archiveWorker(archiveWorkerData.id, resignedDate);
+      await workerCollectionApi.archiveWorker(archiveWorkerData.id, resignedDate);
       alert('Worker archived successfully');
       setArchiveWorkerData(null);
       setResignedDate("");
@@ -357,7 +360,7 @@ const AdminWorkers = () => {
   const handleUnarchiveWorker = async (workerId: string) => {
     if (!confirm('Restore this worker? They will be reactivated.')) return;
     try {
-      await adminAPI.unarchiveWorker(workerId);
+      await workerCollectionApi.unarchiveWorker(workerId);
       alert('Worker restored successfully');
       fetchData();
     } catch (error) {
@@ -585,7 +588,7 @@ const AdminWorkers = () => {
       if (docFiles.aadhaarFront) formData.append('aadhaarFront', docFiles.aadhaarFront);
       if (docFiles.aadhaarBack) formData.append('aadhaarBack', docFiles.aadhaarBack);
 
-      const response = await adminAPI.createWorker(formData);
+      const response = await workerCollectionApi.createWorker(formData);
       
       // Show temporary password to admin
       const deliveryLabel =

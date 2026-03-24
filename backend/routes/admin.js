@@ -68,6 +68,63 @@ const VALID_INDIAN_CITIES = [
 
 const router = express.Router();
 
+const workerUploadFields = [
+  { name: 'profilePicture', maxCount: 1 },
+  { name: 'aadhaarFront', maxCount: 1 },
+  { name: 'aadhaarBack', maxCount: 1 }
+];
+
+const handleWorkerUploadFields = (req, res, next) => {
+  uploadWorkerFiles.fields(workerUploadFields)(req, res, (err) => {
+    if (!err) {
+      next();
+      return;
+    }
+
+    const status = err?.name === 'MulterError' ? 400 : 400;
+    res.status(status).json({
+      error: {
+        message: err.message || 'Worker file upload failed',
+        status
+      }
+    });
+  });
+};
+
+const buildCredentialDeliveryResults = (credentialDelivery, phone) => {
+  const results = {};
+
+  if (credentialDelivery === 'email' || credentialDelivery === 'both') {
+    results.email = 'queued';
+  }
+
+  if (credentialDelivery === 'phone' || credentialDelivery === 'both') {
+    results.sms = phone ? 'queued' : 'skipped: phone not provided';
+  }
+
+  return results;
+};
+
+const queueWorkerCredentialDelivery = ({ credentialDelivery, email, phone, name, temporaryPassword }) => {
+  void Promise.resolve().then(async () => {
+    const deliveryResults = {};
+
+    if (credentialDelivery === 'email' || credentialDelivery === 'both') {
+      const result = await sendTemporaryPasswordEmail(email, name, temporaryPassword);
+      deliveryResults.email = result.success ? 'sent' : `failed: ${result.reason}`;
+    }
+
+    if ((credentialDelivery === 'phone' || credentialDelivery === 'both') && phone) {
+      const result = await sendTemporaryPasswordSMS(phone, name, temporaryPassword);
+      deliveryResults.sms = result.success ? 'sent' : `failed: ${result.reason}`;
+    }
+
+    console.log(`📨 Worker credential delivery completed for ${email}:`, deliveryResults);
+  }).catch((deliveryError) => {
+    console.error(`Worker credential delivery failed for ${email}:`, deliveryError);
+  });
+};
+
 const COMPLETED_BOOKING_DATE_EXPR = {
   $ifNull: [
     '$completedAt',
@@ -679,11 +736,7 @@ router.delete('/admins/:adminId', authenticate, authorize('super_admin'), async 
 router.post('/workers',
   authenticate,
   authorize('admin', 'super_admin'),
-  uploadWorkerFiles.fields([
-    { name: 'profilePicture', maxCount: 1 },
-    { name: 'aadhaarFront', maxCount: 1 },
-    { name: 'aadhaarBack', maxCount: 1 }
-  ]),
+  handleWorkerUploadFields,
   [
     body('name').notEmpty().withMessage('Name is required'),
     body('email').isEmail().withMessage('Valid email is required'),
@@ -840,32 +893,17 @@ router.post('/workers',
         { $push: { assignedWorkers: { worker: worker._id, assignedAt: new Date() } } }
       );
 
-      // Send credentials via the channel chosen by the admin
+      // Return immediately so worker creation isn't blocked by email/SMS provider latency.
       const credentialDelivery = req.body.credentialDelivery || 'email'; // 'email' | 'phone' | 'both'
-      const deliveryResults = {};
-
-      if (credentialDelivery === 'email' || credentialDelivery === 'both') {
-        console.log(`📧 Sending temporary password email to: ${normalizedEmail}`);
-        const result = await sendTemporaryPasswordEmail(normalizedEmail, name, temporaryPassword);
-        deliveryResults.email = result.success ? 'sent' : `failed: ${result.reason}`;
-        console.log(`Email delivery: ${deliveryResults.email}`);
-      }
-
-      if (credentialDelivery === 'phone' || credentialDelivery === 'both') {
-        console.log(`📱 Sending temporary password SMS to: ${phone}`);
-        const result = await sendTemporaryPasswordSMS(phone, name, temporaryPassword);
-        deliveryResults.sms = result.success ? 'sent' : `failed: ${result.reason}`;
-        console.log(`SMS delivery: ${deliveryResults.sms}`);
-      }
+      const deliveryResults = buildCredentialDeliveryResults(credentialDelivery, phone);
 
       const deliveryMessage =
         credentialDelivery === 'both'
-          ? `Credentials sent via email (${deliveryResults.email}) and SMS (${deliveryResults.sms}).`
+          ? 'Credential delivery has been queued for email and SMS.'
           : credentialDelivery === 'phone'
-          ? `Credentials sent via SMS (${deliveryResults.sms}).`
-          : `Credentials sent via email (${deliveryResults.email}).`;
+          ? 'Credential delivery has been queued for SMS.'
+          : 'Credential delivery has been queued for email.';
 
-      // Return response immediately
       res.status(201).json({
         success: true,
         message: `Worker created successfully. ${deliveryMessage}`,
@@ -884,6 +922,14 @@ router.post('/workers',
           assignedApartments: worker.workerProfile.assignedApartments.map(apt => apt.apartmentName)
         },
         temporaryPassword: temporaryPassword // Send back to admin as backup (in case email fails)
+      });
+
+      queueWorkerCredentialDelivery({
+        credentialDelivery,
+        email: normalizedEmail,
+        phone,
+        name,
+        temporaryPassword
       });
     } catch (error) {
       console.error('Create worker error:', error);
@@ -1223,11 +1269,7 @@ router.post('/workers/:workerId/reset-password', authenticate, authorize('admin'
 router.put('/workers/:workerId',
   authenticate,
   authorize('admin', 'super_admin'),
-  uploadWorkerFiles.fields([
-    { name: 'aadhaarFront', maxCount: 1 },
-    { name: 'aadhaarBack', maxCount: 1 },
-    { name: 'profilePicture', maxCount: 1 }
-  ]),
+  handleWorkerUploadFields,
   async (req, res) => {
     try {
       const { workerId } = req.params;

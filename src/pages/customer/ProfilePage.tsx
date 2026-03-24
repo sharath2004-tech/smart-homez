@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { ImageCropDialog } from "@/components/ImageCropDialog";
-import { API_BASE_URL, authAPI, locationsAPI, usersAPI } from "@/lib/api";
+import { API_ORIGIN, authAPI, locationsAPI, usersAPI } from "@/lib/api";
 import { Bell, Camera, Check, ChevronRight, Edit2, Eye, EyeOff, Loader2, MapPin, Plus, Star, Trash2, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -38,6 +38,18 @@ interface Stats {
   preferredWorkers: PreferredWorker[];
   monthsActive: number;
 }
+
+const resolveProfileImageUrl = (value?: string | null) => {
+  if (!value) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(value)) {
+    return value;
+  }
+
+  return `${API_ORIGIN}${value}`;
+};
 
 const ProfilePage = () => {
   const { t } = useTranslation();
@@ -502,9 +514,7 @@ const ProfilePage = () => {
   }
 
   const initials = profile.name.split(' ').map(n => n[0]).join('').toUpperCase();
-  const profileImageUrl = profile.profileImage
-    ? `${API_BASE_URL.replace('/api', '')}${profile.profileImage}`
-    : null;
+  const profileImageUrl = resolveProfileImageUrl(profile.profileImage);
   const displayProfileImageUrl = profilePicturePreview || profileImageUrl;
 
   return (

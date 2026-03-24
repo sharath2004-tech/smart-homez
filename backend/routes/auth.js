@@ -46,6 +46,23 @@ function normalizeIndianPhone(phone) {
 
 const router = express.Router();
 
+const handleProfilePictureUpload = (req, res, next) => {
+  uploadProfilePicture(req, res, (err) => {
+    if (!err) {
+      next();
+      return;
+    }
+
+    const status = err?.name === 'MulterError' ? 400 : 400;
+    res.status(status).json({
+      error: {
+        message: err.message || 'Profile picture upload failed',
+        status
+      }
+    });
+  });
+};
+
 const getPasswordSetupState = (user) => {
   const hasCustomPassword = user?.hasCustomPassword !== false;
   return {
@@ -363,7 +380,9 @@ router.post('/login',
           id: user._id,
           name: user.name,
           email: user.email,
+          phone: user.phone,
           role: user.role,
+          profileImage: user.profileImage,
           isFirstLogin: user.isFirstLogin,
           ...getPasswordSetupState(user)
         },
@@ -406,7 +425,7 @@ router.get('/me', authenticate, async (req, res) => {
 // @route   PATCH /api/auth/me
 // @desc    Update current user profile (name, phone, gender, religion)
 // @access  Private
-router.patch('/me', authenticate, uploadProfilePicture,
+router.patch('/me', authenticate, handleProfilePictureUpload,
   [
     body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
     body('email').optional().isEmail().withMessage('Valid email is required'),
