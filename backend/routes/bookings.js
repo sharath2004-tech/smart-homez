@@ -1073,7 +1073,7 @@ router.post('/',
       }
 
       const serviceConfig = await Service.findById(service)
-        .select('duration durationOptions sizeParameters pricingTiers workerSearchRadiusKm defaultWorkerCount workerWage')
+        .select('name category duration durationOptions sizeParameters pricingTiers workerSearchRadiusKm defaultWorkerCount workerWage')
         .lean();
 
       if (!serviceConfig) {
@@ -1205,7 +1205,7 @@ router.post('/',
       }
 
       // Fetch service radius — use admin-configured workerSearchRadiusKm as the search perimeter
-      const serviceRadiusMeters = (serviceConfig?.workerSearchRadiusKm || 50) * 1000;
+      const serviceRadiusMeters = (serviceConfig?.workerSearchRadiusKm ?? 10) * 1000;
 
       console.log(`🔍 Searching for service location near: [${customerLng}, ${customerLat}] (radius: ${serviceRadiusMeters / 1000}km)`);
       const nearbyLocation = await Location.findOne({
@@ -1518,7 +1518,14 @@ router.post('/',
           // Use advanced assignment system for primary + 2 backup workers
           const assignmentResult = await assignWorkersWithBackup({
             customerId: req.user._id,
-            service: bookingData.service,
+            service: serviceConfig
+              ? {
+                  _id: service,
+                  name: serviceConfig.name,
+                  category: serviceConfig.category,
+                  workerSearchRadiusKm: serviceConfig.workerSearchRadiusKm
+                }
+              : bookingData.service,
             bookingDate: bookingData.bookingDate,
             startTime: bookingData.startTime,
             endTime: bookingData.endTime,

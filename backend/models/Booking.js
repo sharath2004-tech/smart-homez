@@ -14,7 +14,17 @@ const bookingSchema = new mongoose.Schema({
   // Worker assignment details
   assignmentMethod: {
     type: String,
-    enum: ['auto', 'manual', 'customer-preferred'],
+    enum: [
+      'auto',
+      'manual',
+      'customer-preferred',
+      'auto-nearest',
+      'preference-p1',
+      'preference-p2',
+      'preference-p3',
+      'worker-accepted',
+      'backup-activated'
+    ],
     default: 'auto'
   },
   assignedAt: {

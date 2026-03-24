@@ -79,9 +79,9 @@ export const findWorkerWithPreferences = async (params, Booking) => {
     }
 
     // Extract exception worker IDs
-    const exceptionWorkerIds = customer.preferences.exceptionWorkers.map(
-      ex => ex.workerId.toString()
-    );
+    const exceptionWorkerIds = (customer.preferences?.exceptionWorkers || [])
+      .map(ex => ex?.workerId?.toString())
+      .filter(Boolean);
 
     // Priority 1: Check Preference P1
     if (customer.preferences.preferredWorkerP1) {
