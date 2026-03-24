@@ -1,6 +1,6 @@
 import { LanguageSelector } from "@/components/LanguageSelector";
 import LocationSelector, { LocationData } from "@/components/LocationSelector";
-import { authAPI } from "@/lib/api";
+import { authAPI, setStoredCustomerLocation } from "@/lib/api";
 import { Check, Eye, EyeOff, Home, Loader2, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -105,7 +105,7 @@ const RegisterPage = () => {
       // Store token and location for both customers and workers
       localStorage.setItem('token', response.token);
       if (locationData) {
-        localStorage.setItem('userLocation', JSON.stringify(locationData));
+        setStoredCustomerLocation(locationData, 'selected');
       }
       
       setIsLoading(false);

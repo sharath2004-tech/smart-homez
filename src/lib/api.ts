@@ -5,6 +5,25 @@
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 export const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, '');
+export const USER_LOCATION_STORAGE_KEY = 'userLocation';
+export const USER_LOCATION_EVENT_NAME = 'pure-app:user-location-changed';
+
+type StoredCustomerLocation = {
+  lat?: number;
+  lng?: number;
+  latitude?: number;
+  longitude?: number;
+  apartmentName?: string;
+  address?: string;
+  area?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  isAvailable?: boolean;
+  serviceAreaId?: string;
+  timestamp?: number;
+  source?: 'selected' | 'profile' | 'device';
+};
 
 type LocationBearingUser = {
   role?: string;
@@ -33,6 +52,92 @@ const hasValidCoordinates = (coordinates?: number[]) => (
   && coordinates.length === 2
   && coordinates.every((value) => typeof value === 'number' && !Number.isNaN(value))
 );
+
+const hasValidLatLng = (latitude?: number, longitude?: number) => (
+  typeof latitude === 'number'
+  && typeof longitude === 'number'
+  && !Number.isNaN(latitude)
+  && !Number.isNaN(longitude)
+);
+
+export const getStoredCustomerLocation = (): StoredCustomerLocation | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const raw = window.localStorage.getItem(USER_LOCATION_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as StoredCustomerLocation;
+    const latitude = parsed.latitude ?? parsed.lat;
+    const longitude = parsed.longitude ?? parsed.lng;
+
+    if (!hasValidLatLng(latitude, longitude)) {
+      return null;
+    }
+
+    return {
+      ...parsed,
+      lat: latitude,
+      lng: longitude,
+      latitude,
+      longitude,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const notifyStoredLocationChange = (location: StoredCustomerLocation | null) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent(USER_LOCATION_EVENT_NAME, {
+    detail: location,
+  }));
+};
+
+export const setStoredCustomerLocation = (
+  location: StoredCustomerLocation,
+  source: StoredCustomerLocation['source'] = 'selected'
+) => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const latitude = location.latitude ?? location.lat;
+  const longitude = location.longitude ?? location.lng;
+  if (!hasValidLatLng(latitude, longitude)) {
+    return null;
+  }
+
+  const payload: StoredCustomerLocation = {
+    ...location,
+    lat: latitude,
+    lng: longitude,
+    latitude,
+    longitude,
+    source,
+    timestamp: location.timestamp ?? Date.now(),
+  };
+
+  window.localStorage.setItem(USER_LOCATION_STORAGE_KEY, JSON.stringify(payload));
+  notifyStoredLocationChange(payload);
+  return payload;
+};
+
+const removeStoredCustomerLocation = () => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.removeItem(USER_LOCATION_STORAGE_KEY);
+  notifyStoredLocationChange(null);
+};
 
 const buildStoredLocationFromUser = (user?: LocationBearingUser | null) => {
   if (!user || user.role !== 'customer') {
@@ -77,10 +182,19 @@ const syncStoredAuthState = (user?: Record<string, unknown> | null) => {
   }
 
   const storedLocation = buildStoredLocationFromUser(user as LocationBearingUser);
-  if (storedLocation) {
-    window.localStorage.setItem('userLocation', JSON.stringify(storedLocation));
+  const existingLocation = getStoredCustomerLocation();
+  const shouldPreserveExistingLocation = Boolean(
+    existingLocation
+    && hasValidLatLng(existingLocation.latitude ?? existingLocation.lat, existingLocation.longitude ?? existingLocation.lng)
+    && existingLocation.source !== 'profile'
+  );
+
+  if (storedLocation && !shouldPreserveExistingLocation) {
+    setStoredCustomerLocation(storedLocation, 'profile');
   } else if ((user as LocationBearingUser)?.role) {
-    window.localStorage.removeItem('userLocation');
+    if (!shouldPreserveExistingLocation) {
+      removeStoredCustomerLocation();
+    }
   }
 };
 

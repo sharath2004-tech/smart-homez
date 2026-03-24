@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import LocationSelector, { type LocationData } from "@/components/LocationSelector";
 import { useGeolocation } from "@/hooks/useGeolocation";
-import { authAPI, bookingsAPI, dashboardPreferencesAPI, locationsAPI, serviceAreasAPI, servicesAPI } from "@/lib/api";
+import { authAPI, bookingsAPI, dashboardPreferencesAPI, locationsAPI, serviceAreasAPI, servicesAPI, setStoredCustomerLocation } from "@/lib/api";
 import { motion } from "framer-motion";
 import { AlertCircle, ArrowRight, Bell, ChevronRight, Clock, MapPin, RefreshCw, Settings, Star } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -281,12 +281,12 @@ const CustomerDashboard = () => {
       setServiceabilityMessage(response.message || '');
       setNearestServiceArea(response.nearest || null);
 
-      localStorage.setItem('userLocation', JSON.stringify({
+      setStoredCustomerLocation({
         ...nextLocation,
         latitude: nextLocation.lat,
         longitude: nextLocation.lng,
         timestamp: Date.now(),
-      }));
+      }, 'selected');
 
       if (response.isAvailable) {
         const workersData = await locationsAPI.getNearbyWorkers({

@@ -1,3 +1,4 @@
+import { setStoredCustomerLocation } from '@/lib/api';
 import { useEffect, useState } from 'react';
 
 interface GeolocationState {
@@ -44,13 +45,13 @@ export const useGeolocation = (options: GeolocationOptions = {}) => {
       });
 
       // Save to localStorage for quick access
-      localStorage.setItem('userLocation', JSON.stringify({
+      setStoredCustomerLocation({
         lat: position.coords.latitude,
         lng: position.coords.longitude,
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         timestamp: Date.now()
-      }));
+      }, 'device');
     };
 
     const handleError = (error: GeolocationPositionError) => {
@@ -112,13 +113,13 @@ export const useGeolocation = (options: GeolocationOptions = {}) => {
           error: null,
           loading: false,
         });
-        localStorage.setItem('userLocation', JSON.stringify({
+        setStoredCustomerLocation({
           lat: position.coords.latitude,
           lng: position.coords.longitude,
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
           timestamp: Date.now()
-        }));
+        }, 'device');
       },
       (error) => {
         setState(prev => ({ ...prev, loading: false, error: error.message }));

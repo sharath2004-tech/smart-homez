@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import LocationSelector, { LocationData } from "@/components/LocationSelector";
-import { authAPI, serviceAreasAPI, servicesAPI } from "@/lib/api";
+import { authAPI, serviceAreasAPI, servicesAPI, setStoredCustomerLocation } from "@/lib/api";
 import { motion } from "framer-motion";
 import { Clock, MapPin, Search, Sparkles, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -79,9 +79,8 @@ const ServicesPage = () => {
     
     setSelectedLocation(location);
     setShowLocationSelector(false);
-    
-    // Save location to localStorage
-    localStorage.setItem('userLocation', JSON.stringify(location));
+
+    setStoredCustomerLocation(location, 'selected');
   };
 
   const handleChangeLocation = () => {

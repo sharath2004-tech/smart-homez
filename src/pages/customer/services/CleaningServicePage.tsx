@@ -1,10 +1,11 @@
 import AppLayout from "@/components/AppLayout";
+import ServiceLocationCard from "@/components/ServiceLocationCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useServiceBookingAvailability } from "@/hooks/useServiceBookingAvailability";
 import { authAPI, bookingsAPI, servicesAPI, usersAPI } from "@/lib/api";
-import { ChevronLeft, MapPin, Sparkles, Users } from "lucide-react";
+import { ChevronLeft, Sparkles, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -416,42 +417,15 @@ const CleaningServicePage = () => {
           </div>
         </div>
 
-        <div className={`mb-6 rounded-2xl border p-4 ${
-          isOutOfRegion
-            ? 'border-amber-300 bg-amber-50 dark:bg-amber-950/20'
-            : hasResolvedLocation
-            ? 'border-emerald-300 bg-emerald-50 dark:bg-emerald-950/20'
-            : 'border-slate-300 bg-slate-50 dark:bg-slate-900/40'
-        }`}>
-          <div className="flex items-start gap-3">
-            <MapPin className={`mt-0.5 h-4 w-4 shrink-0 ${isOutOfRegion ? 'text-amber-700' : hasResolvedLocation ? 'text-emerald-700' : 'text-slate-600'}`} />
-            <div className="space-y-1 text-sm">
-              <p className="font-semibold text-foreground">
-                {checkingAvailability
-                  ? 'Checking service region...'
-                  : isOutOfRegion
-                  ? 'This service is outside your region'
-                  : hasResolvedLocation
-                  ? 'This service can be booked in your region'
-                  : 'Service location needed before booking'}
-              </p>
-              <p className="text-muted-foreground">
-                {checkingAvailability
-                  ? 'We are verifying the admin-configured service region for your location.'
-                  : isOutOfRegion
-                  ? (availability?.reason || 'Bookings are accepted only in regions configured by admin or super admin.')
-                  : hasResolvedLocation
-                  ? (availability?.reason || 'Your saved location is inside an active service region.')
-                  : 'Please set your service location from the services page or save a default address in your profile.'}
-              </p>
-              {resolvedLocation && (
-                <p className="text-xs text-muted-foreground">
-                  Location: {[resolvedLocation.area, resolvedLocation.city].filter(Boolean).join(', ') || resolvedLocation.address || 'Saved location'}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
+        <ServiceLocationCard
+          className="mb-6"
+          serviceLabel="This service"
+          checkingAvailability={checkingAvailability}
+          hasResolvedLocation={hasResolvedLocation}
+          isOutOfRegion={isOutOfRegion}
+          availabilityReason={availability?.reason}
+          resolvedLocation={resolvedLocation}
+        />
 
         <form onSubmit={handleBooking} className="space-y-6">
 

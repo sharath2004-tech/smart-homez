@@ -1,4 +1,9 @@
-import { locationsAPI, serviceAreasAPI } from "@/lib/api";
+import {
+  getStoredCustomerLocation,
+  locationsAPI,
+  serviceAreasAPI,
+  USER_LOCATION_EVENT_NAME,
+} from "@/lib/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -61,47 +66,20 @@ const hasValidCoordinates = (coordinates?: number[]) => (
 );
 
 const getStoredLocation = (): ResolvedBookingLocation | null => {
-  if (typeof window === "undefined") return null;
+  const parsed = getStoredCustomerLocation();
+  if (!parsed) return null;
 
-  const raw = window.localStorage.getItem("userLocation");
-  if (!raw) return null;
-
-  try {
-    const parsed = JSON.parse(raw) as {
-      lat?: number;
-      lng?: number;
-      latitude?: number;
-      longitude?: number;
-      apartmentName?: string;
-      address?: string;
-      area?: string;
-      city?: string;
-      state?: string;
-      zipCode?: string;
-    };
-
-    const latitude = parsed.latitude ?? parsed.lat;
-    const longitude = parsed.longitude ?? parsed.lng;
-
-    if (typeof latitude !== "number" || typeof longitude !== "number") {
-      return null;
-    }
-
-    return {
-      latitude,
-      longitude,
-      apartmentName: parsed.apartmentName,
-      address: parsed.address,
-      area: parsed.area,
-      city: parsed.city,
-      state: parsed.state,
-      zipCode: parsed.zipCode,
-      source: "stored",
-    };
-  } catch (error) {
-    console.error("Failed to parse stored booking location:", error);
-    return null;
-  }
+  return {
+    latitude: parsed.latitude ?? parsed.lat!,
+    longitude: parsed.longitude ?? parsed.lng!,
+    apartmentName: parsed.apartmentName,
+    address: parsed.address,
+    area: parsed.area,
+    city: parsed.city,
+    state: parsed.state,
+    zipCode: parsed.zipCode,
+    source: "stored",
+  };
 };
 
 const getProfileLocation = (profile?: BookingAvailabilityProfile | null): ResolvedBookingLocation | null => {
@@ -135,14 +113,31 @@ export const useServiceBookingAvailability = (
   const [availability, setAvailability] = useState<ServiceBookingAvailability | null>(null);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [requestingService, setRequestingService] = useState(false);
+  const [storedLocation, setStoredLocation] = useState<ResolvedBookingLocation | null>(() => getStoredLocation());
 
-  const storedLocationSnapshot = typeof window === "undefined"
-    ? ""
-    : (window.localStorage.getItem("userLocation") || "");
+  useEffect(() => {
+    const syncLocation = () => {
+      setStoredLocation(getStoredLocation());
+    };
+
+    syncLocation();
+
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    window.addEventListener("storage", syncLocation);
+    window.addEventListener(USER_LOCATION_EVENT_NAME, syncLocation as EventListener);
+
+    return () => {
+      window.removeEventListener("storage", syncLocation);
+      window.removeEventListener(USER_LOCATION_EVENT_NAME, syncLocation as EventListener);
+    };
+  }, []);
 
   const resolvedLocation = useMemo(
-    () => resolveBookingLocation(profile),
-    [profile, storedLocationSnapshot],
+    () => storedLocation || getProfileLocation(profile),
+    [profile, storedLocation],
   );
 
   const refreshAvailability = useCallback(async () => {

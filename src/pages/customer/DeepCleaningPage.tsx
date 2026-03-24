@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import LocationSelector, { type LocationData } from "@/components/LocationSelector";
-import { api, authAPI, serviceAreasAPI } from "@/lib/api";
+import { api, authAPI, serviceAreasAPI, setStoredCustomerLocation } from "@/lib/api";
 import { AnimatePresence, motion } from "framer-motion";
 import { Calendar, CheckCircle, Clock, MapPin, Minus, Plus, ShoppingCart, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -319,7 +319,7 @@ export default function DeepCleaningPage() {
   const handleLocationConfirmed = async (location: LocationData) => {
     setSelectedLocation(location);
     setShowLocationSelector(false);
-    localStorage.setItem("userLocation", JSON.stringify(location));
+    setStoredCustomerLocation(location, 'selected');
   };
 
   const handleRequestService = async () => {
