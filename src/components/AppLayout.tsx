@@ -1,4 +1,4 @@
-import { API_ORIGIN, api, settingsAPI } from "@/lib/api";
+import { API_ORIGIN, api, authAPI, settingsAPI } from "@/lib/api";
 import { AlertTriangle, BarChart3, Bell, Building, Calendar, ClipboardCheck, CreditCard, DollarSign, FileText, Grid3x3, HelpCircle, IndianRupee, KeyRound, LayoutDashboard, MapPin, MessageSquare, RefreshCw, Settings, Settings2, TrendingUp, User, UserCircle, Users, Wrench } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -8,6 +8,7 @@ import { AppHeader } from "./AppHeader";
 import { CollapsibleSidebar } from "./CollapsibleSidebar";
 import { MobileSidebar } from "./MobileSidebar";
 import { PersistentSidebar } from "./PersistentSidebar";
+import { ProfilePanel } from "./ProfilePanel";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -22,6 +23,9 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
   const { t } = useTranslation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [profilePanelOpen, setProfilePanelOpen] = useState(false);
+  const [profileData, setProfileData] = useState<Record<string, unknown> | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   const storedUser = (() => {
     try {
@@ -79,6 +83,21 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
     localStorage.removeItem('user');
     window.location.href = '/login';
   }, []);
+
+  const handleProfileClick = useCallback(() => {
+    setProfilePanelOpen(true);
+    if (!profileData) {
+      setProfileLoading(true);
+      authAPI.getProfile()
+        .then((res: { user?: Record<string, unknown> }) => {
+          setProfileData(res?.user ?? null);
+        })
+        .catch(() => {
+          setProfileData({});
+        })
+        .finally(() => setProfileLoading(false));
+    }
+  }, [profileData]);
 
   const notificationsPath = useMemo(() =>
     userType === 'worker' ? '/worker/notifications'
@@ -413,6 +432,7 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
           dashboardPath={dashboardPath}
           onMobileMenuToggle={handleMobileMenuToggle}
           onLogout={handleLogout}
+          onProfileClick={handleProfileClick}
           showBusinessHours={showBusinessHours}
           businessHoursText={businessHoursText}
         />
@@ -422,6 +442,17 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
           {children}
         </main>
       </div>
+
+      {/* Profile Panel */}
+      <ProfilePanel
+        isOpen={profilePanelOpen}
+        onClose={() => setProfilePanelOpen(false)}
+        profileData={profileData as Parameters<typeof ProfilePanel>[0]['profileData']}
+        loading={profileLoading}
+        initials={initials}
+        avatarUrl={resolvedAvatarUrl}
+        userType={userType}
+      />
     </div>
   );
 };

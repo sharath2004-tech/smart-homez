@@ -11,6 +11,7 @@ interface AppHeaderProps {
   dashboardPath: string;
   onMobileMenuToggle: () => void;
   onLogout: () => void;
+  onProfileClick?: () => void;
   showBusinessHours: boolean;
   businessHoursText?: string;
 }
@@ -26,6 +27,7 @@ export const AppHeader = memo(({
   dashboardPath,
   onMobileMenuToggle,
   onLogout,
+  onProfileClick,
   showBusinessHours,
   businessHoursText
 }: AppHeaderProps) => {
@@ -72,7 +74,14 @@ export const AppHeader = memo(({
         <LanguageSelector />
 
         {/* User info */}
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
+        <div
+          className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted cursor-pointer hover:bg-accent transition-colors select-none"
+          onClick={onProfileClick}
+          title="View profile"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === "Enter" && onProfileClick?.()}
+        >
           {avatarUrl ? (
             <img src={avatarUrl} alt={userName} className="w-7 h-7 rounded-full object-cover" />
           ) : (
@@ -87,9 +96,22 @@ export const AppHeader = memo(({
 
         {/* Mobile user avatar */}
         {avatarUrl ? (
-          <img src={avatarUrl} alt={userName} className="sm:hidden w-8 h-8 rounded-full object-cover" />
+          <img
+            src={avatarUrl}
+            alt={userName}
+            className="sm:hidden w-8 h-8 rounded-full object-cover cursor-pointer"
+            onClick={onProfileClick}
+            title="View profile"
+          />
         ) : (
-          <div className="sm:hidden w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
+          <div
+            className="sm:hidden w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold cursor-pointer hover:opacity-80 transition-opacity select-none"
+            onClick={onProfileClick}
+            title="View profile"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === "Enter" && onProfileClick?.()}
+          >
             {initials}
           </div>
         )}
