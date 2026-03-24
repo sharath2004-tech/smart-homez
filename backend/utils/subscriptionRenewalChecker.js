@@ -1,6 +1,6 @@
 import Booking from '../models/Booking.js';
-import { sendNotification } from './notificationService.js';
 import { resolveAssignedWorkerForOccurrence } from './bookingStatusUpdater.js';
+import { sendNotification } from './notificationService.js';
 
 const DAY_INDEX_BY_NAME = {
   sunday: 0,
