@@ -259,20 +259,9 @@ const InstaServicePage = () => {
   useEffect(() => {
     const fetchSlots = async () => {
       try {
-        // Get user location from localStorage
-        const userLocation = localStorage.getItem('userLocation');
-        let location = null;
-
-        if (userLocation) {
-          try {
-            const loc = JSON.parse(userLocation);
-            if (loc.lng && loc.lat && !isNaN(loc.lng) && !isNaN(loc.lat)) {
-              location = { lng: loc.lng, lat: loc.lat };
-            }
-          } catch (e) {
-            console.error('Failed to parse user location:', e);
-          }
-        }
+        const location = resolvedLocation
+          ? { lng: resolvedLocation.longitude, lat: resolvedLocation.latitude }
+          : null;
 
         // Always fetch without a gender filter so we get all workers' ranges with
         // gender info — gender filtering is done locally in the busyWorkersBySlot useMemo
@@ -304,11 +293,14 @@ const InstaServicePage = () => {
         setRawBookedRanges(ranges);
         setSlotsLoaded(true);
       } catch {
+        setWorkerCounts({ total: 0, male: 0, female: 0 });
+        setRawBookedRanges([]);
+        setSlotsLoaded(false);
         // non-critical — continue without availability info
       }
     };
     fetchSlots();
-  }, [bookingDate, serviceId]);
+  }, [bookingDate, serviceId, resolvedLocation]);
 
   const handleBook = async () => {
     if (isOutOfRegion) {
@@ -331,7 +323,9 @@ const InstaServicePage = () => {
     }
     const defaultAddr =
       profile?.addresses?.find((a) => a.isDefault) || profile?.addresses?.[0];
-    const coords = defaultAddr?.location?.coordinates;
+    const coords = resolvedLocation
+      ? [resolvedLocation.longitude, resolvedLocation.latitude]
+      : defaultAddr?.location?.coordinates;
     const hasValidCoords =
       Array.isArray(coords) &&
       coords.length === 2 &&
@@ -350,9 +344,9 @@ const InstaServicePage = () => {
         ...(hasValidCoords && {
           location: {
             coordinates: coords,
-            apartmentName: defaultAddr!.apartmentName || "",
-            area: defaultAddr!.area || "",
-            city: defaultAddr!.city || "",
+            apartmentName: resolvedLocation?.apartmentName || defaultAddr?.apartmentName || "",
+            area: resolvedLocation?.area || defaultAddr?.area || "",
+            city: resolvedLocation?.city || defaultAddr?.city || "",
           },
         }),
         notes,
