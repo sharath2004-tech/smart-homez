@@ -17,6 +17,9 @@ import {
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+
+const START_QR_VISIBLE_LEAD_MINUTES = 20;
+
 interface Task {
   _id: string;
   worker?: { _id: string; name: string };
@@ -143,6 +146,11 @@ const getScheduledDurationSeconds = (bookingDate: string, startTime: string, end
   }
 
   return Math.max(0, Math.floor((scheduledEnd - scheduledStart) / 1000));
+};
+
+const getScheduledStartTimestamp = (bookingDate: string, startTime: string) => {
+  const bookingDay = bookingDate.includes('T') ? bookingDate.split('T')[0] : bookingDate;
+  return new Date(`${bookingDay}T${startTime}`).getTime();
 };
 
 const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) => {
@@ -503,6 +511,10 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   const currentUserId = getCurrentUserId();
   const isTeamHead = !task.worker || task.worker._id === currentUserId;
   const isDeepCleaning = task.bookingType === 'deep-cleaning-cart';
+  const scheduledStartTimestamp = getScheduledStartTimestamp(task.bookingDate, task.startTime);
+  const qrVisibleFromTimestamp = scheduledStartTimestamp - (START_QR_VISIBLE_LEAD_MINUTES * 60 * 1000);
+  const startQrWindowOpen = Number.isFinite(scheduledStartTimestamp) && Date.now() >= qrVisibleFromTimestamp;
+  const minutesUntilQrVisible = Math.max(0, Math.ceil((qrVisibleFromTimestamp - Date.now()) / 60000));
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
@@ -833,39 +845,54 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
           {/* QR Code Section - Only team head generates start QR */}
           {task.status !== 'completed' && !task.actualStartTime && (
             isTeamHead ? (
-            <div className="card-elevated p-5 text-center">
-              <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
-                <QrCode className="w-5 h-5 text-primary" />
-                {t('worker.taskDetail.serviceStartQR')}
-              </h3>
+            startQrWindowOpen || qrCodeImage ? (
+              <div className="card-elevated p-5 text-center">
+                <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
+                  <QrCode className="w-5 h-5 text-primary" />
+                  {t('worker.taskDetail.serviceStartQR')}
+                </h3>
 
-              {qrCodeImage ? (
-                <div>
-                  <div className="bg-white p-4 rounded-xl inline-block mb-3 max-w-full">
-                    <img src={qrCodeImage} alt="Service Start QR" className="w-64 h-64 max-w-full" />
+                {qrCodeImage ? (
+                  <div>
+                    <div className="bg-white p-4 rounded-xl inline-block mb-3 max-w-full">
+                      <img src={qrCodeImage} alt="Service Start QR" className="w-64 h-64 max-w-full" />
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      {t('worker.taskDetail.showQRToCustomer')}
+                    </p>
+                    <p className="text-xs text-warning bg-warning-light p-3 rounded-lg">
+                      ⏱️ {t('worker.taskDetail.customerWillScanStart')}
+                    </p>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    {t('worker.taskDetail.showQRToCustomer')}
-                  </p>
-                  <p className="text-xs text-warning bg-warning-light p-3 rounded-lg">
-                    ⏱️ {t('worker.taskDetail.customerWillScanStart')}
-                  </p>
-                </div>
-              ) : (
-                <div>
-                  <button
-                    onClick={handleGenerateStartQR}
-                    className="btn-brand py-3 px-6"
-                  >
-                    <QrCode className="w-5 h-5 inline-block mr-2" />
-                    {t('worker.taskDetail.generateStartQR')}
-                  </button>
-                  <p className="text-sm text-muted-foreground mt-3">
-                    {t('worker.taskDetail.generateWhenReach')}
-                  </p>
-                </div>
-              )}
-            </div>
+                ) : (
+                  <div>
+                    <button
+                      onClick={handleGenerateStartQR}
+                      className="btn-brand py-3 px-6"
+                    >
+                      <QrCode className="w-5 h-5 inline-block mr-2" />
+                      {t('worker.taskDetail.generateStartQR')}
+                    </button>
+                    <p className="text-sm text-muted-foreground mt-3">
+                      QR becomes available only within {START_QR_VISIBLE_LEAD_MINUTES} minutes of the scheduled start time.
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="card-elevated p-5 text-center bg-amber-50 border-2 border-amber-200">
+                <p className="text-2xl mb-2">🕒</p>
+                <p className="font-semibold text-amber-800">Start QR unlocks {START_QR_VISIBLE_LEAD_MINUTES} minutes before service time</p>
+                <p className="text-sm text-amber-700 mt-1">
+                  Scheduled time: <strong>{formatTime(task.startTime)}</strong>
+                </p>
+                <p className="text-xs text-amber-700 mt-2">
+                  {minutesUntilQrVisible > 0
+                    ? `Please wait about ${minutesUntilQrVisible} more minute${minutesUntilQrVisible === 1 ? '' : 's'} before generating the QR.`
+                    : 'The QR window is opening shortly.'}
+                </p>
+              </div>
+            )
             ) : (
             <div className="card-elevated p-5 text-center bg-blue-50 border-2 border-blue-200">
               <p className="text-2xl mb-2">⏳</p>

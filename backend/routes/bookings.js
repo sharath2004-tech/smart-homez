@@ -747,9 +747,9 @@ router.get('/booked-slots', authenticate, async (req, res) => {
     // ── Booked ranges for this date ───────────────────────────────────────────
     const bookings = await Booking.find({
       bookingDate: { $gte: startOfDay, $lte: endOfDay },
-      status: { $in: ['pending', 'confirmed', 'in-progress'] },
+      status: { $ne: 'cancelled' },
       worker: { $ne: null }
-    }).select('worker startTime endTime').lean();
+    }).select('worker startTime endTime actualEndTime status').lean();
 
     // ── Build worker query ────────────────────────────────────────────────────
     const workerQuery = {
@@ -847,8 +847,6 @@ router.get('/booked-slots', authenticate, async (req, res) => {
         }).select('worker supportStaff.worker status startTime endTime actualEndTime').lean()
       : [];
 
-    const now = new Date();
-    const isRequestedDateToday = startOfDay.toDateString() === now.toDateString();
     const dailyPrimaryBookingCounts = new Map();
     workerDayBookings.forEach((booking) => {
       if (!booking?.worker) return;
@@ -864,19 +862,9 @@ router.get('/booked-slots', authenticate, async (req, res) => {
       return dailyBookings < 8;
     });
 
-    const availableWorkers = nonOverloadedWorkers.filter(worker => {
-      if (!isRequestedDateToday) {
-        return true;
-      }
+    const availableWorkers = nonOverloadedWorkers;
 
-      const operationalStatus = getWorkerOperationalAvailabilityFromBookings(worker, workerDayBookings, now);
-      if (operationalStatus.operationsCompleted) {
-        console.log(`   ✅ Worker ${worker._id} operations completed for today`);
-      }
-      return !operationalStatus.operationsCompleted;
-    });
-
-    console.log(`📊 booked-slots: Final available workers: ${availableWorkers.length} (overload: ${leaveEligibleWorkers.length - nonOverloadedWorkers.length} dropped, operational: ${nonOverloadedWorkers.length - availableWorkers.length} dropped)`);
+    console.log(`📊 booked-slots: Final available workers: ${availableWorkers.length} (overload: ${leaveEligibleWorkers.length - nonOverloadedWorkers.length} dropped)`);
 
     // Filter bookedRanges to only the available workers so the frontend
     // slot availability count matches the worker pool (important for gender filter)
@@ -2832,12 +2820,12 @@ router.post('/:id/generate-start-qr',
       if (req.user.role !== 'admin') {
         const now = new Date();
         const scheduledStartTime = getBookingScheduledStartDateTime(booking);
-        const earliestQrGenerationTime = new Date(scheduledStartTime.getTime() - (15 * 60 * 1000));
+        const earliestQrGenerationTime = new Date(scheduledStartTime.getTime() - (20 * 60 * 1000));
 
         if (now < earliestQrGenerationTime) {
           return res.status(400).json({
             error: {
-              message: 'Start QR can only be generated within 15 minutes of the scheduled service start time.',
+              message: 'Start QR can only be generated within 20 minutes of the scheduled service start time.',
               status: 400
             }
           });

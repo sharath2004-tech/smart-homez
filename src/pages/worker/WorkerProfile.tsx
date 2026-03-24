@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { ImageCropDialog } from "@/components/ImageCropDialog";
 import { API_BASE_URL, authAPI, workersAPI } from "@/lib/api";
 import { Briefcase, Camera, CheckCircle, Clock, Download, FileText, Loader2, Mail, MapPin, Phone, Star, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -58,6 +59,8 @@ const WorkerProfile = () => {
   const [stats, setStats] = useState({ today: 0, thisWeek: 0, thisMonth: 0 });
   const [loading, setLoading] = useState(true);
   const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
+  const [pendingProfilePicture, setPendingProfilePicture] = useState<File | null>(null);
+  const [showCropDialog, setShowCropDialog] = useState(false);
   const [uploadingProfilePhoto, setUploadingProfilePhoto] = useState(false);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -127,7 +130,7 @@ const WorkerProfile = () => {
       : null;
   const displayProfileImageUrl = profilePicturePreview || profileImageUrl;
 
-  const handleProfilePictureUpload = async (file: File | null) => {
+  const handleProfilePictureSelection = (file: File | null) => {
     if (!file) return;
 
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
@@ -141,7 +144,12 @@ const WorkerProfile = () => {
       return;
     }
 
-    if (profilePicturePreview) {
+    setPendingProfilePicture(file);
+    setShowCropDialog(true);
+  };
+
+  const handleProfilePictureUpload = async (file: File) => {
+    if (profilePicturePreview?.startsWith('blob:')) {
       URL.revokeObjectURL(profilePicturePreview);
     }
 
@@ -179,6 +187,7 @@ const WorkerProfile = () => {
 
       toast.success('Profile picture updated. Looking sharp ✨');
       setProfilePicturePreview(null);
+      setPendingProfilePicture(null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to update profile picture');
       setProfilePicturePreview(null);
@@ -188,6 +197,24 @@ const WorkerProfile = () => {
         profilePictureInputRef.current.value = '';
       }
     }
+  };
+
+  const handleCropCancel = () => {
+    setPendingProfilePicture(null);
+    setShowCropDialog(false);
+    if (profilePictureInputRef.current) {
+      profilePictureInputRef.current.value = '';
+    }
+  };
+
+  const handleCropConfirm = async (file: File, previewUrl: string) => {
+    setShowCropDialog(false);
+    setPendingProfilePicture(null);
+    if (profilePicturePreview?.startsWith('blob:')) {
+      URL.revokeObjectURL(profilePicturePreview);
+    }
+    setProfilePicturePreview(previewUrl);
+    await handleProfilePictureUpload(file);
   };
 
   return (
@@ -207,7 +234,7 @@ const WorkerProfile = () => {
                 type="file"
                 accept="image/jpeg,image/jpg,image/png,image/webp"
                 className="hidden"
-                onChange={(e) => handleProfilePictureUpload(e.target.files?.[0] || null)}
+                onChange={(e) => handleProfilePictureSelection(e.target.files?.[0] || null)}
               />
               {displayProfileImageUrl ? (
                 <img
@@ -517,6 +544,15 @@ const WorkerProfile = () => {
             </div>
           </div>
         </div>
+
+        <ImageCropDialog
+          open={showCropDialog}
+          imageFile={pendingProfilePicture}
+          onClose={handleCropCancel}
+          onConfirm={handleCropConfirm}
+          title="Crop profile photo"
+          description="Crop and resize your photo before saving it to your worker profile."
+        />
       </div>
     </AppLayout>
   );

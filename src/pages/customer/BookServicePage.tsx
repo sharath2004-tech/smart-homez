@@ -939,7 +939,7 @@ const BookServicePage = () => {
                             }`}>
                               {unavailable
                                 ? (isPast ? 'Past' : 'Full')
-                                : `${available} free`}
+                                  : `${available} available`}
                             </span>
                           </button>
                         );

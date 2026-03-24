@@ -86,18 +86,16 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
 
   const handleProfileClick = useCallback(() => {
     setProfilePanelOpen(true);
-    if (!profileData) {
-      setProfileLoading(true);
-      authAPI.getProfile()
-        .then((res: { user?: Record<string, unknown> }) => {
-          setProfileData(res?.user ?? null);
-        })
-        .catch(() => {
-          setProfileData({});
-        })
-        .finally(() => setProfileLoading(false));
-    }
-  }, [profileData]);
+    setProfileLoading(true);
+    authAPI.getProfile()
+      .then((res: { user?: Record<string, unknown> }) => {
+        setProfileData(res?.user ?? null);
+      })
+      .catch(() => {
+        setProfileData({});
+      })
+      .finally(() => setProfileLoading(false));
+  }, []);
 
   const notificationsPath = useMemo(() =>
     userType === 'worker' ? '/worker/notifications'

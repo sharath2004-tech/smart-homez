@@ -5,7 +5,6 @@
 
 import User from '../models/User.js';
 import {
-    getWorkerOperationalAvailabilityFromBookings,
     isWorkerAvailableForTimeRange,
     isWorkerOnLeaveForDate
 } from './workerAvailability.js';
@@ -173,19 +172,6 @@ export const checkSlotAvailability = async (workerId, date, startTime, endTime, 
             startTime: booking.startTime,
             endTime: booking.endTime
           }
-        };
-      }
-    }
-
-    const isToday = startOfDay.toDateString() === new Date().toDateString();
-    if (isToday) {
-      const operationalBookings = dayBookings.filter(booking => !excludeBookingId || booking._id.toString() !== excludeBookingId.toString());
-      const operationalStatus = getWorkerOperationalAvailabilityFromBookings(worker, operationalBookings, new Date());
-
-      if (operationalStatus.operationsCompleted) {
-        return {
-          available: false,
-          reason: 'Worker has already completed all assigned operations for today'
         };
       }
     }

@@ -718,7 +718,7 @@ const InstaServicePage = () => {
                                 ? "bg-amber-100 text-amber-700"
                                 : "bg-green-100 text-green-700"
                             }`}>
-                              {fullyBooked ? "Full" : `${free} free`}
+                                {fullyBooked ? "Full" : `${free} available`}
                             </span>
                           )}
                         </button>

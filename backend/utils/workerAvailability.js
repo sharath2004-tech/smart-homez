@@ -1,6 +1,7 @@
 import Booking from '../models/Booking.js';
 
 const DEFAULT_TIMEZONE = 'Asia/Kolkata';
+const POST_SERVICE_BUFFER_MINUTES = 15;
 const WEEKDAY_TO_INDEX = {
   sun: 0,
   mon: 1,
@@ -399,6 +400,18 @@ export const getWorkerOperationalAvailabilityFromBookings = (worker, bookings = 
   const currentMinutes = windowStatus.currentMinutes ?? (referenceDate.getHours() * 60 + referenceDate.getMinutes());
   const assignedBookings = bookings.filter(booking => isWorkerAssignedToBooking(booking, workerId));
 
+  const getBookingEndMinutes = (booking) => {
+    if (booking?.actualEndTime) {
+      const actualEnd = new Date(booking.actualEndTime);
+      if (!Number.isNaN(actualEnd.getTime())) {
+        return (actualEnd.getHours() * 60) + actualEnd.getMinutes();
+      }
+    }
+
+    const bookingEnd = timeStringToMinutes(booking?.endTime);
+    return bookingEnd === null ? null : bookingEnd;
+  };
+
   const activeOrUpcomingBookings = assignedBookings.filter(booking => {
     if (!['pending', 'confirmed', 'in-progress'].includes(booking.status)) {
       return false;
@@ -420,10 +433,20 @@ export const getWorkerOperationalAvailabilityFromBookings = (worker, bookings = 
     return Boolean(booking.actualEndTime);
   });
 
+  const completionBufferBookings = completedOrExecutedBookings.filter((booking) => {
+    const bookingEndMinutes = getBookingEndMinutes(booking);
+    if (bookingEndMinutes === null) {
+      return false;
+    }
+
+    return currentMinutes < (bookingEndMinutes + POST_SERVICE_BUFFER_MINUTES);
+  });
+
   return {
-    operationsCompleted: completedOrExecutedBookings.length > 0 && activeOrUpcomingBookings.length === 0,
+    operationsCompleted: completionBufferBookings.length > 0,
     activeOrUpcomingBookings,
-    completedOrExecutedBookings
+    completedOrExecutedBookings,
+    completionBufferBookings
   };
 };
 
@@ -493,7 +516,7 @@ export const evaluateWorkerEffectiveAvailability = async (worker, { referenceDat
       reason = slotsLabel ? `Available only during ${slotsLabel}` : 'Outside configured working hours';
     }
   } else if (operationalStatus.operationsCompleted) {
-    reason = 'All assigned operations for today are already completed';
+    reason = `Worker is in a ${POST_SERVICE_BUFFER_MINUTES}-minute buffer window after completing a service`;
   }
 
   return {

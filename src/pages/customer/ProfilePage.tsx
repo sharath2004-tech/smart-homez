@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { ImageCropDialog } from "@/components/ImageCropDialog";
 import { API_BASE_URL, authAPI, locationsAPI, usersAPI } from "@/lib/api";
 import { Bell, Camera, Check, ChevronRight, Edit2, Eye, EyeOff, Loader2, MapPin, Plus, Star, Trash2, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -73,6 +74,8 @@ const ProfilePage = () => {
   const [accountSuccess, setAccountSuccess] = useState('');
   const [selectedProfilePicture, setSelectedProfilePicture] = useState<File | null>(null);
   const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
+  const [pendingProfilePicture, setPendingProfilePicture] = useState<File | null>(null);
+  const [showCropDialog, setShowCropDialog] = useState(false);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
   // Change password
   const [showPasswordSection, setShowPasswordSection] = useState(false);
@@ -84,6 +87,14 @@ const ProfilePage = () => {
   useEffect(() => {
     fetchProfileData();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (profilePicturePreview?.startsWith('blob:')) {
+        URL.revokeObjectURL(profilePicturePreview);
+      }
+    };
+  }, [profilePicturePreview]);
 
   const fetchProfileData = async () => {
     try {
@@ -320,6 +331,14 @@ const ProfilePage = () => {
 
       const result = await authAPI.updateProfile(payload);
       const updatedUser = result?.user;
+      if (updatedUser) {
+        setProfile((prev) => prev ? { ...prev, ...updatedUser, profileImage: updatedUser?.profileImage || prev.profileImage } : prev);
+        setAccountForm({
+          name: updatedUser?.name || accountForm.name,
+          email: updatedUser?.email || accountForm.email,
+          phone: updatedUser?.phone || accountForm.phone,
+        });
+      }
       // Update localStorage
       try {
         const stored = JSON.parse(localStorage.getItem('user') || '{}');
@@ -332,8 +351,12 @@ const ProfilePage = () => {
       } catch (_e) {
         // localStorage unavailable
       }
+      if (profilePicturePreview?.startsWith('blob:')) {
+        URL.revokeObjectURL(profilePicturePreview);
+      }
       setSelectedProfilePicture(null);
       setProfilePicturePreview(null);
+      setPendingProfilePicture(null);
       setAccountSuccess(t('customer.profile.profileUpdated'));
       await fetchProfileData();
     } catch (err) {
@@ -388,15 +411,48 @@ const ProfilePage = () => {
   };
 
   const handleProfilePictureChange = (file: File | null) => {
-    setSelectedProfilePicture(file);
     if (!file) {
+      if (profilePicturePreview?.startsWith('blob:')) {
+        URL.revokeObjectURL(profilePicturePreview);
+      }
+      setPendingProfilePicture(null);
+      setSelectedProfilePicture(null);
       setProfilePicturePreview(null);
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => setProfilePicturePreview(reader.result as string);
-    reader.readAsDataURL(file);
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      setAccountError('Please choose a JPG, PNG, or WEBP image.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setAccountError('Profile photo should be 5MB or smaller.');
+      return;
+    }
+
+    setAccountError('');
+    setPendingProfilePicture(file);
+    setShowCropDialog(true);
+  };
+
+  const handleCropCancel = () => {
+    setShowCropDialog(false);
+    setPendingProfilePicture(null);
+    if (profilePictureInputRef.current) {
+      profilePictureInputRef.current.value = '';
+    }
+  };
+
+  const handleCropConfirm = (file: File, previewUrl: string) => {
+    if (profilePicturePreview?.startsWith('blob:')) {
+      URL.revokeObjectURL(profilePicturePreview);
+    }
+    setSelectedProfilePicture(file);
+    setProfilePicturePreview(previewUrl);
+    setPendingProfilePicture(null);
+    setShowCropDialog(false);
   };
 
   const openAccountModal = () => {
@@ -404,6 +460,7 @@ const ProfilePage = () => {
     setAccountSuccess('');
     setShowPasswordSection(false);
     setSelectedProfilePicture(null);
+    setPendingProfilePicture(null);
     setProfilePicturePreview(null);
     setShowAccountModal(true);
   };
@@ -414,7 +471,9 @@ const ProfilePage = () => {
     setAccountSuccess('');
     setShowPasswordSection(false);
     setSelectedProfilePicture(null);
+    setPendingProfilePicture(null);
     setProfilePicturePreview(null);
+    setShowCropDialog(false);
   };
 
   if (loading) {
@@ -883,6 +942,15 @@ const ProfilePage = () => {
             </div>
           </div>
         )}
+
+        <ImageCropDialog
+          open={showCropDialog}
+          imageFile={pendingProfilePicture}
+          onClose={handleCropCancel}
+          onConfirm={handleCropConfirm}
+          title="Crop profile photo"
+          description="Crop and resize your photo so it looks great in the app header, profile, and profile drawer."
+        />
       </div>
     </AppLayout>
   );

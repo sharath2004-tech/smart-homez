@@ -477,9 +477,9 @@ const CleaningServicePage = () => {
                     {checkingSlots
                       ? 'Checking live worker availability for this date...'
                       : selectedDate && totalWorkersCount > 0
-                      ? `${getAvailableWorkersForSlot(selectedTime, getEndTimeFromStart(selectedTime, service?.duration || 0))} of ${totalWorkersCount} workers currently free for this time.`
+                        ? `${getAvailableWorkersForSlot(selectedTime, getEndTimeFromStart(selectedTime, service?.duration || 0))} of ${totalWorkersCount} workers are currently available for this time.`
                       : selectedDate && !checkingSlots
-                      ? 'No workers are currently free in this region for the selected date.'
+                        ? 'No workers are currently available in this region for the selected date.'
                       : 'Select a date to check live worker availability.'}
                   </p>
                 </div>
