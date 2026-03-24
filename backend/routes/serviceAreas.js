@@ -6,9 +6,11 @@
 import express from 'express';
 import { body, query, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
+import Location from '../models/Location.js';
 import Service from '../models/Service.js';
 import ServiceArea from '../models/ServiceArea.js';
 import ServiceAvailabilityRequest from '../models/ServiceAvailabilityRequest.js';
+import { calculateDistance } from '../utils/geolocation.js';
 
 const router = express.Router();
 
@@ -53,59 +55,69 @@ router.post('/validate', async (req, res) => {
       });
     }
 
-    // Import Location model
-    const { default: Location } = await import('../models/Location.js');
-    
-    // Find locations within 5km radius (city-level coverage)
-    const nearbyLocations = await Location.find({
+    const nearbyLocation = await Location.findOne({
       location: {
         $near: {
           $geometry: {
             type: 'Point',
             coordinates: [longitude, latitude]
           },
-          $maxDistance: 5000 // 5 km — covers typical city service area
+          $maxDistance: 50000
         }
       },
-      isActive: true // include all active locations regardless of isServiceAvailable
-    }).limit(1);
-    
-    if (nearbyLocations.length > 0) {
-      const location = nearbyLocations[0];
-      res.json({
-        success: true,
-        isAvailable: true,
-        serviceArea: {
-          id: location._id,
-          name: location.apartmentName,
-          city: location.city,
-          area: location.area
-        },
-        message: `Service available at ${location.apartmentName}`,
-      });
-    } else {
-      // Find nearest location (active only)
-      const allLocations = await Location.find({ isActive: true }).limit(10);
-      
-      let nearest = null;
-      let minDistance = Infinity;
-      
-      for (const loc of allLocations) {
-        const [locLng, locLat] = loc.location.coordinates;
-        const distance = calculateDistance(latitude, longitude, locLat, locLng);
-        if (distance < minDistance) {
-          minDistance = distance;
-          nearest = { name: loc.apartmentName, city: loc.city, distance: distance / 1000 }; // km
-        }
+      isActive: true,
+      isServiceAvailable: true
+    }).select('apartmentName city area location maxServiceRadius');
+
+    if (nearbyLocation?.location?.coordinates?.length) {
+      const [locationLng, locationLat] = nearbyLocation.location.coordinates;
+      const distanceMeters = Math.round(calculateDistance(latitude, longitude, locationLat, locationLng));
+      const serviceRadiusMeters = Math.max(nearbyLocation.maxServiceRadius || 500, 100);
+
+      if (distanceMeters <= serviceRadiusMeters) {
+        return res.json({
+          success: true,
+          isAvailable: true,
+          serviceArea: {
+            id: nearbyLocation._id,
+            name: nearbyLocation.apartmentName,
+            city: nearbyLocation.city,
+            area: nearbyLocation.area,
+            distanceMeters,
+            serviceRadiusMeters
+          },
+          message: `Service available at ${nearbyLocation.apartmentName}`,
+        });
       }
-      
-      res.json({
-        success: true,
-        isAvailable: false,
-        message: 'Service not available in your area',
-        nearest: nearest
-      });
     }
+
+    const allLocations = await Location.find({ isActive: true, isServiceAvailable: true })
+      .select('apartmentName city area location')
+      .limit(10);
+
+    let nearest = null;
+    let minDistance = Infinity;
+
+    for (const loc of allLocations) {
+      const [locLng, locLat] = loc.location.coordinates;
+      const distance = calculateDistance(latitude, longitude, locLat, locLng);
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearest = {
+          name: loc.apartmentName,
+          city: loc.city,
+          area: loc.area,
+          distance: Math.round(distance / 100) / 10
+        };
+      }
+    }
+
+    res.json({
+      success: true,
+      isAvailable: false,
+      message: 'Service not available in your selected region',
+      nearest
+    });
   } catch (error) {
     console.error('Service area validation error:', error);
     res.status(500).json({
@@ -113,22 +125,6 @@ router.post('/validate', async (req, res) => {
     });
   }
 });
-
-// Helper function to calculate distance
-function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371e3; // Earth's radius in meters
-  const φ1 = (lat1 * Math.PI) / 180;
-  const φ2 = (lat2 * Math.PI) / 180;
-  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
-
-  const a =
-    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return R * c; // Distance in meters
-}
 
 // @route   GET /api/service-areas
 // @desc    Get all active service areas (public view)

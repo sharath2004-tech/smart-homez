@@ -32,6 +32,7 @@ import {
     getWorkerCapacityStatus,
     monitorWorkerPool
 } from '../utils/workerPoolManager.js';
+import { calculateDistance } from '../utils/geolocation.js';
 
 const router = express.Router();
 
@@ -260,6 +261,49 @@ const getTimeWindowMinutes = (startTime, endTime) => {
   }
 
   return endMinutes - startMinutes;
+};
+
+const getUserCoordinates = (user) => {
+  const defaultAddress = user?.addresses?.find(address => address?.isDefault) || user?.addresses?.[0];
+  const coordinates = defaultAddress?.location?.coordinates || user?.currentLocation?.coordinates;
+
+  if (!Array.isArray(coordinates) || coordinates.length !== 2) {
+    return null;
+  }
+
+  const [longitude, latitude] = coordinates;
+  if ([longitude, latitude].some(value => typeof value !== 'number' || Number.isNaN(value))) {
+    return null;
+  }
+
+  return { longitude, latitude };
+};
+
+const resolveStrictLocationFromCoordinates = async ({ longitude, latitude }) => {
+  const nearestLocation = await Location.findOne({
+    location: {
+      $near: {
+        $geometry: { type: 'Point', coordinates: [longitude, latitude] },
+        $maxDistance: 50000
+      }
+    },
+    isActive: true,
+    isServiceAvailable: true
+  }).select('_id assignedWorkers location maxServiceRadius').lean();
+
+  if (!nearestLocation?.location?.coordinates?.length) {
+    return null;
+  }
+
+  const distanceMeters = calculateDistance(
+    latitude,
+    longitude,
+    nearestLocation.location.coordinates[1],
+    nearestLocation.location.coordinates[0]
+  );
+  const maxRadiusMeters = Math.max(nearestLocation.maxServiceRadius || 500, 100);
+
+  return distanceMeters <= maxRadiusMeters ? nearestLocation : null;
 };
 
 const resolveServiceDurationMinutes = ({ serviceConfig, subscriptionDetails, serviceDetails, estimatedDuration }) => {
@@ -621,23 +665,29 @@ router.get('/booked-slots', authenticate, async (req, res) => {
     const slotDurationMinutes = bhConfig.slotDurationMinutes || 30;
     const isDayActive = dayConfig?.isActive ?? true;
 
-    // ── Resolve nearest Location from coordinates ─────────────────────────────
+    // ── Resolve nearest Location from coordinates/profile ────────────────────
     let targetLocationId = locationId;
     let targetLocation = null;
     if (!targetLocationId && lng && lat) {
       const customerLng = parseFloat(lng);
       const customerLat = parseFloat(lat);
       if (!isNaN(customerLng) && !isNaN(customerLat)) {
-        const nearbyLocation = await Location.findOne({
-          location: {
-            $near: {
-              $geometry: { type: 'Point', coordinates: [customerLng, customerLat] },
-              $maxDistance: 50000 // broad pre-filter — just resolving nearest service zone
-            }
-          },
-          isActive: true,
-          isServiceAvailable: true
-        }).select('_id assignedWorkers').lean();
+        const nearbyLocation = await resolveStrictLocationFromCoordinates({
+          longitude: customerLng,
+          latitude: customerLat
+        });
+        if (nearbyLocation) {
+          targetLocation = nearbyLocation;
+          targetLocationId = nearbyLocation._id.toString();
+        }
+      }
+    }
+
+    if (!targetLocationId) {
+      const currentUser = await User.findById(req.user._id).select('addresses currentLocation').lean();
+      const userCoordinates = getUserCoordinates(currentUser);
+      if (userCoordinates) {
+        const nearbyLocation = await resolveStrictLocationFromCoordinates(userCoordinates);
         if (nearbyLocation) {
           targetLocation = nearbyLocation;
           targetLocationId = nearbyLocation._id.toString();
@@ -647,8 +697,23 @@ router.get('/booked-slots', authenticate, async (req, res) => {
 
     if (!targetLocation && targetLocationId) {
       targetLocation = await Location.findById(targetLocationId)
-        .select('_id assignedWorkers')
+        .select('_id assignedWorkers location maxServiceRadius')
         .lean();
+    }
+
+    if (!targetLocationId) {
+      return res.json({
+        success: true,
+        bookedRanges: [],
+        totalWorkers: 0,
+        maleWorkers: 0,
+        femaleWorkers: 0,
+        openTime,
+        closeTime,
+        slotDurationMinutes,
+        isDayActive,
+        locationId: null
+      });
     }
 
     // ── Booked ranges for this date ───────────────────────────────────────────

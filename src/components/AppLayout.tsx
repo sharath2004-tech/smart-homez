@@ -1,4 +1,4 @@
-import { api, settingsAPI } from "@/lib/api";
+import { API_ORIGIN, api, settingsAPI } from "@/lib/api";
 import { AlertTriangle, BarChart3, Bell, Building, Calendar, ClipboardCheck, CreditCard, DollarSign, FileText, Grid3x3, HelpCircle, IndianRupee, KeyRound, LayoutDashboard, MapPin, MessageSquare, RefreshCw, Settings, Settings2, TrendingUp, User, UserCircle, Users, Wrench } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -298,7 +298,7 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
     const rawImage = userImage ?? storedUser?.profileImage ?? null;
     if (!rawImage) return null;
     if (/^https?:\/\//i.test(rawImage)) return rawImage;
-    return `${api.baseURL?.replace('/api', '') || ''}${rawImage}`;
+    return `${API_ORIGIN}${rawImage}`;
   }, [storedUser?.profileImage, userImage]);
 
   const dashboardPath = useMemo(() =>

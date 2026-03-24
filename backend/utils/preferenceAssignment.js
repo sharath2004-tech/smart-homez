@@ -269,10 +269,24 @@ const checkWorkerAvailability = async (
     };
   }
 
+  const requestedLocationId = location?.locationId?.toString?.() || location?.locationId || null;
+  if (requestedLocationId) {
+    const workerInRequestedRegion = worker.workerProfile?.assignedApartments?.some(
+      apartment => apartment?.locationId?.toString() === requestedLocationId.toString()
+    );
+
+    if (!workerInRequestedRegion) {
+      return {
+        available: false,
+        reason: 'Worker belongs to a different service region'
+      };
+    }
+  }
+
   // Check location proximity (if location provided)
   const hasLatLng = location && location.latitude && location.longitude;
   const hasCoords = location && Array.isArray(location.coordinates) && location.coordinates.length === 2;
-  if (hasLatLng || hasCoords) {
+  if (!requestedLocationId && (hasLatLng || hasCoords)) {
     const isInRadius = await checkWorkerInRadius(worker._id, location, radius);
     if (!isInRadius) {
       return {
@@ -310,6 +324,8 @@ const findNearestAvailableWorker = async (
   Booking
 ) => {
   try {
+    const requestedLocationId = location?.locationId?.toString?.() || location?.locationId || null;
+
     // Build query
     const query = {
       role: 'worker',
@@ -328,8 +344,10 @@ const findNearestAvailableWorker = async (
       query.religion = religionPreference;
     }
 
-    // Add location filter if provided
-    if (location && location.latitude && location.longitude) {
+    // Add strict region filter if provided
+    if (requestedLocationId) {
+      query['workerProfile.assignedApartments.locationId'] = requestedLocationId;
+    } else if (location && location.latitude && location.longitude) {
       query['workerProfile.assignedApartments.location'] = {
         $near: {
           $geometry: {

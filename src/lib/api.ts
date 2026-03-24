@@ -4,6 +4,85 @@
  */
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+export const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, '');
+
+type LocationBearingUser = {
+  role?: string;
+  addresses?: Array<{
+    isDefault?: boolean;
+    apartmentName?: string;
+    apartment?: string;
+    building?: string;
+    street?: string;
+    address?: string;
+    area?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    location?: {
+      coordinates?: number[];
+    };
+  }>;
+  currentLocation?: {
+    coordinates?: number[];
+  };
+};
+
+const hasValidCoordinates = (coordinates?: number[]) => (
+  Array.isArray(coordinates)
+  && coordinates.length === 2
+  && coordinates.every((value) => typeof value === 'number' && !Number.isNaN(value))
+);
+
+const buildStoredLocationFromUser = (user?: LocationBearingUser | null) => {
+  if (!user || user.role !== 'customer') {
+    return null;
+  }
+
+  const addresses = Array.isArray(user.addresses) ? user.addresses : [];
+  const address = addresses.find((entry) => entry?.isDefault) || addresses[0];
+  const coordinates = address?.location?.coordinates || user.currentLocation?.coordinates;
+
+  if (!hasValidCoordinates(coordinates)) {
+    return null;
+  }
+
+  const [lng, lat] = coordinates;
+  const addressText = [address?.street, address?.apartment, address?.building, address?.area, address?.city]
+    .filter(Boolean)
+    .join(', ');
+
+  return {
+    lat,
+    lng,
+    apartmentName: address?.apartmentName || address?.apartment || address?.building || address?.area,
+    address: address?.address || addressText || undefined,
+    area: address?.area,
+    city: address?.city,
+    state: address?.state,
+    zipCode: address?.zipCode,
+  };
+};
+
+const syncStoredAuthState = (user?: Record<string, unknown> | null) => {
+  if (typeof window === 'undefined' || !user) {
+    return;
+  }
+
+  try {
+    const existingUser = JSON.parse(window.localStorage.getItem('user') || '{}');
+    window.localStorage.setItem('user', JSON.stringify({ ...existingUser, ...user }));
+  } catch {
+    window.localStorage.setItem('user', JSON.stringify(user));
+  }
+
+  const storedLocation = buildStoredLocationFromUser(user as LocationBearingUser);
+  if (storedLocation) {
+    window.localStorage.setItem('userLocation', JSON.stringify(storedLocation));
+  } else if ((user as LocationBearingUser)?.role) {
+    window.localStorage.removeItem('userLocation');
+  }
+};
 
 // Log API configuration in development/production for debugging
 if (import.meta.env.DEV) {
@@ -85,7 +164,9 @@ export const authAPI = {
   },
 
   getProfile: async () => {
-    return apiCall('/auth/me');
+    const data = await apiCall('/auth/me');
+    syncStoredAuthState(data?.user);
+    return data;
   },
 
   updateProfile: async (userData: Record<string, unknown> | FormData) => {
@@ -105,13 +186,18 @@ export const authAPI = {
         throw new Error(data.message || data.error?.message || 'Failed to update profile');
       }
 
+      syncStoredAuthState(data?.user);
+
       return data;
     }
 
-    return apiCall('/auth/me', {
+    const data = await apiCall('/auth/me', {
       method: 'PATCH',
       body: JSON.stringify(userData)
     });
+
+    syncStoredAuthState(data?.user);
+    return data;
   },
 
   updatePreferences: async (preferences: Record<string, unknown>) => {
@@ -235,10 +321,13 @@ export const authAPI = {
 
   // Update customer location after OAuth signup
   updateLocation: async (locationId: string) => {
-    return apiCall('/auth/update-location', {
+    const data = await apiCall('/auth/update-location', {
       method: 'POST',
       body: JSON.stringify({ locationId })
     });
+
+    syncStoredAuthState(data?.user);
+    return data;
   }
 };
 
@@ -1807,6 +1896,7 @@ export const reviewAnalyticsAPI = {
 // ====== Generic API wrapper (axios-like convenience object) ======
 // Used by pages that call api.get(), api.patch(), etc. directly.
 export const api = {
+  baseURL: API_BASE_URL,
   get: (endpoint: string) => apiCall(endpoint),
   post: (endpoint: string, data?: Record<string, unknown>) =>
     apiCall(endpoint, { method: 'POST', ...(data !== undefined && { body: JSON.stringify(data) }) }),

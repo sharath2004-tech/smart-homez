@@ -1,10 +1,58 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
+import Location from '../models/Location.js';
 import User from '../models/User.js';
+import { calculateDistance } from '../utils/geolocation.js';
 import { evaluateWorkerEffectiveAvailability } from '../utils/workerAvailability.js';
 
 const router = express.Router();
+
+const getUserCoordinates = (user) => {
+  const defaultAddress = user?.addresses?.find(address => address?.isDefault) || user?.addresses?.[0];
+  const coordinates = defaultAddress?.location?.coordinates || user?.currentLocation?.coordinates;
+
+  if (!Array.isArray(coordinates) || coordinates.length !== 2) {
+    return null;
+  }
+
+  const [longitude, latitude] = coordinates;
+  if ([longitude, latitude].some(value => typeof value !== 'number' || Number.isNaN(value))) {
+    return null;
+  }
+
+  return { longitude, latitude };
+};
+
+const resolveStrictLocation = async ({ longitude, latitude }) => {
+  const nearestLocation = await Location.findOne({
+    location: {
+      $near: {
+        $geometry: {
+          type: 'Point',
+          coordinates: [longitude, latitude]
+        },
+        $maxDistance: 50000
+      }
+    },
+    isActive: true,
+    isServiceAvailable: true
+  }).select('_id location maxServiceRadius').lean();
+
+  if (!nearestLocation?.location?.coordinates?.length) {
+    return null;
+  }
+
+  const distanceMeters = calculateDistance(
+    latitude,
+    longitude,
+    nearestLocation.location.coordinates[1],
+    nearestLocation.location.coordinates[0]
+  );
+  const maxRadiusMeters = Math.max(nearestLocation.maxServiceRadius || 500, 100);
+
+  return distanceMeters <= maxRadiusMeters ? nearestLocation : null;
+};
 
 // @route   GET /api/preferences
 // @desc    Get customer preferences
@@ -253,26 +301,33 @@ router.get('/available-workers',
   authorize('customer', 'admin'),
   async (req, res) => {
     try {
-      const { latitude, longitude, radius = 500 } = req.query;
+      const { latitude, longitude } = req.query;
+
+      const currentUser = await User.findById(req.user._id)
+        .select('addresses currentLocation')
+        .lean();
+
+      const explicitCoordinates = latitude && longitude
+        ? {
+            latitude: parseFloat(latitude),
+            longitude: parseFloat(longitude)
+          }
+        : getUserCoordinates(currentUser);
+
+      const targetLocation = explicitCoordinates
+        ? await resolveStrictLocation(explicitCoordinates)
+        : null;
+
+      if (!targetLocation) {
+        return res.json({ workers: [] });
+      }
 
       let query = {
         role: 'worker',
         isActive: true,
-        'workerProfile.availability': true
+        'workerProfile.availability': true,
+        'workerProfile.assignedApartments.locationId': targetLocation._id
       };
-
-      // If location provided, find workers within radius
-      if (latitude && longitude) {
-        query['workerProfile.assignedApartments.location'] = {
-          $near: {
-            $geometry: {
-              type: 'Point',
-              coordinates: [parseFloat(longitude), parseFloat(latitude)]
-            },
-            $maxDistance: parseInt(radius)
-          }
-        };
-      }
 
       const workers = await User.find(query)
         .select('name gender phone isFirstLogin hasCustomPassword workerProfile.rating workerProfile.totalReviews workerProfile.specialization workerProfile.experience workerProfile.availability workerProfile.leaves workerProfile.workingTimeWindow')

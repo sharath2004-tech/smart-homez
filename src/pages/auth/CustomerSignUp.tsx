@@ -11,7 +11,7 @@ import {
     Navigation,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+  import { Link, useLocation } from "react-router-dom";
 
 // Google OAuth types (will be used once @react-oauth/google is installed)
 declare global {
@@ -63,6 +63,7 @@ interface ServiceCity {
 }
 
 const CustomerSignUp = () => {
+  const location = useLocation();
   const [step, setStep] = useState<Step>("form");
   const [form, setForm] = useState({
     name: "",
@@ -93,6 +94,7 @@ const CustomerSignUp = () => {
     setError("");
     try {
       const response = await authAPI.googleLogin(credential);
+      localStorage.removeItem("userLocation");
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
 
@@ -128,6 +130,17 @@ const CustomerSignUp = () => {
       setGoogleInitialized(true);
     }
   }, [googleInitialized]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("oauth") !== "location") {
+      return;
+    }
+
+    setIsOAuthFlow(true);
+    setStep("location");
+    setError("");
+  }, [location.search]);
 
   useEffect(() => {
     if (step !== "location") return;

@@ -3,10 +3,62 @@ import { authenticate, authorize } from '../middleware/auth.js';
 import Booking from '../models/Booking.js';
 import Location from '../models/Location.js';
 import User from '../models/User.js';
+import { calculateDistance } from '../utils/geolocation.js';
 import { getWorkerPerformance } from '../utils/updateWorkerStats.js';
 import { evaluateWorkerEffectiveAvailability, isWorkerEligibleForAssignment } from '../utils/workerAvailability.js';
 
 const router = express.Router();
+
+const getUserCoordinates = (user) => {
+  const defaultAddress = user?.addresses?.find(address => address?.isDefault) || user?.addresses?.[0];
+  const coordinates = defaultAddress?.location?.coordinates || user?.currentLocation?.coordinates;
+
+  if (!Array.isArray(coordinates) || coordinates.length !== 2) {
+    return null;
+  }
+
+  const [longitude, latitude] = coordinates;
+  if ([longitude, latitude].some(value => typeof value !== 'number' || Number.isNaN(value))) {
+    return null;
+  }
+
+  return { longitude, latitude };
+};
+
+const resolveStrictLocationIdForUser = async (user) => {
+  const coordinates = getUserCoordinates(user);
+  if (!coordinates) {
+    return null;
+  }
+
+  const nearestLocation = await Location.findOne({
+    location: {
+      $near: {
+        $geometry: {
+          type: 'Point',
+          coordinates: [coordinates.longitude, coordinates.latitude]
+        },
+        $maxDistance: 50000
+      }
+    },
+    isActive: true,
+    isServiceAvailable: true
+  }).select('_id location maxServiceRadius').lean();
+
+  if (!nearestLocation?.location?.coordinates?.length) {
+    return null;
+  }
+
+  const distanceMeters = calculateDistance(
+    coordinates.latitude,
+    coordinates.longitude,
+    nearestLocation.location.coordinates[1],
+    nearestLocation.location.coordinates[0]
+  );
+  const maxRadiusMeters = Math.max(nearestLocation.maxServiceRadius || 500, 100);
+
+  return distanceMeters <= maxRadiusMeters ? nearestLocation._id.toString() : null;
+};
 
 // @route   GET /api/users
 // @desc    Get all users (admin only)
@@ -319,11 +371,25 @@ router.delete('/:id', authenticate, authorize('admin', 'super_admin'), async (re
 router.get('/workers/available', authenticate, async (req, res) => {
   try {
     const { specialization, minRating } = req.query;
+    const currentUser = req.user.role === 'customer'
+      ? await User.findById(req.user._id).select('role addresses currentLocation').lean()
+      : req.user;
+    const customerLocationId = req.user.role === 'customer'
+      ? await resolveStrictLocationIdForUser(currentUser)
+      : null;
+
+    if (req.user.role === 'customer' && !customerLocationId) {
+      return res.json({ workers: [] });
+    }
 
     const query = {
       role: 'worker',
       isActive: true
     };
+
+    if (customerLocationId) {
+      query['workerProfile.assignedApartments.locationId'] = customerLocationId;
+    }
 
     // Specialization is an array field, check if it contains the value
     if (specialization) {

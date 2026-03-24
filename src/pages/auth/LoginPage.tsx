@@ -77,6 +77,7 @@ const LoginPage = () => {
     setError("");
     try {
       const response = await authAPI.login(form.email, form.password);
+      localStorage.removeItem("userLocation");
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
 
@@ -165,6 +166,7 @@ const LoginPage = () => {
     setError("");
     try {
       const response = await authAPI.verifyOTP(otpPhone, otpCode, tab);
+      localStorage.removeItem("userLocation");
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
       const role = response.user.role;
@@ -199,8 +201,15 @@ const LoginPage = () => {
     setError("");
     try {
       const response = await authAPI.googleLogin(credential);
+      localStorage.removeItem("userLocation");
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
+
+      if (response.isNewUser === true || response.hasLocation !== true) {
+        window.location.href = "/register/customer?oauth=location";
+        return;
+      }
+
       window.location.href = "/customer/dashboard";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google sign-in failed. Please try again.");
