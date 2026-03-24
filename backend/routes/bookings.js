@@ -279,7 +279,7 @@ const getUserCoordinates = (user) => {
   return { longitude, latitude };
 };
 
-const resolveStrictLocationFromCoordinates = async ({ longitude, latitude }) => {
+const resolveStrictLocationFromCoordinates = async ({ longitude, latitude, minRadiusMeters = 0 }) => {
   const nearestLocation = await Location.findOne({
     location: {
       $near: {
@@ -301,7 +301,8 @@ const resolveStrictLocationFromCoordinates = async ({ longitude, latitude }) => 
     nearestLocation.location.coordinates[1],
     nearestLocation.location.coordinates[0]
   );
-  const maxRadiusMeters = Math.max(nearestLocation.maxServiceRadius || 500, 100);
+  // Use the larger of: location's own radius, the caller's service radius, or 100 m minimum.
+  const maxRadiusMeters = Math.max(nearestLocation.maxServiceRadius || 500, minRadiusMeters, 100);
 
   return distanceMeters <= maxRadiusMeters ? nearestLocation : null;
 };
@@ -666,6 +667,16 @@ router.get('/booked-slots', authenticate, async (req, res) => {
     const isDayActive = dayConfig?.isActive ?? true;
 
     // ── Resolve nearest Location from coordinates/profile ────────────────────
+    // Fetch the service radius early so location resolution uses the same
+    // "max(maxServiceRadius, serviceSearchRadius)" logic as booking creation.
+    let serviceSearchRadiusMeters = 0;
+    if (serviceId) {
+      const svcRadiusDoc = await Service.findById(serviceId)
+        .select('workerSearchRadiusKm')
+        .lean();
+      serviceSearchRadiusMeters = (svcRadiusDoc?.workerSearchRadiusKm || 0) * 1000;
+    }
+
     let targetLocationId = locationId;
     let targetLocation = null;
     if (!targetLocationId && lng && lat) {
@@ -674,7 +685,8 @@ router.get('/booked-slots', authenticate, async (req, res) => {
       if (!isNaN(customerLng) && !isNaN(customerLat)) {
         const nearbyLocation = await resolveStrictLocationFromCoordinates({
           longitude: customerLng,
-          latitude: customerLat
+          latitude: customerLat,
+          minRadiusMeters: serviceSearchRadiusMeters
         });
         if (nearbyLocation) {
           targetLocation = nearbyLocation;
@@ -687,7 +699,10 @@ router.get('/booked-slots', authenticate, async (req, res) => {
       const currentUser = await User.findById(req.user._id).select('addresses currentLocation').lean();
       const userCoordinates = getUserCoordinates(currentUser);
       if (userCoordinates) {
-        const nearbyLocation = await resolveStrictLocationFromCoordinates(userCoordinates);
+        const nearbyLocation = await resolveStrictLocationFromCoordinates({
+          ...userCoordinates,
+          minRadiusMeters: serviceSearchRadiusMeters
+        });
         if (nearbyLocation) {
           targetLocation = nearbyLocation;
           targetLocationId = nearbyLocation._id.toString();

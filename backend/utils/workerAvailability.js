@@ -265,9 +265,11 @@ export const isWorkerAvailableForTimeRange = (worker, bookingDate, startTime, en
 
   const slots = normalizeWorkingTimeSlots(workingTimeWindow);
   if (slots.length === 0) {
+    // Admin enabled the working-time feature but no slots are configured yet —
+    // treat as unrestricted so workers aren't silently blocked from all bookings.
     return {
-      available: false,
-      reason: 'Worker working hours are not configured'
+      available: true,
+      reason: 'Working hours not yet configured — unrestricted'
     };
   }
 
@@ -334,8 +336,14 @@ export const getWorkerBlockedTimeRanges = (worker, bookingDate) => {
     : null;
   const slots = normalizeWorkingTimeSlots(workingTimeWindow);
 
-  if ((workingDays && !workingDays.includes(dayParts.weekday)) || slots.length === 0) {
+  if (workingDays && !workingDays.includes(dayParts.weekday)) {
     return [{ startTime: '00:00', endTime: '23:59', reason: 'outside-working-window' }];
+  }
+
+  // If the admin enabled the working-time feature but hasn't configured any time
+  // slots yet, treat it as unrestricted rather than blocking the entire day.
+  if (slots.length === 0) {
+    return [];
   }
 
   const blockedRanges = [];

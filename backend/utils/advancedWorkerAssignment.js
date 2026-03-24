@@ -398,13 +398,19 @@ export const assignWorkersWithBackup = async (bookingDetails) => {
       );
     });
 
-    // Step 6: Select primary worker (within 5km if distance available)
+    // Step 6: Select primary worker
+    // When workers are already filtered by locationId they are region-locked — the
+    // 5 km distance check against their stored home/current GPS coordinates is
+    // redundant and actively harmful (a worker can be assigned to a complex 8 km
+    // from their home address).  Only apply the proximity constraint when we fall
+    // back to a pure geo-search (no locationId supplied).
+    const hasLocationIdFilter = !!location?.locationId;
     let primaryWorker = null;
     let primaryWorkerData = null;
 
     for (const workerData of workersWithScores) {
-      // Check distance constraint for primary worker (5km)
-      if (workerData.distance !== null && workerData.distance > 5) {
+      // Skip the 5km distance constraint when workers are already region-locked
+      if (!hasLocationIdFilter && workerData.distance !== null && workerData.distance > 5) {
         console.log(`❌ ${workerData.worker.name} too far for primary: ${workerData.distance.toFixed(2)}km`);
         continue;
       }
@@ -415,7 +421,11 @@ export const assignWorkersWithBackup = async (bookingDetails) => {
     }
 
     if (!primaryWorker) {
-      throw new Error('No worker found within 5km radius');
+      throw new Error(
+        hasLocationIdFilter
+          ? 'No available workers in this service region at the requested time'
+          : 'No worker found within 5km radius'
+      );
     }
 
     console.log(`✅ Primary worker assigned: ${primaryWorker.name}`);
@@ -430,8 +440,8 @@ export const assignWorkersWithBackup = async (bookingDetails) => {
         continue;
       }
 
-      // Check distance constraint for backup workers (7km)
-      if (workerData.distance !== null && workerData.distance > 7) {
+      // Skip the 7km distance constraint for backups when workers are region-locked
+      if (!hasLocationIdFilter && workerData.distance !== null && workerData.distance > 7) {
         console.log(`❌ ${workerData.worker.name} too far for backup: ${workerData.distance.toFixed(2)}km`);
         continue;
       }
