@@ -54,6 +54,19 @@ const getPasswordSetupState = (user) => {
   };
 };
 
+const isMatchingTemporaryPassword = (submittedPassword, temporaryPassword) => {
+  if (typeof submittedPassword !== 'string' || typeof temporaryPassword !== 'string') {
+    return false;
+  }
+
+  if (submittedPassword === temporaryPassword) {
+    return true;
+  }
+
+  const trimmedSubmittedPassword = submittedPassword.trim();
+  return trimmedSubmittedPassword.length > 0 && trimmedSubmittedPassword === temporaryPassword;
+};
+
 // Rate limiter for sensitive auth endpoints (OTP / password reset)
 const sensitiveAuthLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -268,8 +281,8 @@ router.post('/login',
       // Normalize email (lowercase and trim) to match schema
       const normalizedEmail = email.toLowerCase().trim();
 
-      // Find user with password field
-      const user = await User.findOne({ email: normalizedEmail }).select('+password');
+      // Find user with password and temporary password fields
+      const user = await User.findOne({ email: normalizedEmail }).select('+password +temporaryPassword');
       if (!user) {
         return res.status(401).json({ 
           error: { message: 'Invalid credentials', status: 401 } 
@@ -283,8 +296,24 @@ router.post('/login',
         });
       }
 
-      // Verify password
-      const isMatch = await user.comparePassword(password);
+      // Verify password. For first-login accounts, also allow the stored temporary
+      // password as a fallback in case the persisted hash became out of sync.
+      let isMatch = await user.comparePassword(password);
+      let usedTemporaryPasswordFallback = false;
+
+      if (!isMatch && user.isFirstLogin && isMatchingTemporaryPassword(password, user.temporaryPassword)) {
+        isMatch = true;
+        usedTemporaryPasswordFallback = true;
+
+        try {
+          user.password = user.temporaryPassword;
+          await user.save({ validateBeforeSave: false });
+          console.warn(`⚠️ Repaired password hash for first-login user ${user.email} using temporary password fallback.`);
+        } catch (repairError) {
+          console.error(`Failed to repair password hash for ${user.email}:`, repairError);
+        }
+      }
+
       if (!isMatch) {
         return res.status(401).json({ 
           error: { message: 'Invalid credentials', status: 401 } 
@@ -299,7 +328,7 @@ router.post('/login',
       );
 
       res.json({
-        message: 'Login successful',
+        message: usedTemporaryPasswordFallback ? 'Login successful (temporary password verified)' : 'Login successful',
         token,
         user: {
           id: user._id,
