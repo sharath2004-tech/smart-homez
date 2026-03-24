@@ -5,11 +5,11 @@ import { ArrowRight, CheckCircle2, Layers3, ShieldCheck, Sparkles } from "lucide
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-    type DeepCleaningConfig,
-    type UserProfile,
-    getCategoryAction,
-    getCategoryMeta,
-    getStartingPrice
+  type DeepCleaningConfig,
+  type UserProfile,
+  getCategoryAction,
+  getCategoryMeta,
+  getStartingPrice
 } from "./deepCleaningTemplate";
 
 const getCategoryPriceText = (items: NonNullable<DeepCleaningConfig["items"]>) => {
@@ -136,50 +136,52 @@ const DeepCleaningLandingPage = () => {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.06 }}
-                    className="rounded-3xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-shadow"
+                    className="h-full"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-3xl">{category.emoji}</div>
-                        <h3 className="mt-3 text-lg font-bold text-foreground leading-tight">{category.label}</h3>
-                      </div>
-                      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
-                        {meta.mode === "quote" ? "Quote" : meta.mode === "package" ? "Package" : "Custom"}
-                      </span>
-                    </div>
-
-                    <p className="mt-3 text-sm text-muted-foreground min-h-[42px]">
-                      {meta?.description || "Choose the right deep cleaning scope for your home and continue with booking."}
-                    </p>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {(meta?.highlights || []).slice(0, 3).map((highlight) => (
-                        <span key={highlight} className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-                          {highlight}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="mt-4 rounded-2xl bg-muted/60 p-3">
-                      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                        <span>{categoryItems.length} services configured</span>
-                        <span>{getCategoryPriceText(categoryItems)}</span>
-                      </div>
-                      <ul className="mt-2 space-y-1.5 text-sm text-foreground">
-                        {previewItems.length > 0 ? previewItems.map((item) => (
-                          <li key={item.id} className="flex items-start gap-2">
-                            <span className="mt-0.5">{item.icon || category.emoji}</span>
-                            <span className="line-clamp-1">{item.name}</span>
-                          </li>
-                        )) : <li className="text-muted-foreground">No active services yet</li>}
-                      </ul>
-                    </div>
-
                     <Link
                       to={action.href}
-                      className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground hover:opacity-95 transition-opacity"
+                      className="group flex h-full flex-col rounded-3xl border border-border bg-card p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                     >
-                      {action.label} <ArrowRight className="w-4 h-4" />
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-3xl">{category.emoji}</div>
+                          <h3 className="mt-3 text-lg font-bold text-foreground leading-tight">{category.label}</h3>
+                        </div>
+                        <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                          {meta.mode === "quote" ? "Quote" : meta.mode === "package" ? "Package" : "Custom"}
+                        </span>
+                      </div>
+
+                      <p className="mt-3 min-h-[42px] text-sm text-muted-foreground">
+                        {meta?.description || "Choose the right deep cleaning scope for your home and continue with booking."}
+                      </p>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {(meta?.highlights || []).slice(0, 3).map((highlight) => (
+                          <span key={highlight} className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                            {highlight}
+                          </span>
+                        ))}
+                      </div>
+
+                      <div className="mt-4 rounded-2xl bg-muted/60 p-3">
+                        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                          <span>{categoryItems.length} services configured</span>
+                          <span>{getCategoryPriceText(categoryItems)}</span>
+                        </div>
+                        <ul className="mt-2 space-y-1.5 text-sm text-foreground">
+                          {previewItems.length > 0 ? previewItems.map((item) => (
+                            <li key={item.id} className="flex items-start gap-2">
+                              <span className="mt-0.5">{item.icon || category.emoji}</span>
+                              <span className="line-clamp-1">{item.name}</span>
+                            </li>
+                          )) : <li className="text-muted-foreground">No active services yet</li>}
+                        </ul>
+                      </div>
+
+                      <div className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-opacity group-hover:opacity-95">
+                        {action.label} <ArrowRight className="w-4 h-4" />
+                      </div>
                     </Link>
                   </motion.div>
                 );
@@ -201,29 +203,31 @@ const DeepCleaningLandingPage = () => {
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.15 + index * 0.05 }}
-                className="rounded-2xl border border-border bg-card p-4"
+                className="h-full"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="text-2xl">{item.icon}</div>
-                  <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">
-                    {item.pricingType === "fixed" ? "Fixed" : "Per unit"}
-                  </span>
-                </div>
-                <h3 className="mt-3 text-sm font-semibold text-foreground leading-tight">{item.name}</h3>
-                <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{item.description}</p>
-                <p className="mt-3 text-sm font-bold text-green-700">
-                  {item.pricingType === "per_sqft"
-                    ? "Enter area for amount"
-                    : <>
-                        ₹{item.price.toLocaleString("en-IN")}
-                        {item.pricingType === "per_unit" ? <span className="text-xs font-normal text-muted-foreground"> / {item.unit}</span> : null}
-                      </>}
-                </p>
                 <Link
-                  to={`/customer/deep-cleaning/customize?category=${encodeURIComponent(item.category)}`}
-                  className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                  to={`/customer/deep-cleaning/customize?category=${encodeURIComponent(item.category)}&item=${encodeURIComponent(item.id)}`}
+                  className="group flex h-full flex-col rounded-2xl border border-border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                 >
-                  Continue <ArrowRight className="w-3.5 h-3.5" />
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-2xl">{item.icon}</div>
+                    <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">
+                      {item.pricingType === "fixed" ? "Fixed" : "Per unit"}
+                    </span>
+                  </div>
+                  <h3 className="mt-3 text-sm font-semibold text-foreground leading-tight">{item.name}</h3>
+                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.description}</p>
+                  <p className="mt-3 text-sm font-bold text-green-700">
+                    {item.pricingType === "per_sqft"
+                      ? "Enter area for amount"
+                      : <>
+                          ₹{item.price.toLocaleString("en-IN")}
+                          {item.pricingType === "per_unit" ? <span className="text-xs font-normal text-muted-foreground"> / {item.unit}</span> : null}
+                        </>}
+                  </p>
+                  <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-primary group-hover:underline">
+                    Continue <ArrowRight className="w-3.5 h-3.5" />
+                  </div>
                 </Link>
               </motion.div>
             ))}

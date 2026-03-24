@@ -227,32 +227,32 @@ const DeepCleaningCategoryPage = () => {
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    className="rounded-2xl border border-border bg-card p-4 shadow-sm"
+                    className="h-full"
                   >
                     {(() => {
                       const itemAction = getItemAction(categoryId, item);
 
                       return (
-                        <>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="text-2xl">{item.icon || category?.emoji}</div>
-                      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
-                        {item.pricingType.replace("_", " ")}
-                      </span>
-                    </div>
-                    <h3 className="mt-3 text-base font-semibold text-foreground">{item.name}</h3>
-                    <p className="mt-1 text-sm text-muted-foreground min-h-[40px]">{item.description}</p>
-                    <div className="mt-3 flex items-center justify-between gap-2">
-                      <span className="text-sm font-bold text-green-700">{priceLabel(item)}</span>
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    </div>
-                    <Link
-                      to={itemAction.href}
-                      className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-95 transition-opacity"
-                    >
-                      {itemAction.label} <ArrowRight className="h-4 w-4" />
-                    </Link>
-                        </>
+                        <Link
+                          to={itemAction.href}
+                          className="group flex h-full flex-col rounded-2xl border border-border bg-card p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="text-2xl">{item.icon || category?.emoji}</div>
+                            <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                              {item.pricingType.replace("_", " ")}
+                            </span>
+                          </div>
+                          <h3 className="mt-3 text-base font-semibold text-foreground">{item.name}</h3>
+                          <p className="mt-1 min-h-[40px] text-sm text-muted-foreground">{item.description}</p>
+                          <div className="mt-3 flex items-center justify-between gap-2">
+                            <span className="text-sm font-bold text-green-700">{priceLabel(item)}</span>
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          </div>
+                          <div className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity group-hover:opacity-95">
+                            {itemAction.label} <ArrowRight className="h-4 w-4" />
+                          </div>
+                        </Link>
                       );
                     })()}
                   </motion.div>
