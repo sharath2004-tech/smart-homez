@@ -1,5 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import RescheduleModal from "@/components/RescheduleModal";
+import WorkerProfilePreviewDialog from "@/components/WorkerProfilePreviewDialog";
 import WorkerTrackingMap from "@/components/WorkerTrackingMap";
 import { Badge } from "@/components/ui/badge";
 import { authAPI, bookingsAPI } from "@/lib/api";
@@ -14,6 +15,7 @@ interface Worker {
   name: string;
   email?: string;
   phone?: string;
+  profileImage?: string;
   rating?: number;
   gender?: string;
   religion?: string;
@@ -21,6 +23,12 @@ interface Worker {
     experience?: number;
     languages?: string[];
     rating?: number;
+    specialization?: string[] | string;
+    totalReviews?: number;
+    totalJobsCompleted?: number;
+    completedJobs?: number;
+    completedBookings?: number;
+    availability?: boolean;
   };
 }
 
@@ -77,6 +85,7 @@ const BookingsPage = () => {
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
   const [bookingToReschedule, setBookingToReschedule] = useState<Booking | null>(null);
   const [trackingBooking, setTrackingBooking] = useState<Booking | null>(null);
+  const [selectedWorkerProfile, setSelectedWorkerProfile] = useState<Worker | null>(null);
 
   // Auto-open a booking detail when navigated here with state.openBookingId
   useEffect(() => {
@@ -403,6 +412,16 @@ const BookingsPage = () => {
                             <span className="text-foreground font-medium capitalize">{booking.worker.religion}</span>
                           </div>
                         )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedWorkerProfile(booking.worker!);
+                          }}
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+                        >
+                          View worker profile
+                        </button>
                       </div>
                     </div>
                   ) : (
@@ -506,6 +525,16 @@ const BookingsPage = () => {
           onClose={() => setTrackingBooking(null)}
         />
       )}
+
+      <WorkerProfilePreviewDialog
+        open={Boolean(selectedWorkerProfile)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedWorkerProfile(null);
+          }
+        }}
+        worker={selectedWorkerProfile}
+      />
     </AppLayout>
   );
 };

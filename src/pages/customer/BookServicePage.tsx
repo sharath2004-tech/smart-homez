@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import WorkerProfilePreviewDialog from "@/components/WorkerProfilePreviewDialog";
 import { useServiceBookingAvailability } from "@/hooks/useServiceBookingAvailability";
 import { authAPI, bookingsAPI, servicesAPI, settingsAPI } from "@/lib/api";
 import { Calendar, Clock, Info, MapPin, Sparkles, Star, User, Users, Zap } from "lucide-react";
@@ -41,11 +42,13 @@ interface Worker {
   phone: string;
   profileImage?: string;
   workerProfile: {
-    specialization: string;
+    specialization: string[] | string;
     rating: number;
     completedBookings: number;
     availability: boolean;
     experience?: number;
+    totalReviews?: number;
+    totalJobsCompleted?: number;
   };
   currentLocation?: {
     coordinates: number[];
@@ -91,6 +94,7 @@ const BookServicePage = () => {
   const [booking, setBooking] = useState(false);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [loadingWorkers, setLoadingWorkers] = useState(false);
+  const [selectedWorkerProfile, setSelectedWorkerProfile] = useState<Worker | null>(null);
   
   // Booking mode: "now" or "schedule"
   const [bookingMode, setBookingMode] = useState<BookingMode>('now');
@@ -1267,11 +1271,21 @@ const BookServicePage = () => {
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {workers.filter(w => w.workerProfile.availability).slice(0, 5).map((worker) => {
                   const { distance, eta } = getWorkerDistanceETA(worker);
+                  const specializationLabel = Array.isArray(worker.workerProfile.specialization)
+                    ? worker.workerProfile.specialization.join(', ')
+                    : worker.workerProfile.specialization;
                   return (
-                    <button
+                    <div
                       key={worker._id}
-                      type="button"
                       onClick={() => setSelectedWorker(worker._id === selectedWorker ? null : worker._id)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setSelectedWorker(worker._id === selectedWorker ? null : worker._id);
+                        }
+                      }}
                       className={`w-full p-4 border-2 rounded-xl text-left transition-all ${
                         selectedWorker === worker._id
                           ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
@@ -1293,7 +1307,7 @@ const BookServicePage = () => {
                           </div>
                           
                           <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                            <span className="capitalize">{worker.workerProfile.specialization}</span>
+                            {specializationLabel ? <span className="capitalize">{specializationLabel}</span> : null}
                             <span>•</span>
                             <span>{worker.workerProfile.completedBookings} jobs</span>
                             {worker.workerProfile.experience && (
@@ -1303,7 +1317,22 @@ const BookServicePage = () => {
                               </>
                             )}
                           </div>
-                          
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSelectedWorkerProfile(worker);
+                              }}
+                              className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
+                            >
+                              View profile
+                            </button>
+                            <span className="rounded-lg bg-muted px-3 py-1.5 text-xs text-muted-foreground">
+                              Tap anywhere on the card to {selectedWorker === worker._id ? 'unselect' : 'select'}
+                            </span>
+                          </div>
+
                           {distance > 0 && (
                             <div className="flex items-center gap-2 mt-2">
                               <div className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded text-xs font-medium">
@@ -1317,7 +1346,7 @@ const BookServicePage = () => {
                           )}
                         </div>
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
                 
@@ -1518,6 +1547,16 @@ const BookServicePage = () => {
             )}
           </div>
         </form>
+
+        <WorkerProfilePreviewDialog
+          open={Boolean(selectedWorkerProfile)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedWorkerProfile(null);
+            }
+          }}
+          worker={selectedWorkerProfile}
+        />
       </div>
     </AppLayout>
   );

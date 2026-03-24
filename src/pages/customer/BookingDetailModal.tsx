@@ -1,6 +1,7 @@
 import BookingOrderPrint from "@/components/BookingOrderPrint";
 import ChatModal from "@/components/ChatModal";
 import EmbeddedQRScanner from "@/components/EmbeddedQRScanner";
+import WorkerProfilePreviewDialog from "@/components/WorkerProfilePreviewDialog";
 import { API_BASE_URL, bookingsAPI } from "@/lib/api";
 import html2pdf from "html2pdf.js";
 import { ArrowLeft, Calendar, Camera, CheckCircle, ClipboardCheck, Clock3, Coffee, DollarSign, Download, MapPin, MessageCircle, Pause, Phone, Play, Printer, QrCode, Timer, User, X, XCircle } from "lucide-react";
@@ -21,6 +22,12 @@ interface Worker {
     experience?: number;
     languages?: string[];
     rating?: number;
+    specialization?: string[] | string;
+    totalReviews?: number;
+    totalJobsCompleted?: number;
+    completedJobs?: number;
+    completedBookings?: number;
+    availability?: boolean;
   };
 }
 
@@ -230,6 +237,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
   const [endingService, setEndingService] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [breakActionLoading, setBreakActionLoading] = useState(false);
+  const [showWorkerProfile, setShowWorkerProfile] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
   const OVERTIME_RATE = 2.5; // ₹2.5 per minute
 
@@ -636,6 +644,14 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                       <span className="text-sm font-medium">{booking.worker.phone}</span>
                     </a>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => setShowWorkerProfile(true)}
+                    className="flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-3 text-sm font-medium text-foreground hover:bg-muted transition-colors w-full"
+                  >
+                    <User className="w-4 h-4 text-primary" />
+                    View worker profile
+                  </button>
                   {booking.status !== 'completed' && booking.status !== 'cancelled' && (
                     <button
                       onClick={() => setShowChat(true)}
@@ -1004,6 +1020,12 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
           onClose={() => setShowChat(false)}
         />
       )}
+
+      <WorkerProfilePreviewDialog
+        open={showWorkerProfile}
+        onOpenChange={setShowWorkerProfile}
+        worker={booking.worker || null}
+      />
 
       {/* Print Modal */}
       {showPrintModal && booking && (

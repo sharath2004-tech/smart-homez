@@ -178,6 +178,9 @@ const CATEGORY_ICONS: Record<string, string> = {
 };
 
 const DEFAULT_VISIBLE_ITEMS = 2;
+const MAX_PROOF_FILES = 5;
+
+const getFileIdentity = (file: File) => `${file.name}-${file.size}-${file.lastModified}`;
 
 const AdminExpenses = () => {
   const { role, name } = useAdminRole();
@@ -267,6 +270,31 @@ const AdminExpenses = () => {
     if (!url) return '';
     if (url.startsWith('http://') || url.startsWith('https://')) return url;
     return `${API_BASE_URL.replace('/api', '')}${url}`;
+  };
+
+  const handleProofFileSelection = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    setSelectedProofFiles((current) => {
+      const combined = [...current, ...Array.from(files)];
+      const deduped = combined.filter((file, index, array) => (
+        index === array.findIndex((candidate) => getFileIdentity(candidate) === getFileIdentity(file))
+      ));
+
+      if (deduped.length > MAX_PROOF_FILES) {
+        toast.error(`You can upload up to ${MAX_PROOF_FILES} proof files for one expense.`);
+      }
+
+      return deduped.slice(0, MAX_PROOF_FILES);
+    });
+
+    if (proofFileInputRef.current) {
+      proofFileInputRef.current.value = '';
+    }
+  };
+
+  const removeSelectedProofFile = (fileToRemove: File) => {
+    setSelectedProofFiles((current) => current.filter((file) => getFileIdentity(file) !== getFileIdentity(fileToRemove)));
   };
 
   const fetchExpenses = async () => {
@@ -809,7 +837,7 @@ const AdminExpenses = () => {
                       Expense Proofs
                     </label>
                     <p className="text-xs text-muted-foreground mb-3">
-                      Upload bills, receipts, or product photos for reference. You can attach up to 5 files at a time.
+                      Upload bills, receipts, or product photos for reference. Admins can attach 2, 3, or up to 5 proof files for the same expense.
                     </p>
                     <input
                       ref={proofFileInputRef}
@@ -817,7 +845,7 @@ const AdminExpenses = () => {
                       multiple
                       accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
                       className="hidden"
-                      onChange={(e) => setSelectedProofFiles(Array.from(e.target.files || []))}
+                      onChange={(e) => handleProofFileSelection(e.target.files)}
                     />
                     <button
                       type="button"
@@ -828,7 +856,7 @@ const AdminExpenses = () => {
                       <span className="text-muted-foreground">
                         {selectedProofFiles.length > 0
                           ? `${selectedProofFiles.length} file${selectedProofFiles.length !== 1 ? 's' : ''} selected`
-                          : 'Click to upload proof files'}
+                          : 'Click to add proof files'}
                       </span>
                     </button>
                   </div>
@@ -836,11 +864,22 @@ const AdminExpenses = () => {
                   {selectedProofFiles.length > 0 && (
                     <div className="rounded-lg bg-background p-3">
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">New files to upload</p>
-                      <div className="space-y-1">
+                      <div className="space-y-2">
                         {selectedProofFiles.map((file) => (
-                          <p key={`${file.name}-${file.lastModified}`} className="text-sm text-foreground break-all">
-                            • {file.name}
-                          </p>
+                          <div
+                            key={`${file.name}-${file.lastModified}`}
+                            className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2"
+                          >
+                            <p className="text-sm text-foreground break-all">{file.name}</p>
+                            <button
+                              type="button"
+                              onClick={() => removeSelectedProofFile(file)}
+                              className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                              aria-label={`Remove ${file.name}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
                         ))}
                       </div>
                     </div>

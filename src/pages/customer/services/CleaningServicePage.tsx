@@ -1,5 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import ServiceLocationCard from "@/components/ServiceLocationCard";
+import WorkerProfilePreviewDialog from "@/components/WorkerProfilePreviewDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,10 +41,20 @@ interface Service {
 interface Worker {
   _id: string;
   name: string;
+  profileImage?: string;
+  email?: string;
+  phone?: string;
+  gender?: string;
+  religion?: string;
   workerProfile: {
     rating: number;
     totalReviews?: number;
     availability: boolean;
+    specialization?: string[] | string;
+    experience?: number;
+    totalJobsCompleted?: number;
+    completedJobs?: number;
+    completedBookings?: number;
   };
 }
 
@@ -94,6 +105,7 @@ const CleaningServicePage = () => {
   const [selectedWorker, setSelectedWorker] = useState<string>('auto-assign');
   const [availableWorkers, setAvailableWorkers] = useState<Worker[]>([]);
   const [loadingWorkers, setLoadingWorkers] = useState(false);
+  const [selectedWorkerProfile, setSelectedWorkerProfile] = useState<Worker | null>(null);
   const [bookedRanges, setBookedRanges] = useState<Array<{ workerId: string | null; startTime: string; endTime: string }>>([]);
   const [totalWorkersCount, setTotalWorkersCount] = useState(0);
   const [checkingSlots, setCheckingSlots] = useState(false);
@@ -587,7 +599,7 @@ const CleaningServicePage = () => {
                   </button>
                   {availableWorkers.map(worker => (
                     <button key={worker._id} type="button" onClick={() => setSelectedWorker(worker._id)}
-                      className={`p-4 rounded-lg border-2 text-left transition-all ${
+                        className={`p-4 rounded-lg border-2 text-left transition-all ${
                         selectedWorker === worker._id ? 'border-primary bg-primary/10 shadow-md' : 'border-border hover:border-primary/50'
                       }`}>
                       <div className="flex items-center gap-3">
@@ -598,6 +610,18 @@ const CleaningServicePage = () => {
                           <div className="font-semibold">{worker.name}</div>
                           <div className="text-sm text-muted-foreground">
                             ⭐ {worker.workerProfile?.rating?.toFixed(1) || 'New'} · {worker.workerProfile?.totalReviews || 0} reviews
+                          </div>
+                          <div className="mt-2">
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSelectedWorkerProfile(worker);
+                              }}
+                              className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
+                            >
+                              View profile
+                            </button>
                           </div>
                         </div>
                         {selectedWorker === worker._id && <span className="text-primary">✓</span>}
@@ -672,6 +696,16 @@ const CleaningServicePage = () => {
           </div>
 
         </form>
+
+        <WorkerProfilePreviewDialog
+          open={Boolean(selectedWorkerProfile)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedWorkerProfile(null);
+            }
+          }}
+          worker={selectedWorkerProfile}
+        />
       </div>
     </AppLayout>
   );
