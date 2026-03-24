@@ -94,7 +94,7 @@ const calculateWorkerScore = (worker, booking, locationDistance = null) => {
 export const findBestWorkers = async (bookingDetails, count = 3) => {
   try {
     const { _id, service, bookingDate, startTime, endTime, location } = bookingDetails;
-    const serviceRadiusKm = service?.workerSearchRadiusKm || 50;
+    const serviceRadiusKm = service?.workerSearchRadiusKm ?? 50;
     const serviceRadiusMeters = serviceRadiusKm * 1000;
 
     console.log(`📏 Service radius: ${serviceRadiusKm}km (service: ${service?.name || 'unknown'})`);

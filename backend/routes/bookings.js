@@ -303,6 +303,7 @@ const resolveStrictLocationFromCoordinates = async ({ longitude, latitude, minRa
   }).select('_id assignedWorkers location maxServiceRadius').lean();
 
   if (!nearestLocation?.location?.coordinates?.length) {
+    console.log('📍 resolveStrictLocation: No nearest location found with valid coordinates');
     return null;
   }
 
@@ -312,9 +313,12 @@ const resolveStrictLocationFromCoordinates = async ({ longitude, latitude, minRa
     nearestLocation.location.coordinates[1],
     nearestLocation.location.coordinates[0]
   );
-  // Use the larger of: location's own radius, the caller's service radius, or 100 m minimum.
-  const maxRadiusMeters = Math.max(nearestLocation.maxServiceRadius || 500, minRadiusMeters, 100);
+  // Use the larger of: location's own radius, the caller's service radius, or 5 km minimum.
+  // The 5 km minimum prevents overly restrictive matching when neither the location
+  // nor the service has configured a meaningful radius.
+  const maxRadiusMeters = Math.max(nearestLocation.maxServiceRadius || 5000, minRadiusMeters, 5000);
 
+  console.log(`📍 resolveStrictLocation: distance=${Math.round(distanceMeters)}m, maxRadius=${maxRadiusMeters}m, locationRadius=${nearestLocation.maxServiceRadius || 'default'}, serviceRadius=${minRadiusMeters}m`);
   return distanceMeters <= maxRadiusMeters ? nearestLocation : null;
 };
 
@@ -685,7 +689,8 @@ router.get('/booked-slots', authenticate, async (req, res) => {
       const svcRadiusDoc = await Service.findById(serviceId)
         .select('workerSearchRadiusKm')
         .lean();
-      serviceSearchRadiusMeters = (svcRadiusDoc?.workerSearchRadiusKm || 0) * 1000;
+      // Use nullish coalescing so missing field uses Service model default (10km)
+      serviceSearchRadiusMeters = (svcRadiusDoc?.workerSearchRadiusKm ?? 10) * 1000;
     }
 
     let targetLocationId = locationId;
@@ -728,6 +733,7 @@ router.get('/booked-slots', authenticate, async (req, res) => {
     }
 
     if (!targetLocationId) {
+      console.log('⚠️ booked-slots: No location resolved for customer coordinates. Returning 0 workers.');
       return res.json({
         success: true,
         bookedRanges: [],
@@ -738,7 +744,8 @@ router.get('/booked-slots', authenticate, async (req, res) => {
         closeTime,
         slotDurationMinutes,
         isDayActive,
-        locationId: null
+        locationId: null,
+        _debug: { reason: 'No serviceable location found near your address' }
       });
     }
 
@@ -796,6 +803,8 @@ router.get('/booked-slots', authenticate, async (req, res) => {
       .select('_id gender isActive isFirstLogin hasCustomPassword workerProfile.availability workerProfile.leaves workerProfile.workingTimeWindow')
       .lean();
 
+    console.log(`📊 booked-slots: ${workers.length} worker(s) matched DB query for location ${targetLocationId}`);
+
     // If specialization mapping is too strict for current worker data,
     // gracefully retry without it. This mirrors the worker assignment logic
     // and prevents false 0-availability in the customer UI.
@@ -805,20 +814,31 @@ router.get('/booked-slots', authenticate, async (req, res) => {
       workers = await User.find(fallbackWithoutSpecialization)
         .select('_id gender isActive isFirstLogin hasCustomPassword workerProfile.availability workerProfile.leaves workerProfile.workingTimeWindow')
         .lean();
+      console.log(`📊 booked-slots: ${workers.length} worker(s) after specialization fallback`);
     }
 
-    const eligibleWorkers = workers.filter((worker) => isWorkerEligibleForAssignment(worker).eligible);
+    const eligibleWorkers = workers.filter((worker) => {
+      const result = isWorkerEligibleForAssignment(worker);
+      if (!result.eligible) {
+        console.log(`   ❌ Worker ${worker._id} ineligible: ${result.reason}`);
+      }
+      return result.eligible;
+    });
+    console.log(`📊 booked-slots: ${eligibleWorkers.length}/${workers.length} workers passed eligibility check`);
 
     // Remove workers on approved leave for this date
     const leaveEligibleWorkers = eligibleWorkers.filter(worker => {
       if (!worker.workerProfile?.leaves?.length) return true;
-      return !worker.workerProfile.leaves.some(leave => {
+      const onLeave = worker.workerProfile.leaves.some(leave => {
         if (leave.status !== 'approved') return false;
         const leaveDate = new Date(leave.date);
         leaveDate.setHours(0, 0, 0, 0);
         return leaveDate.getTime() === bookingDate.getTime();
       });
+      if (onLeave) console.log(`   🏖️ Worker ${worker._id} on approved leave for ${date}`);
+      return !onLeave;
     });
+    console.log(`📊 booked-slots: ${leaveEligibleWorkers.length}/${eligibleWorkers.length} workers passed leave check`);
 
     const workerIds = leaveEligibleWorkers.map(worker => worker._id);
     const workerDayBookings = workerIds.length > 0
@@ -843,6 +863,9 @@ router.get('/booked-slots', authenticate, async (req, res) => {
 
     const nonOverloadedWorkers = leaveEligibleWorkers.filter((worker) => {
       const dailyBookings = dailyPrimaryBookingCounts.get(worker._id.toString()) || 0;
+      if (dailyBookings >= 8) {
+        console.log(`   📦 Worker ${worker._id} overloaded with ${dailyBookings} bookings`);
+      }
       return dailyBookings < 8;
     });
 
@@ -852,8 +875,13 @@ router.get('/booked-slots', authenticate, async (req, res) => {
       }
 
       const operationalStatus = getWorkerOperationalAvailabilityFromBookings(worker, workerDayBookings, now);
+      if (operationalStatus.operationsCompleted) {
+        console.log(`   ✅ Worker ${worker._id} operations completed for today`);
+      }
       return !operationalStatus.operationsCompleted;
     });
+
+    console.log(`📊 booked-slots: Final available workers: ${availableWorkers.length} (overload: ${leaveEligibleWorkers.length - nonOverloadedWorkers.length} dropped, operational: ${nonOverloadedWorkers.length - availableWorkers.length} dropped)`);
 
     // Filter bookedRanges to only the available workers so the frontend
     // slot availability count matches the worker pool (important for gender filter)

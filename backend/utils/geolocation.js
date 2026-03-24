@@ -167,7 +167,7 @@ export const checkServiceAvailability = async (
       };
     }
 
-    const serviceRadiusMeters = (service.workerSearchRadiusKm || 50) * 1000;
+    const serviceRadiusMeters = (service.workerSearchRadiusKm ?? 10) * 1000;
 
     // Find candidate locations inside the service search radius.
     const nearbyLocations = await Location.find({
