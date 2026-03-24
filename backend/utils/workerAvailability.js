@@ -213,6 +213,14 @@ export const isWorkerAvailableForTimeRange = (worker, bookingDate, startTime, en
     };
   }
 
+  const assignmentEligibility = isWorkerEligibleForAssignment(worker);
+  if (!assignmentEligibility.eligible) {
+    return {
+      available: false,
+      reason: assignmentEligibility.reason
+    };
+  }
+
   if (!worker?.isActive) {
     return {
       available: false,
@@ -300,7 +308,7 @@ export const isWorkerEligibleForAssignment = (worker) => {
     };
   }
 
-  if (worker.isFirstLogin === true) {
+  if (worker.isFirstLogin === true || worker.hasCustomPassword === false) {
     return {
       eligible: false,
       reason: 'Worker must sign in and change the system-generated password before taking bookings'

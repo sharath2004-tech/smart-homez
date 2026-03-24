@@ -768,7 +768,7 @@ router.post('/workers',
           monthlyWage: null,
           joinDate: new Date(),
           assignedApartments,
-          availability: true,
+          availability: false,
           serviceRadius: settings.booking.serviceRadius, // configurable walking distance in meters
           documents: {
             aadhaarFront: aadhaarFrontPath,

@@ -76,11 +76,10 @@ const emailShell = (headerTitle, bodyHtml) => `
 
 // Generate temporary password using cryptographically secure random bytes
 export const generateTemporaryPassword = () => {
-  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const lower = 'abcdefghijklmnopqrstuvwxyz';
-  const digits = '0123456789';
-  const special = '!@#$%^&*';
-  const all = upper + lower + digits + special;
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghijkmnopqrstuvwxyz';
+  const digits = '23456789';
+  const all = upper + lower + digits;
 
   // Rejection sampling for unbiased random index within [0, max)
   const randomIndex = (max) => {
@@ -97,8 +96,7 @@ export const generateTemporaryPassword = () => {
     upper[randomIndex(upper.length)],
     lower[randomIndex(lower.length)],
     digits[randomIndex(digits.length)],
-    special[randomIndex(special.length)],
-    ...Array.from({ length: 6 }, () => all[randomIndex(all.length)])
+    ...Array.from({ length: 7 }, () => all[randomIndex(all.length)])
   ];
 
   // Fisher-Yates shuffle using rejection-sampled random indices

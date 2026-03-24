@@ -702,7 +702,7 @@ router.get('/booked-slots', authenticate, async (req, res) => {
 
     // ── Fetch workers (include gender for breakdown) ──────────────────────────
     let workers = await User.find(workerQuery)
-      .select('_id gender isActive workerProfile.availability workerProfile.leaves workerProfile.workingTimeWindow')
+      .select('_id gender isActive isFirstLogin hasCustomPassword workerProfile.availability workerProfile.leaves workerProfile.workingTimeWindow')
       .lean();
 
     // If specialization mapping is too strict for current worker data,
@@ -712,12 +712,14 @@ router.get('/booked-slots', authenticate, async (req, res) => {
       const fallbackWithoutSpecialization = { ...workerQuery };
       delete fallbackWithoutSpecialization['workerProfile.specialization'];
       workers = await User.find(fallbackWithoutSpecialization)
-        .select('_id gender isActive workerProfile.availability workerProfile.leaves workerProfile.workingTimeWindow')
+        .select('_id gender isActive isFirstLogin hasCustomPassword workerProfile.availability workerProfile.leaves workerProfile.workingTimeWindow')
         .lean();
     }
 
+    const eligibleWorkers = workers.filter((worker) => isWorkerEligibleForAssignment(worker).eligible);
+
     // Remove workers on approved leave for this date
-    const leaveEligibleWorkers = workers.filter(worker => {
+    const leaveEligibleWorkers = eligibleWorkers.filter(worker => {
       if (!worker.workerProfile?.leaves?.length) return true;
       return !worker.workerProfile.leaves.some(leave => {
         if (leave.status !== 'approved') return false;

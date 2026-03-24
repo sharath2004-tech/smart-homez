@@ -2,6 +2,7 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
 import User from '../models/User.js';
+import { evaluateWorkerEffectiveAvailability } from '../utils/workerAvailability.js';
 
 const router = express.Router();
 
@@ -274,10 +275,33 @@ router.get('/available-workers',
       }
 
       const workers = await User.find(query)
-        .select('name gender phone workerProfile.rating workerProfile.totalReviews workerProfile.specialization workerProfile.experience')
+        .select('name gender phone isFirstLogin hasCustomPassword workerProfile.rating workerProfile.totalReviews workerProfile.specialization workerProfile.experience workerProfile.availability workerProfile.leaves workerProfile.workingTimeWindow')
         .limit(50);
 
-      res.json({ workers });
+      const workerEntries = await Promise.all(
+        workers.map(async (worker) => ({
+          worker,
+          effectiveAvailability: await evaluateWorkerEffectiveAvailability(worker)
+        }))
+      );
+
+      const availableWorkers = workerEntries
+        .filter(entry => entry.effectiveAvailability.effectiveAvailability)
+        .map(entry => {
+          const worker = entry.worker.toObject();
+          return {
+            ...worker,
+            workerProfile: {
+              ...worker.workerProfile,
+              availability: true,
+              manualAvailability: worker.workerProfile?.availability,
+              effectiveAvailability: true,
+              availabilityReason: null
+            }
+          };
+        });
+
+      res.json({ workers: availableWorkers });
     } catch (error) {
       console.error('Get available workers error:', error);
       res.status(500).json({ error: { message: 'Server error', status: 500 } });

@@ -4,7 +4,7 @@ import Booking from '../models/Booking.js';
 import Location from '../models/Location.js';
 import User from '../models/User.js';
 import { getWorkerPerformance } from '../utils/updateWorkerStats.js';
-import { evaluateWorkerEffectiveAvailability } from '../utils/workerAvailability.js';
+import { evaluateWorkerEffectiveAvailability, isWorkerEligibleForAssignment } from '../utils/workerAvailability.js';
 
 const router = express.Router();
 
@@ -149,6 +149,18 @@ router.put('/toggle-availability', authenticate, authorize('worker'), async (req
       return res.status(400).json({ 
         error: { message: 'Availability must be a boolean value', status: 400 } 
       });
+    }
+
+    if (availability === true) {
+      const eligibility = isWorkerEligibleForAssignment(req.user);
+      if (!eligibility.eligible) {
+        return res.status(403).json({
+          error: {
+            message: eligibility.reason,
+            status: 403
+          }
+        });
+      }
     }
 
     const worker = await User.findByIdAndUpdate(

@@ -443,6 +443,7 @@ router.post(
         password: temporaryPassword,
         temporaryPassword,
         isFirstLogin: true,
+        hasCustomPassword: false,
         phone,
         gender: gender || 'prefer_not_to_say',
         religion: religion || undefined,
@@ -458,7 +459,7 @@ router.post(
           dailyWage: null,
           monthlyWage: null,
           assignedApartments,
-          availability: true,
+          availability: false,
           serviceRadius: settings.booking.serviceRadius,
           documents: {
             aadhaarFront: aadhaarFrontPath,
