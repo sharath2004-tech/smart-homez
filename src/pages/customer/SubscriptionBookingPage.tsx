@@ -30,6 +30,16 @@ interface RecurringSchedule {
   pauseAllowed: boolean;
 }
 
+const addHoursToTime = (time: string, hours: number) => {
+  const [rawHours, rawMinutes] = time.split(':').map(Number);
+  const totalMinutes = (rawHours * 60) + rawMinutes + Math.round(hours * 60);
+  const normalizedMinutes = ((totalMinutes % (24 * 60)) + (24 * 60)) % (24 * 60);
+  const hoursPart = Math.floor(normalizedMinutes / 60);
+  const minutesPart = normalizedMinutes % 60;
+
+  return `${String(hoursPart).padStart(2, '0')}:${String(minutesPart).padStart(2, '0')}`;
+};
+
 export default function SubscriptionBookingPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -160,28 +170,34 @@ export default function SubscriptionBookingPage() {
       
       const userLocation = localStorage.getItem('userLocation');
       const location = userLocation ? JSON.parse(userLocation) : null;
-
-      const [endHour, endMinute] = [
-        parseInt(schedule.preferredTime.split(':')[0]) + Math.floor(schedule.duration),
-        parseInt(schedule.preferredTime.split(':')[1])
-      ];
+      const isSubscriptionBooking = selectedPlan !== 'oneTime';
+      const selectedDays = selectedPlan === 'weekly' ? (schedule.specificDays || []) : [];
 
       const bookingData = {
         service: service?._id,
         bookingDate: schedule.startDate,
         startTime: schedule.preferredTime,
-        endTime: `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`,
-        bookingType: selectedPlan,
+        endTime: addHoursToTime(schedule.preferredTime, schedule.duration),
+        bookingType: selectedPlan === 'oneTime' ? 'oneTime' : selectedPlan,
         serviceDetails: {
           duration: schedule.duration,
-          isSubscription: selectedPlan !== 'oneTime',
-          subscriptionEndDate: schedule.endDate,
-          specificDays: schedule.specificDays,
-          autoRenewal: schedule.autoRenewal,
-          pauseAllowed: schedule.pauseAllowed
+          sessionDurationHours: schedule.duration,
         },
         totalAmount: calculateTotalPrice(),
         estimatedDuration: schedule.duration * 60,
+        ...(isSubscriptionBooking && {
+          isSubscription: true,
+          subscriptionDetails: {
+            startDate: schedule.startDate,
+            endDate: schedule.endDate,
+            frequency: selectedPlan,
+            selectedDays,
+            preferredTime: schedule.preferredTime,
+            durationPerSession: schedule.duration,
+            autoRenewal: schedule.autoRenewal,
+            allowPause: schedule.pauseAllowed,
+          },
+        }),
         location: location ? {
           type: 'Point',
           coordinates: [location.lng, location.lat],

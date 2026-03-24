@@ -115,7 +115,7 @@ const occurrenceAlreadyExists = async (booking, occurrenceDate) => {
   }).select('_id').lean());
 };
 
-const resolveAssignedWorkerForOccurrence = async (booking, occurrenceDate) => {
+export const resolveAssignedWorkerForOccurrence = async (booking, occurrenceDate) => {
   const fixedWorkerId = booking.subscription?.fixedWorker || booking.worker?._id || booking.worker || null;
 
   if (fixedWorkerId) {

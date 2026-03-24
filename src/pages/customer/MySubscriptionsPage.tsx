@@ -29,7 +29,7 @@ interface Booking {
     startDate?: string;
     endDate?: string;
   };
-  worker: {
+  worker?: {
     _id: string;
     name: string;
     phone: string;
@@ -39,7 +39,7 @@ interface Booking {
       rating: number;
       completedBookings: number;
     };
-  };
+  } | null;
   service: {
     _id: string;
     name: string;
@@ -369,29 +369,37 @@ const MySubscriptionsPage = () => {
                         <UserCheck className="w-4 h-4 text-primary" />
                         Assigned Worker
                       </p>
-                      <button
-                        onClick={() => handleChangeWorkerClick(subscription)}
-                        className="text-xs text-primary hover:underline flex items-center gap-1"
-                      >
-                        <Edit2 className="w-3 h-3" />
-                        Change
-                      </button>
+                      {subscription.worker && (
+                        <button
+                          onClick={() => handleChangeWorkerClick(subscription)}
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                          Change
+                        </button>
+                      )}
                     </div>
                     <p className="text-[11px] text-muted-foreground mb-3">
                       After the first visit starts, you can request an admin-approved worker change for future visits.
                     </p>
-                    
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white font-bold">
-                        {subscription.worker.name.charAt(0).toUpperCase()}
+
+                    {subscription.worker ? (
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white font-bold">
+                          {subscription.worker.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-foreground">{subscription.worker.name}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-2 break-words">
+                            {subscription.worker.workerProfile.specialization} • ⭐ {subscription.worker.workerProfile.rating.toFixed(1)}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground">{subscription.worker.name}</p>
-                        <p className="text-xs text-muted-foreground line-clamp-2 break-words">
-                          {subscription.worker.workerProfile.specialization} • ⭐ {subscription.worker.workerProfile.rating.toFixed(1)}
-                        </p>
+                    ) : (
+                      <div className="rounded-lg bg-muted/60 px-3 py-3 text-sm text-muted-foreground">
+                        We’re assigning your worker for this cycle now. Their profile will show up here as soon as the schedule is locked.
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
 
@@ -499,7 +507,7 @@ const MySubscriptionsPage = () => {
                       ) : (
                         <div className="space-y-3 mb-6">
                           {availableWorkers
-                            .filter(w => w._id !== subscription.worker._id)
+                            .filter(w => w._id !== subscription.worker?._id)
                             .map((worker) => (
                               <button
                                 key={worker._id}

@@ -175,6 +175,11 @@ const bookingSchema = new mongoose.Schema({
       default: false
     },
     subscriptionId: String,
+    renewedFrom: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Booking',
+      default: null
+    },
     subscriptionStartDate: Date,
     subscriptionEndDate: Date,
     autoRenewal: {
