@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 interface ImageCropDialogProps {
   open: boolean;

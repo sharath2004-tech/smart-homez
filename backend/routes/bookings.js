@@ -28,7 +28,6 @@ import { checkIfOnTime, updateWorkerStats } from '../utils/updateWorkerStats.js'
 import { assignWorkerToBooking, reassignWorker } from '../utils/workerAssignment.js';
 import {
     getWorkerBlockedTimeRanges,
-    getWorkerOperationalAvailabilityFromBookings,
     isWorkerAvailableForTimeRange,
     isWorkerEligibleForAssignment
 } from '../utils/workerAvailability.js';
