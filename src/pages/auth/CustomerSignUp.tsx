@@ -11,7 +11,7 @@ import {
     Navigation,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-  import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 // Google OAuth types (will be used once @react-oauth/google is installed)
 declare global {

@@ -16,6 +16,7 @@ import {
     checkBackupActivationNeeded
 } from '../utils/advancedWorkerAssignment.js';
 import { processQueuedBookings, updateBookingStatuses } from '../utils/bookingStatusUpdater.js';
+import { calculateDistance } from '../utils/geolocation.js';
 import notificationService from '../utils/notificationService.js';
 import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
 import { checkSlotAvailability } from '../utils/slotManagement.js';
@@ -32,7 +33,6 @@ import {
     getWorkerCapacityStatus,
     monitorWorkerPool
 } from '../utils/workerPoolManager.js';
-import { calculateDistance } from '../utils/geolocation.js';
 
 const router = express.Router();
 
