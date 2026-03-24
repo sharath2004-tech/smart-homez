@@ -1884,135 +1884,129 @@ const AdminWorkers = () => {
                       </div>
                     </div>
 
-                    {/* Credentials Section (Super Admin Only) */}
-                    (
-                      <div className="border border-amber-200 bg-amber-50/50 rounded-xl p-4 space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <AlertTriangle className="w-4 h-4 text-amber-600" />
-                            <h3 className="text-sm font-semibold text-amber-900">Worker Credentials</h3>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setShowCredentials(!showCredentials)}
-                            className="text-xs text-amber-700 hover:text-amber-900 underline flex items-center gap-1"
-                          >
-                            {showCredentials ? (
-                              <>
-                                <EyeOff className="w-3 h-3" />
-                                Hide
-                              </>
-                            ) : (
-                              <>
-                                <Eye className="w-3 h-3" />
-                                Show Credentials
-                              </>
-                            )}
-                          </button>
+                    {/* Credentials Section */}
+                    <div className="border border-amber-200 bg-amber-50/50 rounded-xl p-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-amber-600" />
+                          <h3 className="text-sm font-semibold text-amber-900">Worker Credentials</h3>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowCredentials(!showCredentials)}
+                          className="text-xs text-amber-700 hover:text-amber-900 underline flex items-center gap-1"
+                        >
+                          {showCredentials ? (
+                            <>
+                              <EyeOff className="w-3 h-3" />
+                              Hide
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="w-3 h-3" />
+                              Show Credentials
+                            </>
+                          )}
+                        </button>
+                      </div>
 
-                        {showCredentials && (
-                          <div className="space-y-3 pt-2">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-xs font-medium text-amber-900 mb-1">Email</label>
-                                <div className="relative">
-                                  <input
-                                    type="text"
-                                    value={editWorker.email}
-                                    readOnly
-                                    className="input-clean bg-white text-sm font-mono"
-                                  />
+                      {showCredentials && (
+                        <div className="space-y-3 pt-2">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs font-medium text-amber-900 mb-1">Email</label>
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  value={editWorker.email}
+                                  readOnly
+                                  className="input-clean bg-white text-sm font-mono"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(editWorker.email);
+                                    alert('Email copied to clipboard!');
+                                  }}
+                                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-amber-700 hover:text-amber-900"
+                                >
+                                  Copy
+                                </button>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-amber-900 mb-1">Phone</label>
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  value={editWorker.phone || 'Not provided'}
+                                  readOnly
+                                  className="input-clean bg-white text-sm font-mono"
+                                />
+                                {editWorker.phone && (
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      navigator.clipboard.writeText(editWorker.email);
-                                      alert('Email copied to clipboard!');
+                                      navigator.clipboard.writeText(editWorker.phone || '');
+                                      alert('Phone copied to clipboard!');
                                     }}
                                     className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-amber-700 hover:text-amber-900"
                                   >
                                     Copy
                                   </button>
-                                </div>
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-amber-900 mb-1">Phone</label>
-                                <div className="relative">
-                                  <input
-                                    type="text"
-                                    value={editWorker.phone || 'Not provided'}
-                                    readOnly
-                                    className="input-clean bg-white text-sm font-mono"
-                                  />
-                                  {editWorker.phone && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        navigator.clipboard.writeText(editWorker.phone || '');
-                                        alert('Phone copied to clipboard!');
-                                      }}
-                                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-amber-700 hover:text-amber-900"
-                                    >
-                                      Copy
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="pt-2 border-t border-amber-200">
-                              <p className="text-xs text-amber-800 mb-3">
-                                <Info className="w-3 h-3 inline mr-1" />
-                                Use these credentials for troubleshooting or account recovery
-                              </p>
-
-                              {tempPassword && (
-                                <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                                  <p className="text-xs font-semibold text-green-900 mb-1">New Temporary Password Generated:</p>
-                                  <div className="flex items-center gap-2">
-                                    <code className="text-sm font-mono text-green-700 bg-white px-2 py-1 rounded">{tempPassword}</code>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        navigator.clipboard.writeText(tempPassword);
-                                        alert('Password copied to clipboard!');
-                                      }}
-                                      className="text-xs text-green-700 hover:text-green-900 underline"
-                                    >
-                                      Copy
-                                    </button>
-                                  </div>
-                                  <p className="text-xs text-green-700 mt-2">Share this with the worker securely. They must change it on first login.</p>
-                                </div>
-                              )}
-
-                              <button
-                                type="button"
-                                onClick={handleResetWorkerPassword}
-                                disabled={resettingPassword}
-                                className="w-full py-2 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                              >
-                                {resettingPassword ? (
-                                  <>
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                    Resetting...
-                                  </>
-                                ) : (
-                                  <>
-                                    <AlertTriangle className="w-3 h-3" />
-                                    Reset Worker Password
-                                  </>
                                 )}
-                              </button>
+                              </div>
                             </div>
-                                onClick={() => {
-                                  setEditWorker(null);
-                                  setShowCredentials(false);
-                                  setTempPassword(null);
-                                }}
-                        )}
-                      </div>
-                    )}
+                          </div>
+
+                          <div className="pt-2 border-t border-amber-200">
+                            <p className="text-xs text-amber-800 mb-3">
+                              <Info className="w-3 h-3 inline mr-1" />
+                              Use these credentials for troubleshooting or account recovery
+                            </p>
+
+                            {tempPassword && (
+                              <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                <p className="text-xs font-semibold text-green-900 mb-1">New Temporary Password Generated:</p>
+                                <div className="flex items-center gap-2">
+                                  <code className="text-sm font-mono text-green-700 bg-white px-2 py-1 rounded">{tempPassword}</code>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(tempPassword);
+                                      alert('Password copied to clipboard!');
+                                    }}
+                                    className="text-xs text-green-700 hover:text-green-900 underline"
+                                  >
+                                    Copy
+                                  </button>
+                                </div>
+                                <p className="text-xs text-green-700 mt-2">Share this with the worker securely. They must change it on first login.</p>
+                              </div>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={handleResetWorkerPassword}
+                              disabled={resettingPassword}
+                              className="w-full py-2 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                              {resettingPassword ? (
+                                <>
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                  Resetting...
+                                </>
+                              ) : (
+                                <>
+                                  <AlertTriangle className="w-3 h-3" />
+                                  Reset Worker Password
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
                     {/* Documents */}
                     <div className="space-y-4">
@@ -2039,7 +2033,11 @@ const AdminWorkers = () => {
                               </span>
                             </button>
                           </div>
-
+                              onClick={() => {
+                                setEditWorker(null);
+                                setShowCredentials(false);
+                                setTempPassword(null);
+                              }}
                           <div className="rounded-xl border border-dashed border-border p-3">
                             <label className="block text-sm font-medium mb-2">Update Aadhaar Front</label>
                             <input
