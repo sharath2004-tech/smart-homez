@@ -528,7 +528,7 @@ serviceSchema.pre('validate', function(next) {
 // Session counts and discount rates per plan (Urban Company model)
 // Higher frequency = higher commitment = better per-session discount
 const PLAN_CONFIG = {
-  daily:     { sessionsPerMonth: 26, discountPercentage: 30 }, // 6 days/week × ~4.3 weeks
+  daily:     { sessionsPerMonth: 30, discountPercentage: 30 }, // Daily plan = 30 visits/month
   'bi-weekly': { sessionsPerMonth: 8,  discountPercentage: 20 }, // 2 days/week × 4 weeks
   weekly:    { sessionsPerMonth: 4,  discountPercentage: 15 }, // 1 day/week × 4 weeks
   monthly:   { sessionsPerMonth: 1,  discountPercentage: 5  }  // single session
@@ -544,7 +544,7 @@ serviceSchema.pre('save', function(next) {
   if (!this.pricingPlans || !this.pricingPlans.oneTime) {
     this.pricingPlans = {
       oneTime: p,
-      daily:   Math.round(p * (1 - 0.30) * 26), // 30% off × 26 sessions
+      daily:   Math.round(p * (1 - 0.30) * 30), // 30% off × 30 sessions
       weekly:  Math.round(p * (1 - 0.15) * 4),  // 15% off × 4 sessions
       monthly: Math.round(p * (1 - 0.05) * 1)   // 5% off × 1 session
     };

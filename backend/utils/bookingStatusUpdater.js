@@ -1,6 +1,173 @@
 import Booking from '../models/Booking.js';
+import User from '../models/User.js';
 import { assignWorkersWithBackup } from './advancedWorkerAssignment.js';
 import notificationService from './notificationService.js';
+import { checkSlotAvailability } from './slotManagement.js';
+
+const DAY_INDEX_BY_NAME = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6
+};
+
+const startOfDay = (value) => {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const addDays = (value, days) => {
+  const date = startOfDay(value);
+  date.setDate(date.getDate() + days);
+  return date;
+};
+
+const sameDay = (left, right) => startOfDay(left).getTime() === startOfDay(right).getTime();
+
+const findNextSelectedDay = (fromDate, selectedDays = []) => {
+  const allowedDayIndexes = selectedDays
+    .map(day => DAY_INDEX_BY_NAME[String(day || '').toLowerCase()])
+    .filter(day => Number.isInteger(day));
+
+  if (allowedDayIndexes.length === 0) {
+    return addDays(fromDate, 7);
+  }
+
+  for (let offset = 1; offset <= 14; offset += 1) {
+    const candidate = addDays(fromDate, offset);
+    if (allowedDayIndexes.includes(candidate.getDay())) {
+      return candidate;
+    }
+  }
+
+  return addDays(fromDate, 7);
+};
+
+const resolveScheduleEndDate = (booking) => {
+  if (booking.recurringSchedule?.endDate) {
+    return startOfDay(booking.recurringSchedule.endDate);
+  }
+
+  if (booking.subscription?.subscriptionEndDate) {
+    return startOfDay(booking.subscription.subscriptionEndDate);
+  }
+
+  if (booking.subscription?.isSubscription && booking.recurringSchedule?.frequency === 'monthly') {
+    return addDays(booking.recurringSchedule?.startDate || booking.bookingDate, 29);
+  }
+
+  return null;
+};
+
+const getNextScheduledDate = (booking, currentDate) => {
+  const frequency = String(booking.recurringSchedule?.frequency || '').toLowerCase();
+  const selectedDays = booking.recurringSchedule?.selectedDays || [];
+  const isMonthlyDailySubscription = booking.subscription?.isSubscription && frequency === 'monthly';
+
+  if (isMonthlyDailySubscription || frequency === 'daily') {
+    return addDays(currentDate, 1);
+  }
+
+  if (frequency === 'weekly') {
+    return selectedDays.length > 0
+      ? findNextSelectedDay(currentDate, selectedDays)
+      : addDays(currentDate, 7);
+  }
+
+  if (frequency === 'biweekly') {
+    return addDays(currentDate, 14);
+  }
+
+  if (frequency === '3-days' || frequency === 'alt-days') {
+    return selectedDays.length > 0
+      ? findNextSelectedDay(currentDate, selectedDays)
+      : addDays(currentDate, 2);
+  }
+
+  if (frequency === 'monthly') {
+    const nextDate = startOfDay(currentDate);
+    nextDate.setMonth(nextDate.getMonth() + 1);
+    return nextDate;
+  }
+
+  return addDays(currentDate, 1);
+};
+
+const occurrenceAlreadyExists = async (booking, occurrenceDate) => {
+  if (sameDay(booking.bookingDate, occurrenceDate)) {
+    return true;
+  }
+
+  const endOfOccurrenceDate = startOfDay(occurrenceDate);
+  endOfOccurrenceDate.setHours(23, 59, 59, 999);
+
+  return Boolean(await Booking.findOne({
+    parentBooking: booking._id,
+    bookingDate: { $gte: startOfDay(occurrenceDate), $lte: endOfOccurrenceDate },
+    startTime: booking.startTime,
+    status: { $ne: 'cancelled' }
+  }).select('_id').lean());
+};
+
+const resolveAssignedWorkerForOccurrence = async (booking, occurrenceDate) => {
+  const fixedWorkerId = booking.subscription?.fixedWorker || booking.worker?._id || booking.worker || null;
+
+  if (fixedWorkerId) {
+    const workerDoc = await User.findById(fixedWorkerId)
+      .select('isActive workerProfile.availability workerProfile.leaves workerProfile.workingTimeWindow');
+
+    if (workerDoc?.isActive && workerDoc.workerProfile?.availability) {
+      const slotAvailability = await checkSlotAvailability(
+        fixedWorkerId,
+        occurrenceDate,
+        booking.startTime,
+        booking.endTime,
+        Booking,
+        15
+      );
+
+      if (slotAvailability.available) {
+        return {
+          worker: fixedWorkerId,
+          backupWorkers: [],
+          assignmentMethod: booking.assignmentMethod || 'manual',
+          status: 'confirmed'
+        };
+      }
+    }
+  }
+
+  const assignmentResult = await assignWorkersWithBackup({
+    customerId: booking.customer._id || booking.customer,
+    service: booking.service?._id || booking.service,
+    bookingDate: occurrenceDate,
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+    location: booking.location,
+    bookingType: booking.bookingType,
+    preferences: booking.preferences || {}
+  });
+
+  if (assignmentResult.success) {
+    return {
+      worker: assignmentResult.primaryWorker,
+      backupWorkers: assignmentResult.backupWorkers || [],
+      assignmentMethod: assignmentResult.assignmentMethod,
+      status: 'confirmed'
+    };
+  }
+
+  return {
+    worker: null,
+    backupWorkers: [],
+    assignmentMethod: booking.assignmentMethod || 'auto',
+    status: 'pending'
+  };
+};
 
 /**
  * Update booking statuses based on current time
@@ -107,7 +274,8 @@ export const scheduleRecurringBookings = async () => {
     const recurringBookings = await Booking.find({
       isRecurring: true,
       'recurringSchedule.nextScheduledDate': { $lte: now },
-      status: { $ne: 'cancelled' }
+      status: { $ne: 'cancelled' },
+      'subscription.isPaused': { $ne: true }
     }).populate('service customer worker');
 
     for (const booking of recurringBookings) {
@@ -117,42 +285,56 @@ export const scheduleRecurringBookings = async () => {
         continue;
       }
 
-      // Create next occurrence
-      const nextBooking = new Booking({
-        customer: booking.customer._id,
-        worker: booking.worker?._id,
-        service: booking.service._id,
-        bookingDate: booking.recurringSchedule.nextScheduledDate,
-        startTime: booking.startTime,
-        endTime: booking.endTime,
-        totalAmount: booking.totalAmount,
-        location: booking.location,
-        bookingType: booking.bookingType,
-        isRecurring: false,
-        parentBooking: booking._id,
-        assignmentMethod: booking.assignmentMethod,
-        preferences: booking.preferences
-      });
+      const occurrenceDate = startOfDay(booking.recurringSchedule.nextScheduledDate);
+      const scheduleEndDate = resolveScheduleEndDate(booking);
+      const nextDate = getNextScheduledDate(booking, occurrenceDate);
 
-      await nextBooking.save();
-
-      // Update parent booking's next scheduled date
-      const frequency = booking.recurringSchedule.frequency;
-      let nextDate = new Date(booking.recurringSchedule.nextScheduledDate);
-      
-      if (frequency === 'daily') {
-        nextDate.setDate(nextDate.getDate() + 1);
-      } else if (frequency === 'weekly') {
-        nextDate.setDate(nextDate.getDate() + 7);
-      } else if (frequency === 'monthly') {
-        nextDate.setMonth(nextDate.getMonth() + 1);
+      if (scheduleEndDate && occurrenceDate > scheduleEndDate) {
+        booking.recurringSchedule.nextScheduledDate = null;
+        await booking.save();
+        continue;
       }
 
-      booking.recurringSchedule.nextScheduledDate = nextDate;
+      const alreadyExists = await occurrenceAlreadyExists(booking, occurrenceDate);
+
+      if (!alreadyExists) {
+        const assignment = await resolveAssignedWorkerForOccurrence(booking, occurrenceDate);
+        const timestamps = assignment.worker
+          ? { assignedAt: new Date(), confirmedAt: new Date() }
+          : {};
+
+        const nextBooking = new Booking({
+          customer: booking.customer._id,
+          worker: assignment.worker || undefined,
+          backupWorkers: assignment.backupWorkers || [],
+          service: booking.service._id,
+          bookingDate: occurrenceDate,
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          totalAmount: booking.totalAmount,
+          location: booking.location,
+          bookingType: booking.bookingType,
+          isRecurring: false,
+          parentBooking: booking._id,
+          assignmentMethod: assignment.assignmentMethod,
+          preferences: booking.preferences,
+          scheduledDurationMinutes: booking.scheduledDurationMinutes,
+          serviceDetails: booking.serviceDetails,
+          slotDetails: booking.slotDetails,
+          workforce: booking.workforce,
+          status: assignment.status,
+          ...timestamps
+        });
+
+        await nextBooking.save();
+        console.log(`Created recurring booking ${nextBooking._id} from parent ${booking._id}`);
+      }
+
+      booking.recurringSchedule.nextScheduledDate = scheduleEndDate && nextDate > scheduleEndDate
+        ? null
+        : nextDate;
       booking.recurringSchedule.completedOccurrences += 1;
       await booking.save();
-
-      console.log(`Created recurring booking ${nextBooking._id} from parent ${booking._id}`);
     }
 
     return {

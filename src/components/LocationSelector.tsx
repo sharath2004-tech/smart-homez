@@ -46,6 +46,14 @@ interface Props {
   unavailableConfirmLabel?: string;
 }
 
+interface SearchResult {
+  id: string;
+  label: string;
+  secondaryLabel?: string;
+  lat: number;
+  lng: number;
+}
+
 const LocationSelector = ({
   onLocationConfirmed,
   onClose,
@@ -63,6 +71,7 @@ const LocationSelector = ({
     defaultLocation || null
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isLoadingGPS, setIsLoadingGPS] = useState(false);
   const [availabilityInfo, setAvailabilityInfo] = useState<{
@@ -219,6 +228,11 @@ const LocationSelector = ({
     checkAvailability(lat, lng);
   };
 
+  const focusServiceArea = (area: ServiceArea) => {
+    setSearchQuery(`${area.name}, ${area.city}`);
+    handleMapClick(area.coordinates.lat, area.coordinates.lng);
+  };
+
   const checkAvailability = async (lat: number, lng: number) => {
     try {
       const response = await fetch(`${API_BASE_URL}/service-areas/validate`, {
@@ -289,23 +303,50 @@ const LocationSelector = ({
     setIsSearching(true);
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&addressdetails=1&limit=1`
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&addressdetails=1&limit=5`
       );
       const results = await response.json();
 
       if (results && results.length > 0) {
-        const result = results[0];
-        const lat = parseFloat(result.lat);
-        const lng = parseFloat(result.lon);
-        handleMapClick(lat, lng);
+        const mappedResults = results.map((result: any, index: number) => ({
+          id: `${result.place_id || index}`,
+          label: result.display_name?.split(',').slice(0, 2).join(', ') || searchQuery,
+          secondaryLabel: result.display_name,
+          lat: parseFloat(result.lat),
+          lng: parseFloat(result.lon),
+        }));
+
+        setSearchResults(mappedResults);
+        const firstResult = mappedResults[0];
+        handleMapClick(firstResult.lat, firstResult.lng);
       } else {
+        setSearchResults([]);
         alert("Address not found. Please try a different search or select on the map.");
       }
     } catch (error) {
       console.error("Search error:", error);
+      setSearchResults([]);
       alert("Search failed. Please try again or select manually on the map.");
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handleSearchResultSelect = (result: SearchResult) => {
+    setSearchQuery(result.label);
+    setSearchResults([]);
+    handleMapClick(result.lat, result.lng);
+  };
+
+  const handleNearestAreaJump = () => {
+    if (!availabilityInfo?.nearestArea) return;
+
+    const normalizedNearest = availabilityInfo.nearestArea.name.trim().toLowerCase();
+    const matchingArea = serviceAreas.find((area) => area.name.trim().toLowerCase() === normalizedNearest)
+      || serviceAreas[0];
+
+    if (matchingArea) {
+      focusServiceArea(matchingArea);
     }
   };
 
@@ -370,11 +411,33 @@ const LocationSelector = ({
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                if (!e.target.value.trim()) {
+                  setSearchResults([]);
+                }
+              }}
               onKeyDown={(e) => e.key === "Enter" && handleSearchAddress()}
               placeholder="Search address (e.g., Andheri West, Mumbai)"
               className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             />
+            {searchResults.length > 0 && (
+              <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[1200] rounded-xl border border-border bg-card shadow-xl overflow-hidden">
+                {searchResults.map((result) => (
+                  <button
+                    key={result.id}
+                    type="button"
+                    onClick={() => handleSearchResultSelect(result)}
+                    className="w-full px-3 py-2.5 text-left hover:bg-muted transition-colors border-b last:border-b-0 border-border"
+                  >
+                    <div className="text-sm font-medium text-foreground">{result.label}</div>
+                    {result.secondaryLabel && (
+                      <div className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{result.secondaryLabel}</div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <button
             onClick={handleSearchAddress}
@@ -397,6 +460,24 @@ const LocationSelector = ({
         <p className="text-xs text-muted-foreground text-center">
           Tap on the map or drag the pin to set your exact location
         </p>
+
+        {serviceAreas.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-foreground">Quick jump to a service area</p>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {serviceAreas.slice(0, 8).map((area) => (
+                <button
+                  key={area.id}
+                  type="button"
+                  onClick={() => focusServiceArea(area)}
+                  className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-100 transition-colors"
+                >
+                  {area.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Map Container */}
@@ -454,9 +535,19 @@ const LocationSelector = ({
                     {availabilityInfo.message}
                   </p>
                   {availabilityInfo.nearestArea && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Nearest service area: <strong>{availabilityInfo.nearestArea.name}</strong> ({availabilityInfo.nearestArea.distance.toFixed(1)} km away)
-                    </p>
+                    <div className="mt-2 space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        Nearest service area: <strong>{availabilityInfo.nearestArea.name}</strong> ({availabilityInfo.nearestArea.distance.toFixed(1)} km away)
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleNearestAreaJump}
+                        className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 hover:bg-amber-100 transition-colors"
+                      >
+                        <MapPin className="w-3.5 h-3.5" />
+                        Move pin to nearest service area
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

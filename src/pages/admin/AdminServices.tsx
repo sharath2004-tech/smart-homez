@@ -46,6 +46,7 @@ interface Service {
     isDefault?: boolean;
   }>;
   subscriptionOptions?: {
+    enabled?: boolean;
     allowedFrequencies?: string[];
     requiresSameWorker?: boolean;
     minContractMonths?: number;
@@ -265,14 +266,28 @@ const AdminServices = () => {
   const hasChanged = (nextValue: unknown, previousValue: unknown) =>
     JSON.stringify(nextValue ?? null) !== JSON.stringify(previousValue ?? null);
 
-  const buildServicePayload = (serviceData: Service) => ({
-    ...serviceData,
-    serviceType: serviceData.serviceType || 'other',
-    durationOptions: (serviceData.durationOptions || []).map((tier) => {
-      const { _priceMode, ...cleanTier } = tier as Record<string, unknown>;
-      return cleanTier;
-    }),
-  });
+  const isSubscriptionServiceType = formData.serviceType === 'monthly_subscription';
+
+  const buildServicePayload = (serviceData: Service) => {
+    const isSubscriptionService = serviceData.serviceType === 'monthly_subscription';
+
+    return {
+      ...serviceData,
+      serviceType: serviceData.serviceType || 'other',
+      subscriptionPlans: isSubscriptionService ? (serviceData.subscriptionPlans || []) : [],
+      subscriptionOptions: {
+        ...(serviceData.subscriptionOptions || {}),
+        enabled: isSubscriptionService,
+        allowedFrequencies: isSubscriptionService
+          ? (serviceData.subscriptionOptions?.allowedFrequencies || ['daily', 'alt-days', '3-days', 'weekly'])
+          : [],
+      },
+      durationOptions: (serviceData.durationOptions || []).map((tier) => {
+        const { _priceMode, ...cleanTier } = tier as Record<string, unknown>;
+        return cleanTier;
+      }),
+    };
+  };
 
   useEffect(() => {
     fetchData();
@@ -378,7 +393,7 @@ const AdminServices = () => {
           }
 
           const payloadRecord = payload as Record<string, unknown>;
-          const originalServiceRecord = originalService as Record<string, unknown>;
+          const originalServiceRecord = originalService as unknown as Record<string, unknown>;
 
           const approvalPayload: Record<string, unknown> = {};
           if (hasChanged(payload.price, originalService.price)) approvalPayload.price = payload.price;
@@ -1067,7 +1082,22 @@ const AdminServices = () => {
                   <select
                     value={formData.serviceType || 'other'}
                     onChange={(e) => {
-                      setFormData(prev => ({ ...prev, serviceType: e.target.value }));
+                      const nextServiceType = e.target.value;
+                      const isSubscription = nextServiceType === 'monthly_subscription';
+                      setFormData(prev => ({
+                        ...prev,
+                        serviceType: nextServiceType,
+                        subscriptionOptions: {
+                          ...(prev.subscriptionOptions || {}),
+                          enabled: isSubscription,
+                          allowedFrequencies: isSubscription
+                            ? (prev.subscriptionOptions?.allowedFrequencies?.length
+                                ? prev.subscriptionOptions.allowedFrequencies
+                                : ['daily', 'alt-days', '3-days', 'weekly'])
+                            : [],
+                        },
+                        subscriptionPlans: isSubscription ? (prev.subscriptionPlans || []) : [],
+                      }));
                     }}
                     className="input-clean"
                     required
@@ -1208,6 +1238,7 @@ const AdminServices = () => {
                 </div>
 
                 {/* Subscription Plans Section */}
+                {isSubscriptionServiceType ? (
                 <div className="space-y-3 p-4 bg-gradient-to-br from-primary/5 to-accent/5 rounded-lg border-2 border-primary/20">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1507,6 +1538,14 @@ const AdminServices = () => {
                     </div>
                   )}
                 </div>
+                ) : (
+                <div className="space-y-2 p-4 rounded-lg border border-dashed border-border bg-muted/30">
+                  <label className="block text-sm font-medium text-foreground">Subscription plans</label>
+                  <p className="text-xs text-muted-foreground">
+                    Select <strong>Monthly Subscription</strong> as the service type to configure subscription plans and customer booking frequencies.
+                  </p>
+                </div>
+                )}
 
                 {/* Additional Services Section */}
                 <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
@@ -1712,6 +1751,7 @@ const AdminServices = () => {
                   </div>
 
                 {/* ── Subscription Booking Options ── */}
+                {isSubscriptionServiceType && (
                 <div className="space-y-3 p-4 bg-purple-50/60 border border-purple-300 rounded-lg">
                     <div>
                       <label className="block text-sm font-medium text-foreground">🔄 Subscription Booking Options</label>
@@ -1723,7 +1763,7 @@ const AdminServices = () => {
                       <p className="text-xs font-semibold text-foreground mb-2">Allowed Frequencies</p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {[
-                          { id: 'daily',    label: '📆 Daily',      desc: 'Mon–Sat · 26 visits/mo' },
+                          { id: 'daily',    label: '📆 Daily',      desc: 'Every day · 30 visits/mo' },
                           { id: 'alt-days', label: '📅 Alt Days',   desc: 'Mon/Wed/Fri · 13 visits/mo' },
                           { id: '3-days',   label: '🗓️ 3× Week',   desc: 'Any 3 days · ~12 visits/mo' },
                           { id: 'weekly',   label: '📋 Weekly',     desc: 'Once a week · 4 visits/mo' },
@@ -1781,6 +1821,7 @@ const AdminServices = () => {
                       </label>
                     </div>
                   </div>
+                )}
 
 
                 {isSuperAdmin && (

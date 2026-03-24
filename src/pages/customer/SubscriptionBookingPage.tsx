@@ -116,7 +116,7 @@ export default function SubscriptionBookingPage() {
     
     // For subscriptions, estimate monthly cost
     if (selectedPlan === 'daily') {
-      totalPrice = totalPrice * 30; // 30 days
+      totalPrice = totalPrice * 30; // 30 visits / 30 days
     } else if (selectedPlan === 'weekly') {
       totalPrice = totalPrice * (schedule.specificDays?.length || 1) * 4; // 4 weeks
     } else if (selectedPlan === 'biweekly') {

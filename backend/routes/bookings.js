@@ -7,6 +7,7 @@ import BusinessHours from '../models/BusinessHours.js';
 import Location from '../models/Location.js';
 import Service from '../models/Service.js';
 import Settings from '../models/Settings.js';
+import SubscriptionWorkerChangeRequest from '../models/SubscriptionWorkerChangeRequest.js';
 import User from '../models/User.js';
 import WorkerEarnings from '../models/WorkerEarnings.js';
 import {
@@ -33,6 +34,16 @@ import {
 } from '../utils/workerPoolManager.js';
 
 const router = express.Router();
+
+const DAY_INDEX_BY_NAME = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6
+};
 
 const findDeepCleaningServiceFallback = async () => {
   const directMatch = await Service.findOne({
@@ -122,6 +133,122 @@ const addMinutesToTimeString = (startTime, durationMinutes) => {
   }
 
   return minutesToTimeString(startMinutes + durationMinutes);
+};
+
+const startOfDay = (value) => {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const addDaysToDate = (value, days) => {
+  const date = startOfDay(value);
+  date.setDate(date.getDate() + days);
+  return date;
+};
+
+const findNextSelectedDay = (fromDate, selectedDays = []) => {
+  const allowedDayIndexes = selectedDays
+    .map(day => DAY_INDEX_BY_NAME[String(day || '').toLowerCase()])
+    .filter(day => Number.isInteger(day));
+
+  if (allowedDayIndexes.length === 0) {
+    return addDaysToDate(fromDate, 7);
+  }
+
+  for (let offset = 1; offset <= 14; offset += 1) {
+    const candidate = addDaysToDate(fromDate, offset);
+    if (allowedDayIndexes.includes(candidate.getDay())) {
+      return candidate;
+    }
+  }
+
+  return addDaysToDate(fromDate, 7);
+};
+
+const resolveDefaultSubscriptionEndDate = (frequency, startDate, explicitEndDate = null) => {
+  if (explicitEndDate) {
+    return new Date(explicitEndDate);
+  }
+
+  if (String(frequency || '').toLowerCase() === 'monthly') {
+    return addDaysToDate(startDate, 29);
+  }
+
+  return null;
+};
+
+const getNextRecurringScheduleDate = ({ frequency, startDate, selectedDays = [], isSubscription = false }) => {
+  const normalizedFrequency = String(frequency || '').toLowerCase();
+
+  if ((isSubscription && normalizedFrequency === 'monthly') || normalizedFrequency === 'daily') {
+    return addDaysToDate(startDate, 1);
+  }
+
+  if (normalizedFrequency === 'weekly') {
+    return selectedDays.length > 0
+      ? findNextSelectedDay(startDate, selectedDays)
+      : addDaysToDate(startDate, 7);
+  }
+
+  if (normalizedFrequency === 'biweekly') {
+    return addDaysToDate(startDate, 14);
+  }
+
+  if (normalizedFrequency === '3-days' || normalizedFrequency === 'alt-days') {
+    return selectedDays.length > 0
+      ? findNextSelectedDay(startDate, selectedDays)
+      : addDaysToDate(startDate, 2);
+  }
+
+  if (normalizedFrequency === 'monthly') {
+    const nextDate = startOfDay(startDate);
+    nextDate.setMonth(nextDate.getMonth() + 1);
+    return nextDate;
+  }
+
+  return addDaysToDate(startDate, 1);
+};
+
+const getBookingScheduledStartDateTime = (booking) => {
+  const scheduledStart = new Date(booking.bookingDate);
+  const [hours, minutes] = (booking.startTime || '00:00').split(':').map(Number);
+  scheduledStart.setHours(hours || 0, minutes || 0, 0, 0);
+  return scheduledStart;
+};
+
+const getSubscriptionRootBookingId = (booking) => booking.parentBooking || booking._id;
+
+const notifySubscriptionWorkerChangeAdmins = async (booking, requestedWorker, requestedBy, reason = '') => {
+  const adminFilter = { role: { $in: ['admin', 'super_admin'] }, isActive: true };
+
+  const admins = await User.find(adminFilter).select('_id adminProfile.assignedLocations role').lean();
+  const bookingLocationId = booking.location?.locationId?.toString?.() || null;
+
+  const relevantAdmins = admins.filter(admin => {
+    if (admin.role === 'super_admin') return true;
+    const assignedLocationIds = (admin.adminProfile?.assignedLocations || [])
+      .map(location => location.locationId?.toString())
+      .filter(Boolean);
+
+    if (!bookingLocationId) return true;
+    if (assignedLocationIds.length === 0) return false;
+    return assignedLocationIds.includes(bookingLocationId);
+  });
+
+  await Promise.all(relevantAdmins.map(admin => notificationService.sendNotification({
+    userId: admin._id,
+    type: 'system',
+    title: 'Subscription worker change request',
+    message: `${requestedBy.name || 'A customer'} requested ${requestedWorker.name} for subscription ${booking.service?.name || booking._id}.`,
+    priority: 'high',
+    data: {
+      bookingId: booking._id,
+      requestedWorkerId: requestedWorker._id,
+      requestedBy: requestedBy._id,
+      reason
+    }
+  })));
 };
 
 const getTimeWindowMinutes = (startTime, endTime) => {
@@ -1169,10 +1296,23 @@ router.post('/',
 
       // Add subscription details if it's a subscription booking
       if (isSubscription && subscriptionDetails) {
+        const normalizedSubscriptionStartDate = new Date(subscriptionDetails.startDate);
+        const resolvedSubscriptionEndDate = resolveDefaultSubscriptionEndDate(
+          subscriptionDetails.frequency || bookingType,
+          normalizedSubscriptionStartDate,
+          subscriptionDetails.endDate || null
+        );
+        const initialNextScheduledDate = getNextRecurringScheduleDate({
+          frequency: subscriptionDetails.frequency || bookingType,
+          startDate: normalizedSubscriptionStartDate,
+          selectedDays: subscriptionDetails.selectedDays || [],
+          isSubscription: true
+        });
+
         bookingData.subscription = {
           isSubscription: true,
-          subscriptionStartDate: new Date(subscriptionDetails.startDate),
-          subscriptionEndDate: subscriptionDetails.endDate ? new Date(subscriptionDetails.endDate) : null,
+          subscriptionStartDate: normalizedSubscriptionStartDate,
+          subscriptionEndDate: resolvedSubscriptionEndDate,
           autoRenewal: subscriptionDetails.autoRenewal || false,
           allowPause: subscriptionDetails.allowPause || false,
           fixedWorker: worker, // Store the fixed worker for this subscription
@@ -1187,9 +1327,9 @@ router.post('/',
         // Add recurring schedule for subscription
         bookingData.recurringSchedule = {
           frequency: subscriptionDetails.frequency || bookingType,
-          startDate: new Date(subscriptionDetails.startDate),
-          endDate: subscriptionDetails.endDate ? new Date(subscriptionDetails.endDate) : null,
-          nextScheduledDate: new Date(subscriptionDetails.startDate),
+          startDate: normalizedSubscriptionStartDate,
+          endDate: resolvedSubscriptionEndDate,
+          nextScheduledDate: initialNextScheduledDate,
           selectedDays: subscriptionDetails.selectedDays || [],
           preferredTime: subscriptionDetails.preferredTime
         };
@@ -2515,6 +2655,21 @@ router.post('/:id/generate-start-qr',
         });
       }
 
+      if (req.user.role !== 'admin') {
+        const now = new Date();
+        const scheduledStartTime = getBookingScheduledStartDateTime(booking);
+        const earliestQrGenerationTime = new Date(scheduledStartTime.getTime() - (15 * 60 * 1000));
+
+        if (now < earliestQrGenerationTime) {
+          return res.status(400).json({
+            error: {
+              message: 'Start QR can only be generated within 15 minutes of the scheduled service start time.',
+              status: 400
+            }
+          });
+        }
+      }
+
       const { jobDescriptionAcknowledged } = req.body;
 
       // Generate unique QR code for service start (includes worker ID for validation)
@@ -3686,8 +3841,11 @@ router.post('/:id/change-subscription-worker',
   authorize('customer', 'admin'),
   async (req, res) => {
     try {
-      const { workerId } = req.body;
-      const booking = await Booking.findById(req.params.id);
+      const { workerId, reason = '' } = req.body;
+      const booking = await Booking.findById(req.params.id)
+        .populate('customer', 'name email')
+        .populate('service', 'name category')
+        .populate('worker', 'name');
       
       if (!booking) {
         return res.status(404).json({ 
@@ -3695,15 +3853,29 @@ router.post('/:id/change-subscription-worker',
         });
       }
 
+      const subscriptionBookingId = getSubscriptionRootBookingId(booking);
+      const subscriptionBooking = subscriptionBookingId.toString() === booking._id.toString()
+        ? booking
+        : await Booking.findById(subscriptionBookingId)
+            .populate('customer', 'name email')
+            .populate('service', 'name category')
+            .populate('worker', 'name');
+
+      if (!subscriptionBooking) {
+        return res.status(404).json({ 
+          error: { message: 'Subscription root booking not found', status: 404 } 
+        });
+      }
+
       // Verify this is a subscription booking
-      if (!booking.subscription?.isSubscription) {
+      if (!subscriptionBooking.subscription?.isSubscription) {
         return res.status(400).json({ 
           error: { message: 'This is not a subscription booking', status: 400 } 
         });
       }
 
       // Verify customer owns this subscription
-      if (booking.customer.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      if (subscriptionBooking.customer._id.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
         return res.status(403).json({ 
           error: { message: 'Not authorized to modify this subscription', status: 403 } 
         });
@@ -3723,30 +3895,65 @@ router.post('/:id/change-subscription-worker',
         });
       }
 
-      // Update the subscription's fixed worker
-      booking.worker = workerId;
-      booking.subscription.fixedWorker = workerId;
-      booking.assignmentMethod = 'manual';
-      booking.assignedAt = new Date();
-      
-      await booking.save();
+      const currentFixedWorkerId = subscriptionBooking.subscription.fixedWorker?.toString?.()
+        || subscriptionBooking.worker?._id?.toString?.()
+        || subscriptionBooking.worker?.toString?.()
+        || null;
 
-      // TODO: Update all future bookings for this subscription with the new worker
-      // This would require implementing a parent-child booking relationship
-      // For now, just update the main subscription booking
+      if (currentFixedWorkerId && currentFixedWorkerId === workerId) {
+        return res.status(400).json({
+          error: { message: 'This worker is already assigned to the subscription', status: 400 }
+        });
+      }
 
-      await booking.populate('worker', 'name email phone workerProfile profileImage');
+      const startedVisitCount = await Booking.countDocuments({
+        $or: [
+          { _id: subscriptionBooking._id },
+          { parentBooking: subscriptionBooking._id }
+        ],
+        actualStartTime: { $ne: null },
+        status: { $in: ['in-progress', 'pending-review', 'completed'] }
+      });
+
+      if (req.user.role !== 'admin' && startedVisitCount < 1) {
+        return res.status(400).json({
+          error: {
+            message: 'You can request a worker change only after the first visit has started.',
+            status: 400
+          }
+        });
+      }
+
+      const existingPendingRequest = await SubscriptionWorkerChangeRequest.findOne({
+        subscriptionBooking: subscriptionBooking._id,
+        status: 'pending'
+      }).select('_id').lean();
+
+      if (existingPendingRequest) {
+        return res.status(400).json({
+          error: {
+            message: 'A worker change request is already pending review for this subscription.',
+            status: 400
+          }
+        });
+      }
+
+      const request = await SubscriptionWorkerChangeRequest.create({
+        subscriptionBooking: subscriptionBooking._id,
+        requestedBy: req.user._id,
+        customer: subscriptionBooking.customer._id,
+        service: subscriptionBooking.service?._id || null,
+        currentWorker: currentFixedWorkerId || null,
+        requestedWorker: newWorker._id,
+        reason,
+        visitCountAtRequest: startedVisitCount
+      });
+
+      await notifySubscriptionWorkerChangeAdmins(subscriptionBooking, newWorker, req.user, reason);
 
       res.json({ 
-        message: 'Worker changed successfully',
-        booking,
-        newWorker: {
-          _id: booking.worker._id,
-          name: booking.worker.name,
-          email: booking.worker.email,
-          phone: booking.worker.phone,
-          workerProfile: booking.worker.workerProfile
-        }
+        message: 'Worker change request sent to admin successfully',
+        request
       });
 
     } catch (error) {
@@ -3755,6 +3962,193 @@ router.post('/:id/change-subscription-worker',
     }
   }
 );
+
+// @route   GET /api/bookings/subscription-worker-change-requests/list
+// @desc    List subscription worker change requests for admins
+// @access  Private/Admin
+router.get('/subscription-worker-change-requests/list', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { status = 'pending' } = req.query;
+    const query = {};
+
+    if (status !== 'all') {
+      query.status = status;
+    }
+
+    let requests = await SubscriptionWorkerChangeRequest.find(query)
+      .populate('subscriptionBooking', 'bookingDate startTime endTime location customer worker subscription')
+      .populate('requestedBy', 'name email role')
+      .populate('customer', 'name email phone')
+      .populate('service', 'name category')
+      .populate('currentWorker', 'name email phone')
+      .populate('requestedWorker', 'name email phone workerProfile profileImage')
+      .populate('reviewedBy', 'name role')
+      .sort({ createdAt: -1 });
+
+    if (req.user.role === 'admin') {
+      const admin = await User.findById(req.user._id).select('adminProfile.assignedLocations').lean();
+      const assignedLocationIds = (admin?.adminProfile?.assignedLocations || [])
+        .map(location => location.locationId?.toString())
+        .filter(Boolean);
+
+      requests = requests.filter(request => {
+        const locationId = request.subscriptionBooking?.location?.locationId?.toString?.();
+        if (!locationId) return assignedLocationIds.length === 0;
+        return assignedLocationIds.includes(locationId);
+      });
+    }
+
+    res.json({ success: true, requests });
+  } catch (error) {
+    console.error('Get subscription worker change requests error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   POST /api/bookings/subscription-worker-change-requests/:requestId/review
+// @desc    Review subscription worker change request
+// @access  Private/Admin
+router.post('/subscription-worker-change-requests/:requestId/review', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { status, reviewNote = '' } = req.body;
+
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({
+        error: { message: 'Status must be approved or rejected', status: 400 }
+      });
+    }
+
+    const request = await SubscriptionWorkerChangeRequest.findById(req.params.requestId)
+      .populate('subscriptionBooking')
+      .populate('requestedWorker', 'name email phone workerProfile profileImage')
+      .populate('customer', 'name email');
+
+    if (!request) {
+      return res.status(404).json({
+        error: { message: 'Worker change request not found', status: 404 }
+      });
+    }
+
+    if (request.status !== 'pending') {
+      return res.status(400).json({
+        error: { message: `Request already ${request.status}`, status: 400 }
+      });
+    }
+
+    const subscriptionBooking = await Booking.findById(request.subscriptionBooking._id)
+      .populate('service', 'name');
+
+    if (!subscriptionBooking) {
+      return res.status(404).json({
+        error: { message: 'Subscription booking not found', status: 404 }
+      });
+    }
+
+    if (status === 'approved') {
+      const approvedWorker = await User.findById(request.requestedWorker._id);
+      if (!approvedWorker || approvedWorker.role !== 'worker' || !approvedWorker.isActive) {
+        return res.status(400).json({
+          error: { message: 'Requested worker is no longer available', status: 400 }
+        });
+      }
+
+      subscriptionBooking.worker = approvedWorker._id;
+      subscriptionBooking.subscription.fixedWorker = approvedWorker._id;
+      subscriptionBooking.assignmentMethod = 'manual';
+      subscriptionBooking.assignedAt = new Date();
+      await subscriptionBooking.save();
+
+      const today = startOfDay(new Date());
+      const futureBookings = await Booking.find({
+        parentBooking: subscriptionBooking._id,
+        bookingDate: { $gte: today },
+        actualStartTime: null,
+        status: { $in: ['pending', 'confirmed'] }
+      });
+
+      for (const futureBooking of futureBookings) {
+        const requestedWorkerAvailability = await checkSlotAvailability(
+          approvedWorker._id,
+          futureBooking.bookingDate,
+          futureBooking.startTime,
+          futureBooking.endTime,
+          Booking,
+          15,
+          futureBooking._id
+        );
+
+        if (requestedWorkerAvailability.available) {
+          futureBooking.worker = approvedWorker._id;
+          futureBooking.assignmentMethod = 'manual';
+          futureBooking.assignedAt = new Date();
+          futureBooking.status = 'confirmed';
+          futureBooking.confirmedAt = futureBooking.confirmedAt || new Date();
+          await futureBooking.save();
+          continue;
+        }
+
+        const fallbackAssignment = await assignWorkersWithBackup({
+          customerId: futureBooking.customer,
+          service: futureBooking.service,
+          bookingDate: futureBooking.bookingDate,
+          startTime: futureBooking.startTime,
+          endTime: futureBooking.endTime,
+          location: futureBooking.location,
+          bookingType: futureBooking.bookingType,
+          preferences: futureBooking.preferences || {}
+        });
+
+        if (fallbackAssignment.success) {
+          futureBooking.worker = fallbackAssignment.primaryWorker;
+          futureBooking.backupWorkers = fallbackAssignment.backupWorkers || [];
+          futureBooking.assignmentMethod = fallbackAssignment.assignmentMethod;
+          futureBooking.assignedAt = new Date();
+          futureBooking.status = 'confirmed';
+          futureBooking.confirmedAt = futureBooking.confirmedAt || new Date();
+        } else {
+          futureBooking.worker = undefined;
+          futureBooking.backupWorkers = [];
+          futureBooking.assignmentMethod = 'auto';
+          futureBooking.status = 'pending';
+          futureBooking.assignedAt = null;
+          futureBooking.confirmedAt = null;
+        }
+
+        await futureBooking.save();
+      }
+    }
+
+    request.status = status;
+    request.reviewedBy = req.user._id;
+    request.reviewedAt = new Date();
+    request.reviewNote = reviewNote;
+    await request.save();
+
+    await notificationService.sendNotification({
+      userId: request.customer._id,
+      type: 'system',
+      title: status === 'approved' ? 'Worker change approved' : 'Worker change request reviewed',
+      message: status === 'approved'
+        ? `${request.requestedWorker.name} will handle your future subscription visits whenever available.`
+        : (reviewNote || 'Your worker change request was not approved at this time.'),
+      priority: 'high',
+      data: {
+        bookingId: subscriptionBooking._id,
+        requestId: request._id,
+        status
+      }
+    });
+
+    res.json({
+      success: true,
+      message: status === 'approved' ? 'Worker change approved successfully' : 'Worker change request rejected',
+      request
+    });
+  } catch (error) {
+    console.error('Review subscription worker change request error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
 
 // @route   POST /api/bookings/:id/pause-subscription
 // @desc    Pause a subscription

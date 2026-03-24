@@ -40,7 +40,7 @@ interface UserProfile {
 }
 
 const FREQUENCY_OPTIONS = [
-  { id: "daily",     label: "Daily",      icon: "📆", desc: "Mon–Sat",        visits: 26 },
+  { id: "daily",     label: "Daily",      icon: "📆", desc: "Every day",      visits: 30 },
   { id: "alt-days",  label: "Alt Days",   icon: "📅", desc: "Mon/Wed/Fri",    visits: 13 },
   { id: "3-days",    label: "3× Week",    icon: "🗓️", desc: "Any 3 days",     visits: 12 },
   { id: "weekly",    label: "Weekly",     icon: "📋", desc: "Once a week",    visits: 4  },
@@ -151,7 +151,7 @@ const SubscriptionServicePage = () => {
 
   const getEndDate = () => {
     const d = new Date(startDate);
-    d.setMonth(d.getMonth() + 1);
+    d.setDate(d.getDate() + 29);
     return d.toISOString().split("T")[0];
   };
 

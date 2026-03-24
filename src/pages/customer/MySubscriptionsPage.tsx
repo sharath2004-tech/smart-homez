@@ -172,7 +172,7 @@ const MySubscriptionsPage = () => {
         throw new Error(error.error?.message || 'Failed to change worker');
       }
       
-      toast.success('Worker changed successfully! All future bookings will be assigned to the new worker.');
+      toast.success('Worker change request sent to admin successfully.');
       setChangingWorker(null);
       setAvailableWorkers([]);
       await fetchData();
@@ -377,6 +377,9 @@ const MySubscriptionsPage = () => {
                         Change
                       </button>
                     </div>
+                    <p className="text-[11px] text-muted-foreground mb-3">
+                      After the first visit starts, you can request an admin-approved worker change for future visits.
+                    </p>
                     
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white font-bold">
@@ -477,8 +480,11 @@ const MySubscriptionsPage = () => {
                   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-background rounded-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6">
                       <h3 className="text-xl font-bold text-foreground mb-4">
-                        Change Assigned Worker
+                        Request Worker Change
                       </h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Pick the worker you want and we’ll send the request to admin for approval.
+                      </p>
                       
                       {loadingWorkers ? (
                         <div className="py-12 text-center">

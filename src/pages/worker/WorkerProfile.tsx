@@ -1,13 +1,15 @@
 import AppLayout from "@/components/AppLayout";
 import { API_BASE_URL, authAPI, workersAPI } from "@/lib/api";
-import { Briefcase, CheckCircle, Clock, Download, FileText, Mail, MapPin, Phone, Star, User } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Briefcase, Camera, CheckCircle, Clock, Download, FileText, Loader2, Mail, MapPin, Phone, Star, User } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 
 interface Profile {
   name: string;
   email: string;
   role: string;
+  profileImage?: string;
   phone?: string;
   isActive?: boolean;
   isVerified?: boolean;
@@ -55,10 +57,21 @@ const WorkerProfile = () => {
   const [documents, setDocuments] = useState<WorkerDocuments | null>(null);
   const [stats, setStats] = useState({ today: 0, thisWeek: 0, thisMonth: 0 });
   const [loading, setLoading] = useState(true);
+  const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
+  const [uploadingProfilePhoto, setUploadingProfilePhoto] = useState(false);
+  const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     fetchProfile();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (profilePicturePreview) {
+        URL.revokeObjectURL(profilePicturePreview);
+      }
+    };
+  }, [profilePicturePreview]);
 
   const fetchProfile = async () => {
     try {
@@ -112,9 +125,73 @@ const WorkerProfile = () => {
     : documents?.profileImage
       ? `${API_BASE_URL.replace('/api', '')}${documents.profileImage}`
       : null;
+  const displayProfileImageUrl = profilePicturePreview || profileImageUrl;
+
+  const handleProfilePictureUpload = async (file: File | null) => {
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please choose a JPG, PNG, or WEBP image.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Profile photo should be 5MB or smaller.');
+      return;
+    }
+
+    if (profilePicturePreview) {
+      URL.revokeObjectURL(profilePicturePreview);
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setProfilePicturePreview(previewUrl);
+    setUploadingProfilePhoto(true);
+
+    try {
+      const payload = new FormData();
+      payload.append('profilePicture', file);
+
+      const result = await authAPI.updateProfile(payload);
+      const updatedUser = result?.user;
+
+      if (updatedUser) {
+        setProfile((prev) => prev ? { ...prev, ...updatedUser } : updatedUser);
+        setDocuments((prev) => ({
+          ...(prev || {}),
+          profileImage: updatedUser.profileImage || prev?.profileImage,
+          uploadedAt: new Date().toISOString(),
+        }));
+      }
+
+      try {
+        const stored = JSON.parse(localStorage.getItem('user') || '{}');
+        localStorage.setItem('user', JSON.stringify({
+          ...stored,
+          name: updatedUser?.name || profile.name,
+          email: updatedUser?.email || profile.email,
+          profileImage: updatedUser?.profileImage || stored?.profileImage || null,
+        }));
+      } catch {
+        // Ignore localStorage sync issues
+      }
+
+      toast.success('Profile picture updated. Looking sharp ✨');
+      setProfilePicturePreview(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update profile picture');
+      setProfilePicturePreview(null);
+    } finally {
+      setUploadingProfilePhoto(false);
+      if (profilePictureInputRef.current) {
+        profilePictureInputRef.current.value = '';
+      }
+    }
+  };
 
   return (
-    <AppLayout userType="worker" userName={profile.name}>
+    <AppLayout userType="worker" userName={profile.name} userImage={profile.profileImage || documents?.profileImage || null}>
       <div className="max-w-2xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 animate-fade-in pb-20 md:pb-0">
         <div>
           <h1 className="text-2xl font-bold font-heading text-foreground mb-1">{t('worker.profile.title')}</h1>
@@ -124,19 +201,40 @@ const WorkerProfile = () => {
         {/* Profile Header Card */}
         <div className="card-elevated p-4 sm:p-5 md:p-6">
           <div className="flex items-start gap-5">
-            {profileImageUrl ? (
-              <img
-                src={profileImageUrl}
-                alt={profile.name}
-                className="w-20 h-20 rounded-full object-cover border border-border shrink-0"
+            <div className="relative shrink-0 group">
+              <input
+                ref={profilePictureInputRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => handleProfilePictureUpload(e.target.files?.[0] || null)}
               />
-            ) : (
-              <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-2xl font-bold shrink-0">
-                {initials}
-              </div>
-            )}
+              {displayProfileImageUrl ? (
+                <img
+                  src={displayProfileImageUrl}
+                  alt={profile.name}
+                  className="w-24 h-24 rounded-full object-cover border-4 border-primary/15 shadow-sm"
+                />
+              ) : (
+                <div className="w-24 h-24 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-2xl font-bold border-4 border-primary/15 shadow-sm">
+                  {initials}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => !uploadingProfilePhoto && profilePictureInputRef.current?.click()}
+                className="absolute bottom-0 right-0 h-9 w-9 rounded-full bg-card border border-border shadow-md flex items-center justify-center text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
+                aria-label="Change profile picture"
+                title="Change profile picture"
+              >
+                {uploadingProfilePhoto ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+              </button>
+            </div>
             <div className="flex-1">
               <h2 className="text-2xl font-bold font-heading text-foreground mb-1">{profile.name}</h2>
+              <div className="mb-2 text-xs text-muted-foreground">
+                Tap the camera button to add or change your profile photo.
+              </div>
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="text-sm px-3 py-1 bg-primary-light text-primary rounded-full font-medium capitalize">
                   {profile.role}
@@ -385,7 +483,7 @@ const WorkerProfile = () => {
 
               {!documents.profileImage && !documents.aadhaarFront && !documents.aadhaarBack && (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  No documents uploaded yet. Contact your admin to add documents.
+                  No documents uploaded yet. Use the camera button above to upload your profile picture, or contact your admin for ID documents.
                 </p>
               )}
             </div>
