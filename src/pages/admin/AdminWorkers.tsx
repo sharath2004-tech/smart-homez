@@ -137,7 +137,7 @@ const isWorkerEffectivelyOnline = (worker: Worker) => {
 const getWorkerAvailabilityReason = (worker: Worker) => worker.workerProfile?.availabilityReason || null;
 
 const AdminWorkers = () => {
-  const { role, name, isSuperAdmin } = useAdminRole();
+  const { role, name } = useAdminRole();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [workers, setWorkers] = useState<Worker[]>([]);
@@ -300,6 +300,8 @@ const AdminWorkers = () => {
 
       setEditWorker(worker);
       setEditDocFiles({ profilePicture: null, aadhaarFront: null, aadhaarBack: null });
+      setTempPassword(null);
+      setShowCredentials(false);
 
       // Clear previous analytics data
       setWorkerReliabilityData(null);
@@ -389,9 +391,50 @@ const AdminWorkers = () => {
       
       setEditWorker(worker);
       setEditDocFiles({ profilePicture: null, aadhaarFront: null, aadhaarBack: null });
+      setTempPassword(null);
+      setShowCredentials(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load worker details';
       alert(message);
+    }
+  };
+
+  const handleResetWorkerPassword = async () => {
+    if (!editWorker) return;
+    if (!confirm(`Generate a new temporary password for ${editWorker.name}? This will invalidate their current password.`)) return;
+
+    setResettingPassword(true);
+    try {
+      const credentialDelivery: 'email' | 'phone' | 'both' = editWorker.phone ? 'both' : 'email';
+      const response = await adminAPI.resetWorkerPassword(editWorker._id, credentialDelivery);
+
+      setTempPassword(response.temporaryPassword || null);
+      setEditWorker((current) => {
+        if (!current) return current;
+
+        return {
+          ...current,
+          workerProfile: {
+            ...current.workerProfile,
+            availability: false,
+            manualAvailability: false,
+            effectiveAvailability: false,
+            availabilityReason: 'Worker must sign in and change the system-generated password before taking bookings'
+          }
+        };
+      });
+
+      const deliveryStatus = response.deliveryResults
+        ? Object.entries(response.deliveryResults).map(([key, value]) => `${key}: ${value}`).join(', ')
+        : 'pending';
+
+      alert(`Temporary password reset successfully! ✅\n\nNew Temporary Password: ${response.temporaryPassword || '(check delivery channel)'}\n\nDelivery: ${response.credentialDelivery || credentialDelivery}\nStatus: ${deliveryStatus}\n\nThe worker must log in and change this password before going online.`);
+      fetchData();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to reset password';
+      alert(message);
+    } finally {
+      setResettingPassword(false);
     }
   };
 
@@ -1842,12 +1885,12 @@ const AdminWorkers = () => {
                     </div>
 
                     {/* Credentials Section (Super Admin Only) */}
-                    {isSuperAdmin && (
+                    (
                       <div className="border border-amber-200 bg-amber-50/50 rounded-xl p-4 space-y-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <AlertTriangle className="w-4 h-4 text-amber-600" />
-                            <h3 className="text-sm font-semibold text-amber-900">Worker Credentials (Super Admin Access)</h3>
+                            <h3 className="text-sm font-semibold text-amber-900">Worker Credentials</h3>
                           </div>
                           <button
                             type="button"
@@ -1945,22 +1988,7 @@ const AdminWorkers = () => {
 
                               <button
                                 type="button"
-                                onClick={async () => {
-                                  if (confirm(`Generate a new temporary password for ${editWorker.name}? This will invalidate their current password.`)) {
-                                    setResettingPassword(true);
-                                    try {
-                                      // TODO: Add API endpoint for password reset
-                                      // For now, generate a random password
-                                      const newPass = Math.random().toString(36).slice(-8) + Math.random().toString(36).toUpperCase().slice(-4);
-                                      setTempPassword(newPass);
-                                      alert('⚠️ Password reset endpoint not yet implemented. In production, this would call the backend API.');
-                                    } catch (error) {
-                                      alert('Failed to reset password');
-                                    } finally {
-                                      setResettingPassword(false);
-                                    }
-                                  }
-                                }}
+                                onClick={handleResetWorkerPassword}
                                 disabled={resettingPassword}
                                 className="w-full py-2 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                               >
@@ -1977,7 +2005,11 @@ const AdminWorkers = () => {
                                 )}
                               </button>
                             </div>
-                          </div>
+                                onClick={() => {
+                                  setEditWorker(null);
+                                  setShowCredentials(false);
+                                  setTempPassword(null);
+                                }}
                         )}
                       </div>
                     )}

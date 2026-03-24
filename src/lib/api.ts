@@ -1056,6 +1056,13 @@ export const adminAPI = {
     return apiCall(`/admin/workers/${workerId}`);
   },
 
+  resetWorkerPassword: async (workerId: string, credentialDelivery?: 'email' | 'phone' | 'both') => {
+    return apiCall(`/admin/workers/${workerId}/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify({ credentialDelivery })
+    });
+  },
+
   updateWorker: async (workerId: string, formData: FormData) => {
     const token = getAuthToken();
     const response = await fetch(`${API_BASE_URL}/admin/workers/${workerId}`, {

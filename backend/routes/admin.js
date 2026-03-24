@@ -1078,6 +1078,94 @@ router.get('/workers/:workerId', authenticate, authorize('admin', 'super_admin')
   }
 });
 
+// @route   POST /api/admin/workers/:workerId/reset-password
+// @desc    Generate a fresh temporary password for a worker account
+// @access  Private/Admin/SuperAdmin
+router.post('/workers/:workerId/reset-password', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { workerId } = req.params;
+    const requestedDelivery = req.body?.credentialDelivery;
+
+    const worker = await User.findById(workerId).select('+temporaryPassword');
+    if (!worker || worker.role !== 'worker') {
+      return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
+    }
+
+    if (req.user.role === 'admin') {
+      if (!req.user.adminProfile?.permissions?.canCreateWorkers) {
+        return res.status(403).json({ error: { message: 'No permission to reset worker passwords', status: 403 } });
+      }
+
+      const adminLocationIds = req.user.adminProfile?.assignedLocations?.map(loc => loc.locationId?.toString()) || [];
+      const workerLocationIds = worker.workerProfile?.assignedApartments?.map(apt => apt.locationId?.toString()).filter(Boolean) || [];
+      const hasAccess = workerLocationIds.some(locId => adminLocationIds.includes(locId));
+
+      if (!hasAccess) {
+        return res.status(403).json({ error: { message: 'You can only reset passwords for workers assigned to your locations', status: 403 } });
+      }
+    }
+
+    const hasPhone = Boolean(worker.phone && worker.phone.trim());
+    const credentialDelivery = ['email', 'phone', 'both'].includes(requestedDelivery)
+      ? requestedDelivery
+      : (hasPhone ? 'both' : 'email');
+
+    if ((credentialDelivery === 'phone' || credentialDelivery === 'both') && !hasPhone) {
+      return res.status(400).json({
+        error: { message: 'Worker does not have a phone number for SMS delivery', status: 400 }
+      });
+    }
+
+    const temporaryPassword = generateTemporaryPassword();
+    worker.password = temporaryPassword;
+    worker.temporaryPassword = temporaryPassword;
+    worker.isFirstLogin = true;
+    worker.hasCustomPassword = false;
+
+    if (worker.workerProfile) {
+      worker.workerProfile.availability = false;
+    }
+
+    await worker.save({ validateBeforeSave: false });
+
+    const deliveryResults = {};
+
+    if (credentialDelivery === 'email' || credentialDelivery === 'both') {
+      const result = await sendTemporaryPasswordEmail(worker.email, worker.name, temporaryPassword);
+      deliveryResults.email = result.success ? 'sent' : `failed: ${result.reason}`;
+    }
+
+    if (credentialDelivery === 'phone' || credentialDelivery === 'both') {
+      const result = await sendTemporaryPasswordSMS(worker.phone, worker.name, temporaryPassword);
+      deliveryResults.sms = result.success ? 'sent' : `failed: ${result.reason}`;
+    }
+
+    console.log(`🔐 Temporary password reset for worker ${worker.name} (${worker._id}) by ${req.user.role} ${req.user.name}`);
+
+    res.json({
+      success: true,
+      message: 'Temporary password reset successfully',
+      credentialDelivery,
+      deliveryResults,
+      temporaryPassword,
+      worker: {
+        _id: worker._id,
+        name: worker.name,
+        email: worker.email,
+        phone: worker.phone,
+        isFirstLogin: worker.isFirstLogin,
+        hasCustomPassword: worker.hasCustomPassword,
+        workerProfile: {
+          availability: worker.workerProfile?.availability ?? false
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Reset worker password error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
 // @route   PUT /api/admin/workers/:workerId
 // @desc    Update complete worker details (all fields including documents)
 // @access  Private/Admin/SuperAdmin
