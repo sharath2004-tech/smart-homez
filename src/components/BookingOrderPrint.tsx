@@ -1,5 +1,4 @@
-import { DollarSign, MapPin, Phone, User } from "lucide-react";
-import React, { forwardRef } from "react";
+import { forwardRef } from "react";
 
 interface CartItem {
   name: string;
