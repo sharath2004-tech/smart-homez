@@ -49,6 +49,15 @@ interface DashboardConfiguredService {
   path: string;
 }
 
+interface QuickServiceCard {
+  id: string;
+  icon: string;
+  name: string;
+  subtitle: string;
+  badge?: string;
+  path: string;
+}
+
 interface CustomerServiceRecord {
   _id: string;
   name: string;
@@ -103,6 +112,21 @@ const getStoredDashboardLocation = (): LocationData | null => {
   }
 };
 
+const dedupeQuickServiceCards = (items: QuickServiceCard[]) => {
+  const seen = new Set<string>();
+
+  return items.filter((service) => {
+    const key = `${service.path}::${service.name.trim().toLowerCase()}`;
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+};
+
 const CustomerDashboard = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -114,7 +138,7 @@ const CustomerDashboard = () => {
   const [serviceableStatus, setServiceableStatus] = useState<'available' | 'unavailable' | 'unknown'>('unknown');
   const [serviceabilityMessage, setServiceabilityMessage] = useState('');
   const [nearestServiceArea, setNearestServiceArea] = useState<{ name?: string; distance?: number } | null>(null);
-  const [quickServices, setQuickServices] = useState<DashboardConfiguredService[]>([]);
+  const [quickServices, setQuickServices] = useState<QuickServiceCard[]>([]);
   const [dashboardLinkedServices, setDashboardLinkedServices] = useState<CustomerServiceRecord[]>([]);
   const [deepCleaningRequestServiceId, setDeepCleaningRequestServiceId] = useState<string | null>(null);
   const [requestingDeepCleaning, setRequestingDeepCleaning] = useState(false);
@@ -215,7 +239,7 @@ const CustomerDashboard = () => {
           path: resolveDashboardServicePath(service)
         }));
 
-        setQuickServices(mappedServices);
+        setQuickServices(dedupeQuickServiceCards(mappedServices));
       } catch (error) {
         console.error('Error fetching dashboard services:', error);
         // REMOVED: Hardcoded fallback services. Show error state or empty state instead.

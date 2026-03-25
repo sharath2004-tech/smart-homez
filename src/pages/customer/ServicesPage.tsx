@@ -37,6 +37,21 @@ const HIDDEN_ROOT_SERVICE_TYPES = new Set([
   'deep_cleaning_full_house',
 ]);
 
+const dedupeServices = (items: Service[]) => {
+  const seen = new Set<string>();
+
+  return items.filter((service) => {
+    const serviceKey = service._id || `${service.serviceType || 'service'}:${service.name.toLowerCase()}`;
+
+    if (seen.has(serviceKey)) {
+      return false;
+    }
+
+    seen.add(serviceKey);
+    return true;
+  });
+};
+
 const ServicesPage = () => {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
@@ -161,8 +176,9 @@ const ServicesPage = () => {
       }
 
       const data = await servicesAPI.getAll(params);
-      console.log('Services fetched:', data.services);
-      setServices(data.services || []);
+      const uniqueServices = dedupeServices(data.services || []);
+      console.log('Services fetched:', uniqueServices);
+      setServices(uniqueServices);
     } catch (error) {
       console.error('Error fetching services:', error);
     } finally {
