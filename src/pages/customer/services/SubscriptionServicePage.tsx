@@ -101,10 +101,6 @@ const SubscriptionServicePage = () => {
   const [session1Hours, setSession1Hours] = useState(1);
   const [session2Time, setSession2Time] = useState("17:00");
 
-  // Custom amount editing
-  const [customAmountEnabled, setCustomAmountEnabled] = useState(false);
-  const [customAmount, setCustomAmount] = useState(0);
-
   const {
     availability,
     checkingAvailability,
@@ -197,11 +193,8 @@ const SubscriptionServicePage = () => {
   // Apply frequency-based pricing multiplier
   const monthlyPrice = Math.round(baseMonthlyPrice * currentFreq.priceMultiplier);
 
-  // Use custom amount if enabled, otherwise use calculated price
-  const finalMonthlyPrice = customAmountEnabled ? customAmount : monthlyPrice;
-
   // Per-visit breakdown (Urban Company style)
-  const perVisitPrice = currentFreq.visits > 0 ? Math.round(finalMonthlyPrice / currentFreq.visits) : 0;
+  const perVisitPrice = currentFreq.visits > 0 ? Math.round(monthlyPrice / currentFreq.visits) : 0;
 
   // MRP / savings from originalPrice (apply multiplier to original as well)
   const baseOriginalPrice = durationOption?.originalPrice ?? 0;
@@ -266,7 +259,7 @@ const SubscriptionServicePage = () => {
         bookingDate: startDate,
         startTime: preferredTime,
         endTime: getEndTime(),
-        totalAmount: finalMonthlyPrice,
+        totalAmount: monthlyPrice,
         bookingType: "monthly",
         isSubscription: true,
         subscriptionDetails: {
@@ -305,7 +298,7 @@ const SubscriptionServicePage = () => {
 
       setPendingPaymentBooking({
         bookingId: createdBookingId,
-        amount: finalMonthlyPrice,
+        amount: monthlyPrice,
         serviceName: selectedService.name,
       });
       toast.success("Subscription created. Complete payment here and upload the payment screenshot.", { duration: 5000 });
@@ -555,38 +548,13 @@ const SubscriptionServicePage = () => {
                     <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full">{currentFreq.label}</span>
                   </div>
                   <div className="flex items-end gap-2 flex-wrap">
-                    {!customAmountEnabled && originalMonthlyPrice > monthlyPrice && (
+                    {originalMonthlyPrice > monthlyPrice && (
                       <span className="text-sm text-muted-foreground line-through mb-1">₹{originalMonthlyPrice.toLocaleString("en-IN")}</span>
                     )}
-                    {customAmountEnabled ? (
-                      <div className="flex items-center gap-2 flex-1">
-                        <span className="text-2xl font-bold text-blue-700">₹</span>
-                        <input
-                          type="number"
-                          value={customAmount}
-                          onChange={(e) => setCustomAmount(Math.max(0, parseInt(e.target.value) || 0))}
-                          className="text-2xl font-bold text-blue-700 bg-white border-2 border-blue-400 rounded-lg px-3 py-1 w-32"
-                          min="0"
-                        />
-                        <span className="text-sm text-blue-600 mb-1">/month</span>
-                      </div>
-                    ) : (
-                      <>
-                        <span className="text-3xl font-bold text-blue-700">₹{finalMonthlyPrice.toLocaleString("en-IN")}</span>
-                        <span className="text-sm text-blue-600 mb-1">/month</span>
-                      </>
-                    )}
-                    <button
-                      onClick={() => {
-                        if (!customAmountEnabled) setCustomAmount(monthlyPrice);
-                        setCustomAmountEnabled(!customAmountEnabled);
-                      }}
-                      className="ml-auto text-xs text-blue-600 hover:text-blue-800 underline mb-1"
-                    >
-                      {customAmountEnabled ? "Reset" : "Edit Amount"}
-                    </button>
+                    <span className="text-3xl font-bold text-blue-700">₹{monthlyPrice.toLocaleString("en-IN")}</span>
+                    <span className="text-sm text-blue-600 mb-1">/month</span>
                   </div>
-                  {!customAmountEnabled && monthlySavings > 0 && (
+                  {monthlySavings > 0 && (
                     <p className="text-xs font-medium text-green-600">
                       You save ₹{monthlySavings.toLocaleString("en-IN")}/mo ({savingsPct}% off vs. one-time)
                     </p>
