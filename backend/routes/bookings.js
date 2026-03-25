@@ -1,5 +1,8 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { authenticate, authorize } from '../middleware/auth.js';
 import upload from '../middleware/upload.js';
 import Booking from '../models/Booking.js';
@@ -11,14 +14,14 @@ import SubscriptionWorkerChangeRequest from '../models/SubscriptionWorkerChangeR
 import User from '../models/User.js';
 import WorkerEarnings from '../models/WorkerEarnings.js';
 import {
-  activateBackupWorker,
-  assignWorkersWithBackup,
-  checkBackupActivationNeeded
+    activateBackupWorker,
+    assignWorkersWithBackup,
+    checkBackupActivationNeeded
 } from '../utils/advancedWorkerAssignment.js';
 import {
-  processQueuedBookings,
-  retryPendingBookingAssignment,
-  updateBookingStatuses
+    processQueuedBookings,
+    retryPendingBookingAssignment,
+    updateBookingStatuses
 } from '../utils/bookingStatusUpdater.js';
 import { calculateDistance } from '../utils/geolocation.js';
 import notificationService from '../utils/notificationService.js';
@@ -27,15 +30,18 @@ import { checkSlotAvailability } from '../utils/slotManagement.js';
 import { checkIfOnTime, updateWorkerStats } from '../utils/updateWorkerStats.js';
 import { assignWorkerToBooking, reassignWorker } from '../utils/workerAssignment.js';
 import {
-  getWorkerBlockedTimeRanges,
-  isWorkerAvailableForTimeRange,
-  isWorkerEligibleForAssignment
+    getWorkerBlockedTimeRanges,
+    isWorkerAvailableForTimeRange,
+    isWorkerEligibleForAssignment
 } from '../utils/workerAvailability.js';
 import {
-  getWorkerAvailabilityForecast,
-  getWorkerCapacityStatus,
-  monitorWorkerPool
+    getWorkerAvailabilityForecast,
+    getWorkerCapacityStatus,
+    monitorWorkerPool
 } from '../utils/workerPoolManager.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
@@ -3739,17 +3745,17 @@ router.post('/:id/upload-photo',
       const { photoUrl, type, notes } = req.body;
 
       const booking = await Booking.findById(req.params.id);
-      
+
       if (!booking) {
-        return res.status(404).json({ 
-          error: { message: 'Booking not found', status: 404 } 
+        return res.status(404).json({
+          error: { message: 'Booking not found', status: 404 }
         });
       }
 
       // Verify worker is assigned to this booking
       if (!booking.worker || (booking.worker.toString() !== req.user._id.toString() && req.user.role !== 'admin')) {
-        return res.status(403).json({ 
-          error: { message: 'You are not assigned to this booking', status: 403 } 
+        return res.status(403).json({
+          error: { message: 'You are not assigned to this booking', status: 403 }
         });
       }
 
@@ -3759,14 +3765,63 @@ router.post('/:id/upload-photo',
       }
 
       if (booking.workDocumentation.photos.length >= 10) {
-        return res.status(400).json({ 
-          error: { message: 'Maximum 10 photos allowed per booking', status: 400 } 
+        return res.status(400).json({
+          error: { message: 'Maximum 10 photos allowed per booking', status: 400 }
         });
+      }
+
+      // Handle base64 image conversion to file
+      let savedPhotoUrl = photoUrl;
+
+      if (photoUrl.startsWith('data:image/')) {
+        try {
+          // Extract base64 data
+          const matches = photoUrl.match(/^data:image\/(\w+);base64,(.+)$/);
+          if (!matches) {
+            return res.status(400).json({
+              error: { message: 'Invalid image format', status: 400 }
+            });
+          }
+
+          const imageType = matches[1];
+          const base64Data = matches[2];
+          const buffer = Buffer.from(base64Data, 'base64');
+
+          // Check file size (max 5MB)
+          if (buffer.length > 5 * 1024 * 1024) {
+            return res.status(400).json({
+              error: { message: 'Image size must be less than 5MB', status: 400 }
+            });
+          }
+
+          // Create uploads directory if it doesn't exist
+          const uploadsDir = path.join(__dirname, '..', 'uploads', 'work-documentation');
+          if (!fs.existsSync(uploadsDir)) {
+            fs.mkdirSync(uploadsDir, { recursive: true });
+          }
+
+          // Generate unique filename
+          const filename = `work-doc-${booking._id}-${Date.now()}.${imageType}`;
+          const filePath = path.join(uploadsDir, filename);
+
+          // Save file to disk
+          fs.writeFileSync(filePath, buffer);
+
+          // Store relative path
+          savedPhotoUrl = `/uploads/work-documentation/${filename}`;
+
+          console.log(`✅ Saved work documentation photo: ${savedPhotoUrl}`);
+        } catch (conversionError) {
+          console.error('Error converting base64 to file:', conversionError);
+          return res.status(500).json({
+            error: { message: 'Failed to save image', status: 500 }
+          });
+        }
       }
 
       // Add photo to work documentation
       const photo = {
-        url: photoUrl,
+        url: savedPhotoUrl,
         type: type,
         timestamp: new Date(),
         notes: notes || '',
@@ -3776,7 +3831,7 @@ router.post('/:id/upload-photo',
       booking.workDocumentation.photos.push(photo);
       await booking.save();
 
-      res.json({ 
+      res.json({
         message: 'Photo uploaded successfully',
         photo: photo,
         totalPhotos: booking.workDocumentation.photos.length

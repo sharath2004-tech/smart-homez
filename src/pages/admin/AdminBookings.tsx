@@ -118,6 +118,11 @@ const AdminBookings = () => {
   const [workersLoading, setWorkersLoading] = useState(false);
   const [workerListError, setWorkerListError] = useState<string | null>(null);
   const [reassignBooking, setReassignBooking] = useState<Booking | null>(null);
+
+  // New filters for enhanced export
+  const [selectedWorker, setSelectedWorker] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [availableWorkers, setAvailableWorkers] = useState<AvailableWorker[]>([]);
   const [availableWorkersLoading, setAvailableWorkersLoading] = useState(false);
   const [reassignReason, setReassignReason] = useState('Admin reassignment');
@@ -138,6 +143,20 @@ const AdminBookings = () => {
       }).catch(console.error);
     }
   }, [isSuperAdmin]);
+
+  useEffect(() => {
+    // Fetch workers for filter dropdown
+    const fetchWorkersForFilter = async () => {
+      if (!isSuperAdmin) return;
+      try {
+        const res = await superAdminAPI.getWorkers(selectedLocation || undefined);
+        setAllWorkers(res.workers || []);
+      } catch (e) {
+        console.error('Error fetching workers for filter:', e);
+      }
+    };
+    fetchWorkersForFilter();
+  }, [isSuperAdmin, selectedLocation]);
 
   useEffect(() => {
     fetchBookings();
@@ -178,8 +197,17 @@ const AdminBookings = () => {
       b._id.toLowerCase().includes(search.toLowerCase()) ||
       serviceName.toLowerCase().includes(search.toLowerCase());
     const matchFilter = filter === "all" || b.status === filter;
-    return matchSearch && matchFilter;
-  }), [bookings, filter, search]);
+
+    // Worker filter
+    const matchWorker = !selectedWorker || b.worker?._id === selectedWorker;
+
+    // Date range filter
+    const bookingDate = new Date(b.bookingDate);
+    const matchStartDate = !startDate || bookingDate >= new Date(startDate);
+    const matchEndDate = !endDate || bookingDate <= new Date(endDate);
+
+    return matchSearch && matchFilter && matchWorker && matchStartDate && matchEndDate;
+  }), [bookings, filter, search, selectedWorker, startDate, endDate]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / BOOKINGS_PER_PAGE));
   const paginatedBookings = useMemo(() => {
@@ -189,7 +217,7 @@ const AdminBookings = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, filter, selectedLocation, isSuperAdmin]);
+  }, [search, filter, selectedLocation, isSuperAdmin, selectedWorker, startDate, endDate]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -427,12 +455,14 @@ const AdminBookings = () => {
       const wb = new ExcelJS.Workbook();
       const summaryWs = wb.addWorksheet('Revenue Summary');
       const ws = wb.addWorksheet('Bookings');
+      const workerRevenueWs = wb.addWorksheet('Worker Revenue Analysis');
 
       const totalCustomerAmount = filtered.reduce((sum, booking) => sum + Number(booking.totalAmount || 0), 0);
       const totalWorkerWage = filtered.reduce((sum, booking) => sum + getWorkerWage(booking), 0);
       const totalRevenue = filtered.reduce((sum, booking) => sum + getEstimatedRevenue(booking), 0);
       const totalOvertime = filtered.reduce((sum, booking) => sum + Number(booking.overtimeCharges || 0), 0);
 
+      // Revenue Summary Sheet
       summaryWs.columns = [
         { header: 'Metric', key: 'metric', width: 32 },
         { header: 'Value', key: 'value', width: 26 },
@@ -440,8 +470,17 @@ const AdminBookings = () => {
       const selectedLocationLabel = selectedLocation
         ? locations.find((location) => location._id === selectedLocation)?.apartmentName || selectedLocation
         : 'All Locations';
+      const selectedWorkerLabel = selectedWorker
+        ? allWorkers.find((w) => w._id === selectedWorker)?.name || 'Selected Worker'
+        : 'All Workers';
+      const dateRangeLabel = startDate || endDate
+        ? `${startDate || 'Start'} to ${endDate || 'End'}`
+        : 'All Dates';
+
       [
         { metric: 'Location Filter', value: selectedLocationLabel },
+        { metric: 'Worker Filter', value: selectedWorkerLabel },
+        { metric: 'Date Range', value: dateRangeLabel },
         { metric: 'Status Filter', value: filter },
         { metric: 'Bookings Exported', value: filtered.length },
         { metric: 'Customer Billed Amount', value: totalCustomerAmount },
@@ -451,6 +490,7 @@ const AdminBookings = () => {
         { metric: 'Generated At', value: new Date().toLocaleString('en-IN') },
       ].forEach((row) => summaryWs.addRow(row));
 
+      // Bookings Detail Sheet
       ws.columns = [
         { header: 'Booking ID', key: 'id', width: 15 },
         { header: 'Booking Type', key: 'bookingType', width: 20 },
@@ -513,19 +553,254 @@ const AdminBookings = () => {
         notes: b.notes || '—',
         createdAt: formatDateTime(b.createdAt),
       }));
+
+      // Worker Revenue Analysis Sheet
+      const workerStats = new Map<string, {
+        name: string;
+        bookingCount: number;
+        totalRevenue: number;
+        totalWage: number;
+        totalCustomerAmount: number;
+        completedBookings: number;
+        avgRevenuePerBooking: number;
+      }>();
+
+      filtered.forEach(b => {
+        const workerId = b.worker?._id || 'unassigned';
+        const workerName = b.worker?.name || 'Unassigned';
+
+        if (!workerStats.has(workerId)) {
+          workerStats.set(workerId, {
+            name: workerName,
+            bookingCount: 0,
+            totalRevenue: 0,
+            totalWage: 0,
+            totalCustomerAmount: 0,
+            completedBookings: 0,
+            avgRevenuePerBooking: 0,
+          });
+        }
+
+        const stats = workerStats.get(workerId)!;
+        stats.bookingCount++;
+        stats.totalCustomerAmount += Number(b.totalAmount || 0);
+        stats.totalWage += getWorkerWage(b);
+        stats.totalRevenue += getEstimatedRevenue(b);
+        if (b.status === 'completed') stats.completedBookings++;
+      });
+
+      // Calculate averages and sort by revenue
+      const workerStatsArray = Array.from(workerStats.values()).map(stats => ({
+        ...stats,
+        avgRevenuePerBooking: stats.bookingCount > 0 ? stats.totalRevenue / stats.bookingCount : 0,
+      })).sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+      workerRevenueWs.columns = [
+        { header: 'Worker Name', key: 'name', width: 25 },
+        { header: 'Total Bookings', key: 'bookingCount', width: 15 },
+        { header: 'Completed', key: 'completedBookings', width: 15 },
+        { header: 'Customer Billed (₹)', key: 'totalCustomerAmount', width: 20 },
+        { header: 'Worker Wage (₹)', key: 'totalWage', width: 18 },
+        { header: 'Revenue Generated (₹)', key: 'totalRevenue', width: 22 },
+        { header: 'Avg Revenue/Booking (₹)', key: 'avgRevenuePerBooking', width: 24 },
+      ];
+
+      workerStatsArray.forEach(stats => workerRevenueWs.addRow({
+        name: stats.name,
+        bookingCount: stats.bookingCount,
+        completedBookings: stats.completedBookings,
+        totalCustomerAmount: stats.totalCustomerAmount.toFixed(2),
+        totalWage: stats.totalWage.toFixed(2),
+        totalRevenue: stats.totalRevenue.toFixed(2),
+        avgRevenuePerBooking: stats.avgRevenuePerBooking.toFixed(2),
+      }));
+
+      // Style headers
       summaryWs.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
       summaryWs.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0f766e' } };
       ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
       ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1e293b' } };
+      workerRevenueWs.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      workerRevenueWs.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563eb' } };
+
       const buffer = await wb.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `bookings-${new Date().toISOString().split('T')[0]}.xlsx`;
+      const dateLabel = startDate && endDate ? `_${startDate}_to_${endDate}` : '';
+      link.download = `revenue-report${dateLabel}_${new Date().toISOString().split('T')[0]}.xlsx`;
       link.click();
       URL.revokeObjectURL(link.href);
     } catch (err) {
       console.error('Export error:', err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (!isSuperAdmin) return;
+
+    try {
+      setExporting(true);
+
+      // Calculate statistics
+      const totalCustomerAmount = filtered.reduce((sum, booking) => sum + Number(booking.totalAmount || 0), 0);
+      const totalWorkerWage = filtered.reduce((sum, booking) => sum + getWorkerWage(booking), 0);
+      const totalRevenue = filtered.reduce((sum, booking) => sum + getEstimatedRevenue(booking), 0);
+      const totalOvertime = filtered.reduce((sum, booking) => sum + Number(booking.overtimeCharges || 0), 0);
+
+      // Worker statistics
+      const workerStats = new Map<string, {
+        name: string;
+        bookingCount: number;
+        totalRevenue: number;
+        totalWage: number;
+        completedBookings: number;
+      }>();
+
+      filtered.forEach(b => {
+        const workerId = b.worker?._id || 'unassigned';
+        const workerName = b.worker?.name || 'Unassigned';
+
+        if (!workerStats.has(workerId)) {
+          workerStats.set(workerId, {
+            name: workerName,
+            bookingCount: 0,
+            totalRevenue: 0,
+            totalWage: 0,
+            completedBookings: 0,
+          });
+        }
+
+        const stats = workerStats.get(workerId)!;
+        stats.bookingCount++;
+        stats.totalWage += getWorkerWage(b);
+        stats.totalRevenue += getEstimatedRevenue(b);
+        if (b.status === 'completed') stats.completedBookings++;
+      });
+
+      const workerStatsArray = Array.from(workerStats.values()).sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+      const selectedLocationLabel = selectedLocation
+        ? locations.find((location) => location._id === selectedLocation)?.apartmentName || selectedLocation
+        : 'All Locations';
+      const selectedWorkerLabel = selectedWorker
+        ? allWorkers.find((w) => w._id === selectedWorker)?.name || 'Selected Worker'
+        : 'All Workers';
+      const dateRangeLabel = startDate || endDate
+        ? `${startDate || 'Start'} to ${endDate || 'End'}`
+        : 'All Dates';
+
+      // Create PDF content
+      const content = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Revenue Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+            h1 { color: #0f766e; border-bottom: 3px solid #0f766e; padding-bottom: 10px; }
+            h2 { color: #1e293b; margin-top: 30px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
+            .report-info { background: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0; }
+            .report-info p { margin: 5px 0; }
+            .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }
+            .summary-card { background: #fff; border: 2px solid #e2e8f0; border-radius: 8px; padding: 15px; }
+            .summary-card h3 { margin: 0 0 10px 0; color: #64748b; font-size: 14px; }
+            .summary-card .value { font-size: 24px; font-weight: bold; color: #0f766e; }
+            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            th { background: #1e293b; color: white; padding: 12px; text-align: left; font-weight: 600; }
+            td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; }
+            tr:hover { background: #f8fafc; }
+            .footer { margin-top: 40px; text-align: center; color: #64748b; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <h1>📊 Revenue Report</h1>
+
+          <div class="report-info">
+            <p><strong>Location:</strong> ${selectedLocationLabel}</p>
+            <p><strong>Worker:</strong> ${selectedWorkerLabel}</p>
+            <p><strong>Date Range:</strong> ${dateRangeLabel}</p>
+            <p><strong>Status Filter:</strong> ${filter === 'all' ? 'All Statuses' : filter}</p>
+            <p><strong>Generated:</strong> ${new Date().toLocaleString('en-IN')}</p>
+          </div>
+
+          <h2>Overall Summary</h2>
+          <div class="summary-grid">
+            <div class="summary-card">
+              <h3>Total Bookings</h3>
+              <div class="value">${filtered.length}</div>
+            </div>
+            <div class="summary-card">
+              <h3>Customer Billed Amount</h3>
+              <div class="value">₹${totalCustomerAmount.toFixed(2)}</div>
+            </div>
+            <div class="summary-card">
+              <h3>Worker Wages Paid</h3>
+              <div class="value">₹${totalWorkerWage.toFixed(2)}</div>
+            </div>
+            <div class="summary-card">
+              <h3>Net Revenue</h3>
+              <div class="value">₹${totalRevenue.toFixed(2)}</div>
+            </div>
+          </div>
+
+          ${workerStatsArray.length > 0 ? `
+            <h2>Worker Performance Analysis</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Worker Name</th>
+                  <th>Bookings</th>
+                  <th>Completed</th>
+                  <th>Wages (₹)</th>
+                  <th>Revenue Generated (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${workerStatsArray.map(w => `
+                  <tr>
+                    <td>${w.name}</td>
+                    <td>${w.bookingCount}</td>
+                    <td>${w.completedBookings}</td>
+                    <td>₹${w.totalWage.toFixed(2)}</td>
+                    <td>₹${w.totalRevenue.toFixed(2)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          ` : ''}
+
+          <div class="footer">
+            <p>This is an automated revenue report generated by the system.</p>
+          </div>
+        </body>
+        </html>
+      `;
+
+      // Create temporary element for PDF generation
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = content;
+      tempDiv.style.position = 'absolute';
+      tempDiv.style.left = '-9999px';
+      document.body.appendChild(tempDiv);
+
+      const opt = {
+        margin: 10,
+        filename: `revenue-report_${new Date().toISOString().split('T')[0]}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      // @ts-ignore - html2pdf types not perfect
+      await html2pdf().set(opt).from(tempDiv).save();
+
+      document.body.removeChild(tempDiv);
+    } catch (err) {
+      console.error('PDF Export error:', err);
     } finally {
       setExporting(false);
     }
@@ -544,7 +819,7 @@ const AdminBookings = () => {
   return (
     <AppLayout userType={role} userName={name}>
       <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 animate-fade-in">
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold font-heading text-foreground">
               {isSuperAdmin
@@ -553,47 +828,114 @@ const AdminBookings = () => {
                   : 'All Bookings'
                 : 'My Region Bookings'}
             </h1>
-            <p className="text-muted-foreground text-sm mt-1">{bookings.length} total bookings</p>
+            <p className="text-muted-foreground text-sm mt-1">
+              {bookings.length} total bookings • {filtered.length} filtered
+            </p>
           </div>
           {isSuperAdmin && (
-            <button onClick={handleExport} disabled={exporting} className="flex items-center gap-2 btn-brand text-sm py-2.5 px-4 disabled:opacity-60">
-              <Download className="w-4 h-4" /> {exporting ? 'Exporting…' : 'Export Revenue Excel'}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleExportPDF}
+                disabled={exporting}
+                className="flex items-center gap-2 btn-outline text-sm py-2.5 px-4 disabled:opacity-60"
+              >
+                <Download className="w-4 h-4" /> {exporting ? 'Exporting…' : 'PDF Report'}
+              </button>
+              <button
+                onClick={handleExport}
+                disabled={exporting}
+                className="flex items-center gap-2 btn-brand text-sm py-2.5 px-4 disabled:opacity-60"
+              >
+                <Download className="w-4 h-4" /> {exporting ? 'Exporting…' : 'Excel Report'}
+              </button>
+            </div>
           )}
         </div>
 
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input className="input-clean pl-10" placeholder="Search by customer, ID, or service..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <div className="space-y-3">
+          {/* First Row: Search, Location, Status */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input className="input-clean pl-10" placeholder="Search by customer, ID, or service..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            {isSuperAdmin && (
+              <div className="relative sm:w-56">
+                <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                <select
+                  className="input-clean pl-10"
+                  value={selectedLocation}
+                  onChange={(e) => setSelectedLocation(e.target.value)}
+                >
+                  <option value="">All Locations</option>
+                  {locations.map((loc) => (
+                    <option key={loc._id} value={loc._id}>
+                      {loc.apartmentName}, {loc.city}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <select className="input-clean sm:w-48" value={filter} onChange={(e) => setFilter(e.target.value)}>
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="in-progress">In Progress</option>
+              <option value="pending-review">Pending Review</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
           </div>
+
+          {/* Second Row: Worker Filter and Date Range (Super Admin Only) */}
           {isSuperAdmin && (
-            <div className="relative sm:w-56">
-              <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-              <select
-                className="input-clean pl-10"
-                value={selectedLocation}
-                onChange={(e) => setSelectedLocation(e.target.value)}
-              >
-                <option value="">All Locations</option>
-                {locations.map((loc) => (
-                  <option key={loc._id} value={loc._id}>
-                    {loc.apartmentName}, {loc.city}
-                  </option>
-                ))}
-              </select>
+            <div className="flex flex-col sm:flex-row gap-3 bg-muted/30 p-3 rounded-lg">
+              <div className="relative flex-1">
+                <Users className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                <select
+                  className="input-clean pl-10"
+                  value={selectedWorker}
+                  onChange={(e) => setSelectedWorker(e.target.value)}
+                >
+                  <option value="">All Workers</option>
+                  {allWorkers.map((worker) => (
+                    <option key={worker._id} value={worker._id}>
+                      {worker.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-2 flex-1">
+                <input
+                  type="date"
+                  className="input-clean flex-1"
+                  placeholder="Start Date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+                <input
+                  type="date"
+                  className="input-clean flex-1"
+                  placeholder="End Date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              </div>
+              {(selectedWorker || startDate || endDate) && (
+                <button
+                  onClick={() => {
+                    setSelectedWorker("");
+                    setStartDate("");
+                    setEndDate("");
+                  }}
+                  className="btn-outline text-sm px-3 whitespace-nowrap"
+                >
+                  Clear Filters
+                </button>
+              )}
             </div>
           )}
-          <select className="input-clean sm:w-48" value={filter} onChange={(e) => setFilter(e.target.value)}>
-            <option value="all">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="in-progress">In Progress</option>
-            <option value="pending-review">Pending Review</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
         </div>
 
         {/* Table */}
