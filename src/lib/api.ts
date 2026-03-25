@@ -1650,10 +1650,11 @@ export const superAdminAPI = {
   },
 
   // Bookings — all. Optional ?locationId= and ?status= filters.
-  getBookings: async (params?: { locationId?: string; status?: string; limit?: number }) => {
+  getBookings: async (params?: { locationId?: string; status?: string; page?: number; limit?: number }) => {
     const q = new URLSearchParams();
     if (params?.locationId) q.append('locationId', params.locationId);
     if (params?.status) q.append('status', params.status);
+    if (params?.page) q.append('page', String(params.page));
     if (params?.limit) q.append('limit', String(params.limit));
     return apiCall(`/super-admin/bookings${q.toString() ? `?${q.toString()}` : ''}`);
   },

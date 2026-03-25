@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import ListPagination from "@/components/admin/ListPagination";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { superAdminAPI } from "@/lib/api";
 import ExcelJS from "exceljs";
@@ -25,7 +26,7 @@ import {
   User,
   Users
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
@@ -125,6 +126,10 @@ const statusBadge: Record<string, string> = {
   cancelled: "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-100 text-red-800",
 };
 
+const OVERVIEW_PAGE_SIZE = 6;
+const WORKERS_PAGE_SIZE = 10;
+const BOOKINGS_PAGE_SIZE = 10;
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const SuperAdminDashboard = () => {
@@ -148,6 +153,11 @@ const SuperAdminDashboard = () => {
   const [locationStats, setLocationStats] = useState<GlobalStats | null>(null);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [overviewPage, setOverviewPage] = useState(1);
+  const [workersPage, setWorkersPage] = useState(1);
+  const [bookingsPage, setBookingsPage] = useState(1);
+  const [bookingsTotalPages, setBookingsTotalPages] = useState(1);
+  const [totalLocationBookings, setTotalLocationBookings] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [tabLoading, setTabLoading] = useState(false);
@@ -204,16 +214,18 @@ const SuperAdminDashboard = () => {
 
   // ── Location-filtered load ─────────────────────────────────────────────────
 
-  const fetchLocationData = useCallback(async (locationId: string) => {
+  const fetchLocationData = useCallback(async (locationId: string, pageNumber: number) => {
     try {
       setTabLoading(true);
       const [workersRes, bookingsRes, statsRes] = await Promise.all([
         superAdminAPI.getWorkers(locationId),
-        superAdminAPI.getBookings({ locationId, limit: 30 }),
+        superAdminAPI.getBookings({ locationId, page: pageNumber, limit: BOOKINGS_PAGE_SIZE }),
         superAdminAPI.getStats(locationId),
       ]);
       setWorkers(workersRes.workers || []);
       setBookings(bookingsRes.bookings || []);
+      setBookingsTotalPages(bookingsRes.totalPages || 1);
+      setTotalLocationBookings(bookingsRes.totalBookings || 0);
       if (statsRes.stats) setLocationStats(statsRes.stats);
     } catch (err) {
       console.error("Error fetching location data:", err);
@@ -224,19 +236,41 @@ const SuperAdminDashboard = () => {
 
   useEffect(() => {
     if (selectedLocationId !== "all") {
-      fetchLocationData(selectedLocationId);
+      fetchLocationData(selectedLocationId, bookingsPage);
     } else {
       setLocationStats(null);
       setWorkers([]);
       setBookings([]);
+      setBookingsTotalPages(1);
+      setTotalLocationBookings(0);
     }
-  }, [selectedLocationId, fetchLocationData]);
+  }, [selectedLocationId, bookingsPage, fetchLocationData]);
+
+  useEffect(() => {
+    const nextTotalPages = Math.max(1, Math.ceil(overview.length / OVERVIEW_PAGE_SIZE));
+    if (overviewPage > nextTotalPages) {
+      setOverviewPage(nextTotalPages);
+    }
+  }, [overview.length, overviewPage]);
+
+  useEffect(() => {
+    const nextTotalPages = Math.max(1, Math.ceil(workers.length / WORKERS_PAGE_SIZE));
+    if (workersPage > nextTotalPages) {
+      setWorkersPage(nextTotalPages);
+    }
+  }, [workers.length, workersPage]);
+
+  useEffect(() => {
+    if (bookingsPage > bookingsTotalPages) {
+      setBookingsPage(bookingsTotalPages);
+    }
+  }, [bookingsPage, bookingsTotalPages]);
 
   const handleArchiveWorker = async (workerId: string) => {
     if (!confirm("Archive this worker? They will be deactivated but their history is preserved.")) return;
     try {
       await superAdminAPI.archiveWorker(workerId);
-      fetchLocationData(selectedLocationId);
+      fetchLocationData(selectedLocationId, bookingsPage);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to archive worker");
     }
@@ -246,7 +280,7 @@ const SuperAdminDashboard = () => {
     if (!confirm("Restore this worker? They will be reactivated.")) return;
     try {
       await superAdminAPI.unarchiveWorker(workerId);
-      fetchLocationData(selectedLocationId);
+      fetchLocationData(selectedLocationId, bookingsPage);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to restore worker");
     }
@@ -255,7 +289,7 @@ const SuperAdminDashboard = () => {
   const handleUpdateWorkerAvailability = async (workerId: string, availability: boolean) => {
     try {
       await superAdminAPI.updateWorkerAvailability(workerId, availability);
-      fetchLocationData(selectedLocationId);
+      fetchLocationData(selectedLocationId, bookingsPage);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to update worker availability');
     }
@@ -380,6 +414,16 @@ const SuperAdminDashboard = () => {
 
   const selectedLocation = overview.find((l) => l._id === selectedLocationId);
   const displayStats = selectedLocationId !== "all" && locationStats ? locationStats : globalStats;
+  const totalOverviewPages = Math.max(1, Math.ceil(overview.length / OVERVIEW_PAGE_SIZE));
+  const paginatedOverview = useMemo(() => {
+    const startIndex = (overviewPage - 1) * OVERVIEW_PAGE_SIZE;
+    return overview.slice(startIndex, startIndex + OVERVIEW_PAGE_SIZE);
+  }, [overview, overviewPage]);
+  const totalWorkersPages = Math.max(1, Math.ceil(workers.length / WORKERS_PAGE_SIZE));
+  const paginatedWorkers = useMemo(() => {
+    const startIndex = (workersPage - 1) * WORKERS_PAGE_SIZE;
+    return workers.slice(startIndex, startIndex + WORKERS_PAGE_SIZE);
+  }, [workers, workersPage]);
 
   const formatDate = () =>
     new Date().toLocaleDateString("en-IN", {
@@ -438,6 +482,8 @@ const SuperAdminDashboard = () => {
                 value={selectedLocationId}
                 onChange={(e) => {
                   setSelectedLocationId(e.target.value);
+                  setWorkersPage(1);
+                  setBookingsPage(1);
                   setActiveTab("overview");
                 }}
                 className="pl-9 pr-4 py-2 rounded-xl border border-border bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary w-full sm:min-w-[220px]"
@@ -782,8 +828,9 @@ const SuperAdminDashboard = () => {
                   <p className="text-muted-foreground">No locations yet. <Link to="/admin/locations" className="text-primary underline">Add one</Link>.</p>
                 </div>
               ) : (
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {overview.map((loc) => (
+                <div className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {paginatedOverview.map((loc) => (
                     <div key={loc._id} className="card-elevated p-5 flex flex-col gap-4">
                       {/* Location header */}
                       <div className="flex items-start justify-between">
@@ -838,6 +885,15 @@ const SuperAdminDashboard = () => {
                       </button>
                     </div>
                   ))}
+                </div>
+                  <ListPagination
+                    currentPage={overviewPage}
+                    totalPages={totalOverviewPages}
+                    totalItems={overview.length}
+                    pageSize={OVERVIEW_PAGE_SIZE}
+                    itemLabel="locations"
+                    onPageChange={setOverviewPage}
+                  />
                 </div>
               )}
             </div>
@@ -1005,7 +1061,7 @@ const SuperAdminDashboard = () => {
                               </tr>
                             </thead>
                             <tbody>
-                              {workers.map((w) => (
+                              {paginatedWorkers.map((w) => (
                                 <tr key={w._id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                                   <td className="px-4 py-3">
                                     <div className="flex items-center gap-2.5">
@@ -1067,6 +1123,16 @@ const SuperAdminDashboard = () => {
                             </tbody>
                           </table>
                         </div>
+                        <div className="px-4 py-4">
+                          <ListPagination
+                            currentPage={workersPage}
+                            totalPages={totalWorkersPages}
+                            totalItems={workers.length}
+                            pageSize={WORKERS_PAGE_SIZE}
+                            itemLabel="workers"
+                            onPageChange={setWorkersPage}
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1116,7 +1182,7 @@ const SuperAdminDashboard = () => {
                           </table>
                         </div>
                         <div className="px-4 py-3 border-t border-border bg-muted/30 flex justify-between items-center">
-                          <p className="text-xs text-muted-foreground">{bookings.length} bookings shown</p>
+                          <p className="text-xs text-muted-foreground">{bookings.length} of {totalLocationBookings} bookings shown</p>
                           <div className="flex items-center gap-3">
                             <button
                               onClick={handleExportBookings}
@@ -1130,6 +1196,16 @@ const SuperAdminDashboard = () => {
                               View all bookings <ChevronRight className="w-3 h-3" />
                             </Link>
                           </div>
+                        </div>
+                        <div className="px-4 py-4 border-t border-border/60 bg-card">
+                          <ListPagination
+                            currentPage={bookingsPage}
+                            totalPages={bookingsTotalPages}
+                            totalItems={totalLocationBookings}
+                            pageSize={BOOKINGS_PAGE_SIZE}
+                            itemLabel="bookings"
+                            onPageChange={setBookingsPage}
+                          />
                         </div>
                       </div>
                     )}

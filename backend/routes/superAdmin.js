@@ -791,7 +791,9 @@ router.patch('/customers/:customerId/status', async (req, res) => {
 // @desc    All bookings. Optional ?locationId= and ?status= filters.
 router.get('/bookings', authenticate, authorize('super_admin', 'admin'), async (req, res) => {
   try {
-    const { locationId, status, limit = 50 } = req.query;
+    const { locationId, status, page = 1, limit = 50 } = req.query;
+    const pageNumber = Math.max(1, Number.parseInt(page, 10) || 1);
+    const limitNumber = Math.max(1, Math.min(200, Number.parseInt(limit, 10) || 50));
 
     let bookings = await Booking.find()
       .populate('customer', 'name email phone')
@@ -799,7 +801,7 @@ router.get('/bookings', authenticate, authorize('super_admin', 'admin'), async (
       .populate('supportStaff.worker', 'name email phone')
       .populate('service', 'name category price duration')
       .sort({ createdAt: -1 })
-      .limit(parseInt(limit) * 3);
+      .lean();
 
     if (locationId) {
       const workersInLocation = await User.find({
@@ -816,9 +818,19 @@ router.get('/bookings', authenticate, authorize('super_admin', 'admin'), async (
       bookings = bookings.filter((b) => b.status === status);
     }
 
-    bookings = bookings.slice(0, parseInt(limit));
+    const totalBookings = bookings.length;
+    const totalPages = Math.max(1, Math.ceil(totalBookings / limitNumber));
+    const startIndex = (pageNumber - 1) * limitNumber;
+    const paginatedBookings = bookings.slice(startIndex, startIndex + limitNumber);
 
-    res.json({ success: true, bookings });
+    res.json({
+      success: true,
+      bookings: paginatedBookings,
+      totalBookings,
+      totalPages,
+      currentPage: pageNumber,
+      limit: limitNumber
+    });
   } catch (error) {
     console.error('Super admin get bookings error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });

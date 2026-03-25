@@ -1,10 +1,11 @@
+import ListPagination from "@/components/admin/ListPagination";
 import AppLayout from "@/components/AppLayout";
 import { ReliabilityScoreCard } from "@/components/ReliabilityScoreCard";
 import { WorkerRatingAnalytics } from "@/components/WorkerRatingAnalytics";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { adminAPI, API_BASE_URL, reliabilityAPI, reviewAnalyticsAPI, superAdminAPI } from "@/lib/api";
 import { AlertTriangle, Archive, ArchiveRestore, BarChart3, CheckCircle, Clock, Edit, Eye, EyeOff, FileText, Info, Loader2, MapPin, Plus, Search, Star, TrendingUp, Upload, X, XCircle } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface Location {
   _id: string;
@@ -178,9 +179,11 @@ const formatMinutes = (mins: number) => {
 };
 
 const AdminWorkers = () => {
+  const WORKERS_PER_PAGE = 8;
   const { role, name, isSuperAdmin } = useAdminRole();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
@@ -751,7 +754,7 @@ const AdminWorkers = () => {
     });
   };
 
-  const filtered = workers.filter((w) => {
+  const filtered = useMemo(() => workers.filter((w) => {
     const matchSearch = w.name.toLowerCase().includes(search.toLowerCase()) ||
       w.email.toLowerCase().includes(search.toLowerCase());
 
@@ -759,7 +762,23 @@ const AdminWorkers = () => {
 
     const workerStatus = isWorkerEffectivelyOnline(w) ? 'available' : 'offline';
     return matchSearch && workerStatus === statusFilter;
-  });
+  }), [workers, search, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / WORKERS_PER_PAGE));
+  const paginatedWorkers = useMemo(() => {
+    const startIndex = (currentPage - 1) * WORKERS_PER_PAGE;
+    return filtered.slice(startIndex, startIndex + WORKERS_PER_PAGE);
+  }, [currentPage, filtered]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const onlineCount = workers.filter((worker) => isWorkerEffectivelyOnline(worker)).length;
   const offlineCount = workers.filter((worker) => !isWorkerEffectivelyOnline(worker)).length;
@@ -829,8 +848,9 @@ const AdminWorkers = () => {
             <p className="text-sm mt-2">Click "Add Worker" to create one</p>
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {filtered.map((w) => {
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+            {paginatedWorkers.map((w) => {
               const status = isWorkerEffectivelyOnline(w) ? 'available' : 'offline';
               const availabilityReason = getWorkerAvailabilityReason(w);
               return (
@@ -1004,6 +1024,16 @@ const AdminWorkers = () => {
                 </div>
               );
             })}
+            </div>
+
+            <ListPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filtered.length}
+              pageSize={WORKERS_PER_PAGE}
+              itemLabel="workers"
+              onPageChange={setCurrentPage}
+            />
           </div>
         )}
 

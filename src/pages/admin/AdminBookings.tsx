@@ -1,3 +1,4 @@
+import ListPagination from "@/components/admin/ListPagination";
 import AppLayout from "@/components/AppLayout";
 import BookingOrderPrint from "@/components/BookingOrderPrint";
 import { useAdminRole } from "@/hooks/useAdminRole";
@@ -5,7 +6,7 @@ import { adminAPI, bookingsAPI, superAdminAPI } from "@/lib/api";
 import ExcelJS from "exceljs";
 import html2pdf from "html2pdf.js";
 import { CheckCircle, Coffee, Crown, Download, Eye, MapPin, Printer, Search, Users, Wallet, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface ProofPhoto {
   url: string;
@@ -95,9 +96,11 @@ interface AvailableWorker {
 }
 
 const AdminBookings = () => {
+  const BOOKINGS_PER_PAGE = 12;
   const { role, name, isSuperAdmin } = useAdminRole();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -168,7 +171,7 @@ const AdminBookings = () => {
     }
   };
 
-  const filtered = bookings.filter((b) => {
+  const filtered = useMemo(() => bookings.filter((b) => {
     const serviceName = b.service?.name || (b.bookingType === 'deep-cleaning-cart' ? 'deep cleaning' : '');
     const matchSearch =
       (b.customer?.name || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -176,7 +179,23 @@ const AdminBookings = () => {
       serviceName.toLowerCase().includes(search.toLowerCase());
     const matchFilter = filter === "all" || b.status === filter;
     return matchSearch && matchFilter;
-  });
+  }), [bookings, filter, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / BOOKINGS_PER_PAGE));
+  const paginatedBookings = useMemo(() => {
+    const startIndex = (currentPage - 1) * BOOKINGS_PER_PAGE;
+    return filtered.slice(startIndex, startIndex + BOOKINGS_PER_PAGE);
+  }, [currentPage, filtered]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filter, selectedLocation, isSuperAdmin]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
@@ -589,7 +608,7 @@ const AdminBookings = () => {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((b) => (
+                {paginatedBookings.map((b) => (
                   <tr key={b._id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{b._id.slice(-6).toUpperCase()}</td>
                     <td className="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">{b.customer?.name || 'Unknown'}</td>
@@ -692,6 +711,17 @@ const AdminBookings = () => {
             </div>
           )}
         </div>
+
+        {!noRegionAssigned && filtered.length > 0 && (
+          <ListPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filtered.length}
+            pageSize={BOOKINGS_PER_PAGE}
+            itemLabel="bookings"
+            onPageChange={setCurrentPage}
+          />
+        )}
       </div>
 
       {/* Reassign Worker Modal */}
