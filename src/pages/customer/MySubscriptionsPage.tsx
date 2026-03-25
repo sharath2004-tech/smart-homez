@@ -1,7 +1,8 @@
 import AppLayout from "@/components/AppLayout";
 import SubscriptionCalendar from "@/components/SubscriptionCalendar";
+import SubscriptionPaymentStep from "@/components/SubscriptionPaymentStep";
 import { authAPI, bookingsAPI } from "@/lib/api";
-import { AlertTriangle, Calendar, CalendarDays, CheckCircle, Clock, Edit2, MapPin, RefreshCw, User, UserCheck, XCircle } from "lucide-react";
+import { AlertTriangle, Calendar, CalendarDays, CheckCircle, Clock, CreditCard, Edit2, MapPin, RefreshCw, User, UserCheck, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -74,6 +75,7 @@ const MySubscriptionsPage = () => {
   const [subscriptions, setSubscriptions] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [changingWorker, setChangingWorker] = useState<string | null>(null);
+  const [openPaymentFor, setOpenPaymentFor] = useState<string | null>(null);
   const [availableWorkers, setAvailableWorkers] = useState<Worker[]>([]);
   const [loadingWorkers, setLoadingWorkers] = useState(false);
   const [expandedCalendars, setExpandedCalendars] = useState<Set<string>>(new Set());
@@ -473,9 +475,44 @@ const MySubscriptionsPage = () => {
                   </span>
                 </div>
 
+                {subscription.subscription?.activationStatus === 'payment_pending' && (
+                  <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div>
+                        <p className="text-sm font-semibold text-amber-900 flex items-center gap-2">
+                          <CreditCard className="w-4 h-4" /> Complete payment proof upload
+                        </p>
+                        <p className="text-xs text-amber-700 mt-1 max-w-2xl">
+                          If you left the booking page before uploading the screenshot, no worries — you can continue from here and submit the payment proof now.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setOpenPaymentFor((current) => current === subscription._id ? null : subscription._id)}
+                        className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600"
+                      >
+                        {openPaymentFor === subscription._id ? 'Hide payment form' : 'Continue payment'}
+                      </button>
+                    </div>
+
+                    {openPaymentFor === subscription._id && (
+                      <SubscriptionPaymentStep
+                        bookingId={subscription._id}
+                        amount={subscription.totalAmount}
+                        title={`Finish payment for ${subscription.service.name}`}
+                        description="You can safely resume payment from here anytime before approval. Upload the screenshot once the transfer is complete and the admin team will review it."
+                        successLabel="Payment proof uploaded. Waiting for admin approval"
+                        onPaymentSubmitted={async () => {
+                          setOpenPaymentFor(null);
+                          await fetchData();
+                        }}
+                      />
+                    )}
+                  </div>
+                )}
+
                 {/* Actions */}
                 <div className="flex gap-2">
-                  {subscription.subscription?.allowPause && (
+                  {subscription.subscription?.allowPause && subscription.subscription?.activationStatus === 'active' && (
                     subscription.subscription?.isPaused ? (
                       <button
                         onClick={() => handleResumeSubscription(subscription._id)}
