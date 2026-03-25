@@ -19,16 +19,21 @@ interface NotificationCenterProps {
   userType?: "customer" | "worker" | "admin" | "super_admin";
 }
 
+interface ProfileSummary {
+  role?: "customer" | "worker" | "admin" | "super_admin";
+  name?: string;
+}
+
 export default function NotificationCenter({ userType }: NotificationCenterProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [detectedUserType, setDetectedUserType] = useState<"customer" | "worker" | "admin" | "super_admin">("customer");
 
   // Fetch current user profile from API and detect userType
   useEffect(() => {
     authAPI.getProfile()
-      .then((res: any) => {
+      .then((res: { user?: ProfileSummary } & ProfileSummary) => {
         const user = res.user || res;
         setProfile(user);
         
@@ -37,7 +42,7 @@ export default function NotificationCenter({ userType }: NotificationCenterProps
           setDetectedUserType(user.role);
         }
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         console.error('Error fetching profile:', err);
       });
   }, [userType]);

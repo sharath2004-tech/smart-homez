@@ -54,6 +54,13 @@ interface SearchResult {
   lng: number;
 }
 
+interface NominatimSearchResult {
+  place_id?: number | string;
+  display_name?: string;
+  lat: string;
+  lon: string;
+}
+
 const LocationSelector = ({
   onLocationConfirmed,
   onClose,
@@ -308,7 +315,7 @@ const LocationSelector = ({
       const results = await response.json();
 
       if (results && results.length > 0) {
-        const mappedResults = results.map((result: any, index: number) => ({
+        const mappedResults = (results as NominatimSearchResult[]).map((result, index: number) => ({
           id: `${result.place_id || index}`,
           label: result.display_name?.split(',').slice(0, 2).join(', ') || searchQuery,
           secondaryLabel: result.display_name,

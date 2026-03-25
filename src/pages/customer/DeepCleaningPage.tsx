@@ -134,7 +134,10 @@ export default function DeepCleaningPage() {
   const prevCat = useRef("bathroom");
   const autoOpenedItemRef = useRef<string | null>(null);
 
-  const customerAddresses = profile?.addresses ?? profile?.customerProfile?.addresses ?? [];
+  const customerAddresses = useMemo(
+    () => profile?.addresses ?? profile?.customerProfile?.addresses ?? [],
+    [profile]
+  );
 
   useEffect(() => {
     Promise.all([

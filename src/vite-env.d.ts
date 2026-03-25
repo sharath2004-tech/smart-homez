@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 // Temporary Leaflet type declarations
 declare module 'leaflet' {
   export class Map {

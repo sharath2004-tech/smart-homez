@@ -4,7 +4,7 @@ import { useGeolocation } from "@/hooks/useGeolocation";
 import { authAPI, bookingsAPI, dashboardPreferencesAPI, locationsAPI, serviceAreasAPI, servicesAPI, setStoredCustomerLocation } from "@/lib/api";
 import { motion } from "framer-motion";
 import { AlertCircle, ArrowRight, Bell, ChevronRight, Clock, MapPin, RefreshCw, Settings, Star } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -114,7 +114,7 @@ const CustomerDashboard = () => {
   const [serviceableStatus, setServiceableStatus] = useState<'available' | 'unavailable' | 'unknown'>('unknown');
   const [serviceabilityMessage, setServiceabilityMessage] = useState('');
   const [nearestServiceArea, setNearestServiceArea] = useState<{ name?: string; distance?: number } | null>(null);
-  const [quickServices, setQuickServices] = useState<any[]>([]);
+  const [quickServices, setQuickServices] = useState<DashboardConfiguredService[]>([]);
   const [dashboardLinkedServices, setDashboardLinkedServices] = useState<CustomerServiceRecord[]>([]);
   const [deepCleaningRequestServiceId, setDeepCleaningRequestServiceId] = useState<string | null>(null);
   const [requestingDeepCleaning, setRequestingDeepCleaning] = useState(false);
@@ -122,7 +122,7 @@ const CustomerDashboard = () => {
   const [showLocationSelector, setShowLocationSelector] = useState(false);
   const { latitude, longitude, error: locationError, loading: locationLoading, refetch } = useGeolocation();
 
-  const getDashboardLinkedService = (service: DashboardConfiguredService) => {
+  const getDashboardLinkedService = useCallback((service: DashboardConfiguredService) => {
     if (service.linkedServiceId) {
       return dashboardLinkedServices.find((item) => item._id === service.linkedServiceId) || null;
     }
@@ -150,9 +150,9 @@ const CustomerDashboard = () => {
     });
 
     return serviceByRule || null;
-  };
+  }, [dashboardLinkedServices]);
 
-  const resolveDashboardServicePath = (service: DashboardConfiguredService) => {
+  const resolveDashboardServicePath = useCallback((service: DashboardConfiguredService) => {
     const linkedService = getDashboardLinkedService(service);
 
     if (linkedService?.subscriptionOptions?.enabled) {
@@ -168,7 +168,7 @@ const CustomerDashboard = () => {
     }
 
     return service.path;
-  };
+  }, [getDashboardLinkedService]);
 
   useEffect(() => {
     const stored = getStoredDashboardLocation();
@@ -183,7 +183,7 @@ const CustomerDashboard = () => {
       try {
         const response = await servicesAPI.getAll({ isActive: true, limit: 50 });
         const list = response.services || [];
-        const deepCleaning = list.find((s: any) =>
+        const deepCleaning = list.find((s: CustomerServiceRecord) =>
           s.serviceType === 'deep_cleaning_full_house' ||
           s.serviceCategory === 'deep_cleaning' ||
           s.name.toLowerCase().includes('deep cleaning')
@@ -223,8 +223,8 @@ const CustomerDashboard = () => {
         setQuickServices([]);
       }
     };
-    fetchServices();
-  }, [dashboardLinkedServices, t]);
+    void fetchServices();
+  }, [resolveDashboardServicePath, t]);
 
   useEffect(() => {
     const fetchCoreData = async () => {
@@ -276,7 +276,23 @@ const CustomerDashboard = () => {
         serviceAreaId: response.serviceArea?.id || location.serviceAreaId,
       };
 
-      setSelectedLocation(nextLocation);
+      setSelectedLocation((current) => {
+        if (
+          current
+          && current.lat === nextLocation.lat
+          && current.lng === nextLocation.lng
+          && current.address === nextLocation.address
+          && current.area === nextLocation.area
+          && current.city === nextLocation.city
+          && current.zipCode === nextLocation.zipCode
+          && current.isAvailable === nextLocation.isAvailable
+          && current.serviceAreaId === nextLocation.serviceAreaId
+        ) {
+          return current;
+        }
+
+        return nextLocation;
+      });
       setServiceableStatus(response.isAvailable ? 'available' : 'unavailable');
       setServiceabilityMessage(response.message || '');
       setNearestServiceArea(response.nearest || null);
@@ -306,10 +322,12 @@ const CustomerDashboard = () => {
     }
   }, []);
 
+  const locationToValidate = useMemo(() => selectedLocation, [selectedLocation]);
+
   useEffect(() => {
-    if (!selectedLocation) return;
-    void validateDashboardLocation(selectedLocation);
-  }, [selectedLocation?.lat, selectedLocation?.lng, validateDashboardLocation]);
+    if (!locationToValidate) return;
+    void validateDashboardLocation(locationToValidate);
+  }, [locationToValidate, validateDashboardLocation]);
 
   const handleLocationConfirmed = (location: LocationData) => {
     setSelectedLocation(location);

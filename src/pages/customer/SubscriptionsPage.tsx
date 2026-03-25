@@ -7,12 +7,33 @@ import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { api } from '../../lib/api';
 
+interface SubscriptionSection {
+  _id: string;
+  name: string;
+  description?: string;
+  emoji?: string;
+  color?: string;
+  filterConfig?: {
+    namePatternsInclude?: string[];
+  };
+}
+
+interface SubscriptionItem {
+  _id: string;
+  status: 'active' | 'paused' | 'cancelled' | string;
+  plan: string;
+  totalAmount: number;
+  nextBillingDate?: string;
+  service?: {
+    name?: string;
+  };
+}
+
 export default function SubscriptionsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const [selectedSub, setSelectedSub] = useState(null);
 
-  const { data: subscriptions } = useQuery({
+  const { data: subscriptions } = useQuery<SubscriptionItem[]>({
     queryKey: ['subscriptions'],
     queryFn: async () => {
       const res = await api.get('/subscriptions');
@@ -20,7 +41,7 @@ export default function SubscriptionsPage() {
     }
   });
 
-  const { data: sections = [] } = useQuery({
+  const { data: sections = [] } = useQuery<SubscriptionSection[]>({
     queryKey: ['subscription-sections'],
     queryFn: async () => {
       const res = await api.get('/subscription-sections');
@@ -29,12 +50,12 @@ export default function SubscriptionsPage() {
   });
 
   const pauseMutation = useMutation({
-    mutationFn: (id) => api.patch(`/subscriptions/${id}/pause`, { reason: 'User requested' }),
+    mutationFn: (id: string) => api.patch(`/subscriptions/${id}/pause`, { reason: 'User requested' }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['subscriptions'] })
   });
 
   const resumeMutation = useMutation({
-    mutationFn: (id) => api.patch(`/subscriptions/${id}/resume`),
+    mutationFn: (id: string) => api.patch(`/subscriptions/${id}/resume`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['subscriptions'] })
   });
 
@@ -61,7 +82,7 @@ export default function SubscriptionsPage() {
     return colorMap[color] || 'from-gray-50 to-gray-100';
   };
 
-  const SubscriptionCard = ({ sub }: any) => (
+  const SubscriptionCard = ({ sub }: { sub: SubscriptionItem }) => (
     <Card className="p-6 hover:shadow-lg transition-shadow">
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         {/* Left Section */}
@@ -128,7 +149,7 @@ export default function SubscriptionsPage() {
     </Card>
   );
 
-  const EmptySection = ({ section }: { section: any }) => (
+  const EmptySection = ({ section }: { section: SubscriptionSection }) => (
     <Card className="p-8 text-center border-dashed">
       <div className="max-w-md mx-auto">
         <div className="w-14 h-14 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
@@ -156,7 +177,7 @@ export default function SubscriptionsPage() {
 
       {/* Subscription Sections */}
       {sections.length > 0 ? (
-        sections.map((section: any) => {
+        sections.map((section) => {
           const sectionSubs = subscriptions?.filter(sub => {
             const serviceName = (sub.service?.name || '').toLowerCase();
             const patterns = section.filterConfig?.namePatternsInclude || [];
@@ -220,23 +241,6 @@ export default function SubscriptionsPage() {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-primary mt-0.5">•</span>
-                <span><strong>Pause Anytime:</strong> Going on vacation? Pause your subscription and resume when you're back</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-primary mt-0.5">•</span>
-                <span><strong>Priority Booking:</strong> Subscription members get priority worker assignment during peak hours</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-primary mt-0.5">•</span>
-                <span><strong>Flexible Scheduling:</strong> Modify your service schedule up to 24 hours before each appointment</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </Card>
-    </div>
-  );
-}
                 <span><strong>Pause Anytime:</strong> Going on vacation? Pause your subscription and resume when you're back</span>
               </li>
               <li className="flex items-start gap-2">

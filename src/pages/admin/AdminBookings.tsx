@@ -56,6 +56,7 @@ interface Booking {
   completionPhoto?: ProofPhoto;
   completionPhotos?: ProofPhoto[];
   paymentProof?: ProofPhoto;
+  paymentProofs?: ProofPhoto[];
   actualStartTime?: string;
   actualEndTime?: string;
   actualDurationMinutes?: number;
@@ -294,11 +295,24 @@ const AdminBookings = () => {
     .filter(Boolean)
     .join(', ');
 
-  const hasProofs = (b: Booking) => !!(b.completionPhoto?.url || b.paymentProof?.url || (b.completionPhotos && b.completionPhotos.length > 0));
+  const getPaymentProofs = (booking: Booking) => (
+    booking.paymentProofs && booking.paymentProofs.length > 0
+      ? booking.paymentProofs
+      : booking.paymentProof?.url
+        ? [booking.paymentProof]
+        : []
+  );
+
+  const getLatestPaymentProof = (booking: Booking) => {
+    const proofs = getPaymentProofs(booking);
+    return proofs.length > 0 ? proofs[proofs.length - 1] : undefined;
+  };
+
+  const hasProofs = (b: Booking) => !!(b.completionPhoto?.url || getPaymentProofs(b).length > 0 || (b.completionPhotos && b.completionPhotos.length > 0));
   const needsSubscriptionPaymentReview = (b: Booking) => Boolean(
     b.subscription?.isSubscription
     && b.subscription?.activationStatus === 'approval_pending'
-    && b.paymentProof?.url
+    && getLatestPaymentProof(b)?.url
   );
 
   const handleApproveBooking = async (bookingId: string) => {
@@ -328,16 +342,46 @@ const AdminBookings = () => {
         return;
       }
 
-      setSelectedProofBooking((current) => current ? {
-        ...current,
-        paymentProof: current.paymentProof ? {
-          ...current.paymentProof,
+      setSelectedProofBooking((current) => {
+        if (!current) return current;
+
+        const existingProofs = current.paymentProofs && current.paymentProofs.length > 0
+          ? [...current.paymentProofs]
+          : current.paymentProof?.url
+            ? [{ ...current.paymentProof }]
+            : [];
+        const reviewTimestamp = new Date().toISOString();
+
+        if (existingProofs.length === 0) {
+          return {
+            ...current,
+            paymentProof: current.paymentProof ? {
+              ...current.paymentProof,
+              verified: true,
+              reviewStatus: 'approved',
+              reviewNotes: paymentReviewReason.trim() || null,
+              reviewedAt: reviewTimestamp
+            } : current.paymentProof
+          };
+        }
+
+        const updatedLatestProof = {
+          ...existingProofs[existingProofs.length - 1],
           verified: true,
-          reviewStatus: 'approved',
+          reviewStatus: 'approved' as const,
           reviewNotes: paymentReviewReason.trim() || null,
-          reviewedAt: new Date().toISOString()
-        } : current.paymentProof
-      } : current);
+          reviewedAt: reviewTimestamp
+        };
+
+        return {
+          ...current,
+          paymentProof: updatedLatestProof,
+          paymentProofs: [
+            ...existingProofs.slice(0, -1),
+            updatedLatestProof
+          ]
+        };
+      });
       setPaymentReviewReason('');
       alert('Payment proof approved. You can now assign the worker to activate the subscription.');
     } catch (error) {
@@ -487,7 +531,7 @@ const AdminBookings = () => {
       jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
     };
 
-    // @ts-ignore - html2pdf types not perfect
+    // @ts-expect-error - html2pdf types are incomplete for the chained builder API
     html2pdf().set(opt).from(printRef.current).save();
   };
 
@@ -610,7 +654,7 @@ const AdminBookings = () => {
         estimatedRevenue: getEstimatedRevenue(b),
         overtimeCharges: b.overtimeCharges || 0,
         paymentStatus: b.paymentStatus || 'pending',
-        transactionId: b.paymentProof?.transactionId || '—',
+        transactionId: getLatestPaymentProof(b)?.transactionId || '—',
         status: b.status.charAt(0).toUpperCase() + b.status.slice(1).replace('-', ' '),
         notes: b.notes || '—',
         createdAt: formatDateTime(b.createdAt),
@@ -857,7 +901,7 @@ const AdminBookings = () => {
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
-      // @ts-ignore - html2pdf types not perfect
+      // @ts-expect-error - html2pdf types are incomplete for the chained builder API
       await html2pdf().set(opt).from(tempDiv).save();
 
       document.body.removeChild(tempDiv);
@@ -1087,7 +1131,10 @@ const AdminBookings = () => {
                             {(b.status === 'pending-review' || needsSubscriptionPaymentReview(b)) ? '⏳ Review' : (
                               hasProofs(b) ? (
                                 <span>
-                                  {[b.completionPhotos && b.completionPhotos.length > 0 && `📸×${b.completionPhotos.length}`, b.paymentProof?.url && '💳'].filter(Boolean).join(' ')}
+                                  {[
+                                    b.completionPhotos && b.completionPhotos.length > 0 && `📸×${b.completionPhotos.length}`,
+                                    getPaymentProofs(b).length > 0 && `💳×${getPaymentProofs(b).length}`
+                                  ].filter(Boolean).join(' ')}
                                 </span>
                               ) : 'No proofs'
                             )}
@@ -1378,58 +1425,79 @@ const AdminBookings = () => {
                 <h3 className="font-semibold text-foreground flex items-center gap-2">
                   💳 Payment Proof
                 </h3>
-                {selectedProofBooking.paymentProof?.url ? (
-                  <div className="space-y-2">
-                    <div className="rounded-xl overflow-hidden border-2 border-amber-200 bg-black">
-                      <img
-                        src={bookingsAPI.getCompletionPhotoUrl(selectedProofBooking.paymentProof.url)}
-                        alt="Payment proof"
-                        className="w-full max-h-72 object-contain mx-auto"
-                      />
-                    </div>
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-amber-700 font-medium">Review status:</span>
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                          selectedProofBooking.paymentProof.reviewStatus === 'approved'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : selectedProofBooking.paymentProof.reviewStatus === 'rejected'
-                              ? 'bg-red-100 text-red-700'
-                              : 'bg-amber-100 text-amber-700'
-                        }`}>
-                          {selectedProofBooking.paymentProof.reviewStatus || (selectedProofBooking.paymentProof.verified ? 'approved' : 'pending')}
-                        </span>
+                {getPaymentProofs(selectedProofBooking).length > 0 ? (
+                  <div className="space-y-3">
+                    {getPaymentProofs(selectedProofBooking).length > 1 && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        Customer uploaded {getPaymentProofs(selectedProofBooking).length} proofs. The latest one is used for confirmation; earlier uploads stay visible for reference.
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-amber-700 font-medium">Uploaded at:</span>
-                        <span className="text-foreground">{formatDateTime(selectedProofBooking.paymentProof.timestamp)}</span>
-                      </div>
-                      {selectedProofBooking.paymentProof.reviewNotes && (
-                        <div className="border-t border-amber-200 pt-2">
-                          <span className="text-amber-700 font-medium">Review note:</span>
-                          <p className="text-foreground mt-1 whitespace-pre-wrap">{selectedProofBooking.paymentProof.reviewNotes}</p>
-                        </div>
-                      )}
-                      {selectedProofBooking.paymentProof.reviewedAt && (
-                        <div className="flex items-center justify-between border-t border-amber-200 pt-2">
-                          <span className="text-amber-700 font-medium">Reviewed at:</span>
-                          <span className="text-foreground">{formatDateTime(selectedProofBooking.paymentProof.reviewedAt)}</span>
-                        </div>
-                      )}
-                      {selectedProofBooking.paymentProof.transactionId && (
-                        <div className="flex items-center justify-between border-t border-amber-200 pt-2">
-                          <span className="text-amber-700 font-medium">Transaction ID:</span>
-                          <span className="font-mono font-semibold text-foreground bg-white px-2 py-0.5 rounded border border-amber-200">
-                            {selectedProofBooking.paymentProof.transactionId}
-                          </span>
-                        </div>
-                      )}
-                      {selectedProofBooking.paymentProof.transactionTime && (
-                        <div className="flex items-center justify-between border-t border-amber-200 pt-2">
-                          <span className="text-amber-700 font-medium">Transaction Time:</span>
-                          <span className="text-foreground">{formatDateTime(selectedProofBooking.paymentProof.transactionTime)}</span>
-                        </div>
-                      )}
+                    )}
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {getPaymentProofs(selectedProofBooking).map((proof, index) => {
+                        const isLatestProof = index === getPaymentProofs(selectedProofBooking).length - 1;
+
+                        return (
+                          <div key={`${proof.url}-${proof.timestamp}-${index}`} className="space-y-2 rounded-xl border border-amber-200 bg-amber-50/50 p-3">
+                            <div className="rounded-xl overflow-hidden border-2 border-amber-200 bg-black">
+                              <img
+                                src={bookingsAPI.getCompletionPhotoUrl(proof.url)}
+                                alt={`Payment proof ${index + 1}`}
+                                className="w-full max-h-72 object-contain mx-auto"
+                              />
+                            </div>
+                            <div className="flex items-center justify-between gap-2 text-xs">
+                              <span className="font-medium text-amber-800">Proof {index + 1}</span>
+                              {isLatestProof && (
+                                <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary">Latest</span>
+                              )}
+                            </div>
+                            <div className="bg-white border border-amber-200 rounded-lg p-3 space-y-2 text-sm">
+                              <div className="flex items-center justify-between">
+                                <span className="text-amber-700 font-medium">Review status:</span>
+                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                  proof.reviewStatus === 'approved'
+                                    ? 'bg-emerald-100 text-emerald-700'
+                                    : proof.reviewStatus === 'rejected'
+                                      ? 'bg-red-100 text-red-700'
+                                      : 'bg-amber-100 text-amber-700'
+                                }`}>
+                                  {proof.reviewStatus || (proof.verified ? 'approved' : 'pending')}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-amber-700 font-medium">Uploaded at:</span>
+                                <span className="text-foreground">{formatDateTime(proof.timestamp)}</span>
+                              </div>
+                              {proof.reviewNotes && (
+                                <div className="border-t border-amber-200 pt-2">
+                                  <span className="text-amber-700 font-medium">Review note:</span>
+                                  <p className="text-foreground mt-1 whitespace-pre-wrap">{proof.reviewNotes}</p>
+                                </div>
+                              )}
+                              {proof.reviewedAt && (
+                                <div className="flex items-center justify-between border-t border-amber-200 pt-2">
+                                  <span className="text-amber-700 font-medium">Reviewed at:</span>
+                                  <span className="text-foreground">{formatDateTime(proof.reviewedAt)}</span>
+                                </div>
+                              )}
+                              {proof.transactionId && (
+                                <div className="flex items-center justify-between border-t border-amber-200 pt-2">
+                                  <span className="text-amber-700 font-medium">Transaction ID:</span>
+                                  <span className="font-mono font-semibold text-foreground bg-white px-2 py-0.5 rounded border border-amber-200">
+                                    {proof.transactionId}
+                                  </span>
+                                </div>
+                              )}
+                              {proof.transactionTime && (
+                                <div className="flex items-center justify-between border-t border-amber-200 pt-2">
+                                  <span className="text-amber-700 font-medium">Transaction Time:</span>
+                                  <span className="text-foreground">{formatDateTime(proof.transactionTime)}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ) : (
@@ -1479,7 +1547,7 @@ const AdminBookings = () => {
                     </button>
                   </div>
 
-                  {selectedProofBooking.paymentProof?.reviewStatus === 'approved' && (
+                  {getLatestPaymentProof(selectedProofBooking)?.reviewStatus === 'approved' && (
                     <button
                       onClick={async () => {
                         const bookingToAssign = selectedProofBooking;
@@ -1497,7 +1565,7 @@ const AdminBookings = () => {
               {/* Approve Button for pending-review bookings */}
               {selectedProofBooking.status === 'pending-review' && (
                 <>
-                  {!selectedProofBooking.paymentProof?.url && (
+                  {!getLatestPaymentProof(selectedProofBooking)?.url && (
                     <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 text-center">
                       <p className="text-red-700 font-semibold mb-1">⚠️ Payment Proof Required</p>
                       <p className="text-sm text-red-600">Payment proof must be uploaded before approval</p>
@@ -1505,9 +1573,9 @@ const AdminBookings = () => {
                   )}
                   <button
                     onClick={() => handleApproveBooking(selectedProofBooking._id)}
-                    disabled={approvingBookingId === selectedProofBooking._id || !selectedProofBooking.paymentProof?.url}
+                    disabled={approvingBookingId === selectedProofBooking._id || !getLatestPaymentProof(selectedProofBooking)?.url}
                     className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
-                    title={!selectedProofBooking.paymentProof?.url ? 'Payment proof must be uploaded first' : 'Approve and mark as completed'}
+                    title={!getLatestPaymentProof(selectedProofBooking)?.url ? 'Payment proof must be uploaded first' : 'Approve and mark as completed'}
                   >
                     <CheckCircle className="w-5 h-5" />
                     {approvingBookingId === selectedProofBooking._id ? 'Approving…' : 'Approve & Mark Complete'}

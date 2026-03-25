@@ -283,11 +283,11 @@ const AdminDashboardPreferences = () => {
       });
 
       setHasChanges(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving config:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to save dashboard preferences",
+        description: error instanceof Error ? error.message : "Failed to save dashboard preferences",
         variant: "destructive"
       });
     } finally {

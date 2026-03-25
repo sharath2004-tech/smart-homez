@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { adminAPI, superAdminAPI } from "@/lib/api";
 import { ArrowLeft, Calendar, CheckCircle, Loader2, Mail, MapPin, Phone, ShoppingBag, User, XCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -83,17 +83,13 @@ const AdminCustomerDetails = () => {
   const [sendingResetOtp, setSendingResetOtp] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
-  useEffect(() => {
-    if (customerId) {
-      fetchCustomerDetails();
-    }
-  }, [customerId]);
+  const fetchCustomerDetails = useCallback(async () => {
+    if (!customerId) return;
 
-  const fetchCustomerDetails = async () => {
     setLoading(true);
     setError("");
     try {
-      const response = await adminAPI.getCustomerDetails(customerId!);
+      const response = await adminAPI.getCustomerDetails(customerId);
       if (response.success) {
         setCustomer(response.customer);
       }
@@ -103,7 +99,11 @@ const AdminCustomerDetails = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [customerId]);
+
+  useEffect(() => {
+    void fetchCustomerDetails();
+  }, [fetchCustomerDetails]);
 
   const formatDate = (dateString?: string): string => {
     if (!dateString) return "N/A";

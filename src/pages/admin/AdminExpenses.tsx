@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { API_BASE_URL, adminAPI, bookingsAPI, businessExpensesAPI } from "@/lib/api";
 import { DollarSign, Edit2, Plus, Trash2, TrendingDown, TrendingUp, Upload, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 interface ExpenseProofFile {
@@ -235,26 +235,93 @@ const AdminExpenses = () => {
   });
   const [loadingProfit, setLoadingProfit] = useState(false);
 
-  useEffect(() => {
-    fetchExpenses();
-    // Only fetch profit stats for super_admin
-    if (role === 'super_admin') {
-      fetchProfitStats();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role, selectedLocationId]);
-
-  useEffect(() => {
-    fetchBookings();
-    if (role === 'super_admin') {
-      fetchLocations();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role]);
-
   const activeLocationId = role === 'super_admin' && selectedLocationId !== 'all'
     ? selectedLocationId
     : undefined;
+
+  const fetchExpenses = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await businessExpensesAPI.getAll({
+        ...(activeLocationId ? { locationId: activeLocationId } : {})
+      });
+      setExpenses(data.expenses || []);
+      setSummary(data.summary.reduce((acc: Record<string, { total: number; count: number }>, item: { _id: string; total: number; count: number }) => {
+        acc[item._id] = { total: item.total, count: item.count };
+        return acc;
+      }, {}));
+      setGrandTotal(data.grandTotal || 0);
+    } catch (error) {
+      toast.error("Failed to load expenses");
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  }, [activeLocationId]);
+
+  const fetchBookings = useCallback(async () => {
+    try {
+      const data = await bookingsAPI.getAll({ limit: 1000 });
+      setBookings(data.bookings || []);
+    } catch (error) {
+      console.error("Failed to load bookings");
+    }
+  }, []);
+
+  const fetchLocations = useCallback(async () => {
+    try {
+      const data = await adminAPI.getLocations();
+      setLocations(data.locations || []);
+    } catch (error) {
+      console.error('Failed to load locations', error);
+    }
+  }, []);
+
+  const fetchProfitStats = useCallback(async (from?: string, to?: string) => {
+    const nextFrom = from || profitStats.dateRange.from;
+    const nextTo = to || profitStats.dateRange.to;
+
+    try {
+      setLoadingProfit(true);
+      const data = await adminAPI.getProfitStats(
+        nextFrom,
+        nextTo,
+        activeLocationId
+      );
+      if (data.success) {
+        setProfitStats((current) => ({
+          ...current,
+          ...data.profitStats,
+          revenueByService: data.profitStats.revenueByService || [],
+          wageDetails: data.profitStats.wageDetails || [],
+          dateRange: {
+            from: nextFrom,
+            to: nextTo
+          }
+        }));
+      }
+    } catch (error) {
+      toast.error("Failed to load profit statistics");
+      console.error(error);
+    } finally {
+      setLoadingProfit(false);
+    }
+  }, [activeLocationId, profitStats.dateRange.from, profitStats.dateRange.to]);
+
+  useEffect(() => {
+    void fetchExpenses();
+    // Only fetch profit stats for super_admin
+    if (role === 'super_admin') {
+      void fetchProfitStats();
+    }
+  }, [fetchExpenses, fetchProfitStats, role]);
+
+  useEffect(() => {
+    void fetchBookings();
+    if (role === 'super_admin') {
+      void fetchLocations();
+    }
+  }, [fetchBookings, fetchLocations, role]);
 
   const getExpenseProofs = (expense: Expense): ExpenseProofFile[] => {
     if (expense.proofFiles && expense.proofFiles.length > 0) {
@@ -295,71 +362,6 @@ const AdminExpenses = () => {
 
   const removeSelectedProofFile = (fileToRemove: File) => {
     setSelectedProofFiles((current) => current.filter((file) => getFileIdentity(file) !== getFileIdentity(fileToRemove)));
-  };
-
-  const fetchExpenses = async () => {
-    try {
-      setLoading(true);
-      const data = await businessExpensesAPI.getAll({
-        ...(activeLocationId ? { locationId: activeLocationId } : {})
-      });
-      setExpenses(data.expenses || []);
-      setSummary(data.summary.reduce((acc: Record<string, { total: number; count: number }>, item: { _id: string; total: number; count: number }) => {
-        acc[item._id] = { total: item.total, count: item.count };
-        return acc;
-      }, {}));
-      setGrandTotal(data.grandTotal || 0);
-    } catch (error) {
-      toast.error("Failed to load expenses");
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchBookings = async () => {
-    try {
-      const data = await bookingsAPI.getAll({ limit: 1000 });
-      setBookings(data.bookings || []);
-    } catch (error) {
-      console.error("Failed to load bookings");
-    }
-  };
-
-  const fetchLocations = async () => {
-    try {
-      const data = await adminAPI.getLocations();
-      setLocations(data.locations || []);
-    } catch (error) {
-      console.error('Failed to load locations', error);
-    }
-  };
-
-  const fetchProfitStats = async (from?: string, to?: string) => {
-    try {
-      setLoadingProfit(true);
-      const data = await adminAPI.getProfitStats(
-        from || profitStats.dateRange.from,
-        to || profitStats.dateRange.to,
-        activeLocationId
-      );
-      if (data.success) {
-        setProfitStats({
-          ...data.profitStats,
-          revenueByService: data.profitStats.revenueByService || [],
-          wageDetails: data.profitStats.wageDetails || [],
-          dateRange: {
-            from: from || profitStats.dateRange.from,
-            to: to || profitStats.dateRange.to
-          }
-        });
-      }
-    } catch (error) {
-      toast.error("Failed to load profit statistics");
-      console.error(error);
-    } finally {
-      setLoadingProfit(false);
-    }
   };
 
   const handleDateRangeChange = (from: string, to: string) => {

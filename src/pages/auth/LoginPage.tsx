@@ -1,7 +1,7 @@
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { authAPI, publicAPI } from "@/lib/api";
 import { Eye, EyeOff, Home, Loader2, Phone, RefreshCw, Shield } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
@@ -43,6 +43,27 @@ const LoginPage = () => {
     publicAPI.getStats().then((r) => { if (r.success) setStats(r.stats); }).catch(() => {});
   }, []);
 
+  const handleGoogleLogin = useCallback(async (credential: string) => {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await authAPI.googleLogin(credential);
+      localStorage.removeItem("userLocation");
+      localStorage.setItem("token", response.token);
+      localStorage.setItem("user", JSON.stringify(response.user));
+
+      if (response.isNewUser === true || response.hasLocation !== true) {
+        window.location.href = "/register/customer?oauth=location";
+        return;
+      }
+
+      window.location.href = "/customer/dashboard";
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Google sign-in failed. Please try again.");
+      setLoading(false);
+    }
+  }, []);
+
   // Initialize Google Sign-In once
   useEffect(() => {
     if (window.google && !googleInitialized) {
@@ -52,7 +73,7 @@ const LoginPage = () => {
       });
       setGoogleInitialized(true);
     }
-  }, []);
+  }, [googleInitialized, handleGoogleLogin]);
 
   useEffect(() => {
     setForm({ email: "", password: "" });
@@ -193,27 +214,6 @@ const LoginPage = () => {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Verification failed. Please try again.");
       setOtpLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async (credential: string) => {
-    setLoading(true);
-    setError("");
-    try {
-      const response = await authAPI.googleLogin(credential);
-      localStorage.removeItem("userLocation");
-      localStorage.setItem("token", response.token);
-      localStorage.setItem("user", JSON.stringify(response.user));
-
-      if (response.isNewUser === true || response.hasLocation !== true) {
-        window.location.href = "/register/customer?oauth=location";
-        return;
-      }
-
-      window.location.href = "/customer/dashboard";
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Google sign-in failed. Please try again.");
-      setLoading(false);
     }
   };
 

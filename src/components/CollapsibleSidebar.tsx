@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
@@ -6,14 +6,14 @@ import "../styles/sidebar-enhancements.css";
 
 interface NavigationItem {
   to: string;
-  icon: React.ComponentType<any>;
+  icon: LucideIcon;
   label: string;
 }
 
 interface NavigationSection {
   id: string;
   title: string;
-  icon: React.ComponentType<any>;
+  icon: LucideIcon;
   items: NavigationItem[];
   defaultOpen?: boolean;
 }

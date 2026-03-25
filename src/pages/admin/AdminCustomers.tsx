@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { adminAPI } from "@/lib/api";
 import { Eye, Loader2, Search, UserCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 interface Address {
@@ -42,11 +42,7 @@ const AdminCustomers = () => {
   const [availableCities, setAvailableCities] = useState<string[]>([]);
   const limit = 20;
 
-  useEffect(() => {
-    fetchCustomers();
-  }, [searchTerm, cityFilter, currentPage]);
-
-  const fetchCustomers = async () => {
+  const fetchCustomers = useCallback(async () => {
     setLoading(true);
     try {
       const response = await adminAPI.getCustomers({
@@ -75,7 +71,11 @@ const AdminCustomers = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [cityFilter, currentPage, limit, searchTerm]);
+
+  useEffect(() => {
+    void fetchCustomers();
+  }, [fetchCustomers]);
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);

@@ -58,10 +58,6 @@ const resolveScheduleEndDate = (booking) => {
     return startOfDay(booking.subscription.subscriptionEndDate);
   }
 
-  if (booking.subscription?.isSubscription && booking.recurringSchedule?.frequency === 'monthly') {
-    return addDays(booking.recurringSchedule?.startDate || booking.bookingDate, 29);
-  }
-
   return null;
 };
 

@@ -21,10 +21,10 @@ const ServiceAreaDemo = () => {
   // Fetch current user profile
   useEffect(() => {
     authAPI.getProfile()
-      .then((res: any) => {
+      .then((res: { user?: { name?: string } } & { name?: string }) => {
         setProfile(res.user || res);
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         console.error('Error fetching profile:', err);
       });
   }, []);

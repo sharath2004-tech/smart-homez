@@ -494,7 +494,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
       jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
     };
 
-    // @ts-ignore - html2pdf types not perfect
+    // @ts-expect-error - html2pdf types are incomplete for the chained builder API
     html2pdf().set(opt).from(printRef.current).save();
   };
 

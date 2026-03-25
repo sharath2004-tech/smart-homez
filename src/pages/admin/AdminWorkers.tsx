@@ -5,7 +5,7 @@ import { WorkerRatingAnalytics } from "@/components/WorkerRatingAnalytics";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { adminAPI, API_BASE_URL, reliabilityAPI, reviewAnalyticsAPI, superAdminAPI } from "@/lib/api";
 import { AlertTriangle, Archive, ArchiveRestore, BarChart3, CheckCircle, Clock, Edit, Eye, EyeOff, FileText, Info, Loader2, MapPin, Plus, Search, Star, TrendingUp, Upload, X, XCircle } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface Location {
   _id: string;
@@ -117,6 +117,83 @@ interface WorkerPerformanceTask {
   } | null;
 }
 
+interface WorkerReliabilityAnalytics {
+  currentMonthScore?: {
+    month?: number;
+    year?: number;
+    scoreBreakdown: {
+      finalScore: number;
+      baseScore: number;
+      leaveBonus: number;
+      leavePenalties: number;
+    };
+    leaveData: {
+      totalLeaves: number;
+      uninformedLeaves: number;
+      informedLeaves: number;
+    };
+  };
+  currentMonthLabel?: string | null;
+  hasCurrentMonthScore?: boolean;
+  history?: Array<{
+    month: number;
+    year: number;
+    scoreBreakdown: {
+      finalScore: number;
+    };
+  }>;
+  error?: string;
+}
+
+interface WorkerRatingTrend {
+  currentPeriod: {
+    averageRating: number;
+    reviewCount: number;
+    averageQuality: number;
+    averageTimeliness: number;
+    averageProfessionalism: number;
+  };
+  previousPeriod: {
+    averageRating: number;
+    reviewCount: number;
+  };
+  changes: {
+    rating: number;
+    reviews: number;
+    percentage: number;
+  };
+  trend: 'improving' | 'declining' | 'stable';
+}
+
+interface WorkerRatingWeeklyData {
+  week: string;
+  averageRating: number;
+  categoryAverages: {
+    quality: number;
+    timeliness: number;
+    professionalism: number;
+  };
+  reviewCount: number;
+}
+
+interface WorkerRatingMonthlyData {
+  month: string;
+  averageRating: number;
+  categoryAverages: {
+    quality: number;
+    timeliness: number;
+    professionalism: number;
+  };
+  reviewCount: number;
+  satisfactionRate: number;
+}
+
+interface WorkerRatingAnalyticsData {
+  trends?: WorkerRatingTrend;
+  weeklyData?: WorkerRatingWeeklyData[];
+  monthlyData?: WorkerRatingMonthlyData[];
+}
+
 const statusConfig: Record<string, { label: string; class: string }> = {
   available: { label: "Available", class: "badge-success" },
   offline: { label: "Offline", class: "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold bg-muted text-muted-foreground" },
@@ -212,8 +289,8 @@ const AdminWorkers = () => {
   });
 
   // Worker analytics state
-  const [workerReliabilityData, setWorkerReliabilityData] = useState<any>(null);
-  const [workerRatingAnalytics, setWorkerRatingAnalytics] = useState<any>(null);
+  const [workerReliabilityData, setWorkerReliabilityData] = useState<WorkerReliabilityAnalytics | null>(null);
+  const [workerRatingAnalytics, setWorkerRatingAnalytics] = useState<WorkerRatingAnalyticsData | null>(null);
   const [workerPerformanceSummary, setWorkerPerformanceSummary] = useState<WorkerPerformanceSummary | null>(null);
   const [workerRecentTasks, setWorkerRecentTasks] = useState<WorkerPerformanceTask[]>([]);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
@@ -267,11 +344,7 @@ const AdminWorkers = () => {
   const workerCollectionApi = isSuperAdmin ? superAdminAPI : adminAPI;
   const locationApi = isSuperAdmin ? superAdminAPI : adminAPI;
 
-  useEffect(() => {
-    fetchData();
-  }, [isSuperAdmin]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const [workersRes, locationsRes] = await Promise.all([
@@ -291,7 +364,11 @@ const AdminWorkers = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [locationApi, workerCollectionApi]);
+
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData]);
 
   // Fetch worker reliability and rating analytics
   const fetchWorkerAnalytics = async (workerId: string) => {

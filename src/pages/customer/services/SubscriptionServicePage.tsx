@@ -134,7 +134,7 @@ const SubscriptionServicePage = () => {
       const sorted = [...selectedService.durationOptions].sort((a, b) => a.hours - b.hours);
       setSessionHours(sorted[0].hours);
     }
-  }, [selectedService?._id]);
+  }, [selectedService?.durationOptions]);
 
   const availableFrequencyOptions = useMemo(() => {
     const configuredOptions = selectedService?.subscriptionOptions?.frequencyConfigs?.length

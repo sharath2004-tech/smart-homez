@@ -174,11 +174,11 @@ const InstaServicePage = () => {
   const discountPct = mrpTotal > totalAmount && mrpTotal > 0
     ? Math.round((1 - totalAmount / mrpTotal) * 100)
     : 0;
-  const genderCounts = {
+  const genderCounts = useMemo(() => ({
     any: workerCounts.total,
     female: workerCounts.female,
     male: workerCounts.male,
-  } as const;
+  } as const), [workerCounts.female, workerCounts.male, workerCounts.total]);
   const activeWorkers = genderCounts[genderPref];
 
   const availableSlots = (() => {
@@ -572,7 +572,7 @@ const InstaServicePage = () => {
                     onClick={() => {
                       setHours(opt.hours);
                       setSelectedDurationTotal(opt.price);
-                      setSelectedDurationMrp((opt as any).originalPrice > 0 ? (opt as any).originalPrice : null);
+                      setSelectedDurationMrp(opt.originalPrice > 0 ? opt.originalPrice : null);
                     }}
                     className={`px-4 py-2 rounded-xl border-2 font-semibold text-sm transition-all ${
                       hours === opt.hours

@@ -5,6 +5,29 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
+type DurationPriceMode = 'hour' | 'month';
+
+interface ServiceDurationOption {
+  hours: number;
+  price: number;
+  originalPrice?: number;
+  isDefault?: boolean;
+  _priceMode?: DurationPriceMode;
+}
+
+interface SuggestedServiceReference {
+  _id: string;
+  name: string;
+  price: number;
+}
+
+interface SuggestedServiceOption {
+  serviceId: string | SuggestedServiceReference;
+  displayText?: string;
+  sortOrder?: number;
+  isActive?: boolean;
+}
+
 interface Service {
   _id?: string;
   name: string;
@@ -40,11 +63,7 @@ interface Service {
     label: string;
     price: number;
   }>;
-  durationOptions?: Array<{
-    hours: number;
-    price: number;
-    isDefault?: boolean;
-  }>;
+  durationOptions?: ServiceDurationOption[];
   subscriptionOptions?: {
     enabled?: boolean;
     allowedFrequencies?: string[];
@@ -74,12 +93,7 @@ interface Service {
   };
   tags?: string[];
   taskOptions?: Array<{ id: string; label: string; icon: string; isActive: boolean }>;
-  suggestedServices?: Array<{
-    serviceId: string | { _id: string; name: string; price: number };
-    displayText?: string;
-    sortOrder?: number;
-    isActive?: boolean;
-  }>;
+  suggestedServices?: SuggestedServiceOption[];
   dos?: string[];
   donts?: string[];
   defaultWorkerCount?: number;
@@ -170,6 +184,18 @@ const DEFAULT_SUBSCRIPTION_FREQUENCY_CONFIGS: SubscriptionFrequencyConfig[] = [
   { id: '3-days', label: '3× Week', description: 'Any 3 days', visits: 12, priceMultiplier: 0.6, sortOrder: 2, isActive: true },
   { id: 'weekly', label: 'Weekly', description: 'Once a week', visits: 4, priceMultiplier: 0.35, sortOrder: 3, isActive: true },
 ];
+
+const createDefaultDurationTier = (): ServiceDurationOption => ({
+  hours: 1,
+  price: 0,
+  originalPrice: 0,
+  isDefault: false,
+  _priceMode: 'hour',
+});
+
+const getSuggestedServiceId = (serviceId: SuggestedServiceOption['serviceId']) => (
+  typeof serviceId === 'string' ? serviceId : serviceId._id
+);
 
 const getNormalizedFrequencyConfigs = (configs?: Service['subscriptionOptions'] extends { frequencyConfigs?: infer T } ? T : never): SubscriptionFrequencyConfig[] => (
   DEFAULT_SUBSCRIPTION_FREQUENCY_CONFIGS.map((defaultConfig) => {
@@ -546,17 +572,17 @@ const AdminServices = () => {
       durationOptions: service.durationOptions || [],
       subscriptionOptions: getNormalizedSubscriptionOptions(service.subscriptionOptions, service.serviceType === 'monthly_subscription'),
       sizeParameters: service.sizeParameters || { enabled: false, sizeType: 'quantity', options: [] },
-      originalPrice: (service as any).originalPrice || 0,
-      taskOptions: (service as any).taskOptions || [],
+      originalPrice: service.originalPrice || 0,
+      taskOptions: service.taskOptions || [],
       suggestedServices: service.suggestedServices || [],
-      dos: (service as any).dos || [],
-      donts: (service as any).donts || [],
-      defaultWorkerCount: (service as any).defaultWorkerCount ?? 1,
-      workerWage: (service as any).workerWage || { type: 'per_hour', rate: 0 },
-      workerSearchRadiusKm: (service as any).workerSearchRadiusKm ?? 10,
-      serviceCategory: (service as any).serviceCategory ?? 'other',
-      displayOrder: (service as any).displayOrder ?? 0,
-      allowBreakRequests: (service as any).allowBreakRequests === true,
+      dos: service.dos || [],
+      donts: service.donts || [],
+      defaultWorkerCount: service.defaultWorkerCount ?? 1,
+      workerWage: service.workerWage || { type: 'per_hour', rate: 0 },
+      workerSearchRadiusKm: service.workerSearchRadiusKm ?? 10,
+      serviceCategory: service.serviceCategory ?? 'other',
+      displayOrder: service.displayOrder ?? 0,
+      allowBreakRequests: service.allowBreakRequests === true,
     });
     setEditingId(service._id!);
     setShowForm(true);
@@ -695,11 +721,11 @@ const AdminServices = () => {
                 ✨ Deep Cleaning Cart
               </span>
             )}
-            {(service as any).workerSearchRadiusKm != null && (
+            {service.workerSearchRadiusKm != null && (
               <span className="text-xs px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-800 font-medium">
-                📍 {(service as any).workerSearchRadiusKm < 1
-                  ? `${Math.round((service as any).workerSearchRadiusKm * 1000)}m`
-                  : `${(service as any).workerSearchRadiusKm}km`} radius
+                📍 {service.workerSearchRadiusKm < 1
+                  ? `${Math.round(service.workerSearchRadiusKm * 1000)}m`
+                  : `${service.workerSearchRadiusKm}km`} radius
               </span>
             )}
           </div>
@@ -711,7 +737,7 @@ const AdminServices = () => {
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-2">Monthly price per daily session hours:</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {service.durationOptions.map((d: any, i) => (
+                  {service.durationOptions.map((d, i) => (
                     <div key={i} className="p-1.5 bg-purple-50 border border-purple-200 rounded-lg text-center min-w-[50px]">
                       <div className="text-xs text-purple-600 font-medium">{d.hours}h/day</div>
                       <div className="text-xs font-bold text-purple-800">₹{d.price}</div>
@@ -1270,16 +1296,16 @@ const AdminServices = () => {
                   </label>
                   <input
                     type="number"
-                    value={(formData as any).originalPrice || ''}
-                    onChange={(e) => setFormData({ ...formData, originalPrice: Number(e.target.value) } as any)}
+                    value={formData.originalPrice || ''}
+                    onChange={(e) => setFormData({ ...formData, originalPrice: Number(e.target.value) || 0 })}
                     className="input-clean"
                     min="0"
                     step="any"
                     placeholder="e.g. 190"
                   />
-                  {(formData as any).originalPrice > formData.price && (
+                  {(formData.originalPrice ?? 0) > formData.price && (
                     <p className="text-xs text-green-600 mt-1 font-medium">
-                      {Math.round((1 - formData.price / (formData as any).originalPrice) * 100)}% discount shown to customers
+                      {Math.round((1 - formData.price / (formData.originalPrice ?? 1)) * 100)}% discount shown to customers
                     </p>
                   )}
                   <p className="text-xs text-muted-foreground mt-1">Leave 0 to hide the strikethrough price.</p>
@@ -1409,7 +1435,7 @@ const AdminServices = () => {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setFormData({ ...formData, durationOptions: [...(formData.durationOptions || []), { hours: 1, price: 0, originalPrice: 0, isDefault: false, _priceMode: 'hour' } as any] })}
+                      onClick={() => setFormData({ ...formData, durationOptions: [...(formData.durationOptions || []), createDefaultDurationTier()] })}
                       className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1"
                     >
                       <Plus className="w-3 h-3" /> Add Tier
@@ -1425,8 +1451,8 @@ const AdminServices = () => {
                           <span className="col-span-2" />
                         </div>
                         {(formData.durationOptions || []).map((tier, index) => {
-                          const mode = (tier as any)._priceMode || 'hour';
-                          const originalPrice = (tier as any).originalPrice || 0;
+                          const mode = tier._priceMode || 'hour';
+                          const originalPrice = tier.originalPrice || 0;
                           const savingsPct = originalPrice > tier.price && originalPrice > 0
                             ? Math.round((1 - tier.price / originalPrice) * 100)
                             : 0;
@@ -1452,7 +1478,7 @@ const AdminServices = () => {
                                       className={`flex-1 py-0.5 text-center transition-colors ${mode === 'hour' ? 'bg-blue-600 text-white' : 'bg-white text-muted-foreground'}`}
                                       onClick={() => {
                                         const updated = [...(formData.durationOptions || [])];
-                                        updated[index] = { ...updated[index], _priceMode: 'hour' } as any;
+                                        updated[index] = { ...updated[index], _priceMode: 'hour' };
                                         setFormData({ ...formData, durationOptions: updated });
                                       }}
                                     >/hr</button>
@@ -1460,7 +1486,7 @@ const AdminServices = () => {
                                       className={`flex-1 py-0.5 text-center transition-colors ${mode === 'month' ? 'bg-blue-600 text-white' : 'bg-white text-muted-foreground'}`}
                                       onClick={() => {
                                         const updated = [...(formData.durationOptions || [])];
-                                        updated[index] = { ...updated[index], _priceMode: 'month' } as any;
+                                        updated[index] = { ...updated[index], _priceMode: 'month' };
                                         setFormData({ ...formData, durationOptions: updated });
                                       }}
                                     >/mo</button>
@@ -1485,7 +1511,7 @@ const AdminServices = () => {
                                     type="number" min="0" step="any" value={displayMrp}
                                     onChange={e => {
                                       const updated = [...(formData.durationOptions || [])];
-                                      updated[index] = { ...updated[index], originalPrice: Number(e.target.value) } as any;
+                                      updated[index] = { ...updated[index], originalPrice: Number(e.target.value) };
                                       setFormData({ ...formData, durationOptions: updated });
                                     }}
                                     className="input-clean text-sm" placeholder={mode === 'hour' ? '80' : '18200'}
@@ -1886,7 +1912,7 @@ const AdminServices = () => {
                           <div key={index} className="grid grid-cols-12 gap-2 items-center bg-white rounded-lg border border-orange-100 p-2">
                             <div className="col-span-10">
                               <select
-                                value={typeof suggestion.serviceId === 'string' ? suggestion.serviceId : (suggestion.serviceId as any)?._id || ''}
+                                value={getSuggestedServiceId(suggestion.serviceId)}
                                 onChange={(e) => {
                                   const suggestions = [...(formData.suggestedServices || [])];
                                   suggestions[index] = { ...suggestions[index], serviceId: e.target.value };

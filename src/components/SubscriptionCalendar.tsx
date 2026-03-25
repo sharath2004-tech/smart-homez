@@ -28,10 +28,19 @@ export default function SubscriptionCalendar({ selectedDays, startDate, endDate,
     [selectedDays]
   );
 
-  const subStart = startDate ? new Date(startDate) : null;
-  const subEnd   = endDate   ? new Date(endDate)   : null;
-  if (subStart) subStart.setHours(0, 0, 0, 0);
-  if (subEnd)   subEnd.setHours(0, 0, 0, 0);
+  const subStart = useMemo(() => {
+    if (!startDate) return null;
+    const date = new Date(startDate);
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }, [startDate]);
+
+  const subEnd = useMemo(() => {
+    if (!endDate) return null;
+    const date = new Date(endDate);
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }, [endDate]);
 
   // Build days for grid
   const year  = viewDate.getFullYear();

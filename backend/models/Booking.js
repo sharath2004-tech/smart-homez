@@ -608,6 +608,51 @@ const bookingSchema = new mongoose.Schema({
       default: null
     }
   },
+  paymentProofs: [{
+    url: {
+      type: String,
+      required: true
+    },
+    timestamp: {
+      type: Date,
+      default: Date.now
+    },
+    uploadedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    verified: {
+      type: Boolean,
+      default: false
+    },
+    reviewStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending'
+    },
+    reviewNotes: {
+      type: String,
+      default: null
+    },
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    reviewedAt: {
+      type: Date,
+      default: null
+    },
+    transactionId: {
+      type: String,
+      default: null
+    },
+    transactionTime: {
+      type: Date,
+      default: null
+    }
+  }],
   // Workforce tracking — snapshotted from service at booking creation, editable by admin post-confirm
   workforce: {
     workerCount: {

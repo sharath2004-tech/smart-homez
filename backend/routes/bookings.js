@@ -45,6 +45,8 @@ const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
+const SUBSCRIPTION_FLOW_NOTIFICATIONS_ENABLED = false;
+
 const DAY_INDEX_BY_NAME = {
   sunday: 0,
   monday: 1,
@@ -236,11 +238,87 @@ const resolveDefaultSubscriptionEndDate = (frequency, startDate, explicitEndDate
     return new Date(explicitEndDate);
   }
 
-  if (String(frequency || '').toLowerCase() === 'monthly') {
-    return addDaysToDate(startDate, 29);
+  return null;
+};
+
+const createPaymentProofEntry = ({ photoUrl, uploadedBy, transactionId, transactionTime }) => ({
+  url: photoUrl,
+  timestamp: new Date(),
+  uploadedBy,
+  verified: false,
+  reviewStatus: 'pending',
+  reviewNotes: null,
+  reviewedBy: null,
+  reviewedAt: null,
+  transactionId: transactionId ? transactionId.trim() : null,
+  transactionTime: transactionTime ? new Date(transactionTime) : new Date()
+});
+
+const ensurePaymentProofHistory = (booking) => {
+  if (!Array.isArray(booking.paymentProofs)) {
+    booking.paymentProofs = [];
   }
 
-  return null;
+  if (booking.paymentProof?.url) {
+    const hasLegacyProof = booking.paymentProofs.some((proof) => proof.url === booking.paymentProof.url);
+    if (!hasLegacyProof) {
+      booking.paymentProofs.push({
+        url: booking.paymentProof.url,
+        timestamp: booking.paymentProof.timestamp || new Date(),
+        uploadedBy: booking.paymentProof.uploadedBy || null,
+        verified: Boolean(booking.paymentProof.verified),
+        reviewStatus: booking.paymentProof.reviewStatus || (booking.paymentProof.verified ? 'approved' : 'pending'),
+        reviewNotes: booking.paymentProof.reviewNotes || null,
+        reviewedBy: booking.paymentProof.reviewedBy || null,
+        reviewedAt: booking.paymentProof.reviewedAt || null,
+        transactionId: booking.paymentProof.transactionId || null,
+        transactionTime: booking.paymentProof.transactionTime || null
+      });
+    }
+  }
+
+  return booking.paymentProofs;
+};
+
+const getLatestPaymentProofEntry = (booking) => {
+  const paymentProofs = ensurePaymentProofHistory(booking);
+  if (paymentProofs.length > 0) {
+    return paymentProofs[paymentProofs.length - 1];
+  }
+
+  return booking.paymentProof?.url ? booking.paymentProof : null;
+};
+
+const syncLatestPaymentProof = (booking) => {
+  const latestProof = getLatestPaymentProofEntry(booking);
+
+  booking.paymentProof = latestProof
+    ? {
+        url: latestProof.url,
+        timestamp: latestProof.timestamp,
+        uploadedBy: latestProof.uploadedBy || null,
+        verified: Boolean(latestProof.verified),
+        reviewStatus: latestProof.reviewStatus || (latestProof.verified ? 'approved' : 'pending'),
+        reviewNotes: latestProof.reviewNotes || null,
+        reviewedBy: latestProof.reviewedBy || null,
+        reviewedAt: latestProof.reviewedAt || null,
+        transactionId: latestProof.transactionId || null,
+        transactionTime: latestProof.transactionTime || null
+      }
+    : {
+        url: null,
+        timestamp: null,
+        uploadedBy: null,
+        verified: false,
+        reviewStatus: 'pending',
+        reviewNotes: null,
+        reviewedBy: null,
+        reviewedAt: null,
+        transactionId: null,
+        transactionTime: null
+      };
+
+  return booking.paymentProof;
 };
 
 const getNextRecurringScheduleDate = ({ frequency, startDate, selectedDays = [], isSubscription = false }) => {
@@ -285,6 +363,10 @@ const getBookingScheduledStartDateTime = (booking) => {
 const getSubscriptionRootBookingId = (booking) => booking.parentBooking || booking._id;
 
 const notifySubscriptionWorkerChangeAdmins = async (booking, requestedWorker, requestedBy, reason = '') => {
+  if (!SUBSCRIPTION_FLOW_NOTIFICATIONS_ENABLED) {
+    return;
+  }
+
   const adminFilter = { role: { $in: ['admin', 'super_admin'] }, isActive: true };
 
   const admins = await User.find(adminFilter).select('_id adminProfile.assignedLocations role').lean();
@@ -317,6 +399,10 @@ const notifySubscriptionWorkerChangeAdmins = async (booking, requestedWorker, re
 };
 
 const notifySubscriptionApprovalAdmins = async (booking, requestedBy) => {
+  if (!SUBSCRIPTION_FLOW_NOTIFICATIONS_ENABLED) {
+    return;
+  }
+
   const adminFilter = { role: { $in: ['admin', 'super_admin'] }, isActive: true };
 
   const admins = await User.find(adminFilter).select('_id adminProfile.assignedLocations role').lean();
@@ -3438,7 +3524,8 @@ router.post('/:id/upload-payment-proof',
 
       // Save payment proof photo
       const photoUrl = `/uploads/completion-photos/${req.file.filename}`;
-      const isReupload = booking.paymentProof && booking.paymentProof.url;
+      const existingPaymentProofs = ensurePaymentProofHistory(booking);
+      const isReupload = existingPaymentProofs.length > 0;
 
       const { transactionId, transactionTime } = req.body;
 
@@ -3448,18 +3535,13 @@ router.post('/:id/upload-payment-proof',
         && booking.subscription?.activationStatus === 'payment_pending'
       );
 
-      booking.paymentProof = {
-        url: photoUrl,
-        timestamp: new Date(),
+      booking.paymentProofs.push(createPaymentProofEntry({
+        photoUrl,
         uploadedBy: req.user._id,
-        verified: false,
-        reviewStatus: 'pending',
-        reviewNotes: null,
-        reviewedBy: null,
-        reviewedAt: null,
-        transactionId: transactionId ? transactionId.trim() : null,
-        transactionTime: transactionTime ? new Date(transactionTime) : new Date()
-      };
+        transactionId,
+        transactionTime
+      }));
+      syncLatestPaymentProof(booking);
 
       if (isCustomer && isSubscriptionBooking) {
         booking.paymentStatus = 'paid';
@@ -3485,6 +3567,7 @@ router.post('/:id/upload-payment-proof',
           ? 'Payment proof uploaded successfully. Subscription is now waiting for admin approval.'
           : 'Payment proof uploaded successfully',
         paymentProof: booking.paymentProof,
+        paymentProofs: booking.paymentProofs,
         subscriptionActivated: false,
         subscriptionStatus: booking.subscription?.activationStatus || null,
         bookingStatus: booking.status,
@@ -3533,54 +3616,32 @@ router.post('/:id/payment-proof-review',
         return res.status(403).json({ error: { message: 'You can only review bookings in your assigned region', status: 403 } });
       }
 
-      if (!booking.paymentProof?.url) {
+      const latestPaymentProof = getLatestPaymentProofEntry(booking);
+
+      if (!latestPaymentProof?.url) {
         return res.status(400).json({ error: { message: 'No payment proof has been uploaded for this booking', status: 400 } });
       }
 
       const { action, reason } = req.body;
       const trimmedReason = typeof reason === 'string' ? reason.trim() : '';
 
-      booking.paymentProof.reviewStatus = action === 'approve' ? 'approved' : 'rejected';
-      booking.paymentProof.reviewNotes = trimmedReason || null;
-      booking.paymentProof.reviewedBy = req.user._id;
-      booking.paymentProof.reviewedAt = new Date();
-      booking.paymentProof.verified = action === 'approve';
+      latestPaymentProof.reviewStatus = action === 'approve' ? 'approved' : 'rejected';
+      latestPaymentProof.reviewNotes = trimmedReason || null;
+      latestPaymentProof.reviewedBy = req.user._id;
+      latestPaymentProof.reviewedAt = new Date();
+      latestPaymentProof.verified = action === 'approve';
+      syncLatestPaymentProof(booking);
 
       if (action === 'approve') {
         if (booking.subscription?.isSubscription && booking.subscription.activationStatus === 'payment_pending') {
           booking.subscription.activationStatus = 'approval_pending';
         }
-
-        await notificationService.sendNotification({
-          userId: booking.customer._id,
-          type: 'booking',
-          title: 'Subscription payment approved',
-          message: `Your payment proof for ${booking.service?.name || 'your subscription'} has been approved. Admin will now assign your worker and activate the subscription.`,
-          priority: 'high',
-          data: {
-            bookingId: booking._id,
-            action: 'payment-proof-approved'
-          }
-        });
       } else {
         booking.paymentStatus = 'pending';
         if (booking.subscription?.isSubscription) {
           booking.subscription.activationStatus = 'payment_pending';
           booking.subscription.activatedAt = null;
         }
-
-        await notificationService.sendNotification({
-          userId: booking.customer._id,
-          type: 'booking',
-          title: 'Subscription payment proof rejected',
-          message: `Your payment proof for ${booking.service?.name || 'your subscription'} was rejected${trimmedReason ? `: ${trimmedReason}` : '. Please upload a new screenshot.'}`,
-          priority: 'high',
-          data: {
-            bookingId: booking._id,
-            action: 'payment-proof-rejected',
-            reason: trimmedReason || null
-          }
-        });
       }
 
       await booking.save();
@@ -3592,7 +3653,8 @@ router.post('/:id/payment-proof-review',
           _id: booking._id,
           paymentStatus: booking.paymentStatus,
           subscription: booking.subscription,
-          paymentProof: booking.paymentProof
+          paymentProof: booking.paymentProof,
+          paymentProofs: booking.paymentProofs
         }
       });
     } catch (error) {
@@ -3775,7 +3837,9 @@ router.post('/:id/admin-approve',
       }
 
       // Require payment proof to be uploaded before approval
-      if (!booking.paymentProof || !booking.paymentProof.url) {
+      const latestPaymentProof = getLatestPaymentProofEntry(booking);
+
+      if (!latestPaymentProof || !latestPaymentProof.url) {
         return res.status(400).json({
           error: { message: 'Payment proof must be uploaded before admin can approve completion', status: 400 }
         });
@@ -3791,8 +3855,14 @@ router.post('/:id/admin-approve',
       if (booking.completionPhoto && booking.completionPhoto.url) {
         booking.completionPhoto.verified = true;
       }
-      if (booking.paymentProof && booking.paymentProof.url) {
-        booking.paymentProof.verified = true;
+      if (latestPaymentProof && latestPaymentProof.url) {
+        latestPaymentProof.verified = true;
+        if (!latestPaymentProof.reviewStatus || latestPaymentProof.reviewStatus === 'pending') {
+          latestPaymentProof.reviewStatus = 'approved';
+        }
+        latestPaymentProof.reviewedAt = latestPaymentProof.reviewedAt || new Date();
+        latestPaymentProof.reviewedBy = latestPaymentProof.reviewedBy || req.user._id;
+        syncLatestPaymentProof(booking);
       }
 
       await booking.save();

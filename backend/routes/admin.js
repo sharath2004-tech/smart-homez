@@ -196,10 +196,6 @@ const resolveSubscriptionEndDate = (booking) => {
     return startOfDay(booking.subscription.subscriptionEndDate);
   }
 
-  if (booking.subscription?.isSubscription && booking.recurringSchedule?.frequency === 'monthly') {
-    return addDays(booking.recurringSchedule?.startDate || booking.bookingDate, 29);
-  }
-
   return null;
 };
 
@@ -389,6 +385,15 @@ const evaluateWorkerCoverageForSubscription = async (booking, worker) => {
     isFullCoverage: coveredOccurrences === occurrences.length,
     conflictDetails
   };
+};
+
+const getLatestPaymentProof = (booking) => {
+  const paymentProofs = Array.isArray(booking.paymentProofs) ? booking.paymentProofs : [];
+  if (paymentProofs.length > 0) {
+    return paymentProofs[paymentProofs.length - 1];
+  }
+
+  return booking.paymentProof?.url ? booking.paymentProof : null;
 };
 
 // ============== SUPER ADMIN ROUTES ==============
@@ -3384,11 +3389,13 @@ router.post('/manual-assign',
           booking.subscription.activationStatus = 'active';
           booking.subscription.activatedAt = new Date();
         }
-        if (booking.paymentProof?.url) {
-          booking.paymentProof.verified = true;
-          booking.paymentProof.reviewStatus = 'approved';
-          booking.paymentProof.reviewedBy = booking.paymentProof.reviewedBy || req.user._id;
-          booking.paymentProof.reviewedAt = booking.paymentProof.reviewedAt || new Date();
+        const latestPaymentProof = getLatestPaymentProof(booking);
+        if (latestPaymentProof?.url) {
+          latestPaymentProof.verified = true;
+          latestPaymentProof.reviewStatus = 'approved';
+          latestPaymentProof.reviewedBy = latestPaymentProof.reviewedBy || req.user._id;
+          latestPaymentProof.reviewedAt = latestPaymentProof.reviewedAt || new Date();
+          booking.paymentProof = latestPaymentProof;
         }
       }
       booking.notes = `${booking.notes || ''}${booking.notes ? '\n' : ''}${previousWorkerId ? 'Reassigned' : 'Assigned'} by ${req.user.role}${reason ? `: ${reason}` : ''}`;

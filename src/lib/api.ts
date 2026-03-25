@@ -2073,7 +2073,7 @@ export const dashboardPreferencesAPI = {
     return apiCall('/dashboard-preferences/admin');
   },
 
-  updateConfig: async (services: any[], maxServices?: number) => {
+  updateConfig: async (services: Array<Record<string, unknown>>, maxServices?: number) => {
     return apiCall('/dashboard-preferences', {
       method: 'PUT',
       body: JSON.stringify({ services, maxServices })
