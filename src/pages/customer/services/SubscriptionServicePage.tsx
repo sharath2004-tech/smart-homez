@@ -27,6 +27,11 @@ interface Service {
   duration: number;
   serviceType: string;
   durationOptions?: { hours: number; price: number; originalPrice?: number; isDefault?: boolean }[];
+  subscriptionOptions?: {
+    allowedFrequencies?: FrequencyOptionId[];
+    autoRenewal?: boolean;
+    requiresSameWorker?: boolean;
+  };
 }
 
 interface UserProfile {
@@ -46,7 +51,18 @@ interface PendingPaymentBooking {
   serviceName: string;
 }
 
-const FREQUENCY_OPTIONS = [
+type FrequencyOptionId = "daily" | "alt-days" | "3-days" | "weekly";
+
+type FrequencyOption = {
+  id: FrequencyOptionId;
+  label: string;
+  icon: string;
+  desc: string;
+  visits: number;
+  priceMultiplier: number;
+};
+
+const FREQUENCY_OPTIONS: FrequencyOption[] = [
   { id: "daily",     label: "Daily",      icon: "📆", desc: "Every day",      visits: 30, priceMultiplier: 1.0 },
   { id: "alt-days",  label: "Alt Days",   icon: "📅", desc: "Mon/Wed/Fri",    visits: 13, priceMultiplier: 0.65 },
   { id: "3-days",    label: "3× Week",    icon: "🗓️", desc: "Any 3 days",     visits: 12, priceMultiplier: 0.60 },
@@ -72,7 +88,7 @@ const SubscriptionServicePage = () => {
   const [pendingPaymentBooking, setPendingPaymentBooking] = useState<PendingPaymentBooking | null>(null);
 
   // Booking params
-  const [frequency, setFrequency] = useState("daily");
+  const [frequency, setFrequency] = useState<FrequencyOptionId>("daily");
   const [sessionHours, setSessionHours] = useState(1);
   const [startDate, setStartDate] = useState("");
   const [preferredTime, setPreferredTime] = useState("09:00");
@@ -115,6 +131,31 @@ const SubscriptionServicePage = () => {
     }
   }, [selectedService?._id]);
 
+  const allowedFrequencyIds = selectedService?.subscriptionOptions?.allowedFrequencies?.filter(
+    (freq): freq is FrequencyOptionId => FREQUENCY_OPTIONS.some((option) => option.id === freq)
+  ) || [];
+
+  const availableFrequencyOptions = (
+    allowedFrequencyIds.length > 0
+      ? allowedFrequencyIds
+      : FREQUENCY_OPTIONS.map((option) => option.id)
+  ).map((id) => FREQUENCY_OPTIONS.find((option) => option.id === id)).filter(Boolean) as FrequencyOption[];
+
+  useEffect(() => {
+    if (!selectedService) {
+      return;
+    }
+
+    setAutoRenewal(selectedService.subscriptionOptions?.autoRenewal ?? true);
+    setFrequency((currentFrequency) => {
+      if (availableFrequencyOptions.some((option) => option.id === currentFrequency)) {
+        return currentFrequency;
+      }
+
+      return availableFrequencyOptions[0]?.id || "daily";
+    });
+  }, [selectedService, availableFrequencyOptions]);
+
   // Reset split state whenever hours change
   useEffect(() => {
     if (sessionHours < 2) setSplitEnabled(false);
@@ -145,7 +186,9 @@ const SubscriptionServicePage = () => {
     ? [...selectedService.durationOptions].sort((a, b) => a.hours - b.hours).map(d => d.hours)
     : FALLBACK_HOURS;
 
-  const currentFreq = FREQUENCY_OPTIONS.find(f => f.id === frequency) || FREQUENCY_OPTIONS[0];
+  const currentFreq = availableFrequencyOptions.find((option) => option.id === frequency)
+    || availableFrequencyOptions[0]
+    || FREQUENCY_OPTIONS[0];
 
   // Monthly price from durationOptions — authoritative source
   const durationOption = selectedService?.durationOptions?.find(d => d.hours === sessionHours);
@@ -472,7 +515,7 @@ const SubscriptionServicePage = () => {
                   </h2>
                   <p className="text-xs text-muted-foreground mb-3">How often should the maid visit?</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {FREQUENCY_OPTIONS.map((opt) => {
+                    {availableFrequencyOptions.map((opt) => {
                       const freqPrice = Math.round(baseMonthlyPrice * opt.priceMultiplier);
                       return (
                         <button
@@ -563,7 +606,10 @@ const SubscriptionServicePage = () => {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
-                    <span className="text-xs text-blue-700 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Same maid daily</span>
+                    <span className="text-xs text-blue-700 flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" />
+                      {selectedService?.subscriptionOptions?.requiresSameWorker ?? true ? 'Same maid daily' : 'Worker assigned based on availability'}
+                    </span>
                     <span className="text-xs text-blue-700 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Pause anytime</span>
                     <span className="text-xs text-blue-700 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Priority booking</span>
                   </div>
