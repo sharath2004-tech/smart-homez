@@ -55,6 +55,10 @@ interface Booking {
     apartmentName?: string;
   };
   totalAmount: number;
+  paymentProof?: {
+    reviewStatus?: 'pending' | 'approved' | 'rejected';
+    reviewNotes?: string | null;
+  };
 }
 
 interface Worker {
@@ -409,9 +413,13 @@ const MySubscriptionsPage = () => {
                     ) : (
                       <div className="rounded-lg bg-muted/60 px-3 py-3 text-sm text-muted-foreground">
                         {subscription.subscription?.activationStatus === 'payment_pending'
-                          ? 'Upload the subscription payment proof to move this booking into admin review.'
+                          ? subscription.paymentProof?.reviewStatus === 'rejected'
+                            ? `Your previous payment proof was rejected${subscription.paymentProof.reviewNotes ? `: ${subscription.paymentProof.reviewNotes}` : '. Please upload a new screenshot to continue.'}`
+                            : 'Upload the subscription payment proof to move this booking into admin review.'
                           : subscription.subscription?.activationStatus === 'approval_pending'
-                            ? 'Your payment proof is under review. Admin or super admin will approve the schedule and lock the worker soon.'
+                            ? subscription.paymentProof?.reviewStatus === 'approved'
+                              ? 'Your payment proof has been approved. Admin or super admin will lock the worker and activate the subscription soon.'
+                              : 'Your payment proof is under review. Admin or super admin will approve the schedule and lock the worker soon.'
                             : 'We’re assigning your worker for this cycle now. Their profile will show up here as soon as the schedule is locked.'}
                       </div>
                     )}
@@ -493,6 +501,15 @@ const MySubscriptionsPage = () => {
                         {openPaymentFor === subscription._id ? 'Hide payment form' : 'Continue payment'}
                       </button>
                     </div>
+
+                    {subscription.paymentProof?.reviewStatus === 'rejected' && (
+                      <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+                        <p className="text-sm font-semibold text-red-700">Previous payment proof was rejected</p>
+                        <p className="text-xs text-red-600 mt-1">
+                          {subscription.paymentProof.reviewNotes || 'Please upload a clearer or correct screenshot to continue with subscription approval.'}
+                        </p>
+                      </div>
+                    )}
 
                     {openPaymentFor === subscription._id && (
                       <SubscriptionPaymentStep

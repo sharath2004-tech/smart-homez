@@ -581,6 +581,24 @@ const bookingSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     },
+    reviewStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending'
+    },
+    reviewNotes: {
+      type: String,
+      default: null
+    },
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    reviewedAt: {
+      type: Date,
+      default: null
+    },
     transactionId: {
       type: String,
       default: null

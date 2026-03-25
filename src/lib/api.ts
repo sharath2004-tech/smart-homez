@@ -712,6 +712,13 @@ export const bookingsAPI = {
     return apiCall(`/bookings/${id}/admin-approve`, { method: 'POST' });
   },
 
+  reviewPaymentProof: async (id: string, action: 'approve' | 'reject', reason?: string) => {
+    return apiCall(`/bookings/${id}/payment-proof-review`, {
+      method: 'POST',
+      body: JSON.stringify({ action, reason })
+    });
+  },
+
   initChecklist: (id: string, items: string[]) =>
     apiCall(`/bookings/${id}/checklist`, { method: 'PATCH', body: JSON.stringify({ items }) }),
 

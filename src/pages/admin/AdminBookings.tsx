@@ -12,6 +12,9 @@ interface ProofPhoto {
   url: string;
   timestamp: string;
   verified: boolean;
+  reviewStatus?: 'pending' | 'approved' | 'rejected';
+  reviewNotes?: string | null;
+  reviewedAt?: string;
   transactionId?: string;
   transactionTime?: string;
 }
@@ -125,6 +128,8 @@ const AdminBookings = () => {
   const [exporting, setExporting] = useState(false);
   const [selectedProofBooking, setSelectedProofBooking] = useState<Booking | null>(null);
   const [approvingBookingId, setApprovingBookingId] = useState<string | null>(null);
+  const [paymentReviewLoading, setPaymentReviewLoading] = useState<'approve' | 'reject' | null>(null);
+  const [paymentReviewReason, setPaymentReviewReason] = useState('');
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocation, setSelectedLocation] = useState("");
   const [noRegionAssigned, setNoRegionAssigned] = useState(false);
@@ -290,6 +295,11 @@ const AdminBookings = () => {
     .join(', ');
 
   const hasProofs = (b: Booking) => !!(b.completionPhoto?.url || b.paymentProof?.url || (b.completionPhotos && b.completionPhotos.length > 0));
+  const needsSubscriptionPaymentReview = (b: Booking) => Boolean(
+    b.subscription?.isSubscription
+    && b.subscription?.activationStatus === 'approval_pending'
+    && b.paymentProof?.url
+  );
 
   const handleApproveBooking = async (bookingId: string) => {
     try {
@@ -302,6 +312,39 @@ const AdminBookings = () => {
       alert((error as Error).message || 'Failed to approve booking');
     } finally {
       setApprovingBookingId(null);
+    }
+  };
+
+  const handleReviewPaymentProof = async (booking: Booking, action: 'approve' | 'reject') => {
+    try {
+      setPaymentReviewLoading(action);
+      await bookingsAPI.reviewPaymentProof(booking._id, action, paymentReviewReason.trim() || undefined);
+      await fetchBookings();
+
+      if (action === 'reject') {
+        setSelectedProofBooking(null);
+        setPaymentReviewReason('');
+        alert('Payment proof rejected. Customer can now upload a new screenshot.');
+        return;
+      }
+
+      setSelectedProofBooking((current) => current ? {
+        ...current,
+        paymentProof: current.paymentProof ? {
+          ...current.paymentProof,
+          verified: true,
+          reviewStatus: 'approved',
+          reviewNotes: paymentReviewReason.trim() || null,
+          reviewedAt: new Date().toISOString()
+        } : current.paymentProof
+      } : current);
+      setPaymentReviewReason('');
+      alert('Payment proof approved. You can now assign the worker to activate the subscription.');
+    } catch (error) {
+      console.error('Payment proof review error:', error);
+      alert((error as Error).message || 'Failed to review payment proof');
+    } finally {
+      setPaymentReviewLoading(null);
     }
   };
 
@@ -1028,17 +1071,20 @@ const AdminBookings = () => {
                             {b.workforce?.totalWorkerWage ? `₹${b.workforce.totalWorkerWage}` : 'Wages'}
                           </button>
                         )}
-                        {(b.status === 'completed' || b.status === 'pending-review') ? (
+                        {(b.status === 'completed' || b.status === 'pending-review' || needsSubscriptionPaymentReview(b)) ? (
                           <button
-                            onClick={() => setSelectedProofBooking(b)}
+                            onClick={() => {
+                              setPaymentReviewReason('');
+                              setSelectedProofBooking(b);
+                            }}
                             className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors ${
                               hasProofs(b)
-                                ? b.status === 'pending-review' ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                ? (b.status === 'pending-review' || needsSubscriptionPaymentReview(b)) ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                                 : 'bg-muted text-muted-foreground hover:bg-muted/70'
                             }`}
                           >
                             <Eye className="w-3.5 h-3.5" />
-                            {b.status === 'pending-review' ? '⏳ Review' : (
+                            {(b.status === 'pending-review' || needsSubscriptionPaymentReview(b)) ? '⏳ Review' : (
                               hasProofs(b) ? (
                                 <span>
                                   {[b.completionPhotos && b.completionPhotos.length > 0 && `📸×${b.completionPhotos.length}`, b.paymentProof?.url && '💳'].filter(Boolean).join(' ')}
@@ -1251,6 +1297,12 @@ const AdminBookings = () => {
                   <p className="text-muted-foreground text-xs">Payment</p>
                   <p className="font-medium text-foreground">{selectedProofBooking.paymentStatus || 'pending'}</p>
                 </div>
+                {selectedProofBooking.subscription?.isSubscription && (
+                  <div>
+                    <p className="text-muted-foreground text-xs">Subscription Approval</p>
+                    <p className="font-medium text-foreground">{selectedProofBooking.subscription.activationStatus || '—'}</p>
+                  </div>
+                )}
                 <div>
                   <p className="text-muted-foreground text-xs">Timing</p>
                   <p className="font-medium text-foreground">{formatMinutes(selectedProofBooking.scheduledDurationMinutes)}</p>
@@ -1337,9 +1389,33 @@ const AdminBookings = () => {
                     </div>
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2 text-sm">
                       <div className="flex items-center justify-between">
+                        <span className="text-amber-700 font-medium">Review status:</span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          selectedProofBooking.paymentProof.reviewStatus === 'approved'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : selectedProofBooking.paymentProof.reviewStatus === 'rejected'
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {selectedProofBooking.paymentProof.reviewStatus || (selectedProofBooking.paymentProof.verified ? 'approved' : 'pending')}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
                         <span className="text-amber-700 font-medium">Uploaded at:</span>
                         <span className="text-foreground">{formatDateTime(selectedProofBooking.paymentProof.timestamp)}</span>
                       </div>
+                      {selectedProofBooking.paymentProof.reviewNotes && (
+                        <div className="border-t border-amber-200 pt-2">
+                          <span className="text-amber-700 font-medium">Review note:</span>
+                          <p className="text-foreground mt-1 whitespace-pre-wrap">{selectedProofBooking.paymentProof.reviewNotes}</p>
+                        </div>
+                      )}
+                      {selectedProofBooking.paymentProof.reviewedAt && (
+                        <div className="flex items-center justify-between border-t border-amber-200 pt-2">
+                          <span className="text-amber-700 font-medium">Reviewed at:</span>
+                          <span className="text-foreground">{formatDateTime(selectedProofBooking.paymentProof.reviewedAt)}</span>
+                        </div>
+                      )}
                       {selectedProofBooking.paymentProof.transactionId && (
                         <div className="flex items-center justify-between border-t border-amber-200 pt-2">
                           <span className="text-amber-700 font-medium">Transaction ID:</span>
@@ -1363,6 +1439,60 @@ const AdminBookings = () => {
                   </div>
                 )}
               </div>
+
+              {needsSubscriptionPaymentReview(selectedProofBooking) && (
+                <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-3">
+                  <div>
+                    <p className="font-semibold text-orange-900">Review subscription payment proof</p>
+                    <p className="text-xs text-orange-700 mt-1">
+                      After approving the proof, assign a worker to activate this subscription. If the screenshot is wrong or unclear, reject it and the customer will be asked to upload a new one.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">Review note (optional for approval, recommended for rejection)</label>
+                    <textarea
+                      value={paymentReviewReason}
+                      onChange={(e) => setPaymentReviewReason(e.target.value)}
+                      className="input-clean min-h-24 text-sm w-full"
+                      placeholder="Add a note for the customer or your team"
+                      maxLength={500}
+                    />
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <button
+                      onClick={() => handleReviewPaymentProof(selectedProofBooking, 'approve')}
+                      disabled={paymentReviewLoading !== null}
+                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <CheckCircle className="w-5 h-5" />
+                      {paymentReviewLoading === 'approve' ? 'Approving…' : 'Approve payment proof'}
+                    </button>
+                    <button
+                      onClick={() => handleReviewPaymentProof(selectedProofBooking, 'reject')}
+                      disabled={paymentReviewLoading !== null}
+                      className="w-full py-3 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                      {paymentReviewLoading === 'reject' ? 'Rejecting…' : 'Reject payment proof'}
+                    </button>
+                  </div>
+
+                  {selectedProofBooking.paymentProof?.reviewStatus === 'approved' && (
+                    <button
+                      onClick={async () => {
+                        const bookingToAssign = selectedProofBooking;
+                        setSelectedProofBooking(null);
+                        await openReassignModal(bookingToAssign);
+                      }}
+                      className="w-full py-3 border border-emerald-300 bg-white rounded-xl text-emerald-700 font-semibold hover:bg-emerald-50 transition-colors"
+                    >
+                      Open worker assignment
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* Approve Button for pending-review bookings */}
               {selectedProofBooking.status === 'pending-review' && (

@@ -3452,7 +3452,11 @@ router.post('/:id/upload-payment-proof',
         url: photoUrl,
         timestamp: new Date(),
         uploadedBy: req.user._id,
-        verified: true,
+        verified: false,
+        reviewStatus: 'pending',
+        reviewNotes: null,
+        reviewedBy: null,
+        reviewedAt: null,
         transactionId: transactionId ? transactionId.trim() : null,
         transactionTime: transactionTime ? new Date(transactionTime) : new Date()
       };
@@ -3490,6 +3494,109 @@ router.post('/:id/upload-payment-proof',
 
     } catch (error) {
       console.error('Upload payment proof error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   POST /api/bookings/:id/payment-proof-review
+// @desc    Admin/super admin approves or rejects a customer payment proof
+// @access  Private/Admin
+router.post('/:id/payment-proof-review',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  [
+    body('action').isIn(['approve', 'reject']).withMessage('Valid review action is required'),
+    body('reason').optional().isString().trim().isLength({ max: 500 }).withMessage('Reason must be 500 characters or fewer')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: { message: errors.array()[0].msg, status: 400 } });
+      }
+
+      const booking = await Booking.findById(req.params.id)
+        .populate('customer', 'name email')
+        .populate('service', 'name');
+
+      if (!booking) {
+        return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
+      }
+
+      const bookingLocationId = booking.location?.locationId?.toString() || null;
+      const adminLocationIds = (req.user.adminProfile?.assignedLocations || [])
+        .map((location) => location.locationId?.toString())
+        .filter(Boolean);
+
+      if (req.user.role === 'admin' && (!bookingLocationId || !adminLocationIds.includes(bookingLocationId))) {
+        return res.status(403).json({ error: { message: 'You can only review bookings in your assigned region', status: 403 } });
+      }
+
+      if (!booking.paymentProof?.url) {
+        return res.status(400).json({ error: { message: 'No payment proof has been uploaded for this booking', status: 400 } });
+      }
+
+      const { action, reason } = req.body;
+      const trimmedReason = typeof reason === 'string' ? reason.trim() : '';
+
+      booking.paymentProof.reviewStatus = action === 'approve' ? 'approved' : 'rejected';
+      booking.paymentProof.reviewNotes = trimmedReason || null;
+      booking.paymentProof.reviewedBy = req.user._id;
+      booking.paymentProof.reviewedAt = new Date();
+      booking.paymentProof.verified = action === 'approve';
+
+      if (action === 'approve') {
+        if (booking.subscription?.isSubscription && booking.subscription.activationStatus === 'payment_pending') {
+          booking.subscription.activationStatus = 'approval_pending';
+        }
+
+        await notificationService.sendNotification({
+          userId: booking.customer._id,
+          type: 'booking',
+          title: 'Subscription payment approved',
+          message: `Your payment proof for ${booking.service?.name || 'your subscription'} has been approved. Admin will now assign your worker and activate the subscription.`,
+          priority: 'high',
+          data: {
+            bookingId: booking._id,
+            action: 'payment-proof-approved'
+          }
+        });
+      } else {
+        booking.paymentStatus = 'pending';
+        if (booking.subscription?.isSubscription) {
+          booking.subscription.activationStatus = 'payment_pending';
+          booking.subscription.activatedAt = null;
+        }
+
+        await notificationService.sendNotification({
+          userId: booking.customer._id,
+          type: 'booking',
+          title: 'Subscription payment proof rejected',
+          message: `Your payment proof for ${booking.service?.name || 'your subscription'} was rejected${trimmedReason ? `: ${trimmedReason}` : '. Please upload a new screenshot.'}`,
+          priority: 'high',
+          data: {
+            bookingId: booking._id,
+            action: 'payment-proof-rejected',
+            reason: trimmedReason || null
+          }
+        });
+      }
+
+      await booking.save();
+
+      res.json({
+        success: true,
+        message: action === 'approve' ? 'Payment proof approved successfully' : 'Payment proof rejected successfully',
+        booking: {
+          _id: booking._id,
+          paymentStatus: booking.paymentStatus,
+          subscription: booking.subscription,
+          paymentProof: booking.paymentProof
+        }
+      });
+    } catch (error) {
+      console.error('Payment proof review error:', error);
       res.status(500).json({ error: { message: 'Server error', status: 500 } });
     }
   }

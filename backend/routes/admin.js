@@ -3384,6 +3384,12 @@ router.post('/manual-assign',
           booking.subscription.activationStatus = 'active';
           booking.subscription.activatedAt = new Date();
         }
+        if (booking.paymentProof?.url) {
+          booking.paymentProof.verified = true;
+          booking.paymentProof.reviewStatus = 'approved';
+          booking.paymentProof.reviewedBy = booking.paymentProof.reviewedBy || req.user._id;
+          booking.paymentProof.reviewedAt = booking.paymentProof.reviewedAt || new Date();
+        }
       }
       booking.notes = `${booking.notes || ''}${booking.notes ? '\n' : ''}${previousWorkerId ? 'Reassigned' : 'Assigned'} by ${req.user.role}${reason ? `: ${reason}` : ''}`;
       

@@ -98,6 +98,12 @@ interface Booking {
   rating?: number;
   review?: string;
   paymentStatus?: string;
+  paymentProof?: {
+    url?: string | null;
+    verified?: boolean;
+    reviewStatus?: 'pending' | 'approved' | 'rejected';
+    reviewNotes?: string | null;
+  };
   breakRequests?: BreakRequest[];
   isOnBreak?: boolean;
   totalBreakMinutes?: number;
@@ -928,6 +934,15 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                     </p>
                   </div>
 
+                  {booking.paymentProof?.reviewStatus === 'rejected' && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+                      <p className="text-sm font-semibold text-red-700">Previous payment proof was rejected</p>
+                      <p className="text-xs text-red-600 mt-1">
+                        {booking.paymentProof.reviewNotes || 'Please upload a clearer or correct payment screenshot to continue the subscription approval.'}
+                      </p>
+                    </div>
+                  )}
+
                   <SubscriptionPaymentStep
                     bookingId={booking._id}
                     amount={booking.totalAmount}
@@ -946,7 +961,9 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                 <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
                   <p className="text-sm font-semibold text-orange-900">Payment proof uploaded</p>
                   <p className="text-xs text-orange-700 mt-1">
-                    Your payment screenshot is under review. Admin or super admin will approve the subscription and assign the worker after verification.
+                    {booking.paymentProof?.reviewStatus === 'approved'
+                      ? 'Your payment proof has been approved. Admin or super admin will assign the worker and activate the subscription shortly.'
+                      : 'Your payment screenshot is under review. Admin or super admin will approve the subscription and assign the worker after verification.'}
                   </p>
                 </div>
               )}
