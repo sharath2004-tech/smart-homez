@@ -2,13 +2,13 @@
 
 import { describe, expect, it } from 'vitest';
 
+import Payment from '../../backend/models/Payment.js';
 import { parseCoordinate } from '../../backend/utils/coordinateValidation.js';
 import { normalizeMaxServices } from '../../backend/utils/dashboardPreferences.js';
-import Payment from '../../backend/models/Payment.js';
 import {
-  buildBookingDateTime,
-  buildVerifiedCartItems,
-  normalizeDurationMinutes,
+    buildBookingDateTime,
+    buildVerifiedCartItems,
+    normalizeDurationMinutes,
 } from '../../backend/utils/deepCleaningValidation.js';
 
 describe('coordinate validation helpers', () => {

@@ -2,6 +2,7 @@ import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import Location from '../models/Location.js';
 import User from '../models/User.js';
+import { hasValue, parseCoordinate } from '../utils/coordinateValidation.js';
 import {
     calculateDistance,
     checkServiceAvailability,
@@ -9,7 +10,6 @@ import {
     geocodeAddress,
     reverseGeocode
 } from '../utils/geolocation.js';
-import { hasValue, parseCoordinate } from '../utils/coordinateValidation.js';
 
 const router = express.Router();
 

@@ -10,7 +10,7 @@ import Location from '../models/Location.js';
 import Service from '../models/Service.js';
 import ServiceArea from '../models/ServiceArea.js';
 import ServiceAvailabilityRequest from '../models/ServiceAvailabilityRequest.js';
-import { hasValue, parseCoordinate } from '../utils/coordinateValidation.js';
+import { parseCoordinate } from '../utils/coordinateValidation.js';
 import { calculateDistance } from '../utils/geolocation.js';
 
 const router = express.Router();
