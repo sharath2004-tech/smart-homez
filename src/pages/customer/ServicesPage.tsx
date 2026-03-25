@@ -31,6 +31,12 @@ const SERVICE_CATEGORIES = [
   { key: 'deep',         labelKey: 'customer.services.catDeepLabel',  icon: '✨', descKey: 'customer.services.catDeepDesc',  color: 'bg-green-50 border-green-300',  badgeKey: 'customer.services.catDeepBadge',  badgeColor: 'bg-teal-100 text-teal-700', path: '/customer/deep-cleaning' },
 ];
 
+const HIDDEN_ROOT_SERVICE_TYPES = new Set([
+  'instant_hourly',
+  'monthly_subscription',
+  'deep_cleaning_full_house',
+]);
+
 const ServicesPage = () => {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
@@ -181,7 +187,13 @@ const ServicesPage = () => {
     return true;
   };
 
-  const displayedServices = services.filter(matchesCategory);
+  const displayedServices = services.filter((service) => {
+    if (service.serviceType && HIDDEN_ROOT_SERVICE_TYPES.has(service.serviceType)) {
+      return false;
+    }
+
+    return matchesCategory(service);
+  });
 
   const getCategoryEmoji = (category: string, name: string) => {
     if (name.toLowerCase().includes('insta')) return '⚡';
