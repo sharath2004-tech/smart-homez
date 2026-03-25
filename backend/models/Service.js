@@ -331,6 +331,40 @@ const serviceSchema = new mongoose.Schema({
       type: String,
       enum: ['daily', 'alt-days', '3-days', 'weekly', 'biweekly', 'monthly', 'custom']
     }],
+    frequencyConfigs: [{
+      id: {
+        type: String,
+        enum: ['daily', 'alt-days', '3-days', 'weekly']
+      },
+      label: {
+        type: String,
+        trim: true,
+        default: ''
+      },
+      description: {
+        type: String,
+        trim: true,
+        default: ''
+      },
+      visits: {
+        type: Number,
+        min: 0,
+        default: 0
+      },
+      priceMultiplier: {
+        type: Number,
+        min: 0,
+        default: 1
+      },
+      sortOrder: {
+        type: Number,
+        default: 0
+      },
+      isActive: {
+        type: Boolean,
+        default: true
+      }
+    }],
     discountPercentage: {
       type: Number,
       default: 0,

@@ -15,9 +15,27 @@ import {
     User,
     Zap,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+
+type FrequencyOptionId = "daily" | "alt-days" | "3-days" | "weekly";
+
+type FrequencyOption = {
+  id: FrequencyOptionId;
+  label: string;
+  icon: string;
+  desc: string;
+  visits: number;
+  priceMultiplier: number;
+};
+
+const DEFAULT_FREQUENCY_OPTIONS: FrequencyOption[] = [
+  { id: "daily",     label: "Daily",      icon: "📆", desc: "Every day",      visits: 30, priceMultiplier: 1.0 },
+  { id: "alt-days",  label: "Alt Days",   icon: "📅", desc: "Mon/Wed/Fri",    visits: 13, priceMultiplier: 0.65 },
+  { id: "3-days",    label: "3× Week",    icon: "🗓️", desc: "Any 3 days",     visits: 12, priceMultiplier: 0.60 },
+  { id: "weekly",    label: "Weekly",     icon: "📋", desc: "Once a week",    visits: 4,  priceMultiplier: 0.35 },
+];
 
 interface Service {
   _id: string;
@@ -31,6 +49,15 @@ interface Service {
     allowedFrequencies?: FrequencyOptionId[];
     autoRenewal?: boolean;
     requiresSameWorker?: boolean;
+    frequencyConfigs?: Array<{
+      id: FrequencyOptionId;
+      label?: string;
+      description?: string;
+      visits?: number;
+      priceMultiplier?: number;
+      sortOrder?: number;
+      isActive?: boolean;
+    }>;
   };
 }
 
@@ -50,24 +77,6 @@ interface PendingPaymentBooking {
   amount: number;
   serviceName: string;
 }
-
-type FrequencyOptionId = "daily" | "alt-days" | "3-days" | "weekly";
-
-type FrequencyOption = {
-  id: FrequencyOptionId;
-  label: string;
-  icon: string;
-  desc: string;
-  visits: number;
-  priceMultiplier: number;
-};
-
-const FREQUENCY_OPTIONS: FrequencyOption[] = [
-  { id: "daily",     label: "Daily",      icon: "📆", desc: "Every day",      visits: 30, priceMultiplier: 1.0 },
-  { id: "alt-days",  label: "Alt Days",   icon: "📅", desc: "Mon/Wed/Fri",    visits: 13, priceMultiplier: 0.65 },
-  { id: "3-days",    label: "3× Week",    icon: "🗓️", desc: "Any 3 days",     visits: 12, priceMultiplier: 0.60 },
-  { id: "weekly",    label: "Weekly",     icon: "📋", desc: "Once a week",    visits: 4,  priceMultiplier: 0.35 },
-];
 
 // Fallback hours list if service has no durationOptions
 const FALLBACK_HOURS = [1, 1.5, 2, 2.5, 3];
@@ -127,15 +136,37 @@ const SubscriptionServicePage = () => {
     }
   }, [selectedService?._id]);
 
-  const allowedFrequencyIds = selectedService?.subscriptionOptions?.allowedFrequencies?.filter(
-    (freq): freq is FrequencyOptionId => FREQUENCY_OPTIONS.some((option) => option.id === freq)
-  ) || [];
+  const availableFrequencyOptions = useMemo(() => {
+    const configuredOptions = selectedService?.subscriptionOptions?.frequencyConfigs?.length
+      ? DEFAULT_FREQUENCY_OPTIONS.map((defaultOption) => {
+          const savedOption = selectedService.subscriptionOptions?.frequencyConfigs?.find(
+            (option) => option.id === defaultOption.id
+          );
 
-  const availableFrequencyOptions = (
-    allowedFrequencyIds.length > 0
-      ? allowedFrequencyIds
-      : FREQUENCY_OPTIONS.map((option) => option.id)
-  ).map((id) => FREQUENCY_OPTIONS.find((option) => option.id === id)).filter(Boolean) as FrequencyOption[];
+          return {
+            ...defaultOption,
+            label: savedOption?.label?.trim() || defaultOption.label,
+            desc: savedOption?.description?.trim() || defaultOption.desc,
+            visits: savedOption?.visits && savedOption.visits > 0 ? savedOption.visits : defaultOption.visits,
+            priceMultiplier: typeof savedOption?.priceMultiplier === 'number' && savedOption.priceMultiplier >= 0
+              ? savedOption.priceMultiplier
+              : defaultOption.priceMultiplier,
+          };
+        })
+      : DEFAULT_FREQUENCY_OPTIONS;
+
+    const allowedIds = selectedService?.subscriptionOptions?.allowedFrequencies?.filter(
+      (freq): freq is FrequencyOptionId => DEFAULT_FREQUENCY_OPTIONS.some((option) => option.id === freq)
+    ) || [];
+
+    const orderedIds = allowedIds.length > 0
+      ? allowedIds
+      : configuredOptions.map((option) => option.id);
+
+    return orderedIds
+      .map((id) => configuredOptions.find((option) => option.id === id))
+      .filter(Boolean) as FrequencyOption[];
+  }, [selectedService]);
 
   useEffect(() => {
     if (!selectedService) {
@@ -184,7 +215,7 @@ const SubscriptionServicePage = () => {
 
   const currentFreq = availableFrequencyOptions.find((option) => option.id === frequency)
     || availableFrequencyOptions[0]
-    || FREQUENCY_OPTIONS[0];
+    || DEFAULT_FREQUENCY_OPTIONS[0];
 
   // Monthly price from durationOptions — authoritative source
   const durationOption = selectedService?.durationOptions?.find(d => d.hours === sessionHours);

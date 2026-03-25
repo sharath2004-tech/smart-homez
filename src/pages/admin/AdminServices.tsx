@@ -51,6 +51,15 @@ interface Service {
     requiresSameWorker?: boolean;
     minContractMonths?: number;
     autoRenewal?: boolean;
+    frequencyConfigs?: Array<{
+      id: SubscriptionFrequencyId;
+      label: string;
+      description: string;
+      visits: number;
+      priceMultiplier: number;
+      sortOrder: number;
+      isActive: boolean;
+    }>;
   };
   sizeParameters?: {
     enabled: boolean;
@@ -140,6 +149,58 @@ const MINI_SERVICE_TYPES = [
   { id: 'fixed_door_cleaning', label: 'Glass Door', price: 349, duration: 30 },
 ];
 const MINI_SERVICE_IDS = new Set(MINI_SERVICE_TYPES.map(t => t.id));
+
+type SubscriptionFrequencyId = 'daily' | 'alt-days' | '3-days' | 'weekly';
+
+type SubscriptionFrequencyConfig = {
+  id: SubscriptionFrequencyId;
+  label: string;
+  description: string;
+  visits: number;
+  priceMultiplier: number;
+  sortOrder: number;
+  isActive: boolean;
+};
+
+const DEFAULT_ALLOWED_FREQUENCIES: SubscriptionFrequencyId[] = ['daily', 'alt-days', '3-days', 'weekly'];
+
+const DEFAULT_SUBSCRIPTION_FREQUENCY_CONFIGS: SubscriptionFrequencyConfig[] = [
+  { id: 'daily', label: 'Daily', description: 'Every day', visits: 30, priceMultiplier: 1, sortOrder: 0, isActive: true },
+  { id: 'alt-days', label: 'Alt Days', description: 'Mon/Wed/Fri', visits: 13, priceMultiplier: 0.65, sortOrder: 1, isActive: true },
+  { id: '3-days', label: '3× Week', description: 'Any 3 days', visits: 12, priceMultiplier: 0.6, sortOrder: 2, isActive: true },
+  { id: 'weekly', label: 'Weekly', description: 'Once a week', visits: 4, priceMultiplier: 0.35, sortOrder: 3, isActive: true },
+];
+
+const getNormalizedFrequencyConfigs = (configs?: Service['subscriptionOptions'] extends { frequencyConfigs?: infer T } ? T : never): SubscriptionFrequencyConfig[] => (
+  DEFAULT_SUBSCRIPTION_FREQUENCY_CONFIGS.map((defaultConfig) => {
+    const existingConfig = configs?.find((config) => config.id === defaultConfig.id);
+
+    return {
+      ...defaultConfig,
+      ...existingConfig,
+      label: existingConfig?.label?.trim() || defaultConfig.label,
+      description: existingConfig?.description?.trim() || defaultConfig.description,
+      visits: existingConfig?.visits && existingConfig.visits > 0 ? existingConfig.visits : defaultConfig.visits,
+      priceMultiplier: typeof existingConfig?.priceMultiplier === 'number' && existingConfig.priceMultiplier >= 0
+        ? existingConfig.priceMultiplier
+        : defaultConfig.priceMultiplier,
+    };
+  })
+);
+
+const getNormalizedSubscriptionOptions = (
+  options?: Service['subscriptionOptions'],
+  isSubscriptionService: boolean = true
+) => ({
+  enabled: isSubscriptionService,
+  allowedFrequencies: isSubscriptionService
+    ? ((options?.allowedFrequencies?.length ? options.allowedFrequencies : DEFAULT_ALLOWED_FREQUENCIES) as string[])
+    : [],
+  requiresSameWorker: options?.requiresSameWorker ?? true,
+  minContractMonths: options?.minContractMonths,
+  autoRenewal: options?.autoRenewal ?? true,
+  frequencyConfigs: isSubscriptionService ? getNormalizedFrequencyConfigs(options?.frequencyConfigs) : [],
+});
 
 const SERVICE_TYPE_CARDS = [
   {
@@ -249,7 +310,7 @@ const AdminServices = () => {
     isQuoteService: false,
     additionalServiceOptions: [],
     durationOptions: [],
-    subscriptionOptions: { allowedFrequencies: ['daily', 'alt-days', '3-days', 'weekly'], requiresSameWorker: true, autoRenewal: true },
+    subscriptionOptions: getNormalizedSubscriptionOptions(),
     sizeParameters: { enabled: false, sizeType: 'quantity', options: [] },
     suggestedServices: [],
     dos: [],
@@ -270,18 +331,13 @@ const AdminServices = () => {
 
   const buildServicePayload = (serviceData: Service) => {
     const isSubscriptionService = serviceData.serviceType === 'monthly_subscription';
+    const normalizedSubscriptionOptions = getNormalizedSubscriptionOptions(serviceData.subscriptionOptions, isSubscriptionService);
 
     return {
       ...serviceData,
       serviceType: serviceData.serviceType || 'other',
-      subscriptionPlans: isSubscriptionService ? (serviceData.subscriptionPlans || []) : [],
-      subscriptionOptions: {
-        ...(serviceData.subscriptionOptions || {}),
-        enabled: isSubscriptionService,
-        allowedFrequencies: isSubscriptionService
-          ? (serviceData.subscriptionOptions?.allowedFrequencies || ['daily', 'alt-days', '3-days', 'weekly'])
-          : [],
-      },
+      subscriptionPlans: isSubscriptionService ? [] : (serviceData.subscriptionPlans || []),
+      subscriptionOptions: normalizedSubscriptionOptions,
       durationOptions: (serviceData.durationOptions || []).map((tier) => {
         const { _priceMode, ...cleanTier } = tier as Record<string, unknown>;
         return cleanTier;
@@ -488,7 +544,7 @@ const AdminServices = () => {
       subscriptionPlans: service.subscriptionPlans || [],
       additionalServiceOptions: service.additionalServiceOptions,
       durationOptions: service.durationOptions || [],
-      subscriptionOptions: service.subscriptionOptions || { allowedFrequencies: ['daily', 'alt-days', '3-days', 'weekly'], requiresSameWorker: true, autoRenewal: true },
+      subscriptionOptions: getNormalizedSubscriptionOptions(service.subscriptionOptions, service.serviceType === 'monthly_subscription'),
       sizeParameters: service.sizeParameters || { enabled: false, sizeType: 'quantity', options: [] },
       originalPrice: (service as any).originalPrice || 0,
       taskOptions: (service as any).taskOptions || [],
@@ -537,7 +593,7 @@ const AdminServices = () => {
       isActive: true,
       isQuoteService: false,
       durationOptions: [],
-      subscriptionOptions: { allowedFrequencies: ['daily', 'alt-days', '3-days', 'weekly'], requiresSameWorker: true, autoRenewal: true },
+      subscriptionOptions: getNormalizedSubscriptionOptions(),
       sizeParameters: { enabled: false, sizeType: 'quantity', options: [] },
       originalPrice: 0,
       taskOptions: [],
@@ -1087,15 +1143,7 @@ const AdminServices = () => {
                       setFormData(prev => ({
                         ...prev,
                         serviceType: nextServiceType,
-                        subscriptionOptions: {
-                          ...(prev.subscriptionOptions || {}),
-                          enabled: isSubscription,
-                          allowedFrequencies: isSubscription
-                            ? (prev.subscriptionOptions?.allowedFrequencies?.length
-                                ? prev.subscriptionOptions.allowedFrequencies
-                                : ['daily', 'alt-days', '3-days', 'weekly'])
-                            : [],
-                        },
+                        subscriptionOptions: getNormalizedSubscriptionOptions(prev.subscriptionOptions, isSubscription),
                         subscriptionPlans: isSubscription ? (prev.subscriptionPlans || []) : [],
                       }));
                     }}
@@ -1239,304 +1287,16 @@ const AdminServices = () => {
 
                 {/* Subscription Plans Section */}
                 {isSubscriptionServiceType ? (
-                <div className="space-y-3 p-4 bg-gradient-to-br from-primary/5 to-accent/5 rounded-lg border-2 border-primary/20">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="block text-sm font-medium text-foreground">
-                        Subscription Plans
-                      </label>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Create custom booking plans - Each service can have unique subscription options
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <select
-                        onChange={(e) => {
-                          if (!e.target.value) return;
-                          const template = JSON.parse(e.target.value);
-                          const newPlan = {
-                            ...template,
-                            id: `${template.name}-${Date.now()}`,
-                            sortOrder: (formData.subscriptionPlans?.length || 0) + 1
-                          };
-                          setFormData({
-                            ...formData,
-                            subscriptionPlans: [
-                              ...(formData.subscriptionPlans || []),
-                              newPlan
-                            ]
-                          });
-                          e.target.value = ''; // Reset select
-                        }}
-                        className="text-xs px-3 py-1.5 bg-background border border-border rounded-lg hover:border-primary transition-colors"
-                      >
-                        <option value="">+ Add from Template</option>
-                        <optgroup label="Basic Plans">
-                          <option value={JSON.stringify({name: 'oneTime', displayName: 'One-Time', icon: '📅', description: 'Single service', price: formData.price, discountPercentage: 0, isActive: true, requiresFixedWorker: false, allowDaySelection: false})}>
-                            One-Time Booking
-                          </option>
-                          <option value={JSON.stringify({name: 'daily', displayName: 'Daily', icon: '🌅', description: 'Every day', price: Math.round(formData.price * 0.85), discountPercentage: 15, isActive: true, requiresFixedWorker: true, allowDaySelection: false})}>
-                            Daily (15% off)
-                          </option>
-                          <option value={JSON.stringify({name: 'weekly', displayName: 'Weekly', icon: '📆', description: 'Select days', price: Math.round(formData.price * 0.75), discountPercentage: 25, isActive: true, requiresFixedWorker: true, allowDaySelection: true})}>
-                            Weekly (25% off)
-                          </option>
-                          <option value={JSON.stringify({name: 'monthly', displayName: 'Monthly', icon: '🗓️', description: 'Once a month', price: Math.round(formData.price * 0.65), discountPercentage: 35, isActive: true, requiresFixedWorker: true, allowDaySelection: false})}>
-                            Monthly (35% off)
-                          </option>
-                        </optgroup>
-                        <optgroup label="Flexible Plans">
-                          <option value={JSON.stringify({name: 'biweekly', displayName: 'Bi-Weekly', icon: '📋', description: 'Every 2 weeks', price: Math.round(formData.price * 0.80), discountPercentage: 20, isActive: true, requiresFixedWorker: true, allowDaySelection: false})}>
-                            Bi-Weekly (20% off)
-                          </option>
-                          <option value={JSON.stringify({name: 'weekend', displayName: 'Weekend Only', icon: '🎉', description: 'Sat & Sun', price: Math.round(formData.price * 0.85), discountPercentage: 15, isActive: true, requiresFixedWorker: true, allowDaySelection: true})}>
-                            Weekend Only
-                          </option>
-                          <option value={JSON.stringify({name: 'weekday', displayName: 'Weekday Only', icon: '💼', description: 'Mon-Fri', price: Math.round(formData.price * 0.80), discountPercentage: 20, isActive: true, requiresFixedWorker: true, allowDaySelection: true})}>
-                            Weekday Only
-                          </option>
-                        </optgroup>
-                        <optgroup label="Premium Plans">
-                          <option value={JSON.stringify({name: 'quarterly', displayName: 'Quarterly', icon: '🎯', description: 'Every 3 months', price: Math.round(formData.price * 0.55), discountPercentage: 45, isActive: true, requiresFixedWorker: true, allowDaySelection: false})}>
-                            Quarterly (45% off)
-                          </option>
-                          <option value={JSON.stringify({name: 'annual', displayName: 'Annual', icon: '🏆', description: 'Yearly plan', price: Math.round(formData.price * 0.50), discountPercentage: 50, isActive: true, requiresFixedWorker: true, allowDaySelection: false})}>
-                            Annual (50% off)
-                          </option>
-                          <option value={JSON.stringify({name: 'trial', displayName: 'Trial', icon: '🎁', description: '3-day trial', price: Math.round(formData.price * 0.50), discountPercentage: 50, isActive: true, requiresFixedWorker: false, allowDaySelection: false})}>
-                            Trial (3 days)
-                          </option>
-                        </optgroup>
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newPlan = {
-                            id: `custom-${Date.now()}`,
-                            name: `custom-${Date.now()}`,
-                            displayName: 'Custom Plan',
-                            icon: '✨',
-                            description: 'Custom subscription',
-                            price: formData.price,
-                            discountPercentage: 0,
-                            isActive: true,
-                            requiresFixedWorker: false,
-                            allowDaySelection: false,
-                            sortOrder: (formData.subscriptionPlans?.length || 0) + 1
-                          };
-                          setFormData({
-                            ...formData,
-                            subscriptionPlans: [
-                              ...(formData.subscriptionPlans || []),
-                              newPlan
-                            ]
-                          });
-                        }}
-                        className="text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1 whitespace-nowrap"
-                      >
-                        <Plus className="w-3 h-3" />
-                        Custom Plan
-                      </button>
-                    </div>
+                <div className="space-y-3 p-4 bg-purple-50 border border-purple-300 rounded-lg">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground">📦 Subscription Frequency Packs</label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Customer subscription cards use <strong>Duration Tiers</strong> for daily base pricing and the <strong>Subscription Booking Options</strong> section below for frequency titles, descriptions, visits and pricing behavior.
+                    </p>
                   </div>
-                  
-                  {/* Info Banner */}
-                  <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-3">
-                    <div className="flex items-start gap-2">
-                      <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                      <div className="text-xs text-blue-800 dark:text-blue-200">
-                        <p className="font-medium mb-1">💡 Pro Tip: Customize plans per service</p>
-                        <ul className="space-y-0.5 text-blue-700 dark:text-blue-300">
-                          <li>• <strong>Cleaning services</strong> might offer Daily, Weekly, Bi-Weekly plans</li>
-                          <li>• <strong>Health services</strong> could have Monthly check-up packages</li>
-                          <li>• <strong>Maintenance</strong> might need Quarterly or Annual plans</li>
-                          <li>• Set different prices for each plan - Not all services need the same discounts!</li>
-                        </ul>
-                      </div>
-                    </div>
+                  <div className="text-xs text-purple-700 bg-white border border-purple-200 rounded-lg p-3">
+                    For monthly subscription services, the old generic subscription plan editor is not used. Configure the actual customer-facing Daily / Alt Days / 3× Week / Weekly packs below.
                   </div>
-                  
-                  {formData.subscriptionPlans && formData.subscriptionPlans.length > 0 && (
-                    <div className="space-y-3 mt-3">
-                      {[...(formData.subscriptionPlans || [])].sort((a, b) => a.sortOrder - b.sortOrder).map((plan, index) => (
-                        <div key={plan.id} className="p-4 bg-background rounded-lg border-2 border-border hover:border-primary/50 transition-colors">
-                          <div className="grid gap-3">
-                            {/* Row 1: Display Name, Icon, Active Status */}
-                            <div className="grid grid-cols-12 gap-3">
-                              <div className="col-span-5">
-                                <label className="text-xs text-muted-foreground mb-1 block">Display Name</label>
-                                <input
-                                  type="text"
-                                  placeholder="e.g., One-Time"
-                                  value={plan.displayName}
-                                  onChange={(e) => {
-                                    const newPlans = [...(formData.subscriptionPlans || [])];
-                                    newPlans[index] = { ...newPlans[index], displayName: e.target.value };
-                                    setFormData({ ...formData, subscriptionPlans: newPlans });
-                                  }}
-                                  className="input-clean text-sm"
-                                />
-                              </div>
-                              <div className="col-span-2">
-                                <label className="text-xs text-muted-foreground mb-1 block">Icon</label>
-                                <input
-                                  type="text"
-                                  placeholder="📅"
-                                  value={plan.icon}
-                                  onChange={(e) => {
-                                    const newPlans = [...(formData.subscriptionPlans || [])];
-                                    newPlans[index] = { ...newPlans[index], icon: e.target.value };
-                                    setFormData({ ...formData, subscriptionPlans: newPlans });
-                                  }}
-                                  className="input-clean text-sm text-center"
-                                />
-                              </div>
-                              <div className="col-span-3">
-                                <label className="text-xs text-muted-foreground mb-1 block">Price (₹)</label>
-                                <input
-                                  type="number"
-                                  value={plan.price}
-                                  onChange={(e) => {
-                                    const newPlans = [...(formData.subscriptionPlans || [])];
-                                    newPlans[index] = { ...newPlans[index], price: Number(e.target.value) };
-                                    setFormData({ ...formData, subscriptionPlans: newPlans });
-                                  }}
-                                  className="input-clean text-sm"
-                                  min="0"
-                                />
-                              </div>
-                              <div className="col-span-2">
-                                <label className="text-xs text-muted-foreground mb-1 block">Discount %</label>
-                                <input
-                                  type="number"
-                                  value={plan.discountPercentage}
-                                  onChange={(e) => {
-                                    const discount = Number(e.target.value);
-                                    const newPlans = [...(formData.subscriptionPlans || [])];
-                                    newPlans[index] = {
-                                      ...newPlans[index],
-                                      discountPercentage: discount,
-                                      price: Math.round(formData.price * (1 - discount / 100))
-                                    };
-                                    setFormData({ ...formData, subscriptionPlans: newPlans });
-                                  }}
-                                  className="input-clean text-sm"
-                                  min="0"
-                                  max="100"
-                                />
-                              </div>
-                            </div>
-
-                            {/* Row 2: Description */}
-                            <div>
-                              <label className="text-xs text-muted-foreground mb-1 block">Description</label>
-                              <input
-                                type="text"
-                                placeholder="e.g., Single service"
-                                value={plan.description}
-                                onChange={(e) => {
-                                  const newPlans = [...(formData.subscriptionPlans || [])];
-                                  newPlans[index] = { ...newPlans[index], description: e.target.value };
-                                  setFormData({ ...formData, subscriptionPlans: newPlans });
-                                }}
-                                className="input-clean text-sm"
-                              />
-                            </div>
-
-                            {/* Row 3: Options */}
-                            <div className="flex items-center gap-4 flex-wrap">
-                              <label className="flex items-center gap-2 cursor-pointer text-sm">
-                                <input
-                                  type="checkbox"
-                                  checked={plan.isActive}
-                                  onChange={(e) => {
-                                    const newPlans = [...(formData.subscriptionPlans || [])];
-                                    newPlans[index] = { ...newPlans[index], isActive: e.target.checked };
-                                    setFormData({ ...formData, subscriptionPlans: newPlans });
-                                  }}
-                                  className="w-3.5 h-3.5 accent-primary"
-                                />
-                                <span className="text-xs">Active</span>
-                              </label>
-                              
-                              <label className="flex items-center gap-2 cursor-pointer text-sm">
-                                <input
-                                  type="checkbox"
-                                  checked={plan.requiresFixedWorker}
-                                  onChange={(e) => {
-                                    const newPlans = [...(formData.subscriptionPlans || [])];
-                                    newPlans[index] = { ...newPlans[index], requiresFixedWorker: e.target.checked };
-                                    setFormData({ ...formData, subscriptionPlans: newPlans });
-                                  }}
-                                  className="w-3.5 h-3.5 accent-primary"
-                                />
-                                <span className="text-xs">Fixed Worker Required</span>
-                              </label>
-                              
-                              <label className="flex items-center gap-2 cursor-pointer text-sm">
-                                <input
-                                  type="checkbox"
-                                  checked={plan.allowDaySelection}
-                                  onChange={(e) => {
-                                    const newPlans = [...(formData.subscriptionPlans || [])];
-                                    newPlans[index] = { ...newPlans[index], allowDaySelection: e.target.checked };
-                                    setFormData({ ...formData, subscriptionPlans: newPlans });
-                                  }}
-                                  className="w-3.5 h-3.5 accent-primary"
-                                />
-                                <span className="text-xs">Allow Day Selection</span>
-                              </label>
-
-                              <div className="ml-auto flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newPlans = [...(formData.subscriptionPlans || [])];
-                                    if (index > 0) {
-                                      [newPlans[index - 1], newPlans[index]] = [newPlans[index], newPlans[index - 1]];
-                                      newPlans[index - 1].sortOrder = index;
-                                      newPlans[index].sortOrder = index + 1;
-                                      setFormData({ ...formData, subscriptionPlans: newPlans });
-                                    }
-                                  }}
-                                  className="p-1.5 text-xs hover:bg-muted rounded transition-colors"
-                                  disabled={index === 0}
-                                >
-                                  ↑
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newPlans = [...(formData.subscriptionPlans || [])];
-                                    if (index < newPlans.length - 1) {
-                                      [newPlans[index], newPlans[index + 1]] = [newPlans[index + 1], newPlans[index]];
-                                      newPlans[index].sortOrder = index + 1;
-                                      newPlans[index + 1].sortOrder = index + 2;
-                                      setFormData({ ...formData, subscriptionPlans: newPlans });
-                                    }
-                                  }}
-                                  className="p-1.5 text-xs hover:bg-muted rounded transition-colors"
-                                  disabled={index === (formData.subscriptionPlans?.length || 0) - 1}
-                                >
-                                  ↓
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newPlans = formData.subscriptionPlans?.filter((_, i) => i !== index) || [];
-                                    setFormData({ ...formData, subscriptionPlans: newPlans });
-                                  }}
-                                  className="p-1.5 hover:bg-destructive/10 rounded transition-colors"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
                 ) : (
                 <div className="space-y-2 p-4 rounded-lg border border-dashed border-border bg-muted/30">
@@ -1758,6 +1518,16 @@ const AdminServices = () => {
                       <p className="text-xs text-muted-foreground mt-0.5">Controls which frequencies & settings customers can choose on the booking page</p>
                     </div>
 
+                    {(() => {
+                      const sortedDurationTiers = [...(formData.durationOptions || [])].sort((a, b) => a.hours - b.hours);
+                      const previewTier = sortedDurationTiers[0];
+                      const previewBaseMonthlyPrice = previewTier?.price || formData.price || 0;
+                      const previewBaseLabel = previewTier ? `${previewTier.hours}h/day tier` : 'base price';
+                      const frequencyConfigs = getNormalizedFrequencyConfigs(formData.subscriptionOptions?.frequencyConfigs);
+
+                      return (
+                        <>
+
                     {/* Allowed Frequencies */}
                     <div>
                       <p className="text-xs font-semibold text-foreground mb-2">Allowed Frequencies</p>
@@ -1793,6 +1563,138 @@ const AdminServices = () => {
                       </div>
                     </div>
 
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-xs font-semibold text-foreground mb-1">Editable Frequency Cards</p>
+                        <p className="text-xs text-muted-foreground">
+                          Preview totals below are based on the <strong>{previewBaseLabel}</strong> (₹{previewBaseMonthlyPrice.toLocaleString('en-IN')}/month).
+                        </p>
+                      </div>
+
+                      <div className="space-y-3">
+                        {frequencyConfigs.map((config, index) => {
+                          const previewMonthlyTotal = Math.round(previewBaseMonthlyPrice * config.priceMultiplier);
+                          const previewPerVisit = config.visits > 0 ? Math.round(previewMonthlyTotal / config.visits) : 0;
+
+                          return (
+                            <div key={config.id} className="rounded-lg border border-purple-200 bg-white p-3 space-y-3">
+                              <div className="flex items-center justify-between gap-2">
+                                <div>
+                                  <p className="text-sm font-semibold text-foreground capitalize">{config.id.replace(/-/g, ' ')}</p>
+                                  <p className="text-xs text-muted-foreground">Customer-facing content for this frequency card</p>
+                                </div>
+                                <span className={`text-[11px] px-2 py-1 rounded-full font-medium ${(formData.subscriptionOptions?.allowedFrequencies || []).includes(config.id) ? 'bg-purple-100 text-purple-700' : 'bg-muted text-muted-foreground'}`}>
+                                  {(formData.subscriptionOptions?.allowedFrequencies || []).includes(config.id) ? 'Visible to customer' : 'Hidden from customer'}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-xs text-muted-foreground mb-1">Title</label>
+                                  <input
+                                    type="text"
+                                    value={config.label}
+                                    onChange={(e) => {
+                                      const nextConfigs = [...frequencyConfigs];
+                                      nextConfigs[index] = { ...nextConfigs[index], label: e.target.value };
+                                      setFormData({ ...formData, subscriptionOptions: { ...formData.subscriptionOptions, frequencyConfigs: nextConfigs } });
+                                    }}
+                                    className="input-clean text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-muted-foreground mb-1">Visits per month</label>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={config.visits}
+                                    onChange={(e) => {
+                                      const nextConfigs = [...frequencyConfigs];
+                                      nextConfigs[index] = { ...nextConfigs[index], visits: Math.max(1, Number(e.target.value) || 1) };
+                                      setFormData({ ...formData, subscriptionOptions: { ...formData.subscriptionOptions, frequencyConfigs: nextConfigs } });
+                                    }}
+                                    className="input-clean text-sm"
+                                  />
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="block text-xs text-muted-foreground mb-1">Description</label>
+                                <input
+                                  type="text"
+                                  value={config.description}
+                                  onChange={(e) => {
+                                    const nextConfigs = [...frequencyConfigs];
+                                    nextConfigs[index] = { ...nextConfigs[index], description: e.target.value };
+                                    setFormData({ ...formData, subscriptionOptions: { ...formData.subscriptionOptions, frequencyConfigs: nextConfigs } });
+                                  }}
+                                  className="input-clean text-sm"
+                                  placeholder="e.g. Mon/Wed/Fri"
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-xs text-muted-foreground mb-1">Per visit price preview (₹)</label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    value={previewPerVisit}
+                                    onChange={(e) => {
+                                      const nextPerVisit = Math.max(0, Number(e.target.value) || 0);
+                                      const nextMultiplier = previewBaseMonthlyPrice > 0
+                                        ? Number(((nextPerVisit * config.visits) / previewBaseMonthlyPrice).toFixed(4))
+                                        : config.priceMultiplier;
+                                      const nextConfigs = [...frequencyConfigs];
+                                      nextConfigs[index] = { ...nextConfigs[index], priceMultiplier: nextMultiplier };
+                                      setFormData({ ...formData, subscriptionOptions: { ...formData.subscriptionOptions, frequencyConfigs: nextConfigs } });
+                                    }}
+                                    className="input-clean text-sm"
+                                  />
+                                  <p className="text-[11px] text-muted-foreground mt-1">Editable for the preview tier; other duration tiers scale with the same ratio.</p>
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-muted-foreground mb-1">Monthly price factor</label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={config.priceMultiplier}
+                                    onChange={(e) => {
+                                      const nextConfigs = [...frequencyConfigs];
+                                      nextConfigs[index] = { ...nextConfigs[index], priceMultiplier: Math.max(0, Number(e.target.value) || 0) };
+                                      setFormData({ ...formData, subscriptionOptions: { ...formData.subscriptionOptions, frequencyConfigs: nextConfigs } });
+                                    }}
+                                    className="input-clean text-sm"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                                <div className="rounded-lg bg-purple-50 border border-purple-100 px-3 py-2">
+                                  <p className="text-muted-foreground">Preview monthly</p>
+                                  <p className="font-bold text-purple-700">₹{previewMonthlyTotal.toLocaleString('en-IN')}</p>
+                                </div>
+                                <div className="rounded-lg bg-purple-50 border border-purple-100 px-3 py-2">
+                                  <p className="text-muted-foreground">Per visit</p>
+                                  <p className="font-bold text-purple-700">₹{previewPerVisit.toLocaleString('en-IN')}</p>
+                                </div>
+                                <div className="rounded-lg bg-purple-50 border border-purple-100 px-3 py-2">
+                                  <p className="text-muted-foreground">Visits</p>
+                                  <p className="font-bold text-purple-700">~{config.visits}</p>
+                                </div>
+                                <div className="rounded-lg bg-purple-50 border border-purple-100 px-3 py-2">
+                                  <p className="text-muted-foreground">Factor</p>
+                                  <p className="font-bold text-purple-700">{config.priceMultiplier.toFixed(2)}×</p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
                     {/* Toggles */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <label className="flex items-center justify-between p-3 rounded-lg bg-white border border-border cursor-pointer">
@@ -1820,6 +1722,9 @@ const AdminServices = () => {
                         />
                       </label>
                     </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
 
