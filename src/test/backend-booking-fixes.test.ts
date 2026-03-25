@@ -1,0 +1,145 @@
+// @vitest-environment node
+
+import { describe, expect, it } from 'vitest';
+
+import { parseCoordinate } from '../../backend/utils/coordinateValidation.js';
+import { normalizeMaxServices } from '../../backend/utils/dashboardPreferences.js';
+import Payment from '../../backend/models/Payment.js';
+import {
+  buildBookingDateTime,
+  buildVerifiedCartItems,
+  normalizeDurationMinutes,
+} from '../../backend/utils/deepCleaningValidation.js';
+
+describe('coordinate validation helpers', () => {
+  it('accepts zero coordinates as valid numeric input', () => {
+    expect(parseCoordinate(0)).toBe(0);
+    expect(parseCoordinate('0')).toBe(0);
+    expect(parseCoordinate('0.000')).toBe(0);
+  });
+
+  it('rejects missing and non-numeric coordinates', () => {
+    expect(parseCoordinate(undefined)).toBeNull();
+    expect(parseCoordinate(null)).toBeNull();
+    expect(parseCoordinate('')).toBeNull();
+    expect(parseCoordinate('north')).toBeNull();
+  });
+});
+
+describe('dashboard preferences normalization', () => {
+  it('preserves valid maxServices values below six', () => {
+    expect(normalizeMaxServices(1)).toBe(1);
+    expect(normalizeMaxServices(3)).toBe(3);
+    expect(normalizeMaxServices(5)).toBe(5);
+  });
+
+  it('clamps invalid values into the supported 1-8 range', () => {
+    expect(normalizeMaxServices(0)).toBe(1);
+    expect(normalizeMaxServices(99)).toBe(8);
+    expect(normalizeMaxServices('abc')).toBe(1);
+  });
+});
+
+describe('deep cleaning validation helpers', () => {
+  const config = {
+    items: [
+      {
+        id: 'kitchen_deep',
+        name: 'Kitchen Deep Cleaning',
+        category: 'kitchen',
+        pricingType: 'tiered',
+        price: 0,
+        durationMinutes: 120,
+        unit: 'service',
+        tiers: [
+          { label: '2 BHK', price: 2600 },
+          { label: '3 BHK', price: 3200 },
+        ],
+      },
+      {
+        id: 'fullhouse_bare',
+        name: 'Full House Deep Clean — Bare Flat',
+        category: 'fullhouse',
+        pricingType: 'per_sqft',
+        price: 8,
+        durationMinutes: 240,
+        unit: 'sqft',
+      },
+      {
+        id: 'fan_clean',
+        name: 'Fan Cleaning',
+        category: 'appliances',
+        pricingType: 'per_unit',
+        price: 100,
+        durationMinutes: 30,
+        unit: 'fan',
+        maxQty: 20,
+      },
+    ],
+  };
+
+  it('builds booking date time only for valid dates and HH:MM input', () => {
+    const bookingDate = buildBookingDateTime('2026-04-05', '09:30');
+    expect(bookingDate).not.toBeNull();
+    expect(bookingDate?.getHours()).toBe(9);
+    expect(bookingDate?.getMinutes()).toBe(30);
+
+    expect(buildBookingDateTime('invalid-date', '09:30')).toBeNull();
+    expect(buildBookingDateTime('2026-04-05', '25:00')).toBeNull();
+  });
+
+  it('rejects invalid tier selections instead of silently pricing them at zero', () => {
+    const result = buildVerifiedCartItems([
+      { itemId: 'kitchen_deep', qty: 1, selectedTier: '9 BHK' },
+    ], config);
+
+    expect(result.verifiedCartItems).toHaveLength(0);
+    expect(result.invalidItems).toEqual([
+      expect.objectContaining({ itemId: 'kitchen_deep' }),
+    ]);
+    expect(result.calculatedTotal).toBe(0);
+  });
+
+  it('rejects sqft items without a positive area value', () => {
+    const result = buildVerifiedCartItems([
+      { itemId: 'fullhouse_bare', areaValue: 0 },
+    ], config);
+
+    expect(result.verifiedCartItems).toHaveLength(0);
+    expect(result.invalidItems[0]?.reason).toContain('requires a valid area value greater than 0');
+  });
+
+  it('rejects quantities above configured maxQty', () => {
+    const result = buildVerifiedCartItems([
+      { itemId: 'fan_clean', qty: 21 },
+    ], config);
+
+    expect(result.verifiedCartItems).toHaveLength(0);
+    expect(result.invalidItems[0]?.reason).toContain('maximum quantity of 20');
+  });
+
+  it('calculates valid tiered and sqft cart totals correctly', () => {
+    const result = buildVerifiedCartItems([
+      { itemId: 'kitchen_deep', qty: 1, selectedTier: '2 BHK' },
+      { itemId: 'fullhouse_bare', areaValue: 100 },
+      { itemId: 'fan_clean', qty: 2 },
+    ], config);
+
+    expect(result.invalidItems).toHaveLength(0);
+    expect(result.verifiedCartItems).toHaveLength(3);
+    expect(result.calculatedTotal).toBe(2600 + 800 + 200);
+  });
+
+  it('normalizes invalid durations to a safe minimum default', () => {
+    expect(normalizeDurationMinutes(undefined)).toBe(180);
+    expect(normalizeDurationMinutes(0)).toBe(180);
+    expect(normalizeDurationMinutes(14.2)).toBe(15);
+    expect(normalizeDurationMinutes(47.6)).toBe(48);
+  });
+});
+
+describe('payment model compatibility', () => {
+  it('supports the qr-upi payment method used by the payment route and UI', () => {
+    expect(Payment.schema.path('paymentMethod').enumValues).toContain('qr-upi');
+  });
+});

@@ -9,6 +9,7 @@ import {
     geocodeAddress,
     reverseGeocode
 } from '../utils/geolocation.js';
+import { hasValue, parseCoordinate } from '../utils/coordinateValidation.js';
 
 const router = express.Router();
 
@@ -252,7 +253,10 @@ router.post('/check-availability', authenticate, async (req, res) => {
   try {
     const { serviceId, longitude, latitude, apartmentName } = req.body;
 
-    if (!serviceId || !longitude || !latitude) {
+    const parsedLongitude = parseCoordinate(longitude);
+    const parsedLatitude = parseCoordinate(latitude);
+
+    if (!serviceId || parsedLongitude === null || parsedLatitude === null) {
       return res.status(400).json({
         success: false,
         message: 'Service ID, longitude, and latitude are required'
@@ -261,8 +265,8 @@ router.post('/check-availability', authenticate, async (req, res) => {
 
     const availability = await checkServiceAvailability(
       serviceId,
-      longitude,
-      latitude,
+      parsedLongitude,
+      parsedLatitude,
       apartmentName
     );
 
@@ -284,7 +288,10 @@ router.post('/nearby-workers', authenticate, async (req, res) => {
   try {
     const { longitude, latitude, maxDistance = 500, specializations } = req.body;
 
-    if (!longitude || !latitude) {
+    const parsedLongitude = parseCoordinate(longitude);
+    const parsedLatitude = parseCoordinate(latitude);
+
+    if (parsedLongitude === null || parsedLatitude === null) {
       return res.status(400).json({
         success: false,
         message: 'Longitude and latitude are required'
@@ -292,8 +299,8 @@ router.post('/nearby-workers', authenticate, async (req, res) => {
     }
 
     const workers = await findNearbyWorkers(
-      longitude,
-      latitude,
+      parsedLongitude,
+      parsedLatitude,
       maxDistance,
       specializations
     );
@@ -317,7 +324,10 @@ router.post('/nearby', authenticate, async (req, res) => {
   try {
     const { longitude, latitude, maxDistance = 500 } = req.body;
 
-    if (!longitude || !latitude) {
+    const parsedLongitude = parseCoordinate(longitude);
+    const parsedLatitude = parseCoordinate(latitude);
+
+    if (parsedLongitude === null || parsedLatitude === null) {
       return res.status(400).json({
         success: false,
         message: 'Longitude and latitude are required'
@@ -329,7 +339,7 @@ router.post('/nearby', authenticate, async (req, res) => {
         $near: {
           $geometry: {
             type: 'Point',
-            coordinates: [longitude, latitude]
+            coordinates: [parsedLongitude, parsedLatitude]
           },
           $maxDistance: maxDistance
         }
@@ -343,8 +353,8 @@ router.post('/nearby', authenticate, async (req, res) => {
     // Calculate distance for each location
     const locationsWithDistance = locations.map(loc => {
       const distance = calculateDistance(
-        latitude,
-        longitude,
+        parsedLatitude,
+        parsedLongitude,
         loc.location.coordinates[1],
         loc.location.coordinates[0]
       );
@@ -407,14 +417,17 @@ router.post('/reverse-geocode', authenticate, async (req, res) => {
   try {
     const { latitude, longitude } = req.body;
 
-    if (!latitude || !longitude) {
+    const parsedLatitude = parseCoordinate(latitude);
+    const parsedLongitude = parseCoordinate(longitude);
+
+    if (parsedLatitude === null || parsedLongitude === null) {
       return res.status(400).json({
         success: false,
         message: 'Latitude and longitude are required'
       });
     }
 
-    const address = await reverseGeocode(latitude, longitude);
+    const address = await reverseGeocode(parsedLatitude, parsedLongitude);
 
     res.status(200).json({
       success: true,
@@ -436,7 +449,7 @@ router.get('/customer/nearby', async (req, res) => {
   try {
     const { latitude, longitude, maxDistance = 5000 } = req.query;
 
-    if (!latitude || !longitude) {
+    if (!hasValue(latitude) || !hasValue(longitude)) {
       return res.status(400).json({
         success: false,
         message: 'Latitude and longitude are required',

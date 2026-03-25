@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { normalizeMaxServices } from '../utils/dashboardPreferences.js';
 
 const dashboardPreferencesSchema = new mongoose.Schema({
   // Service configuration for customer dashboard
@@ -164,8 +165,8 @@ dashboardPreferencesSchema.statics.getDefaultConfig = async function() {
       }
     });
 
-    if ((config.maxServices || 0) < 6) {
-      config.maxServices = 6;
+    if (typeof config.maxServices !== 'number' || config.maxServices < 1 || config.maxServices > 8) {
+      config.maxServices = normalizeMaxServices(config.maxServices);
       hasChanges = true;
     }
 

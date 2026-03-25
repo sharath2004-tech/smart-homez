@@ -36,7 +36,7 @@ const paymentSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['card', 'cash', 'bank_transfer', 'wallet'],
+    enum: ['qr-upi', 'card', 'cash', 'bank_transfer', 'wallet'],
     required: true
   },
   transactionId: {

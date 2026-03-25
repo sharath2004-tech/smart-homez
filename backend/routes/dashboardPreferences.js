@@ -84,6 +84,8 @@ router.put('/', authenticate, authorize('admin', 'super_admin'), [
     }
 
     const { services, maxServices } = req.body;
+    const config = await DashboardPreferences.getDefaultConfig();
+    const resolvedMaxServices = maxServices ?? config.maxServices;
     const normalizedServices = services.map((service) => ({
       ...service,
       linkedServiceId: service.linkedServiceId || null,
@@ -98,9 +100,9 @@ router.put('/', authenticate, authorize('admin', 'super_admin'), [
     }
 
     // Validate max services limit
-    if (activeServices.length > (maxServices || 4)) {
+    if (activeServices.length > resolvedMaxServices) {
       return res.status(400).json({
-        error: { message: `Cannot have more than ${maxServices || 4} active services`, status: 400 }
+        error: { message: `Cannot have more than ${resolvedMaxServices} active services`, status: 400 }
       });
     }
 
@@ -113,9 +115,8 @@ router.put('/', authenticate, authorize('admin', 'super_admin'), [
     }
 
     // Update configuration
-    const config = await DashboardPreferences.getDefaultConfig();
     config.services = normalizedServices;
-    if (maxServices) config.maxServices = maxServices;
+    if (maxServices !== undefined) config.maxServices = maxServices;
     config.lastUpdatedBy = req.user._id;
     config.lastUpdatedAt = new Date();
 

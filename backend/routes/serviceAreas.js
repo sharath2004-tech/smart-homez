@@ -10,6 +10,7 @@ import Location from '../models/Location.js';
 import Service from '../models/Service.js';
 import ServiceArea from '../models/ServiceArea.js';
 import ServiceAvailabilityRequest from '../models/ServiceAvailabilityRequest.js';
+import { hasValue, parseCoordinate } from '../utils/coordinateValidation.js';
 import { calculateDistance } from '../utils/geolocation.js';
 
 const router = express.Router();
@@ -42,14 +43,17 @@ router.post('/validate', async (req, res) => {
   try {
     const { latitude, longitude } = req.body;
 
-    if (!latitude || !longitude) {
+    const parsedLatitude = parseCoordinate(latitude);
+    const parsedLongitude = parseCoordinate(longitude);
+
+    if (parsedLatitude === null || parsedLongitude === null) {
       return res.status(400).json({
         error: { message: 'Latitude and longitude are required', status: 400 },
       });
     }
 
     // Validate coordinate ranges
-    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    if (parsedLatitude < -90 || parsedLatitude > 90 || parsedLongitude < -180 || parsedLongitude > 180) {
       return res.status(400).json({
         error: { message: 'Invalid coordinates', status: 400 },
       });
@@ -60,7 +64,7 @@ router.post('/validate', async (req, res) => {
         $near: {
           $geometry: {
             type: 'Point',
-            coordinates: [longitude, latitude]
+            coordinates: [parsedLongitude, parsedLatitude]
           },
           $maxDistance: 50000
         }
@@ -71,7 +75,7 @@ router.post('/validate', async (req, res) => {
 
     if (nearbyLocation?.location?.coordinates?.length) {
       const [locationLng, locationLat] = nearbyLocation.location.coordinates;
-      const distanceMeters = Math.round(calculateDistance(latitude, longitude, locationLat, locationLng));
+      const distanceMeters = Math.round(calculateDistance(parsedLatitude, parsedLongitude, locationLat, locationLng));
       const serviceRadiusMeters = Math.max(nearbyLocation.maxServiceRadius || 500, 100);
 
       if (distanceMeters <= serviceRadiusMeters) {
@@ -100,7 +104,7 @@ router.post('/validate', async (req, res) => {
 
     for (const loc of allLocations) {
       const [locLng, locLat] = loc.location.coordinates;
-      const distance = calculateDistance(latitude, longitude, locLat, locLng);
+      const distance = calculateDistance(parsedLatitude, parsedLongitude, locLat, locLng);
       if (distance < minDistance) {
         minDistance = distance;
         nearest = {
@@ -200,7 +204,10 @@ router.post('/notify', authenticate, async (req, res) => {
   try {
     const { latitude, longitude, email } = req.body;
 
-    if (!email || !latitude || !longitude) {
+    const parsedLatitude = parseCoordinate(latitude);
+    const parsedLongitude = parseCoordinate(longitude);
+
+    if (!email || parsedLatitude === null || parsedLongitude === null) {
       return res.status(400).json({
         error: { message: 'Email and location are required', status: 400 },
       });
@@ -210,8 +217,8 @@ router.post('/notify', authenticate, async (req, res) => {
     // For now, just acknowledge
     console.log('Service expansion notification:', {
       email,
-      latitude,
-      longitude,
+      latitude: parsedLatitude,
+      longitude: parsedLongitude,
       userId: req.user._id,
       timestamp: new Date(),
     });

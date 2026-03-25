@@ -1,12 +1,18 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import Booking from '../models/Booking.js';
+import BusinessHours from '../models/BusinessHours.js';
 import DeepCleaningChangeRequest from '../models/DeepCleaningChangeRequest.js';
 import DeepCleaningConfig from '../models/DeepCleaningConfig.js';
 import Location from '../models/Location.js';
 import Service from '../models/Service.js';
 import User from '../models/User.js';
 import { assignWorkersWithBackup } from '../utils/advancedWorkerAssignment.js';
+import {
+    buildBookingDateTime,
+    buildVerifiedCartItems,
+    normalizeDurationMinutes,
+} from '../utils/deepCleaningValidation.js';
 import notificationService from '../utils/notificationService.js';
 import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
 
@@ -35,14 +41,6 @@ const DEFAULT_PAGE_CONTENT = {
   categoriesSubtitle: 'Pick a category, enter your requirements and get the final amount based on your home details.',
   miniServicesTitle: 'Popular mini services',
   miniServicesSubtitle: 'Add-on services for specific areas and appliances.',
-};
-
-const normalizeDurationMinutes = (value) => {
-  const numericValue = Number(value);
-  if (!Number.isFinite(numericValue) || numericValue <= 0) {
-    return 180;
-  }
-  return Math.max(15, Math.round(numericValue));
 };
 
 const normalizeTierLabel = (label, index) => {
@@ -179,50 +177,6 @@ const buildDeepCleaningSnapshot = (source = {}) => ({
   minimumCartValue: Number(source.minimumCartValue ?? 0),
 });
 
-const buildVerifiedCartItems = (cartItems, config) => {
-  let calculatedTotal = 0;
-
-  const verifiedCartItems = (cartItems || []).map(item => {
-    const configItem = config.items.find(i => i.id === item.itemId);
-    if (!configItem) return null;
-
-    let totalPrice = 0;
-    const qty = Math.max(1, Number(item.qty) || 1);
-    const areaValue = item.areaValue != null ? Math.max(0, Number(item.areaValue) || 0) : null;
-
-    if (configItem.pricingType === 'per_sqft') {
-      totalPrice = configItem.price * (areaValue || 0);
-    } else if (configItem.pricingType === 'tiered') {
-      const tier = configItem.tiers?.find(t => t.label === item.selectedTier);
-      totalPrice = tier ? tier.price * qty : 0;
-    } else {
-      totalPrice = configItem.price * qty;
-    }
-
-    calculatedTotal += totalPrice;
-
-    return {
-      itemId: configItem.id,
-      name: configItem.pricingType === 'per_sqft' && areaValue
-        ? `${configItem.name} (${areaValue} ${configItem.unit || 'sqft'})`
-        : configItem.name,
-      category: configItem.category,
-      qty,
-      durationMinutes: normalizeDurationMinutes(configItem.durationMinutes),
-      unitPrice: configItem.price,
-      totalPrice,
-      selectedTier: configItem.pricingType === 'tiered'
-        ? (item.selectedTier || null)
-        : configItem.pricingType === 'per_sqft' && areaValue
-          ? `${areaValue} ${configItem.unit || 'sqft'}`
-          : item.selectedTier || null,
-      areaValue,
-    };
-  }).filter(Boolean);
-
-  return { verifiedCartItems, calculatedTotal };
-};
-
 const getDeepCleaningService = async () => {
   const directMatch = await Service.findOne({
     serviceCategory: 'deep_cleaning',
@@ -292,6 +246,7 @@ const findCoveringLocation = async ({ longitude, latitude, maxDistance }) => {
       },
     },
     isActive: true,
+    isServiceAvailable: true,
   }).lean();
 };
 
@@ -436,8 +391,15 @@ router.post('/estimate', authenticate, authorize('customer'), async (req, res) =
     }
 
     const config = await ensureConfig();
-    const { verifiedCartItems, calculatedTotal } = buildVerifiedCartItems(cartItems, config);
+    const { verifiedCartItems, calculatedTotal, invalidItems } = buildVerifiedCartItems(cartItems, config);
     const estimatedDurationMinutes = verifiedCartItems.reduce((sum, item) => sum + normalizeDurationMinutes(item.durationMinutes), 0);
+
+    if (invalidItems.length > 0) {
+      return res.status(400).json({
+        error: { message: invalidItems[0].reason, status: 400 },
+        invalidItems,
+      });
+    }
 
     if (verifiedCartItems.length === 0) {
       return res.status(400).json({ error: { message: 'No valid items in cart', status: 400 } });
@@ -538,10 +500,26 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
       return res.status(400).json({ error: { message: 'Booking date and time are required', status: 400 } });
     }
 
+    const bookingStartDateTime = buildBookingDateTime(bookingDate, startTime);
+    if (!bookingStartDateTime) {
+      return res.status(400).json({ error: { message: 'Please provide a valid booking date and start time', status: 400 } });
+    }
+
+    if (bookingStartDateTime <= new Date()) {
+      return res.status(400).json({ error: { message: 'Booking date and time must be in the future', status: 400 } });
+    }
+
     const config = await ensureConfig();
 
     // ── Server-side price recalculation (never trust client amounts) ──────────
-    const { verifiedCartItems, calculatedTotal } = buildVerifiedCartItems(cartItems, config);
+    const { verifiedCartItems, calculatedTotal, invalidItems } = buildVerifiedCartItems(cartItems, config);
+
+    if (invalidItems.length > 0) {
+      return res.status(400).json({
+        error: { message: invalidItems[0].reason, status: 400 },
+        invalidItems,
+      });
+    }
 
     if (verifiedCartItems.length === 0) {
       return res.status(400).json({ error: { message: 'No valid items in cart', status: 400 } });
@@ -555,12 +533,52 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
 
     const scheduledDurationMinutes = verifiedCartItems.reduce((sum, item) => sum + normalizeDurationMinutes(item.durationMinutes), 0);
 
+    const bookingDateStr = bookingStartDateTime.toISOString().slice(0, 10);
+    try {
+      const businessHoursConfig = await BusinessHours.getConfig();
+      const holiday = (businessHoursConfig.holidays || []).find((entry) => entry.date === bookingDateStr);
+      if (holiday) {
+        return res.status(400).json({
+          error: {
+            message: `Bookings are not available on ${holiday.label || 'this holiday'} (${bookingDateStr}). Please choose a different date.`,
+            status: 400,
+          },
+        });
+      }
+    } catch (businessHoursError) {
+      console.error('Deep cleaning holiday check failed (non-fatal):', businessHoursError.message);
+    }
+
     // Build endTime from configured deep-cleaning duration
     const [h, m] = startTime.split(':').map(Number);
     const totalMinutes = (h * 60) + m + scheduledDurationMinutes;
     const endH = Math.floor(totalMinutes / 60) % 24;
     const endM = totalMinutes % 60;
     const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
+    const startOfRequestedDay = new Date(bookingStartDateTime);
+    startOfRequestedDay.setHours(0, 0, 0, 0);
+    const endOfRequestedDay = new Date(bookingStartDateTime);
+    endOfRequestedDay.setHours(23, 59, 59, 999);
+
+    const customerConflict = await Booking.findOne({
+      customer: req.user._id,
+      bookingDate: { $gte: startOfRequestedDay, $lte: endOfRequestedDay },
+      status: { $in: ['pending', 'confirmed', 'in-progress'] },
+      startTime: { $lt: endTime },
+      endTime: { $gt: startTime },
+    })
+      .select('startTime endTime')
+      .lean();
+
+    if (customerConflict) {
+      return res.status(400).json({
+        error: {
+          message: `You already have another booking between ${customerConflict.startTime} and ${customerConflict.endTime}. Please choose a different time.`,
+          status: 400,
+        },
+      });
+    }
 
     // Get customer location
     const customer = await User.findById(req.user._id)
@@ -572,6 +590,9 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
 
     // Fetch deep cleaning service radius configured by admin (serviceCategory: deep_cleaning)
     const deepCleanServiceDoc = await getDeepCleaningService();
+    if (!deepCleanServiceDoc) {
+      return res.status(404).json({ error: { message: 'Deep cleaning service is not configured', status: 404 } });
+    }
     const deepCleanRadiusMeters = (deepCleanServiceDoc?.workerSearchRadiusKm || 50) * 1000;
 
     const customerLng = requestedLocation?.longitude ?? (savedCoordinates ? Number(savedCoordinates[0]) : null);
@@ -620,7 +641,7 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
       customer:     req.user._id,
       service:      deepCleanServiceDoc?._id,
       bookingType:  'deep-cleaning-cart',
-      bookingDate:  new Date(bookingDate),
+      bookingDate:  new Date(bookingStartDateTime),
       startTime,
       endTime,
       scheduledDurationMinutes,
