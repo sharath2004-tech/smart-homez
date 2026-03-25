@@ -5,6 +5,7 @@ import { SubscriptionPlanSelector } from "@/components/SubscriptionPlanSelector"
 import { Button } from "@/components/ui/button";
 import { useServiceBookingAvailability } from "@/hooks/useServiceBookingAvailability";
 import { authAPI, bookingsAPI, servicesAPI } from "@/lib/api";
+import { getApproxMonthlyVisits } from "@/utils/subscriptionPlanDetails";
 import { ArrowLeft, CheckCircle2, MapPin, Package } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -132,14 +133,8 @@ export default function SubscriptionBookingPage() {
     let totalPrice = discountedPrice * schedule.duration;
     
     // For subscriptions, estimate monthly cost
-    if (selectedPlan === 'daily') {
-      totalPrice = totalPrice * 30; // 30 visits / 30 days
-    } else if (selectedPlan === 'weekly') {
-      totalPrice = totalPrice * (schedule.specificDays?.length || 1) * 4; // 4 weeks
-    } else if (selectedPlan === 'biweekly') {
-      totalPrice = totalPrice * 2 * 4; // Twice a week for 4 weeks
-    } else if (selectedPlan === 'monthly') {
-      totalPrice = totalPrice * 4; // 4 times a month
+    if (selectedPlan !== 'oneTime') {
+      totalPrice = totalPrice * getApproxMonthlyVisits(selectedPlan, schedule.specificDays?.length || 0);
     }
     
     return Math.round(totalPrice);
@@ -446,7 +441,7 @@ export default function SubscriptionBookingPage() {
                     <div className="text-right">
                       <p className="text-sm font-semibold text-green-600">
                         {t('subscription.youSave')}: ₹{Math.round(service!.price * schedule.duration * 
-                          (selectedPlan === 'daily' ? 30 : 4) * 
+                          getApproxMonthlyVisits(selectedPlan, schedule.specificDays?.length || 0) * 
                           ({daily: 0.1, weekly: 0.15, biweekly: 0.12, monthly: 0.2}[selectedPlan] || 0)
                         )}
                       </p>

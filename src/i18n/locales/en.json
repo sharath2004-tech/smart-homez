@@ -105,9 +105,9 @@
       "weekly": "Weekly Plan",
       "weeklyDesc": "Choose specific days",
       "biweekly": "Bi-Weekly",
-      "biweeklyDesc": "Twice a week",
+      "biweeklyDesc": "Every 2 weeks",
       "monthly": "Monthly Plan",
-      "monthlyDesc": "Best value package"
+      "monthlyDesc": "One visit each month"
     },
     "features": {
       "flexibleSchedule": "Flexible scheduling",
@@ -119,8 +119,8 @@
       "save20": "Save 20% per service",
       "dailyService": "Service every day",
       "weeklyService": "Weekly service",
-      "twiceWeekly": "Service twice a week",
-      "monthlyService": "Monthly service",
+      "twiceWeekly": "Service every 2 weeks",
+      "monthlyService": "One visit each month",
       "priorityBooking": "Priority booking",
       "prioritySupport": "Priority support",
       "premiumSupport": "Premium 24/7 support",

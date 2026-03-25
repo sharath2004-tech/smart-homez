@@ -14,12 +14,13 @@ import User from '../models/User.js';
 import WorkerEarnings from '../models/WorkerEarnings.js';
 import WorkerSalaryRequest from '../models/WorkerSalaryRequest.js';
 import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/emailService.js';
+import { getNextRecurringScheduleDate } from '../utils/recurringSchedule.js';
 import { checkSlotAvailability } from '../utils/slotManagement.js';
 import {
-  evaluateWorkerEffectiveAvailability,
-  isWorkerAssignedToBooking,
-  isWorkerAvailableForTimeRange,
-  isWorkerEligibleForAssignment
+    evaluateWorkerEffectiveAvailability,
+    isWorkerAssignedToBooking,
+    isWorkerAvailableForTimeRange,
+    isWorkerEligibleForAssignment
 } from '../utils/workerAvailability.js';
 
 // Send temporary password via SMS (plain message, not Twilio Verify)
@@ -144,16 +145,6 @@ const REVENUE_BOOKING_MATCH = {
   cancellationDate: null
 };
 
-const DAY_INDEX_BY_NAME = {
-  sunday: 0,
-  monday: 1,
-  tuesday: 2,
-  wednesday: 3,
-  thursday: 4,
-  friday: 5,
-  saturday: 6
-};
-
 const startOfDay = (value) => {
   const date = new Date(value);
   date.setHours(0, 0, 0, 0);
@@ -168,25 +159,6 @@ const addDays = (value, days) => {
 
 const sameDay = (left, right) => startOfDay(left).getTime() === startOfDay(right).getTime();
 
-const findNextSelectedDay = (fromDate, selectedDays = []) => {
-  const allowedDayIndexes = selectedDays
-    .map(day => DAY_INDEX_BY_NAME[String(day || '').toLowerCase()])
-    .filter(day => Number.isInteger(day));
-
-  if (allowedDayIndexes.length === 0) {
-    return addDays(fromDate, 7);
-  }
-
-  for (let offset = 1; offset <= 14; offset += 1) {
-    const candidate = addDays(fromDate, offset);
-    if (allowedDayIndexes.includes(candidate.getDay())) {
-      return candidate;
-    }
-  }
-
-  return addDays(fromDate, 7);
-};
-
 const resolveSubscriptionEndDate = (booking) => {
   if (booking.recurringSchedule?.endDate) {
     return startOfDay(booking.recurringSchedule.endDate);
@@ -197,40 +169,6 @@ const resolveSubscriptionEndDate = (booking) => {
   }
 
   return null;
-};
-
-const getNextSubscriptionOccurrenceDate = (booking, currentDate) => {
-  const frequency = String(booking.recurringSchedule?.frequency || '').toLowerCase();
-  const selectedDays = booking.recurringSchedule?.selectedDays || [];
-  const isMonthlyDailySubscription = booking.subscription?.isSubscription && frequency === 'monthly';
-
-  if (isMonthlyDailySubscription || frequency === 'daily') {
-    return addDays(currentDate, 1);
-  }
-
-  if (frequency === 'weekly') {
-    return selectedDays.length > 0
-      ? findNextSelectedDay(currentDate, selectedDays)
-      : addDays(currentDate, 7);
-  }
-
-  if (frequency === 'biweekly') {
-    return addDays(currentDate, 14);
-  }
-
-  if (frequency === '3-days' || frequency === 'alt-days') {
-    return selectedDays.length > 0
-      ? findNextSelectedDay(currentDate, selectedDays)
-      : addDays(currentDate, 2);
-  }
-
-  if (frequency === 'monthly') {
-    const nextDate = startOfDay(currentDate);
-    nextDate.setMonth(nextDate.getMonth() + 1);
-    return nextDate;
-  }
-
-  return addDays(currentDate, 1);
 };
 
 const buildSubscriptionOccurrenceWindows = async (booking, { maxOccurrences = 45 } = {}) => {
@@ -287,7 +225,11 @@ const buildSubscriptionOccurrenceWindows = async (booking, { maxOccurrences = 45
       source: 'planned'
     });
 
-    const nextDate = getNextSubscriptionOccurrenceDate(booking, occurrenceDate);
+    const nextDate = getNextRecurringScheduleDate({
+      frequency: booking.recurringSchedule?.frequency,
+      startDate: occurrenceDate,
+      selectedDays: booking.recurringSchedule?.selectedDays || []
+    });
     if (!nextDate || sameDay(nextDate, occurrenceDate)) {
       break;
     }

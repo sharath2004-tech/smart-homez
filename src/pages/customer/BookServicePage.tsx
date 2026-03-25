@@ -3,6 +3,7 @@ import SubscriptionPaymentStep from "@/components/SubscriptionPaymentStep";
 import WorkerProfilePreviewDialog from "@/components/WorkerProfilePreviewDialog";
 import { useServiceBookingAvailability } from "@/hooks/useServiceBookingAvailability";
 import { authAPI, bookingsAPI, servicesAPI, settingsAPI } from "@/lib/api";
+import { getCustomerPlanFrequencyLabel } from "@/utils/subscriptionPlanDetails";
 import { Calendar, Clock, Info, MapPin, Sparkles, Star, User, Users, Zap } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -1239,11 +1240,7 @@ const BookServicePage = () => {
                   <p className="text-sm font-semibold text-foreground mb-2">📋 Summary</p>
                   <div className="space-y-1 text-xs text-muted-foreground">
                     <p>• Plan: <span className="font-medium text-foreground capitalize">{bookingType}</span></p>
-                    <p>• Frequency: <span className="font-medium text-foreground">
-                      {bookingType === 'daily' && 'Every day'}
-                      {bookingType === 'weekly' && `${selectedDays.length} days per week`}
-                      {bookingType === 'monthly' && 'Monthly (30 days)'}
-                    </span></p>
+                    <p>• Frequency: <span className="font-medium text-foreground">{getCustomerPlanFrequencyLabel(bookingType, selectedDays.length)}</span></p>
                     <p>• Time: <span className="font-medium text-foreground">{preferredTime}</span></p>
                     <p>• Duration: <span className="font-medium text-foreground">{durationPerSession} hour{durationPerSession > 1 ? 's' : ''}</span></p>
                     {subscriptionStartDate && <p>• Starts: <span className="font-medium text-foreground">{new Date(subscriptionStartDate).toLocaleDateString()}</span></p>}

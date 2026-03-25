@@ -10,6 +10,7 @@ import {
     buildVerifiedCartItems,
     normalizeDurationMinutes,
 } from '../../backend/utils/deepCleaningValidation.js';
+import { getNextRecurringScheduleDate } from '../../backend/utils/recurringSchedule.js';
 
 describe('coordinate validation helpers', () => {
   it('accepts zero coordinates as valid numeric input', () => {
@@ -135,6 +136,32 @@ describe('deep cleaning validation helpers', () => {
     expect(normalizeDurationMinutes(0)).toBe(180);
     expect(normalizeDurationMinutes(14.2)).toBe(15);
     expect(normalizeDurationMinutes(47.6)).toBe(48);
+  });
+});
+
+describe('recurring schedule helpers', () => {
+  it('advances monthly schedules by calendar month instead of one day', () => {
+    const nextDate = getNextRecurringScheduleDate({
+      frequency: 'monthly',
+      startDate: new Date('2026-03-26T00:00:00.000Z'),
+      selectedDays: [],
+    });
+
+    expect(nextDate.getFullYear()).toBe(2026);
+    expect(nextDate.getMonth()).toBe(3);
+    expect(nextDate.getDate()).toBe(26);
+  });
+
+  it('keeps daily schedules advancing by one day', () => {
+    const nextDate = getNextRecurringScheduleDate({
+      frequency: 'daily',
+      startDate: new Date('2026-03-26T00:00:00.000Z'),
+      selectedDays: [],
+    });
+
+    expect(nextDate.getFullYear()).toBe(2026);
+    expect(nextDate.getMonth()).toBe(2);
+    expect(nextDate.getDate()).toBe(27);
   });
 });
 

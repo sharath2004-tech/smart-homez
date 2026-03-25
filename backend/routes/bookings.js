@@ -26,6 +26,7 @@ import {
 import { calculateDistance } from '../utils/geolocation.js';
 import notificationService from '../utils/notificationService.js';
 import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
+import { getNextRecurringScheduleDate } from '../utils/recurringSchedule.js';
 import { checkSlotAvailability } from '../utils/slotManagement.js';
 import { checkIfOnTime, updateWorkerStats } from '../utils/updateWorkerStats.js';
 import { assignWorkerToBooking, reassignWorker } from '../utils/workerAssignment.js';
@@ -46,16 +47,6 @@ const __dirname = path.dirname(__filename);
 const router = express.Router();
 
 const SUBSCRIPTION_FLOW_NOTIFICATIONS_ENABLED = false;
-
-const DAY_INDEX_BY_NAME = {
-  sunday: 0,
-  monday: 1,
-  tuesday: 2,
-  wednesday: 3,
-  thursday: 4,
-  friday: 5,
-  saturday: 6
-};
 
 const findDeepCleaningServiceFallback = async () => {
   const directMatch = await Service.findOne({
@@ -214,25 +205,6 @@ const addDaysToDate = (value, days) => {
   return date;
 };
 
-const findNextSelectedDay = (fromDate, selectedDays = []) => {
-  const allowedDayIndexes = selectedDays
-    .map(day => DAY_INDEX_BY_NAME[String(day || '').toLowerCase()])
-    .filter(day => Number.isInteger(day));
-
-  if (allowedDayIndexes.length === 0) {
-    return addDaysToDate(fromDate, 7);
-  }
-
-  for (let offset = 1; offset <= 14; offset += 1) {
-    const candidate = addDaysToDate(fromDate, offset);
-    if (allowedDayIndexes.includes(candidate.getDay())) {
-      return candidate;
-    }
-  }
-
-  return addDaysToDate(fromDate, 7);
-};
-
 const resolveDefaultSubscriptionEndDate = (frequency, startDate, explicitEndDate = null) => {
   if (explicitEndDate) {
     return new Date(explicitEndDate);
@@ -319,38 +291,6 @@ const syncLatestPaymentProof = (booking) => {
       };
 
   return booking.paymentProof;
-};
-
-const getNextRecurringScheduleDate = ({ frequency, startDate, selectedDays = [], isSubscription = false }) => {
-  const normalizedFrequency = String(frequency || '').toLowerCase();
-
-  if ((isSubscription && normalizedFrequency === 'monthly') || normalizedFrequency === 'daily') {
-    return addDaysToDate(startDate, 1);
-  }
-
-  if (normalizedFrequency === 'weekly') {
-    return selectedDays.length > 0
-      ? findNextSelectedDay(startDate, selectedDays)
-      : addDaysToDate(startDate, 7);
-  }
-
-  if (normalizedFrequency === 'biweekly') {
-    return addDaysToDate(startDate, 14);
-  }
-
-  if (normalizedFrequency === '3-days' || normalizedFrequency === 'alt-days') {
-    return selectedDays.length > 0
-      ? findNextSelectedDay(startDate, selectedDays)
-      : addDaysToDate(startDate, 2);
-  }
-
-  if (normalizedFrequency === 'monthly') {
-    const nextDate = startOfDay(startDate);
-    nextDate.setMonth(nextDate.getMonth() + 1);
-    return nextDate;
-  }
-
-  return addDaysToDate(startDate, 1);
 };
 
 const getBookingScheduledStartDateTime = (booking) => {
@@ -1536,8 +1476,7 @@ router.post('/',
         const initialNextScheduledDate = getNextRecurringScheduleDate({
           frequency: subscriptionDetails.frequency || bookingType,
           startDate: normalizedSubscriptionStartDate,
-          selectedDays: subscriptionDetails.selectedDays || [],
-          isSubscription: true
+          selectedDays: subscriptionDetails.selectedDays || []
         });
 
         bookingData.subscription = {

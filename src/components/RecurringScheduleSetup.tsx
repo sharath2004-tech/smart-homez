@@ -169,8 +169,8 @@ export function RecurringScheduleSetup({ schedule, onChange, bookingType }: Recu
         </div>
       </div>
 
-      {/* Specific Days Selection (for weekly/biweekly plans) */}
-      {isSubscription && (bookingType === 'weekly' || bookingType === 'biweekly') && (
+      {/* Specific Days Selection (for weekly plans) */}
+      {isSubscription && bookingType === 'weekly' && (
         <div>
           <Label className="flex items-center gap-2 mb-3">
             <Repeat className="w-4 h-4" />
@@ -207,6 +207,34 @@ export function RecurringScheduleSetup({ schedule, onChange, bookingType }: Recu
               <p className="font-semibold text-sm">{t('subscription.dailySchedule')}</p>
               <p className="text-sm text-muted-foreground mt-1">
                 {t('subscription.dailyScheduleDesc')}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isSubscription && bookingType === 'biweekly' && (
+        <div className="p-4 bg-accent rounded-lg border border-border">
+          <div className="flex items-start gap-3">
+            <Repeat className="w-5 h-5 text-primary mt-0.5" />
+            <div>
+              <p className="font-semibold text-sm">Every 2 weeks</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Service will repeat every 2 weeks from your selected start date at your preferred time.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isSubscription && bookingType === 'monthly' && (
+        <div className="p-4 bg-accent rounded-lg border border-border">
+          <div className="flex items-start gap-3">
+            <Repeat className="w-5 h-5 text-primary mt-0.5" />
+            <div>
+              <p className="font-semibold text-sm">Monthly visit schedule</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Service will repeat once a month from your selected start date at your preferred time.
               </p>
             </div>
           </div>

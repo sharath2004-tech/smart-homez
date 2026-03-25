@@ -2,19 +2,10 @@ import Booking from '../models/Booking.js';
 import User from '../models/User.js';
 import { assignWorkersWithBackup } from './advancedWorkerAssignment.js';
 import notificationService from './notificationService.js';
+import { getNextRecurringScheduleDate } from './recurringSchedule.js';
 import { checkSlotAvailability } from './slotManagement.js';
 
 let pendingAssignmentRetryInProgress = false;
-
-const DAY_INDEX_BY_NAME = {
-  sunday: 0,
-  monday: 1,
-  tuesday: 2,
-  wednesday: 3,
-  thursday: 4,
-  friday: 5,
-  saturday: 6
-};
 
 const startOfDay = (value) => {
   const date = new Date(value);
@@ -30,25 +21,6 @@ const addDays = (value, days) => {
 
 const sameDay = (left, right) => startOfDay(left).getTime() === startOfDay(right).getTime();
 
-const findNextSelectedDay = (fromDate, selectedDays = []) => {
-  const allowedDayIndexes = selectedDays
-    .map(day => DAY_INDEX_BY_NAME[String(day || '').toLowerCase()])
-    .filter(day => Number.isInteger(day));
-
-  if (allowedDayIndexes.length === 0) {
-    return addDays(fromDate, 7);
-  }
-
-  for (let offset = 1; offset <= 14; offset += 1) {
-    const candidate = addDays(fromDate, offset);
-    if (allowedDayIndexes.includes(candidate.getDay())) {
-      return candidate;
-    }
-  }
-
-  return addDays(fromDate, 7);
-};
-
 const resolveScheduleEndDate = (booking) => {
   if (booking.recurringSchedule?.endDate) {
     return startOfDay(booking.recurringSchedule.endDate);
@@ -59,40 +31,6 @@ const resolveScheduleEndDate = (booking) => {
   }
 
   return null;
-};
-
-const getNextScheduledDate = (booking, currentDate) => {
-  const frequency = String(booking.recurringSchedule?.frequency || '').toLowerCase();
-  const selectedDays = booking.recurringSchedule?.selectedDays || [];
-  const isMonthlyDailySubscription = booking.subscription?.isSubscription && frequency === 'monthly';
-
-  if (isMonthlyDailySubscription || frequency === 'daily') {
-    return addDays(currentDate, 1);
-  }
-
-  if (frequency === 'weekly') {
-    return selectedDays.length > 0
-      ? findNextSelectedDay(currentDate, selectedDays)
-      : addDays(currentDate, 7);
-  }
-
-  if (frequency === 'biweekly') {
-    return addDays(currentDate, 14);
-  }
-
-  if (frequency === '3-days' || frequency === 'alt-days') {
-    return selectedDays.length > 0
-      ? findNextSelectedDay(currentDate, selectedDays)
-      : addDays(currentDate, 2);
-  }
-
-  if (frequency === 'monthly') {
-    const nextDate = startOfDay(currentDate);
-    nextDate.setMonth(nextDate.getMonth() + 1);
-    return nextDate;
-  }
-
-  return addDays(currentDate, 1);
 };
 
 const occurrenceAlreadyExists = async (booking, occurrenceDate) => {
@@ -370,7 +308,11 @@ export const scheduleRecurringBookings = async () => {
 
       const occurrenceDate = startOfDay(booking.recurringSchedule.nextScheduledDate);
       const scheduleEndDate = resolveScheduleEndDate(booking);
-      const nextDate = getNextScheduledDate(booking, occurrenceDate);
+      const nextDate = getNextRecurringScheduleDate({
+        frequency: booking.recurringSchedule?.frequency,
+        startDate: occurrenceDate,
+        selectedDays: booking.recurringSchedule?.selectedDays || []
+      });
 
       if (scheduleEndDate && occurrenceDate > scheduleEndDate) {
         booking.recurringSchedule.nextScheduledDate = null;

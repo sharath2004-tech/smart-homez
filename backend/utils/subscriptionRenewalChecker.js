@@ -1,16 +1,7 @@
 import Booking from '../models/Booking.js';
 import { resolveAssignedWorkerForOccurrence } from './bookingStatusUpdater.js';
 import { sendNotification } from './notificationService.js';
-
-const DAY_INDEX_BY_NAME = {
-  sunday: 0,
-  monday: 1,
-  tuesday: 2,
-  wednesday: 3,
-  thursday: 4,
-  friday: 5,
-  saturday: 6,
-};
+import { getNextRecurringScheduleDate } from './recurringSchedule.js';
 
 const startOfDay = (value) => {
   const date = new Date(value);
@@ -30,57 +21,6 @@ const cloneValue = (value) => {
   }
 
   return JSON.parse(JSON.stringify(value));
-};
-
-const findNextSelectedDay = (fromDate, selectedDays = []) => {
-  const allowedDayIndexes = selectedDays
-    .map(day => DAY_INDEX_BY_NAME[String(day || '').toLowerCase()])
-    .filter(day => Number.isInteger(day));
-
-  if (allowedDayIndexes.length === 0) {
-    return addDays(fromDate, 7);
-  }
-
-  for (let offset = 1; offset <= 14; offset += 1) {
-    const candidate = addDays(fromDate, offset);
-    if (allowedDayIndexes.includes(candidate.getDay())) {
-      return candidate;
-    }
-  }
-
-  return addDays(fromDate, 7);
-};
-
-const getNextRecurringScheduleDate = ({ frequency, startDate, selectedDays = [], isSubscription = false }) => {
-  const normalizedFrequency = String(frequency || '').toLowerCase();
-
-  if ((isSubscription && normalizedFrequency === 'monthly') || normalizedFrequency === 'daily') {
-    return addDays(startDate, 1);
-  }
-
-  if (normalizedFrequency === 'weekly') {
-    return selectedDays.length > 0
-      ? findNextSelectedDay(startDate, selectedDays)
-      : addDays(startDate, 7);
-  }
-
-  if (normalizedFrequency === 'biweekly') {
-    return addDays(startDate, 14);
-  }
-
-  if (normalizedFrequency === '3-days' || normalizedFrequency === 'alt-days') {
-    return selectedDays.length > 0
-      ? findNextSelectedDay(startDate, selectedDays)
-      : addDays(startDate, 2);
-  }
-
-  if (normalizedFrequency === 'monthly') {
-    const nextDate = startOfDay(startDate);
-    nextDate.setMonth(nextDate.getMonth() + 1);
-    return nextDate;
-  }
-
-  return addDays(startDate, 1);
 };
 
 const getSubscriptionCycleLengthDays = (booking) => {
@@ -155,7 +95,6 @@ const buildRenewedSubscriptionPayload = async (booking) => {
         frequency,
         startDate: renewalStartDate,
         selectedDays,
-        isSubscription: true,
       }),
       completedOccurrences: 0,
     },

@@ -1241,7 +1241,7 @@ const AdminBookings = () => {
                       )}
                       {worker.conflictReasons && worker.conflictReasons.length > 0 && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          First issue: {new Date(worker.conflictReasons[0].date).toLocaleDateString('en-IN')} {worker.conflictReasons[0].startTime}-{worker.conflictReasons[0].endTime}
+                          First issue: {new Date(worker.conflictReasons[0].date).toLocaleDateString('en-IN')} {worker.conflictReasons[0].startTime}-{worker.conflictReasons[0].endTime} — {worker.conflictReasons[0].reason}
                         </p>
                       )}
                       {worker.assignedApartments?.[0] && (
