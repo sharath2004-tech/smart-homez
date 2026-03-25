@@ -11,6 +11,15 @@ import {
     normalizeDurationMinutes,
 } from '../../backend/utils/deepCleaningValidation.js';
 import { getNextRecurringScheduleDate } from '../../backend/utils/recurringSchedule.js';
+import {
+    findFirstOverlappingOccurrence,
+    getSubscriptionConflictWindowEnd,
+    isRequestedDateTimeInPast,
+} from '../../backend/utils/subscriptionScheduling.js';
+import {
+    getMinimumSubscriptionStartDate,
+    isSubscriptionStartTimeExpired,
+} from '../utils/subscriptionStartRules';
 
 describe('coordinate validation helpers', () => {
   it('accepts zero coordinates as valid numeric input', () => {
@@ -162,6 +171,59 @@ describe('recurring schedule helpers', () => {
     expect(nextDate.getFullYear()).toBe(2026);
     expect(nextDate.getMonth()).toBe(2);
     expect(nextDate.getDate()).toBe(27);
+  });
+
+  it('detects overlapping recurring subscriptions beyond the first booking day', () => {
+    const overlapDate = findFirstOverlappingOccurrence({
+      proposedSchedule: {
+        frequency: 'weekly',
+        startDate: new Date('2026-03-31T00:00:00.000Z'),
+        endDate: null,
+        selectedDays: ['friday'],
+        startTime: '09:00',
+        endTime: '10:00',
+      },
+      existingSchedule: {
+        frequency: 'weekly',
+        startDate: new Date('2026-03-27T00:00:00.000Z'),
+        endDate: null,
+        selectedDays: ['friday'],
+        startTime: '09:30',
+        endTime: '10:30',
+      },
+      rangeStart: new Date('2026-03-27T00:00:00.000Z'),
+      rangeEnd: getSubscriptionConflictWindowEnd(new Date('2026-03-27T00:00:00.000Z')),
+    });
+
+    expect(overlapDate).not.toBeNull();
+    expect(overlapDate?.getDay()).toBe(5);
+    expect(overlapDate?.getTime()).toBeGreaterThan(new Date('2026-03-31T00:00:00.000Z').getTime());
+  });
+
+  it('flags same-day subscription starts whose preferred time has already passed', () => {
+    expect(isRequestedDateTimeInPast({
+      date: '2026-03-26',
+      time: '09:00',
+      now: new Date('2026-03-26T09:05:00.000Z'),
+      bufferMinutes: 30,
+    })).toBe(true);
+
+    expect(isRequestedDateTimeInPast({
+      date: '2026-03-27',
+      time: '09:00',
+      now: new Date('2026-03-26T09:05:00.000Z'),
+      bufferMinutes: 30,
+    })).toBe(false);
+  });
+});
+
+describe('subscription start rules', () => {
+  it('pushes the minimum start date to tomorrow when today\'s preferred time is over', () => {
+    const now = new Date(2026, 2, 26, 9, 5, 0, 0);
+
+    expect(isSubscriptionStartTimeExpired('2026-03-26', '09:00', now, 30)).toBe(true);
+    expect(getMinimumSubscriptionStartDate('09:00', now, 30)).toBe('2026-03-27');
+    expect(getMinimumSubscriptionStartDate('11:00', now, 30)).toBe('2026-03-26');
   });
 });
 

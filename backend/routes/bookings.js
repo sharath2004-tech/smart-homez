@@ -28,6 +28,12 @@ import notificationService from '../utils/notificationService.js';
 import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
 import { getNextRecurringScheduleDate } from '../utils/recurringSchedule.js';
 import { checkSlotAvailability } from '../utils/slotManagement.js';
+import {
+    findFirstOverlappingOccurrence,
+    getNextBookableDate,
+    getSubscriptionConflictWindowEnd,
+    isRequestedDateTimeInPast,
+} from '../utils/subscriptionScheduling.js';
 import { checkIfOnTime, updateWorkerStats } from '../utils/updateWorkerStats.js';
 import { assignWorkerToBooking, reassignWorker } from '../utils/workerAssignment.js';
 import {
@@ -302,6 +308,106 @@ const getBookingScheduledStartDateTime = (booking) => {
 
 const getSubscriptionRootBookingId = (booking) => booking.parentBooking || booking._id;
 
+const getComparableScheduleFromBooking = (booking) => {
+  const isRecurringPattern = Boolean(
+    booking?.subscription?.isSubscription
+    || booking?.isRecurring
+    || ['daily', 'weekly', 'biweekly', 'monthly', 'monthly-subscription'].includes(booking?.bookingType)
+  );
+
+  const startDate = booking?.subscription?.subscriptionStartDate
+    || booking?.recurringSchedule?.startDate
+    || booking?.bookingDate;
+  const endDate = isRecurringPattern
+    ? (booking?.subscription?.subscriptionEndDate || booking?.recurringSchedule?.endDate || null)
+    : (booking?.bookingDate || startDate);
+
+  return {
+    frequency: isRecurringPattern
+      ? (booking?.recurringSchedule?.frequency || booking?.bookingType || 'daily')
+      : 'daily',
+    startDate,
+    endDate,
+    selectedDays: booking?.recurringSchedule?.selectedDays || [],
+    startTime: booking?.startTime,
+    endTime: booking?.endTime,
+  };
+};
+
+const findScheduleConflict = async ({
+  match,
+  proposedSchedule,
+  excludeBookingId = null,
+}) => {
+  const comparisonStart = startOfDay(proposedSchedule.startDate);
+  const comparisonEnd = getSubscriptionConflictWindowEnd(
+    proposedSchedule.startDate,
+    proposedSchedule.endDate || null,
+  );
+
+  const exclusionFilter = excludeBookingId
+    ? {
+        _id: { $ne: excludeBookingId },
+        parentBooking: { $ne: excludeBookingId },
+      }
+    : {};
+
+  const [candidateBookings, activeSubscriptionRoots] = await Promise.all([
+    Booking.find({
+      ...match,
+      ...exclusionFilter,
+      bookingDate: { $gte: comparisonStart, $lte: comparisonEnd },
+      status: { $in: ['pending', 'confirmed', 'in-progress'] },
+    })
+      .select('bookingDate startTime endTime bookingType isRecurring recurringSchedule subscription parentBooking service')
+      .populate('service', 'name')
+      .lean(),
+    Booking.find({
+      ...match,
+      ...exclusionFilter,
+      'subscription.isSubscription': true,
+      parentBooking: null,
+      bookingDate: { $lte: comparisonEnd },
+      status: { $in: ['pending', 'confirmed', 'in-progress'] },
+      $or: [
+        { 'subscription.subscriptionEndDate': null },
+        { 'subscription.subscriptionEndDate': { $gte: comparisonStart } },
+      ],
+    })
+      .select('bookingDate startTime endTime bookingType isRecurring recurringSchedule subscription parentBooking service')
+      .populate('service', 'name')
+      .lean(),
+  ]);
+
+  const candidateMap = new Map();
+  [...candidateBookings, ...activeSubscriptionRoots].forEach((booking) => {
+    if (!booking?._id) {
+      return;
+    }
+
+    candidateMap.set(booking._id.toString(), booking);
+  });
+
+  for (const booking of candidateMap.values()) {
+    const existingSchedule = getComparableScheduleFromBooking(booking);
+    const overlappingDate = findFirstOverlappingOccurrence({
+      proposedSchedule,
+      existingSchedule,
+      rangeStart: comparisonStart,
+      rangeEnd: comparisonEnd,
+    });
+
+    if (overlappingDate) {
+      return {
+        booking,
+        overlappingDate,
+      };
+    }
+  }
+
+  return null;
+};
+
 const notifySubscriptionWorkerChangeAdmins = async (booking, requestedWorker, requestedBy, reason = '') => {
   if (!SUBSCRIPTION_FLOW_NOTIFICATIONS_ENABLED) {
     return;
@@ -371,6 +477,49 @@ const notifySubscriptionApprovalAdmins = async (booking, requestedBy) => {
       customerId: booking.customer,
       locationId: booking.location?.locationId || null,
       activationStatus: 'approval_pending'
+    }
+  })));
+};
+
+const notifySubscriptionPauseAdmins = async (booking, requestedBy, reason = '', requestedStartDate = null, requestedEndDate = null) => {
+  if (!SUBSCRIPTION_FLOW_NOTIFICATIONS_ENABLED) {
+    return;
+  }
+
+  const adminFilter = { role: { $in: ['admin', 'super_admin'] }, isActive: true };
+
+  const admins = await User.find(adminFilter).select('_id adminProfile.assignedLocations role').lean();
+  const bookingLocationId = booking.location?.locationId?.toString?.() || null;
+
+  const relevantAdmins = admins.filter(admin => {
+    if (admin.role === 'super_admin') return true;
+
+    const assignedLocationIds = (admin.adminProfile?.assignedLocations || [])
+      .map(location => location.locationId?.toString())
+      .filter(Boolean);
+
+    if (!bookingLocationId) return assignedLocationIds.length === 0;
+    if (assignedLocationIds.length === 0) return false;
+    return assignedLocationIds.includes(bookingLocationId);
+  });
+
+  const requestedWindow = [requestedStartDate, requestedEndDate]
+    .filter(Boolean)
+    .map((value) => new Date(value).toLocaleDateString())
+    .join(' → ');
+
+  await Promise.all(relevantAdmins.map(admin => notificationService.sendNotification({
+    userId: admin._id,
+    type: 'system',
+    title: 'Subscription pause request',
+    message: `${requestedBy.name || 'A customer'} requested a pause for ${booking.service?.name || booking._id}${requestedWindow ? ` (${requestedWindow})` : ''}.`,
+    priority: 'high',
+    data: {
+      bookingId: booking._id,
+      requestedBy: requestedBy._id,
+      requestedStartDate,
+      requestedEndDate,
+      reason,
     }
   })));
 };
@@ -1165,7 +1314,26 @@ router.post('/',
             } 
           });
         }
+        if (subscriptionDetails.endDate && new Date(subscriptionDetails.endDate) < new Date(subscriptionDetails.startDate)) {
+          return res.status(400).json({
+            error: {
+              message: 'Subscription end date cannot be before the start date',
+              status: 400,
+            }
+          });
+        }
       }
+
+      const normalizedSubscriptionStartDate = isSubscription && subscriptionDetails
+        ? new Date(subscriptionDetails.startDate)
+        : null;
+      const resolvedSubscriptionEndDate = isSubscription && subscriptionDetails
+        ? resolveDefaultSubscriptionEndDate(
+            subscriptionDetails.frequency || bookingType,
+            normalizedSubscriptionStartDate,
+            subscriptionDetails.endDate || null,
+          )
+        : null;
 
       const serviceConfig = await Service.findById(service)
         .select('name category duration durationOptions sizeParameters pricingTiers workerSearchRadiusKm defaultWorkerCount workerWage')
@@ -1388,26 +1556,40 @@ router.post('/',
         });
       }
 
-      const requestedBookingDate = new Date(isSubscription ? subscriptionDetails.startDate : bookingDate);
-      const startOfRequestedDay = new Date(requestedBookingDate);
-      startOfRequestedDay.setHours(0, 0, 0, 0);
-      const endOfRequestedDay = new Date(requestedBookingDate);
-      endOfRequestedDay.setHours(23, 59, 59, 999);
-
-      const customerConflict = await Booking.findOne({
-        customer: req.user._id,
-        bookingDate: { $gte: startOfRequestedDay, $lte: endOfRequestedDay },
-        status: { $in: ['pending', 'confirmed', 'in-progress'] },
-        startTime: { $lt: bookingWindow.endTime },
-        endTime: { $gt: bookingWindow.startTime }
-      })
-        .select('bookingId startTime endTime')
-        .lean();
-
-      if (customerConflict) {
+      if (isSubscription && subscriptionDetails && isRequestedDateTimeInPast({
+        date: subscriptionDetails.startDate,
+        time: bookingWindow.startTime,
+      })) {
         return res.status(400).json({
           error: {
-            message: `You already have another booking between ${customerConflict.startTime} and ${customerConflict.endTime}. Please choose a different time.`,
+            message: 'The selected subscription start time has already passed for today. Please choose tomorrow or a later time.',
+            status: 400,
+            code: 'SUBSCRIPTION_START_TIME_PASSED',
+            suggestedDate: getNextBookableDate().toISOString().slice(0, 10),
+          }
+        });
+      }
+
+      const requestedBookingDate = new Date(isSubscription ? subscriptionDetails.startDate : bookingDate);
+      const proposedSchedule = {
+        frequency: isSubscription ? (subscriptionDetails.frequency || bookingType) : 'daily',
+        startDate: requestedBookingDate,
+        endDate: isSubscription ? resolvedSubscriptionEndDate : requestedBookingDate,
+        selectedDays: isSubscription ? (subscriptionDetails.selectedDays || []) : [],
+        startTime: bookingWindow.startTime,
+        endTime: bookingWindow.endTime,
+      };
+
+      const customerConflict = await findScheduleConflict({
+        match: { customer: req.user._id },
+        proposedSchedule,
+      });
+
+      if (customerConflict) {
+        const conflictDate = new Date(customerConflict.overlappingDate).toLocaleDateString();
+        return res.status(400).json({
+          error: {
+            message: `You already have another booking on ${conflictDate} between ${customerConflict.booking.startTime} and ${customerConflict.booking.endTime}. Please choose a different time.`,
             status: 400,
             code: 'CUSTOMER_BOOKING_CONFLICT'
           }
@@ -1415,22 +1597,17 @@ router.post('/',
       }
 
       if (worker) {
-        const workerAvailability = await checkSlotAvailability(
-          worker,
-          requestedBookingDate,
-          bookingWindow.startTime,
-          bookingWindow.endTime,
-          Booking,
-          15
-        );
+        const workerConflict = await findScheduleConflict({
+          match: { worker },
+          proposedSchedule,
+        });
 
-        if (!workerAvailability.available) {
+        if (workerConflict) {
           return res.status(400).json({
             error: {
-              message: workerAvailability.reason || 'Selected worker has a conflicting booking at this time.',
+              message: `Selected worker already has a booking on ${new Date(workerConflict.overlappingDate).toLocaleDateString()} between ${workerConflict.booking.startTime} and ${workerConflict.booking.endTime}.`,
               status: 400,
-              code: 'WORKER_BOOKING_CONFLICT',
-              conflictingBooking: workerAvailability.conflictingBooking || null
+              code: 'WORKER_BOOKING_CONFLICT'
             }
           });
         }
@@ -1467,12 +1644,6 @@ router.post('/',
 
       // Add subscription details if it's a subscription booking
       if (isSubscription && subscriptionDetails) {
-        const normalizedSubscriptionStartDate = new Date(subscriptionDetails.startDate);
-        const resolvedSubscriptionEndDate = resolveDefaultSubscriptionEndDate(
-          subscriptionDetails.frequency || bookingType,
-          normalizedSubscriptionStartDate,
-          subscriptionDetails.endDate || null
-        );
         const initialNextScheduledDate = getNextRecurringScheduleDate({
           frequency: subscriptionDetails.frequency || bookingType,
           startDate: normalizedSubscriptionStartDate,
@@ -4644,14 +4815,16 @@ router.post('/subscription-worker-change-requests/:requestId/review', authentica
 });
 
 // @route   POST /api/bookings/:id/pause-subscription
-// @desc    Pause a subscription
+// @desc    Request an admin-reviewed pause for a subscription
 // @access  Private/Customer
 router.post('/:id/pause-subscription',
   authenticate,
   authorize('customer', 'admin'),
   async (req, res) => {
     try {
-      const booking = await Booking.findById(req.params.id);
+      const booking = await Booking.findById(req.params.id)
+        .populate('customer', 'name email')
+        .populate('service', 'name');
       
       if (!booking) {
         return res.status(404).json({ 
@@ -4687,14 +4860,45 @@ router.post('/:id/pause-subscription',
         });
       }
 
-      // Pause the subscription
-      booking.subscription.isPaused = true;
-      booking.subscription.pausedAt = new Date();
+      if (booking.subscription.pauseRequestStatus === 'pending') {
+        return res.status(400).json({
+          error: { message: 'A pause request is already pending admin review', status: 400 }
+        });
+      }
+
+      const {
+        requestedStartDate = null,
+        requestedEndDate = null,
+        reason = '',
+      } = req.body || {};
+
+      if (requestedStartDate && requestedEndDate && new Date(requestedEndDate) < new Date(requestedStartDate)) {
+        return res.status(400).json({
+          error: { message: 'Pause end date cannot be before pause start date', status: 400 }
+        });
+      }
+
+      booking.subscription.pauseRequestStatus = 'pending';
+      booking.subscription.pauseRequestedAt = new Date();
+      booking.subscription.pauseRequestedBy = req.user._id;
+      booking.subscription.pauseRequestStartDate = requestedStartDate ? startOfDay(requestedStartDate) : null;
+      booking.subscription.pauseRequestEndDate = requestedEndDate ? startOfDay(requestedEndDate) : null;
+      booking.subscription.pauseRequestReason = reason || '';
+      booking.subscription.pauseReviewedAt = null;
+      booking.subscription.pauseReviewedBy = null;
+      booking.subscription.pauseReviewNote = '';
       
       await booking.save();
+      await notifySubscriptionPauseAdmins(
+        booking,
+        req.user,
+        reason,
+        booking.subscription.pauseRequestStartDate,
+        booking.subscription.pauseRequestEndDate,
+      );
 
       res.json({ 
-        message: 'Subscription paused successfully',
+        message: 'Pause request sent to admin successfully',
         booking
       });
 
@@ -4704,6 +4908,117 @@ router.post('/:id/pause-subscription',
     }
   }
 );
+
+// @route   GET /api/bookings/subscription-pause-requests/list
+// @desc    List subscription pause requests for admins
+// @access  Private/Admin
+router.get('/subscription-pause-requests/list', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { status = 'pending' } = req.query;
+    const query = {
+      'subscription.isSubscription': true,
+    };
+
+    if (status === 'all') {
+      query['subscription.pauseRequestStatus'] = { $in: ['pending', 'approved', 'rejected'] };
+    } else {
+      query['subscription.pauseRequestStatus'] = status;
+    }
+
+    let requests = await Booking.find(query)
+      .populate('customer', 'name email phone')
+      .populate('service', 'name category')
+      .populate('worker', 'name email phone')
+      .populate('subscription.pauseRequestedBy', 'name email role')
+      .populate('subscription.pauseReviewedBy', 'name email role')
+      .sort({ 'subscription.pauseRequestedAt': -1 });
+
+    if (req.user.role === 'admin') {
+      const admin = await User.findById(req.user._id).select('adminProfile.assignedLocations').lean();
+      const assignedLocationIds = (admin?.adminProfile?.assignedLocations || [])
+        .map(location => location.locationId?.toString())
+        .filter(Boolean);
+
+      requests = requests.filter(request => {
+        const locationId = request.location?.locationId?.toString?.();
+        if (!locationId) return assignedLocationIds.length === 0;
+        return assignedLocationIds.includes(locationId);
+      });
+    }
+
+    res.json({ success: true, requests });
+  } catch (error) {
+    console.error('Get subscription pause requests error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   POST /api/bookings/subscription-pause-requests/:bookingId/review
+// @desc    Review subscription pause request
+// @access  Private/Admin
+router.post('/subscription-pause-requests/:bookingId/review', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { status, reviewNote = '' } = req.body;
+
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({
+        error: { message: 'Status must be approved or rejected', status: 400 }
+      });
+    }
+
+    const booking = await Booking.findById(req.params.bookingId)
+      .populate('customer', 'name email')
+      .populate('service', 'name');
+
+    if (!booking || !booking.subscription?.isSubscription) {
+      return res.status(404).json({
+        error: { message: 'Subscription pause request not found', status: 404 }
+      });
+    }
+
+    if (booking.subscription.pauseRequestStatus !== 'pending') {
+      return res.status(400).json({
+        error: { message: `Pause request already ${booking.subscription.pauseRequestStatus || 'processed'}`, status: 400 }
+      });
+    }
+
+    booking.subscription.pauseRequestStatus = status;
+    booking.subscription.pauseReviewedAt = new Date();
+    booking.subscription.pauseReviewedBy = req.user._id;
+    booking.subscription.pauseReviewNote = reviewNote;
+
+    if (status === 'approved') {
+      booking.subscription.isPaused = true;
+      booking.subscription.pausedAt = new Date();
+      booking.subscription.resumedAt = null;
+    }
+
+    await booking.save();
+
+    await notificationService.sendNotification({
+      userId: booking.customer._id,
+      type: 'system',
+      title: status === 'approved' ? 'Subscription pause approved' : 'Subscription pause request reviewed',
+      message: status === 'approved'
+        ? `Your pause request for ${booking.service?.name || 'your subscription'} was approved.`
+        : (reviewNote || 'Your pause request was not approved at this time.'),
+      priority: 'high',
+      data: {
+        bookingId: booking._id,
+        status,
+      }
+    });
+
+    res.json({
+      success: true,
+      message: status === 'approved' ? 'Pause request approved successfully' : 'Pause request rejected',
+      booking,
+    });
+  } catch (error) {
+    console.error('Review subscription pause request error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
 
 // @route   POST /api/bookings/:id/resume-subscription
 // @desc    Resume a paused subscription
@@ -4745,6 +5060,15 @@ router.post('/:id/resume-subscription',
       // Resume the subscription
       booking.subscription.isPaused = false;
       booking.subscription.resumedAt = new Date();
+      booking.subscription.pauseRequestStatus = 'none';
+      booking.subscription.pauseRequestedAt = null;
+      booking.subscription.pauseRequestedBy = null;
+      booking.subscription.pauseRequestStartDate = null;
+      booking.subscription.pauseRequestEndDate = null;
+      booking.subscription.pauseRequestReason = '';
+      booking.subscription.pauseReviewedAt = null;
+      booking.subscription.pauseReviewedBy = null;
+      booking.subscription.pauseReviewNote = '';
       
       await booking.save();
 

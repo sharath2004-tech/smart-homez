@@ -20,6 +20,12 @@ interface Booking {
     autoRenewal?: boolean;
     allowPause?: boolean;
     isPaused?: boolean;
+    pauseRequestStatus?: 'none' | 'pending' | 'approved' | 'rejected';
+    pauseRequestedAt?: string | null;
+    pauseRequestStartDate?: string | null;
+    pauseRequestEndDate?: string | null;
+    pauseRequestReason?: string;
+    pauseReviewNote?: string;
     subscriptionStartDate?: string;
     subscriptionEndDate?: string;
     preferredTime?: string;
@@ -83,6 +89,13 @@ const MySubscriptionsPage = () => {
   const [availableWorkers, setAvailableWorkers] = useState<Worker[]>([]);
   const [loadingWorkers, setLoadingWorkers] = useState(false);
   const [expandedCalendars, setExpandedCalendars] = useState<Set<string>>(new Set());
+  const [pauseRequestFor, setPauseRequestFor] = useState<string | null>(null);
+  const [pauseRequestForm, setPauseRequestForm] = useState({
+    requestedStartDate: '',
+    requestedEndDate: '',
+    reason: '',
+  });
+  const [submittingPauseRequest, setSubmittingPauseRequest] = useState(false);
 
   const toggleCalendar = (id: string) =>
     setExpandedCalendars(prev => {
@@ -189,8 +202,18 @@ const MySubscriptionsPage = () => {
     }
   };
 
+  const openPauseRequestModal = (bookingId: string) => {
+    setPauseRequestFor(bookingId);
+    setPauseRequestForm({
+      requestedStartDate: '',
+      requestedEndDate: '',
+      reason: '',
+    });
+  };
+
   const handlePauseSubscription = async (bookingId: string) => {
     try {
+      setSubmittingPauseRequest(true);
       const token = localStorage.getItem('token');
       const response = await fetch(
         `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/bookings/${bookingId}/pause-subscription`,
@@ -199,7 +222,12 @@ const MySubscriptionsPage = () => {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
-          }
+          },
+          body: JSON.stringify({
+            requestedStartDate: pauseRequestForm.requestedStartDate || null,
+            requestedEndDate: pauseRequestForm.requestedEndDate || null,
+            reason: pauseRequestForm.reason.trim(),
+          })
         }
       );
       
@@ -208,11 +236,14 @@ const MySubscriptionsPage = () => {
         throw new Error(error.error?.message || 'Failed to pause subscription');
       }
       
-      toast.success('Subscription paused successfully');
+      toast.success('Pause request sent to admin successfully');
+      setPauseRequestFor(null);
       await fetchData();
     } catch (error) {
       console.error('Error pausing subscription:', error);
       toast.error((error as Error).message || 'Failed to pause subscription');
+    } finally {
+      setSubmittingPauseRequest(false);
     }
   };
 
@@ -330,6 +361,10 @@ const MySubscriptionsPage = () => {
                     ) : subscription.subscription?.isPaused ? (
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300">
                         Paused
+                      </span>
+                    ) : subscription.subscription?.pauseRequestStatus === 'pending' ? (
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                        Pause request pending
                       </span>
                     ) : (
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
@@ -538,17 +573,39 @@ const MySubscriptionsPage = () => {
                         <RefreshCw className="w-4 h-4" />
                         Resume
                       </button>
+                    ) : subscription.subscription?.pauseRequestStatus === 'pending' ? (
+                      <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                        Pause request pending admin approval
+                      </div>
                     ) : (
                       <button
-                        onClick={() => handlePauseSubscription(subscription._id)}
+                        onClick={() => openPauseRequestModal(subscription._id)}
                         className="btn-outline flex items-center gap-2"
                       >
                         <XCircle className="w-4 h-4" />
-                        Pause
+                        Request Pause
                       </button>
                     )
                   )}
                 </div>
+
+                {subscription.subscription?.pauseRequestStatus === 'rejected' && subscription.subscription?.pauseReviewNote && (
+                  <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    Pause request update: {subscription.subscription.pauseReviewNote}
+                  </div>
+                )}
+
+                {subscription.subscription?.pauseRequestStatus === 'pending' && (
+                  <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                    Your pause request was sent on {subscription.subscription.pauseRequestedAt ? new Date(subscription.subscription.pauseRequestedAt).toLocaleDateString() : 'today'}.
+                    {subscription.subscription.pauseRequestStartDate && (
+                      <span> Requested break: {new Date(subscription.subscription.pauseRequestStartDate).toLocaleDateString()}</span>
+                    )}
+                    {subscription.subscription.pauseRequestEndDate && (
+                      <span> to {new Date(subscription.subscription.pauseRequestEndDate).toLocaleDateString()}</span>
+                    )}
+                  </div>
+                )}
 
                 {/* Worker Change Modal */}
                 {changingWorker === subscription._id && (
@@ -606,6 +663,88 @@ const MySubscriptionsPage = () => {
                       >
                         Cancel
                       </button>
+                    </div>
+                  </div>
+                )}
+
+                {pauseRequestFor === subscription._id && (
+                  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-background rounded-xl max-w-lg w-full p-6 space-y-4">
+                      <div>
+                        <h3 className="text-xl font-bold text-foreground">Request subscription pause</h3>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Tell admin when you want the break to start and end. They’ll review it before the subscription is paused.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-foreground mb-2">Pause start date</label>
+                          <input
+                            type="date"
+                            value={pauseRequestForm.requestedStartDate}
+                            onChange={(event) => setPauseRequestForm((current) => ({
+                              ...current,
+                              requestedStartDate: event.target.value,
+                              requestedEndDate: current.requestedEndDate && event.target.value && current.requestedEndDate < event.target.value
+                                ? event.target.value
+                                : current.requestedEndDate,
+                            }))}
+                            className="input-clean"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-foreground mb-2">Pause end date</label>
+                          <input
+                            type="date"
+                            value={pauseRequestForm.requestedEndDate}
+                            min={pauseRequestForm.requestedStartDate || undefined}
+                            onChange={(event) => setPauseRequestForm((current) => ({
+                              ...current,
+                              requestedEndDate: event.target.value,
+                            }))}
+                            className="input-clean"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-foreground mb-2">Reason for pause</label>
+                        <textarea
+                          value={pauseRequestForm.reason}
+                          onChange={(event) => setPauseRequestForm((current) => ({
+                            ...current,
+                            reason: event.target.value.slice(0, 500),
+                          }))}
+                          rows={4}
+                          maxLength={500}
+                          placeholder="Example: Travelling for 2 days, please pause the visits."
+                          className="input-clean resize-none"
+                        />
+                      </div>
+
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPauseRequestFor(null);
+                            setPauseRequestForm({ requestedStartDate: '', requestedEndDate: '', reason: '' });
+                          }}
+                          className="btn-outline flex-1"
+                          disabled={submittingPauseRequest}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePauseSubscription(subscription._id)}
+                          className="btn-brand flex-1"
+                          disabled={submittingPauseRequest}
+                        >
+                          {submittingPauseRequest ? 'Sending...' : 'Send Request'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}

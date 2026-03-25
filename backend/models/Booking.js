@@ -203,6 +203,49 @@ const bookingSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     },
+    pauseRequestStatus: {
+      type: String,
+      enum: ['none', 'pending', 'approved', 'rejected'],
+      default: 'none'
+    },
+    pauseRequestedAt: {
+      type: Date,
+      default: null
+    },
+    pauseRequestedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    pauseRequestStartDate: {
+      type: Date,
+      default: null
+    },
+    pauseRequestEndDate: {
+      type: Date,
+      default: null
+    },
+    pauseRequestReason: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: 500
+    },
+    pauseReviewedAt: {
+      type: Date,
+      default: null
+    },
+    pauseReviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    pauseReviewNote: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: 500
+    },
     pausedAt: Date,
     resumedAt: Date,
     fixedWorker: {

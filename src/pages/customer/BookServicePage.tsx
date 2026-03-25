@@ -4,6 +4,7 @@ import WorkerProfilePreviewDialog from "@/components/WorkerProfilePreviewDialog"
 import { useServiceBookingAvailability } from "@/hooks/useServiceBookingAvailability";
 import { authAPI, bookingsAPI, servicesAPI, settingsAPI } from "@/lib/api";
 import { getCustomerPlanFrequencyLabel } from "@/utils/subscriptionPlanDetails";
+import { getMinimumSubscriptionStartDate, isSubscriptionStartTimeExpired } from "@/utils/subscriptionStartRules";
 import { Calendar, Clock, Info, MapPin, Sparkles, Star, User, Users, Zap } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -378,6 +379,12 @@ const BookServicePage = () => {
         toast.error('Please select at least one day for weekly subscription');
         return;
       }
+      if (isSubscriptionStartTimeExpired(subscriptionStartDate, preferredTime)) {
+        const nextValidDate = getMinimumSubscriptionStartDate(preferredTime);
+        setSubscriptionStartDate(nextValidDate);
+        toast.error('That preferred time has already passed for today. Please review the updated start date and submit again.');
+        return;
+      }
     }
     
     const selectedTime = getBookingTime();
@@ -606,6 +613,22 @@ const BookServicePage = () => {
     }
     setSelectedExactTime('');
   }, [selectedDate, fetchDateAvailability, preferences.workerGenderPreference]);
+
+  const minimumSubscriptionStartDate = getMinimumSubscriptionStartDate(preferredTime);
+
+  useEffect(() => {
+    if (
+      bookingType !== 'oneTime'
+      && subscriptionStartDate
+      && isSubscriptionStartTimeExpired(subscriptionStartDate, preferredTime)
+    ) {
+      const nextValidDate = getMinimumSubscriptionStartDate(preferredTime);
+      if (subscriptionStartDate !== nextValidDate) {
+        setSubscriptionStartDate(nextValidDate);
+        toast.info('Today\'s selected subscription time has already passed, so we moved the start date to the next available day.');
+      }
+    }
+  }, [bookingType, preferredTime, subscriptionStartDate]);
 
   // Convert HH:MM string to minutes
   const toMinutes = (t: string): number => {
@@ -1107,11 +1130,13 @@ const BookServicePage = () => {
                       }
                       setSubscriptionStartDate(val);
                     }}
-                    min={getTodayDate()}
+                    min={minimumSubscriptionStartDate}
                     className="input-clean"
                     required
                   />
-                  <p className="text-xs text-muted-foreground mt-1">When should your subscription begin?</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    When should your subscription begin? If today’s preferred time is already over, the earliest available start shifts to the next day.
+                  </p>
                 </div>
 
                 {/* End Date (Optional) */}
@@ -1141,7 +1166,9 @@ const BookServicePage = () => {
                     className="input-clean"
                     required
                   />
-                  <p className="text-xs text-muted-foreground mt-1">What time should the worker arrive?</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    What time should the worker arrive? If this time has already passed today, the subscription will begin from {minimumSubscriptionStartDate === getTodayDate() ? 'today' : 'tomorrow'}.
+                  </p>
                 </div>
 
                 {/* Day Selection for Weekly */}
