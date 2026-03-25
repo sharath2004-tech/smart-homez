@@ -14,7 +14,7 @@ interface Booking {
   bookingType: string;
   subscription?: {
     isSubscription: boolean;
-    activationStatus?: 'payment_pending' | 'active';
+    activationStatus?: 'payment_pending' | 'approval_pending' | 'active';
     fixedWorker?: string;
     autoRenewal?: boolean;
     allowPause?: boolean;
@@ -107,7 +107,6 @@ const MySubscriptionsPage = () => {
       const subscriptionBookings = (bookingsData.bookings || [])
         .filter((booking: Booking) => 
           booking.subscription?.isSubscription && 
-          (booking.subscription?.activationStatus || 'active') === 'active' &&
           booking.status !== 'cancelled' &&
           booking.status !== 'completed'
         )
@@ -255,7 +254,7 @@ const MySubscriptionsPage = () => {
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-foreground mb-2">My Subscriptions</h1>
-          <p className="text-muted-foreground">Manage your active subscriptions and assigned workers</p>
+          <p className="text-muted-foreground">Manage your active subscriptions, payment status, and assigned workers</p>
         </div>
 
         {/* Renewal reminder banners */}
@@ -314,7 +313,15 @@ const MySubscriptionsPage = () => {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {subscription.subscription?.isPaused ? (
+                    {subscription.subscription?.activationStatus === 'payment_pending' ? (
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                        Awaiting payment proof
+                      </span>
+                    ) : subscription.subscription?.activationStatus === 'approval_pending' ? (
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
+                        Awaiting admin approval
+                      </span>
+                    ) : subscription.subscription?.isPaused ? (
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300">
                         Paused
                       </span>
@@ -399,7 +406,11 @@ const MySubscriptionsPage = () => {
                       </div>
                     ) : (
                       <div className="rounded-lg bg-muted/60 px-3 py-3 text-sm text-muted-foreground">
-                        We’re assigning your worker for this cycle now. Their profile will show up here as soon as the schedule is locked.
+                        {subscription.subscription?.activationStatus === 'payment_pending'
+                          ? 'Upload the subscription payment proof to move this booking into admin review.'
+                          : subscription.subscription?.activationStatus === 'approval_pending'
+                            ? 'Your payment proof is under review. Admin or super admin will approve the schedule and lock the worker soon.'
+                            : 'We’re assigning your worker for this cycle now. Their profile will show up here as soon as the schedule is locked.'}
                       </div>
                     )}
                   </div>

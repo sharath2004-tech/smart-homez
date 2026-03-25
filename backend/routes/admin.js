@@ -16,10 +16,10 @@ import WorkerSalaryRequest from '../models/WorkerSalaryRequest.js';
 import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/emailService.js';
 import { checkSlotAvailability } from '../utils/slotManagement.js';
 import {
-  evaluateWorkerEffectiveAvailability,
-  isWorkerAssignedToBooking,
-  isWorkerAvailableForTimeRange,
-  isWorkerEligibleForAssignment
+    evaluateWorkerEffectiveAvailability,
+    isWorkerAssignedToBooking,
+    isWorkerAvailableForTimeRange,
+    isWorkerEligibleForAssignment
 } from '../utils/workerAvailability.js';
 
 // Send temporary password via SMS (plain message, not Twilio Verify)
@@ -142,6 +142,253 @@ const COMPLETED_BOOKING_DATE_EXPR = {
 const REVENUE_BOOKING_MATCH = {
   status: 'completed',
   cancellationDate: null
+};
+
+const DAY_INDEX_BY_NAME = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6
+};
+
+const startOfDay = (value) => {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const addDays = (value, days) => {
+  const date = startOfDay(value);
+  date.setDate(date.getDate() + days);
+  return date;
+};
+
+const sameDay = (left, right) => startOfDay(left).getTime() === startOfDay(right).getTime();
+
+const findNextSelectedDay = (fromDate, selectedDays = []) => {
+  const allowedDayIndexes = selectedDays
+    .map(day => DAY_INDEX_BY_NAME[String(day || '').toLowerCase()])
+    .filter(day => Number.isInteger(day));
+
+  if (allowedDayIndexes.length === 0) {
+    return addDays(fromDate, 7);
+  }
+
+  for (let offset = 1; offset <= 14; offset += 1) {
+    const candidate = addDays(fromDate, offset);
+    if (allowedDayIndexes.includes(candidate.getDay())) {
+      return candidate;
+    }
+  }
+
+  return addDays(fromDate, 7);
+};
+
+const resolveSubscriptionEndDate = (booking) => {
+  if (booking.recurringSchedule?.endDate) {
+    return startOfDay(booking.recurringSchedule.endDate);
+  }
+
+  if (booking.subscription?.subscriptionEndDate) {
+    return startOfDay(booking.subscription.subscriptionEndDate);
+  }
+
+  if (booking.subscription?.isSubscription && booking.recurringSchedule?.frequency === 'monthly') {
+    return addDays(booking.recurringSchedule?.startDate || booking.bookingDate, 29);
+  }
+
+  return null;
+};
+
+const getNextSubscriptionOccurrenceDate = (booking, currentDate) => {
+  const frequency = String(booking.recurringSchedule?.frequency || '').toLowerCase();
+  const selectedDays = booking.recurringSchedule?.selectedDays || [];
+  const isMonthlyDailySubscription = booking.subscription?.isSubscription && frequency === 'monthly';
+
+  if (isMonthlyDailySubscription || frequency === 'daily') {
+    return addDays(currentDate, 1);
+  }
+
+  if (frequency === 'weekly') {
+    return selectedDays.length > 0
+      ? findNextSelectedDay(currentDate, selectedDays)
+      : addDays(currentDate, 7);
+  }
+
+  if (frequency === 'biweekly') {
+    return addDays(currentDate, 14);
+  }
+
+  if (frequency === '3-days' || frequency === 'alt-days') {
+    return selectedDays.length > 0
+      ? findNextSelectedDay(currentDate, selectedDays)
+      : addDays(currentDate, 2);
+  }
+
+  if (frequency === 'monthly') {
+    const nextDate = startOfDay(currentDate);
+    nextDate.setMonth(nextDate.getMonth() + 1);
+    return nextDate;
+  }
+
+  return addDays(currentDate, 1);
+};
+
+const buildSubscriptionOccurrenceWindows = async (booking, { maxOccurrences = 45 } = {}) => {
+  const windows = [];
+  const nowDay = startOfDay(new Date());
+  const seenKeys = new Set();
+
+  const pushWindow = ({ bookingId = null, bookingDate, startTime, endTime, source = 'planned' }) => {
+    const normalizedDate = startOfDay(bookingDate);
+    if (normalizedDate < nowDay) {
+      return;
+    }
+
+    const key = `${normalizedDate.toISOString()}|${startTime}|${endTime}`;
+    if (seenKeys.has(key)) {
+      return;
+    }
+
+    seenKeys.add(key);
+    windows.push({
+      bookingId,
+      bookingDate: normalizedDate,
+      startTime,
+      endTime,
+      source
+    });
+  };
+
+  pushWindow({
+    bookingId: booking._id,
+    bookingDate: booking.bookingDate,
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+    source: 'root'
+  });
+
+  if (!booking.subscription?.isSubscription || !booking.recurringSchedule?.frequency) {
+    return windows;
+  }
+
+  const scheduleEndDate = resolveSubscriptionEndDate(booking);
+  let occurrenceDate = startOfDay(booking.recurringSchedule?.startDate || booking.subscription?.subscriptionStartDate || booking.bookingDate);
+  let occurrenceCount = 0;
+
+  while (occurrenceCount < maxOccurrences) {
+    if (scheduleEndDate && occurrenceDate > scheduleEndDate) {
+      break;
+    }
+
+    pushWindow({
+      bookingDate: occurrenceDate,
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      source: 'planned'
+    });
+
+    const nextDate = getNextSubscriptionOccurrenceDate(booking, occurrenceDate);
+    if (!nextDate || sameDay(nextDate, occurrenceDate)) {
+      break;
+    }
+
+    occurrenceDate = nextDate;
+    occurrenceCount += 1;
+  }
+
+  const futureBookings = await Booking.find({
+    parentBooking: booking._id,
+    bookingDate: { $gte: nowDay },
+    status: { $ne: 'cancelled' }
+  })
+    .select('_id bookingDate startTime endTime')
+    .lean();
+
+  futureBookings.forEach((futureBooking) => {
+    pushWindow({
+      bookingId: futureBooking._id,
+      bookingDate: futureBooking.bookingDate,
+      startTime: futureBooking.startTime,
+      endTime: futureBooking.endTime,
+      source: 'generated'
+    });
+  });
+
+  return windows
+    .sort((left, right) => {
+      const dateDifference = left.bookingDate.getTime() - right.bookingDate.getTime();
+      if (dateDifference !== 0) return dateDifference;
+      return left.startTime.localeCompare(right.startTime);
+    })
+    .slice(0, maxOccurrences);
+};
+
+const evaluateWorkerCoverageForSubscription = async (booking, worker) => {
+  const occurrences = await buildSubscriptionOccurrenceWindows(booking);
+
+  if (occurrences.length === 0) {
+    return {
+      totalOccurrences: 0,
+      coveredOccurrences: 0,
+      isFullCoverage: true,
+      conflictDetails: []
+    };
+  }
+
+  let coveredOccurrences = 0;
+  const conflictDetails = [];
+
+  for (const occurrence of occurrences) {
+    const timeRangeAvailability = isWorkerAvailableForTimeRange(
+      worker,
+      occurrence.bookingDate,
+      occurrence.startTime,
+      occurrence.endTime
+    );
+
+    if (!timeRangeAvailability.available) {
+      conflictDetails.push({
+        date: occurrence.bookingDate,
+        startTime: occurrence.startTime,
+        endTime: occurrence.endTime,
+        reason: timeRangeAvailability.reason || 'Outside worker availability window'
+      });
+      continue;
+    }
+
+    const slotAvailability = await checkSlotAvailability(
+      worker._id,
+      occurrence.bookingDate,
+      occurrence.startTime,
+      occurrence.endTime,
+      Booking,
+      15,
+      occurrence.bookingId || null
+    );
+
+    if (!slotAvailability.available) {
+      conflictDetails.push({
+        date: occurrence.bookingDate,
+        startTime: occurrence.startTime,
+        endTime: occurrence.endTime,
+        reason: slotAvailability.reason || 'Worker has another booking in this slot'
+      });
+      continue;
+    }
+
+    coveredOccurrences += 1;
+  }
+
+  return {
+    totalOccurrences: occurrences.length,
+    coveredOccurrences,
+    isFullCoverage: coveredOccurrences === occurrences.length,
+    conflictDetails
+  };
 };
 
 // ============== SUPER ADMIN ROUTES ==============
@@ -2891,6 +3138,7 @@ router.get('/bookings/:bookingId/available-workers', authenticate, authorize('ad
       .select('name email phone isFirstLogin workerProfile.specialization workerProfile.assignedApartments workerProfile.rating workerProfile.availability workerProfile.leaves workerProfile.workingTimeWindow')
       .sort({ 'workerProfile.rating': -1, name: 1 });
 
+    const isSubscriptionApprovalBooking = Boolean(booking.subscription?.isSubscription);
     const availableWorkers = [];
 
     for (const worker of workers) {
@@ -2900,6 +3148,41 @@ router.get('/bookings/:bookingId/available-workers', authenticate, authorize('ad
 
       const eligibility = isWorkerEligibleForAssignment(worker);
       if (!eligibility.eligible) {
+        continue;
+      }
+
+      if (isSubscriptionApprovalBooking) {
+        const coverage = await evaluateWorkerCoverageForSubscription(booking, worker);
+        if (coverage.coveredOccurrences === 0) {
+          continue;
+        }
+
+        availableWorkers.push({
+          _id: worker._id,
+          name: worker.name,
+          email: worker.email,
+          phone: worker.phone,
+          rating: worker.workerProfile?.rating || 0,
+          specialization: worker.workerProfile?.specialization || [],
+          assignedApartments: worker.workerProfile?.assignedApartments || [],
+          recommended: coverage.isFullCoverage,
+          recommendationScore: (coverage.isFullCoverage ? 1000 : 0) + (coverage.coveredOccurrences * 10) + (worker.workerProfile?.rating || 0),
+          subscriptionCoverage: {
+            totalOccurrences: coverage.totalOccurrences,
+            coveredOccurrences: coverage.coveredOccurrences,
+            isFullCoverage: coverage.isFullCoverage,
+            conflictCount: coverage.conflictDetails.length
+          },
+          coverageSummary: coverage.isFullCoverage
+            ? `Available for all ${coverage.totalOccurrences} planned visits`
+            : `Available for ${coverage.coveredOccurrences} of ${coverage.totalOccurrences} planned visits`,
+          conflictReasons: coverage.conflictDetails.slice(0, 3).map((detail) => ({
+            date: detail.date,
+            startTime: detail.startTime,
+            endTime: detail.endTime,
+            reason: detail.reason
+          }))
+        });
         continue;
       }
 
@@ -2933,7 +3216,29 @@ router.get('/bookings/:bookingId/available-workers', authenticate, authorize('ad
       });
     }
 
-    res.json({ success: true, workers: availableWorkers, bookingId: booking._id });
+    if (isSubscriptionApprovalBooking) {
+      availableWorkers.sort((left, right) => {
+        const leftCoverage = left.subscriptionCoverage?.coveredOccurrences || 0;
+        const rightCoverage = right.subscriptionCoverage?.coveredOccurrences || 0;
+        if ((right.recommended ? 1 : 0) !== (left.recommended ? 1 : 0)) {
+          return (right.recommended ? 1 : 0) - (left.recommended ? 1 : 0);
+        }
+        if (rightCoverage !== leftCoverage) {
+          return rightCoverage - leftCoverage;
+        }
+        if ((right.rating || 0) !== (left.rating || 0)) {
+          return (right.rating || 0) - (left.rating || 0);
+        }
+        return left.name.localeCompare(right.name);
+      });
+    }
+
+    res.json({
+      success: true,
+      workers: availableWorkers,
+      bookingId: booking._id,
+      recommendationMode: isSubscriptionApprovalBooking ? 'subscription-coverage' : 'single-slot'
+    });
   } catch (error) {
     console.error('Get available workers for booking error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
@@ -3033,16 +3338,50 @@ router.post('/manual-assign',
         });
       }
 
+      if (booking.subscription?.isSubscription) {
+        if (['payment_pending', 'approval_pending'].includes(booking.subscription.activationStatus || '') && !booking.paymentProof?.url) {
+          return res.status(400).json({
+            error: {
+              message: 'Payment proof must be uploaded before approving and assigning this subscription.',
+              status: 400
+            }
+          });
+        }
+
+        const subscriptionCoverage = await evaluateWorkerCoverageForSubscription(booking, worker);
+        if (!subscriptionCoverage.isFullCoverage) {
+          const firstConflict = subscriptionCoverage.conflictDetails[0];
+          const conflictLabel = firstConflict
+            ? `${new Date(firstConflict.date).toLocaleDateString('en-IN')} ${firstConflict.startTime}-${firstConflict.endTime}: ${firstConflict.reason}`
+            : 'Worker is not available for the full subscription schedule';
+
+          return res.status(400).json({
+            error: {
+              message: `This worker can cover only ${subscriptionCoverage.coveredOccurrences} of ${subscriptionCoverage.totalOccurrences} planned visits. First conflict: ${conflictLabel}`,
+              status: 400
+            }
+          });
+        }
+      }
+
       const previousWorkerId = booking.worker?.toString() || null;
 
       booking.worker = workerId;
       booking.assignmentMethod = 'manual';
       booking.assignedBy = req.user._id;
       booking.assignedAt = new Date();
+      if (booking.subscription?.isSubscription) {
+        booking.subscription.fixedWorker = workerId;
+        if (['payment_pending', 'approval_pending'].includes(booking.subscription.activationStatus || '')) {
+          booking.subscription.activationStatus = 'active';
+          booking.subscription.activatedAt = new Date();
+        }
+      }
       booking.notes = `${booking.notes || ''}${booking.notes ? '\n' : ''}${previousWorkerId ? 'Reassigned' : 'Assigned'} by ${req.user.role}${reason ? `: ${reason}` : ''}`;
       
-      if (booking.status === 'pending') {
+      if (booking.status === 'pending' || booking.subscription?.isSubscription) {
         booking.status = 'confirmed';
+        booking.confirmedAt = booking.confirmedAt || new Date();
       }
 
       await booking.save();

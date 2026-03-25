@@ -316,6 +316,39 @@ const notifySubscriptionWorkerChangeAdmins = async (booking, requestedWorker, re
   })));
 };
 
+const notifySubscriptionApprovalAdmins = async (booking, requestedBy) => {
+  const adminFilter = { role: { $in: ['admin', 'super_admin'] }, isActive: true };
+
+  const admins = await User.find(adminFilter).select('_id adminProfile.assignedLocations role').lean();
+  const bookingLocationId = booking.location?.locationId?.toString?.() || null;
+
+  const relevantAdmins = admins.filter(admin => {
+    if (admin.role === 'super_admin') return true;
+
+    const assignedLocationIds = (admin.adminProfile?.assignedLocations || [])
+      .map(location => location.locationId?.toString())
+      .filter(Boolean);
+
+    if (!bookingLocationId) return assignedLocationIds.length === 0;
+    if (assignedLocationIds.length === 0) return false;
+    return assignedLocationIds.includes(bookingLocationId);
+  });
+
+  await Promise.all(relevantAdmins.map(admin => notificationService.sendNotification({
+    userId: admin._id,
+    type: 'booking',
+    title: 'Subscription approval pending',
+    message: `${requestedBy.name || 'A customer'} uploaded payment proof for subscription ${booking.service?.name || booking._id}. Review worker coverage and approve the plan.`,
+    priority: 'high',
+    data: {
+      bookingId: booking._id,
+      customerId: booking.customer,
+      locationId: booking.location?.locationId || null,
+      activationStatus: 'approval_pending'
+    }
+  })));
+};
+
 const getTimeWindowMinutes = (startTime, endTime) => {
   const startMinutes = timeStringToMinutes(startTime);
   const endMinutes = timeStringToMinutes(endTime);
@@ -3409,7 +3442,7 @@ router.post('/:id/upload-payment-proof',
 
       const { transactionId, transactionTime } = req.body;
 
-      const wasPendingSubscriptionActivation = Boolean(
+      const wasPendingSubscriptionApproval = Boolean(
         isCustomer
         && isSubscriptionBooking
         && booking.subscription?.activationStatus === 'payment_pending'
@@ -3427,27 +3460,29 @@ router.post('/:id/upload-payment-proof',
       if (isCustomer && isSubscriptionBooking) {
         booking.paymentStatus = 'paid';
         if (booking.subscription) {
-          booking.subscription.activationStatus = 'active';
-          booking.subscription.activatedAt = new Date();
+          booking.subscription.activationStatus = 'approval_pending';
+          booking.subscription.activatedAt = null;
         }
       }
 
       await booking.save();
 
       let assignmentRetryResult = null;
-      if (wasPendingSubscriptionActivation) {
-        assignmentRetryResult = await retryPendingBookingAssignment(booking._id, { notifyCustomer: true });
-        await booking.populate('worker', 'name email phone');
+      if (wasPendingSubscriptionApproval) {
+        await booking.populate('customer', 'name email');
+        await booking.populate('service', 'name');
+        await notifySubscriptionApprovalAdmins(booking, req.user);
       }
 
       console.log(`✅ ${req.user.role} ${isReupload ? 're-uploaded' : 'uploaded'} payment proof:`, photoUrl, transactionId ? `| TxnID: ${transactionId}` : '');
 
       res.json({ 
-        message: wasPendingSubscriptionActivation
-          ? 'Payment proof uploaded successfully and subscription is now active'
+        message: wasPendingSubscriptionApproval
+          ? 'Payment proof uploaded successfully. Subscription is now waiting for admin approval.'
           : 'Payment proof uploaded successfully',
         paymentProof: booking.paymentProof,
-        subscriptionActivated: wasPendingSubscriptionActivation,
+        subscriptionActivated: false,
+        subscriptionStatus: booking.subscription?.activationStatus || null,
         bookingStatus: booking.status,
         worker: booking.worker || null,
         assignmentRetried: assignmentRetryResult?.success === true

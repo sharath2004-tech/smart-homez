@@ -176,7 +176,7 @@ const bookingSchema = new mongoose.Schema({
     },
     activationStatus: {
       type: String,
-      enum: ['payment_pending', 'active'],
+      enum: ['payment_pending', 'approval_pending', 'active'],
       default: 'active'
     },
     activatedAt: {

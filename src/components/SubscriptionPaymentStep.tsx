@@ -36,9 +36,9 @@ export default function SubscriptionPaymentStep({
   bookingId,
   amount,
   title = "Complete subscription payment",
-  description = "Pay using the company UPI ID or QR code, then upload your payment screenshot to finish the booking flow.",
+  description = "Pay using the company UPI ID or QR code, then upload your payment screenshot. Admin or super admin will review the plan and assign the worker before activation.",
   onPaymentSubmitted,
-  successLabel = "Payment proof uploaded successfully",
+  successLabel = "Payment proof uploaded. Waiting for admin approval",
 }: SubscriptionPaymentStepProps) {
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null);
   const [loadingSettings, setLoadingSettings] = useState(true);

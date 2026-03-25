@@ -45,6 +45,10 @@ interface Booking {
   totalAmount: number;
   createdAt: string;
   paymentStatus?: string;
+  subscription?: {
+    isSubscription: boolean;
+    activationStatus?: 'payment_pending' | 'approval_pending' | 'active';
+  };
   paymentMethod?: string;
   completionPhoto?: ProofPhoto;
   completionPhotos?: ProofPhoto[];
@@ -92,6 +96,21 @@ interface AvailableWorker {
   phone?: string;
   rating: number;
   specialization: string[];
+  recommended?: boolean;
+  recommendationScore?: number;
+  coverageSummary?: string;
+  subscriptionCoverage?: {
+    totalOccurrences: number;
+    coveredOccurrences: number;
+    isFullCoverage: boolean;
+    conflictCount: number;
+  };
+  conflictReasons?: Array<{
+    date: string;
+    startTime: string;
+    endTime: string;
+    reason: string;
+  }>;
   assignedApartments?: Array<{ apartmentName: string; area: string; city: string }>;
 }
 
@@ -991,13 +1010,13 @@ const AdminBookings = () => {
                             Team ({(b.supportStaff?.length ?? 0) + (b.worker ? 1 : 0)})
                           </button>
                         )}
-                        {['pending', 'confirmed', 'in-progress'].includes(b.status) && b.worker && (
+                        {['pending', 'confirmed', 'in-progress'].includes(b.status) && (
                           <button
                             onClick={() => openReassignModal(b)}
                             className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-sky-100 text-sky-700 hover:bg-sky-200 transition-colors"
                           >
                             <Users className="w-3.5 h-3.5" />
-                            Reassign
+                            {b.worker ? 'Reassign' : 'Assign'}
                           </button>
                         )}
                         {['confirmed', 'in-progress', 'pending-review', 'completed'].includes(b.status) && (
@@ -1087,7 +1106,11 @@ const AdminBookings = () => {
             <div className="p-5 space-y-4">
               <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm">
                 <p><span className="font-semibold text-sky-800">Current worker:</span> {reassignBooking.worker?.name || 'Unassigned'}</p>
-                <p className="text-muted-foreground mt-1">Only workers available for this booking time and location are shown.</p>
+                <p className="text-muted-foreground mt-1">
+                  {reassignBooking.subscription?.isSubscription
+                    ? 'Workers are ranked by how many upcoming subscription visits they can cover before you approve the plan.'
+                    : 'Only workers available for this booking time and location are shown.'}
+                </p>
               </div>
 
               <div>
@@ -1109,8 +1132,25 @@ const AdminBookings = () => {
                 {!availableWorkersLoading && availableWorkers.map((worker) => (
                   <div key={worker._id} className="flex items-center justify-between p-3 bg-muted/40 border border-border rounded-xl">
                     <div>
-                      <p className="text-sm font-medium text-foreground">{worker.name}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium text-foreground">{worker.name}</p>
+                        {worker.recommended && (
+                          <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                            Recommended
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">⭐ {worker.rating.toFixed(1)} · {worker.specialization?.join(', ') || 'General'}</p>
+                      {worker.coverageSummary && (
+                        <p className={`text-xs mt-1 ${worker.subscriptionCoverage?.isFullCoverage ? 'text-emerald-700' : 'text-amber-700'}`}>
+                          {worker.coverageSummary}
+                        </p>
+                      )}
+                      {worker.conflictReasons && worker.conflictReasons.length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          First issue: {new Date(worker.conflictReasons[0].date).toLocaleDateString('en-IN')} {worker.conflictReasons[0].startTime}-{worker.conflictReasons[0].endTime}
+                        </p>
+                      )}
                       {worker.assignedApartments?.[0] && (
                         <p className="text-xs text-muted-foreground mt-1">
                           {worker.assignedApartments[0].apartmentName}, {worker.assignedApartments[0].area}
@@ -1122,7 +1162,7 @@ const AdminBookings = () => {
                       disabled={teamActionLoading}
                       className="px-3 py-2 text-xs font-semibold rounded-lg bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-60"
                     >
-                      {teamActionLoading ? 'Saving…' : 'Assign'}
+                      {teamActionLoading ? 'Saving…' : reassignBooking.subscription?.isSubscription ? 'Approve & Assign' : 'Assign'}
                     </button>
                   </div>
                 ))}
