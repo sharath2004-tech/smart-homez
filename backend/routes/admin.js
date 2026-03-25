@@ -3134,9 +3134,18 @@ router.get('/bookings/:bookingId/available-workers', authenticate, authorize('ad
       workerQuery['workerProfile.assignedApartments.locationId'] = { $in: adminLocationIds };
     }
 
-    const workers = await User.find(workerQuery)
+    let workers = await User.find(workerQuery)
       .select('name email phone isFirstLogin workerProfile.specialization workerProfile.assignedApartments workerProfile.rating workerProfile.availability workerProfile.leaves workerProfile.workingTimeWindow')
       .sort({ 'workerProfile.rating': -1, name: 1 });
+
+    if (workers.length === 0 && workerQuery['workerProfile.specialization']) {
+      const fallbackWorkerQuery = { ...workerQuery };
+      delete fallbackWorkerQuery['workerProfile.specialization'];
+
+      workers = await User.find(fallbackWorkerQuery)
+        .select('name email phone isFirstLogin workerProfile.specialization workerProfile.assignedApartments workerProfile.rating workerProfile.availability workerProfile.leaves workerProfile.workingTimeWindow')
+        .sort({ 'workerProfile.rating': -1, name: 1 });
+    }
 
     const isSubscriptionApprovalBooking = Boolean(booking.subscription?.isSubscription);
     const availableWorkers = [];
@@ -3153,9 +3162,6 @@ router.get('/bookings/:bookingId/available-workers', authenticate, authorize('ad
 
       if (isSubscriptionApprovalBooking) {
         const coverage = await evaluateWorkerCoverageForSubscription(booking, worker);
-        if (coverage.coveredOccurrences === 0) {
-          continue;
-        }
 
         availableWorkers.push({
           _id: worker._id,
@@ -3175,7 +3181,9 @@ router.get('/bookings/:bookingId/available-workers', authenticate, authorize('ad
           },
           coverageSummary: coverage.isFullCoverage
             ? `Available for all ${coverage.totalOccurrences} planned visits`
-            : `Available for ${coverage.coveredOccurrences} of ${coverage.totalOccurrences} planned visits`,
+            : coverage.coveredOccurrences > 0
+              ? `Available for ${coverage.coveredOccurrences} of ${coverage.totalOccurrences} planned visits`
+              : `Currently unavailable for the planned subscription visits`,
           conflictReasons: coverage.conflictDetails.slice(0, 3).map((detail) => ({
             date: detail.date,
             startTime: detail.startTime,

@@ -1092,7 +1092,7 @@ const AdminBookings = () => {
             <div className="sticky top-0 bg-card border-b border-border p-4 flex items-center justify-between rounded-t-2xl">
               <div>
                 <h2 className="font-bold text-foreground text-lg flex items-center gap-2">
-                  <Users className="w-5 h-5 text-sky-600" /> Reassign Worker
+                  <Users className="w-5 h-5 text-sky-600" /> {reassignBooking.worker ? 'Reassign Worker' : 'Assign Worker'}
                 </h2>
                 <p className="text-sm text-muted-foreground">
                   {reassignBooking.service?.name || 'Booking'} · {formatDate(reassignBooking.bookingDate)} · {formatTime(reassignBooking.startTime)} - {formatTime(reassignBooking.endTime)}
