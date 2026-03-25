@@ -14,6 +14,7 @@ interface Booking {
   bookingType: string;
   subscription?: {
     isSubscription: boolean;
+    activationStatus?: 'payment_pending' | 'active';
     fixedWorker?: string;
     autoRenewal?: boolean;
     allowPause?: boolean;
@@ -106,6 +107,7 @@ const MySubscriptionsPage = () => {
       const subscriptionBookings = (bookingsData.bookings || [])
         .filter((booking: Booking) => 
           booking.subscription?.isSubscription && 
+          (booking.subscription?.activationStatus || 'active') === 'active' &&
           booking.status !== 'cancelled' &&
           booking.status !== 'completed'
         )

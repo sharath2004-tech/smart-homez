@@ -1628,6 +1628,27 @@ export const superAdminAPI = {
     return apiCall(`/super-admin/workers/${workerId}/unarchive`, { method: 'PATCH' });
   },
 
+  updateWorkerAvailability: async (workerId: string, availability: boolean) => {
+    return apiCall(`/super-admin/workers/${workerId}/availability`, {
+      method: 'PATCH',
+      body: JSON.stringify({ availability })
+    });
+  },
+
+  sendCustomerResetOtp: async (customerId: string, delivery: 'auto' | 'email' | 'sms' | 'both' = 'auto') => {
+    return apiCall(`/super-admin/customers/${customerId}/send-reset-otp`, {
+      method: 'POST',
+      body: JSON.stringify({ delivery })
+    });
+  },
+
+  updateCustomerStatus: async (customerId: string, isActive: boolean) => {
+    return apiCall(`/super-admin/customers/${customerId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isActive })
+    });
+  },
+
   // Bookings — all. Optional ?locationId= and ?status= filters.
   getBookings: async (params?: { locationId?: string; status?: string; limit?: number }) => {
     const q = new URLSearchParams();

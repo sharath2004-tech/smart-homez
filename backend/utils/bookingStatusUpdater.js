@@ -174,7 +174,16 @@ export const resolveAssignedWorkerForOccurrence = async (booking, occurrenceDate
 const getPendingAssignmentBaseQuery = (now = new Date()) => ({
   status: 'pending',
   $or: [{ worker: null }, { worker: { $exists: false } }],
-  bookingDate: { $gte: startOfDay(now) }
+  bookingDate: { $gte: startOfDay(now) },
+  $and: [
+    {
+      $or: [
+        { 'subscription.isSubscription': { $ne: true } },
+        { 'subscription.activationStatus': 'active' },
+        { 'subscription.activationStatus': { $exists: false } }
+      ]
+    }
+  ]
 });
 
 const isBookingStillAssignable = (booking, now = new Date()) => {
@@ -353,6 +362,10 @@ export const scheduleRecurringBookings = async () => {
     }).populate('service customer worker');
 
     for (const booking of recurringBookings) {
+      if (booking.subscription?.isSubscription && booking.subscription?.activationStatus === 'payment_pending') {
+        continue;
+      }
+
       // Skip if required references are missing
       if (!booking.customer || !booking.service) {
         console.log(`Skipping recurring booking ${booking._id}: missing customer or service reference`);

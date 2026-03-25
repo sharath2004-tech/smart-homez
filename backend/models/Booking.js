@@ -174,6 +174,15 @@ const bookingSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     },
+    activationStatus: {
+      type: String,
+      enum: ['payment_pending', 'active'],
+      default: 'active'
+    },
+    activatedAt: {
+      type: Date,
+      default: null
+    },
     subscriptionId: String,
     renewedFrom: {
       type: mongoose.Schema.Types.ObjectId,

@@ -3,27 +3,27 @@ import { useAdminRole } from "@/hooks/useAdminRole";
 import { superAdminAPI } from "@/lib/api";
 import ExcelJS from "exceljs";
 import {
-    Archive,
-    ArchiveRestore,
-    BarChart2,
-    BookOpen,
-    Building2,
-    Calendar,
-    CheckCircle,
-    ChevronRight,
-    Clock,
-    FileSpreadsheet,
-    IndianRupee,
-    Loader2,
-    MapPin,
-    Plus,
-    RefreshCw,
-    Settings,
-    Star,
-    Trash2,
-    TrendingUp,
-    User,
-    Users
+  Archive,
+  ArchiveRestore,
+  BarChart2,
+  BookOpen,
+  Building2,
+  Calendar,
+  CheckCircle,
+  ChevronRight,
+  Clock,
+  FileSpreadsheet,
+  IndianRupee,
+  Loader2,
+  MapPin,
+  Plus,
+  RefreshCw,
+  Settings,
+  Star,
+  Trash2,
+  TrendingUp,
+  User,
+  Users
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -54,6 +54,7 @@ interface Worker {
   name: string;
   email: string;
   phone?: string;
+  isActive?: boolean;
   isArchived?: boolean;
   workerProfile?: {
     specialization?: string[];
@@ -248,6 +249,15 @@ const SuperAdminDashboard = () => {
       fetchLocationData(selectedLocationId);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to restore worker");
+    }
+  };
+
+  const handleUpdateWorkerAvailability = async (workerId: string, availability: boolean) => {
+    try {
+      await superAdminAPI.updateWorkerAvailability(workerId, availability);
+      fetchLocationData(selectedLocationId);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to update worker availability');
     }
   };
 
@@ -1032,15 +1042,25 @@ const SuperAdminDashboard = () => {
                                     </span>
                                   </td>
                                   <td className="px-4 py-3">
-                                    {w.isArchived ? (
-                                      <button onClick={() => handleUnarchiveWorker(w._id)} className="text-xs text-green-700 hover:underline flex items-center gap-1 whitespace-nowrap">
-                                        <ArchiveRestore className="w-3 h-3" /> Restore
-                                      </button>
-                                    ) : (
-                                      <button onClick={() => handleArchiveWorker(w._id)} className="text-xs text-amber-700 hover:underline flex items-center gap-1 whitespace-nowrap">
-                                        <Archive className="w-3 h-3" /> Archive
-                                      </button>
-                                    )}
+                                    <div className="flex flex-col items-start gap-2">
+                                      {!w.isArchived && (
+                                        <button
+                                          onClick={() => handleUpdateWorkerAvailability(w._id, !w.workerProfile?.availability)}
+                                          className={`text-xs hover:underline flex items-center gap-1 whitespace-nowrap ${w.workerProfile?.availability ? 'text-slate-700' : 'text-green-700'}`}
+                                        >
+                                          <CheckCircle className="w-3 h-3" /> {w.workerProfile?.availability ? 'Set Inactive' : 'Set Active'}
+                                        </button>
+                                      )}
+                                      {w.isArchived ? (
+                                        <button onClick={() => handleUnarchiveWorker(w._id)} className="text-xs text-green-700 hover:underline flex items-center gap-1 whitespace-nowrap">
+                                          <ArchiveRestore className="w-3 h-3" /> Restore
+                                        </button>
+                                      ) : (
+                                        <button onClick={() => handleArchiveWorker(w._id)} className="text-xs text-amber-700 hover:underline flex items-center gap-1 whitespace-nowrap">
+                                          <Archive className="w-3 h-3" /> Archive
+                                        </button>
+                                      )}
+                                    </div>
                                   </td>
                                 </tr>
                               ))}

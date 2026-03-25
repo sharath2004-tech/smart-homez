@@ -4011,7 +4011,7 @@ router.get('/customers/:id',
       const { id } = req.params;
       
       const customer = await User.findOne({ _id: id, role: 'customer' })
-        .select('name email phone addresses preferences createdAt isVerified isEmailVerified isPhoneVerified')
+        .select('name email phone addresses preferences createdAt isVerified isEmailVerified isPhoneVerified isActive')
         .lean();
       
       if (!customer) {
@@ -4061,6 +4061,7 @@ router.get('/customers/:id',
           phone: customer.phone,
           addresses: customer.addresses,
           preferences: customer.preferences,
+          isActive: customer.isActive,
           isVerified: customer.isVerified,
           isEmailVerified: customer.isEmailVerified,
           isPhoneVerified: customer.isPhoneVerified,

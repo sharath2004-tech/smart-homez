@@ -1372,9 +1372,11 @@ router.post('/',
       }
 
       // Prepare booking data with validated location reference
+      const initialAssignedWorker = isSubscription ? undefined : (worker || undefined);
+
       const bookingData = {
         customer: req.user._id,
-        worker: worker || undefined,
+        worker: initialAssignedWorker,
         service,
         bookingDate: isSubscription ? subscriptionDetails.startDate : bookingDate,
         startTime: bookingWindow.startTime,
@@ -1390,7 +1392,7 @@ router.post('/',
           state: nearbyLocation.state
         },
         notes,
-        assignmentMethod: worker ? 'manual' : 'auto',
+        assignmentMethod: initialAssignedWorker ? 'manual' : 'auto',
         bookingType: bookingType || 'oneTime',
         isRecurring: ['daily', 'weekly', 'monthly', 'recurring-short', 'monthly-subscription'].includes(bookingType),
         preferences: preferences || {},
@@ -1415,11 +1417,13 @@ router.post('/',
 
         bookingData.subscription = {
           isSubscription: true,
+          activationStatus: 'payment_pending',
+          activatedAt: null,
           subscriptionStartDate: normalizedSubscriptionStartDate,
           subscriptionEndDate: resolvedSubscriptionEndDate,
           autoRenewal: subscriptionDetails.autoRenewal || false,
           allowPause: subscriptionDetails.allowPause || false,
-          fixedWorker: worker, // Store the fixed worker for this subscription
+          fixedWorker: undefined,
           durationPerSession: subscriptionDetails.durationPerSession || 1,
           preferredTime: subscriptionDetails.preferredTime,
           // Split sessions: store multiple time windows when customer splits work across day
@@ -1438,12 +1442,8 @@ router.post('/',
           preferredTime: subscriptionDetails.preferredTime
         };
         
-        // Status: confirmed if worker already known (manual), pending if auto-assignment will run
-        bookingData.status = worker ? 'confirmed' : 'pending';
-        if (worker) {
-          bookingData.confirmedAt = new Date();
-          bookingData.assignedAt = new Date();
-        }
+        // Subscription stays inactive until payment proof is uploaded.
+        bookingData.status = 'pending';
       }
 
       // Add recurring schedule if it's a recurring booking (non-subscription)
@@ -1482,7 +1482,9 @@ router.post('/',
       const shouldAutoAssign = autoAssign !== false; // Default to true unless explicitly disabled
       const mustAssignImmediately = !booking.subscription?.isSubscription && ['adhoc', 'oneTime'].includes(booking.bookingType);
       
-      if (!worker && shouldAutoAssign) {
+      const canAttemptAssignment = !booking.subscription?.isSubscription || booking.subscription?.activationStatus === 'active';
+
+      if (!worker && shouldAutoAssign && canAttemptAssignment) {
         try {
           console.log('🚀 Using advanced worker assignment (primary + backups)...');
           
@@ -3401,26 +3403,48 @@ router.post('/:id/upload-payment-proof',
 
       const { transactionId, transactionTime } = req.body;
 
+      const wasPendingSubscriptionActivation = Boolean(
+        isCustomer
+        && isSubscriptionBooking
+        && booking.subscription?.activationStatus === 'payment_pending'
+      );
+
       booking.paymentProof = {
         url: photoUrl,
         timestamp: new Date(),
         uploadedBy: req.user._id,
-        verified: isCustomer && isSubscriptionBooking ? false : true,
+        verified: true,
         transactionId: transactionId ? transactionId.trim() : null,
         transactionTime: transactionTime ? new Date(transactionTime) : new Date()
       };
 
       if (isCustomer && isSubscriptionBooking) {
-        booking.paymentStatus = 'pending';
+        booking.paymentStatus = 'paid';
+        if (booking.subscription) {
+          booking.subscription.activationStatus = 'active';
+          booking.subscription.activatedAt = new Date();
+        }
       }
 
       await booking.save();
 
+      let assignmentRetryResult = null;
+      if (wasPendingSubscriptionActivation) {
+        assignmentRetryResult = await retryPendingBookingAssignment(booking._id, { notifyCustomer: true });
+        await booking.populate('worker', 'name email phone');
+      }
+
       console.log(`✅ ${req.user.role} ${isReupload ? 're-uploaded' : 'uploaded'} payment proof:`, photoUrl, transactionId ? `| TxnID: ${transactionId}` : '');
 
       res.json({ 
-        message: 'Payment proof uploaded successfully',
-        paymentProof: booking.paymentProof
+        message: wasPendingSubscriptionActivation
+          ? 'Payment proof uploaded successfully and subscription is now active'
+          : 'Payment proof uploaded successfully',
+        paymentProof: booking.paymentProof,
+        subscriptionActivated: wasPendingSubscriptionActivation,
+        bookingStatus: booking.status,
+        worker: booking.worker || null,
+        assignmentRetried: assignmentRetryResult?.success === true
       });
 
     } catch (error) {

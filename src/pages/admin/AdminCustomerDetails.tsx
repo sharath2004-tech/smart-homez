@@ -1,9 +1,10 @@
 import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
-import { adminAPI } from "@/lib/api";
+import { adminAPI, superAdminAPI } from "@/lib/api";
 import { ArrowLeft, Calendar, CheckCircle, Loader2, Mail, MapPin, Phone, ShoppingBag, User, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { toast } from "sonner";
 
 interface Address {
   label?: string;
@@ -57,6 +58,7 @@ interface CustomerDetails {
     religionPreference?: string;
     specialInstructions?: string;
   };
+  isActive?: boolean;
   isVerified?: boolean;
   isEmailVerified?: boolean;
   isPhoneVerified?: boolean;
@@ -73,11 +75,13 @@ interface CustomerDetails {
 }
 
 const AdminCustomerDetails = () => {
-  const { role, name } = useAdminRole();
+  const { role, name, isSuperAdmin } = useAdminRole();
   const { customerId } = useParams<{ customerId: string }>();
   const [customer, setCustomer] = useState<CustomerDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [sendingResetOtp, setSendingResetOtp] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   useEffect(() => {
     if (customerId) {
@@ -127,6 +131,41 @@ const AdminCustomerDetails = () => {
     }
   };
 
+  const handleSendResetOtp = async () => {
+    if (!customer || !isSuperAdmin) return;
+
+    try {
+      setSendingResetOtp(true);
+      const response = await superAdminAPI.sendCustomerResetOtp(customer._id, customer.phone ? 'both' : 'email');
+      const deliverySummary = response.deliveryResults
+        ? Object.entries(response.deliveryResults).map(([key, value]) => `${key}: ${value}`).join(', ')
+        : 'queued';
+      toast.success(`Reset OTP sent successfully (${deliverySummary})`);
+    } catch (err) {
+      console.error("Failed to send customer reset OTP:", err);
+      toast.error(err instanceof Error ? err.message : 'Failed to send reset OTP');
+    } finally {
+      setSendingResetOtp(false);
+    }
+  };
+
+  const handleToggleCustomerStatus = async () => {
+    if (!customer || !isSuperAdmin) return;
+
+    try {
+      setUpdatingStatus(true);
+      const nextStatus = !customer.isActive;
+      await superAdminAPI.updateCustomerStatus(customer._id, nextStatus);
+      setCustomer((current) => current ? { ...current, isActive: nextStatus } : current);
+      toast.success(`Customer account ${nextStatus ? 'activated' : 'deactivated'} successfully`);
+    } catch (err) {
+      console.error("Failed to update customer status:", err);
+      toast.error(err instanceof Error ? err.message : 'Failed to update customer status');
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
   if (loading) {
     return (
       <AppLayout userType={role} userName={name}>
@@ -167,11 +206,38 @@ const AdminCustomerDetails = () => {
             <p className="text-muted-foreground mt-1">Customer ID: {customer._id}</p>
           </div>
           <div className="flex gap-2">
+            {typeof customer.isActive === 'boolean' && (
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold ${customer.isActive ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'}`}>
+                {customer.isActive ? 'Account Active' : 'Account Inactive'}
+              </span>
+            )}
             {customer.isVerified && (
               <span className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
                 <CheckCircle className="h-4 w-4" />
                 Verified
               </span>
+            )}
+            {isSuperAdmin && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleSendResetOtp}
+                  disabled={sendingResetOtp}
+                  className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {sendingResetOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                  Send Reset OTP
+                </button>
+                <button
+                  type="button"
+                  onClick={handleToggleCustomerStatus}
+                  disabled={updatingStatus}
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {updatingStatus ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {customer.isActive ? 'Deactivate Account' : 'Activate Account'}
+                </button>
+              </>
             )}
           </div>
         </div>

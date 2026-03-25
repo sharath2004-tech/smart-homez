@@ -1,5 +1,4 @@
 import AppLayout from "@/components/AppLayout";
-import WorkerAvailabilityToggle from "@/components/WorkerAvailabilityToggle";
 import { API_BASE_URL, authAPI, workersAPI } from "@/lib/api";
 import { Bell, CheckCircle, ChevronRight, Clock, MapPin, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -215,8 +214,6 @@ const WorkerDashboard = () => {
             </div>
           </div>
           
-          {/* Availability Toggle - Prominent position */}
-          <WorkerAvailabilityToggle />
         </div>
 
         {/* Hours worked summary */}

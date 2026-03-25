@@ -4,6 +4,7 @@
  * Regular admins are blocked at the authorize() middleware level.
  */
 
+import crypto from 'crypto';
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import twilio from 'twilio';
@@ -14,7 +15,8 @@ import BusinessHours from '../models/BusinessHours.js';
 import Location from '../models/Location.js';
 import Settings from '../models/Settings.js';
 import User from '../models/User.js';
-import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/emailService.js';
+import { generateTemporaryPassword, sendPasswordResetOtpEmail, sendTemporaryPasswordEmail } from '../utils/emailService.js';
+import { sendOTP } from '../utils/msg91Service.js';
 
 // Send temporary password via SMS
 async function sendTemporaryPasswordSMS(phone, name, temporaryPassword) {
@@ -37,6 +39,12 @@ async function sendTemporaryPasswordSMS(phone, name, temporaryPassword) {
     console.error('❌ SMS send error:', error.message);
     return { success: false, reason: error.message };
   }
+}
+
+function toE164(phone) {
+  const digits = String(phone || '').replace(/\D/g, '').slice(-10);
+  if (digits.length < 10) throw new Error('Enter a valid 10-digit mobile number');
+  return `+91${digits}`;
 }
 
 // Canonical list of valid Indian cities — prevents free-text garbage input
@@ -648,6 +656,131 @@ router.patch('/workers/:workerId/unarchive', async (req, res) => {
     res.json({ success: true, message: 'Worker unarchived successfully' });
   } catch (error) {
     console.error('Super admin unarchive worker error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   PATCH /api/super-admin/workers/:workerId/availability
+router.patch('/workers/:workerId/availability', async (req, res) => {
+  try {
+    const { availability } = req.body;
+
+    if (typeof availability !== 'boolean') {
+      return res.status(400).json({ error: { message: 'Availability must be a boolean value', status: 400 } });
+    }
+
+    const worker = await User.findById(req.params.workerId);
+    if (!worker || worker.role !== 'worker') {
+      return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
+    }
+
+    worker.workerProfile = worker.workerProfile || {};
+    worker.workerProfile.availability = availability;
+    worker.workerProfile.lastAvailabilityUpdate = new Date();
+    await worker.save({ validateBeforeSave: false });
+
+    res.json({
+      success: true,
+      message: `Worker marked as ${availability ? 'active' : 'inactive'} successfully`,
+      worker: {
+        _id: worker._id,
+        availability: worker.workerProfile.availability,
+        isArchived: worker.isArchived,
+        isActive: worker.isActive
+      }
+    });
+  } catch (error) {
+    console.error('Super admin worker availability update error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   POST /api/super-admin/customers/:customerId/send-reset-otp
+router.post('/customers/:customerId/send-reset-otp', async (req, res) => {
+  try {
+    const { delivery = 'auto' } = req.body || {};
+    const customer = await User.findOne({ _id: req.params.customerId, role: 'customer' }).select('+passwordResetToken +passwordResetExpires');
+
+    if (!customer) {
+      return res.status(404).json({ error: { message: 'Customer not found', status: 404 } });
+    }
+
+    const deliveryResults = {};
+    let sentSomething = false;
+
+    const shouldSendEmail = ['auto', 'email', 'both'].includes(delivery) && Boolean(customer.email);
+    const shouldSendSms = ['sms', 'both'].includes(delivery) || (delivery === 'auto' && Boolean(customer.phone));
+
+    if (shouldSendEmail) {
+      const otp = String(100000 + crypto.randomInt(900000));
+      const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
+      customer.passwordResetToken = hashedOtp;
+      customer.passwordResetExpires = new Date(Date.now() + 10 * 60 * 1000);
+      await customer.save({ validateBeforeSave: false });
+
+      const emailResult = await sendPasswordResetOtpEmail(customer.email, customer.name, otp);
+      deliveryResults.email = emailResult.success ? 'sent' : `failed: ${emailResult.reason}`;
+      sentSomething = sentSomething || emailResult.success;
+    }
+
+    if (shouldSendSms && customer.phone) {
+      try {
+        await sendOTP(toE164(customer.phone));
+        deliveryResults.sms = 'sent';
+        sentSomething = true;
+      } catch (smsError) {
+        deliveryResults.sms = `failed: ${smsError.message}`;
+      }
+    } else if (['sms', 'both'].includes(delivery) && !customer.phone) {
+      deliveryResults.sms = 'skipped: phone not available';
+    }
+
+    if (!sentSomething) {
+      return res.status(400).json({
+        error: {
+          message: 'Unable to send reset OTP to this customer. Check email/SMS configuration or customer contact details.',
+          status: 400
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Password reset OTP sent to customer successfully',
+      deliveryResults
+    });
+  } catch (error) {
+    console.error('Super admin send customer reset OTP error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   PATCH /api/super-admin/customers/:customerId/status
+router.patch('/customers/:customerId/status', async (req, res) => {
+  try {
+    const { isActive } = req.body;
+
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({ error: { message: 'isActive must be a boolean value', status: 400 } });
+    }
+
+    const customer = await User.findOneAndUpdate(
+      { _id: req.params.customerId, role: 'customer' },
+      { $set: { isActive } },
+      { new: true, runValidators: true }
+    ).select('name email isActive');
+
+    if (!customer) {
+      return res.status(404).json({ error: { message: 'Customer not found', status: 404 } });
+    }
+
+    res.json({
+      success: true,
+      message: `Customer account ${isActive ? 'activated' : 'deactivated'} successfully`,
+      customer
+    });
+  } catch (error) {
+    console.error('Super admin customer status update error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
   }
 });
