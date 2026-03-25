@@ -16,10 +16,10 @@ import WorkerSalaryRequest from '../models/WorkerSalaryRequest.js';
 import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/emailService.js';
 import { checkSlotAvailability } from '../utils/slotManagement.js';
 import {
-    evaluateWorkerEffectiveAvailability,
-    isWorkerAssignedToBooking,
-    isWorkerAvailableForTimeRange,
-    isWorkerEligibleForAssignment
+  evaluateWorkerEffectiveAvailability,
+  isWorkerAssignedToBooking,
+  isWorkerAvailableForTimeRange,
+  isWorkerEligibleForAssignment
 } from '../utils/workerAvailability.js';
 
 // Send temporary password via SMS (plain message, not Twilio Verify)

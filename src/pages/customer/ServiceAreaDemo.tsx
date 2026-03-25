@@ -8,8 +8,8 @@ import ServiceAreaMap from '@/components/ServiceAreaMap';
 import ServiceAvailabilityChecker from '@/components/ServiceAvailabilityChecker';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { authAPI } from '@/lib/api';
 import { getAvailableCities } from '@/data/serviceAreas';
+import { authAPI } from '@/lib/api';
 import { CheckCircle2, MapPin } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
