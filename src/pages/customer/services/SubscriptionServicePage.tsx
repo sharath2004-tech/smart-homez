@@ -5,15 +5,15 @@ import { useServiceBookingAvailability } from "@/hooks/useServiceBookingAvailabi
 import { authAPI, bookingsAPI, servicesAPI } from "@/lib/api";
 import { motion } from "framer-motion";
 import {
-  AlertCircle,
-  Calendar,
-  CheckCircle,
-  ChevronLeft,
-  Clock,
-  RefreshCw,
-  Star,
-  User,
-  Zap,
+    AlertCircle,
+    Calendar,
+    CheckCircle,
+    ChevronLeft,
+    Clock,
+    RefreshCw,
+    Star,
+    User,
+    Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -47,10 +47,10 @@ interface PendingPaymentBooking {
 }
 
 const FREQUENCY_OPTIONS = [
-  { id: "daily",     label: "Daily",      icon: "📆", desc: "Every day",      visits: 30 },
-  { id: "alt-days",  label: "Alt Days",   icon: "📅", desc: "Mon/Wed/Fri",    visits: 13 },
-  { id: "3-days",    label: "3× Week",    icon: "🗓️", desc: "Any 3 days",     visits: 12 },
-  { id: "weekly",    label: "Weekly",     icon: "📋", desc: "Once a week",    visits: 4  },
+  { id: "daily",     label: "Daily",      icon: "📆", desc: "Every day",      visits: 30, priceMultiplier: 1.0 },
+  { id: "alt-days",  label: "Alt Days",   icon: "📅", desc: "Mon/Wed/Fri",    visits: 13, priceMultiplier: 0.65 },
+  { id: "3-days",    label: "3× Week",    icon: "🗓️", desc: "Any 3 days",     visits: 12, priceMultiplier: 0.60 },
+  { id: "weekly",    label: "Weekly",     icon: "📋", desc: "Once a week",    visits: 4,  priceMultiplier: 0.35 },
 ];
 
 // Fallback hours list if service has no durationOptions
@@ -84,6 +84,10 @@ const SubscriptionServicePage = () => {
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [session1Hours, setSession1Hours] = useState(1);
   const [session2Time, setSession2Time] = useState("17:00");
+
+  // Custom amount editing
+  const [customAmountEnabled, setCustomAmountEnabled] = useState(false);
+  const [customAmount, setCustomAmount] = useState(0);
 
   const {
     availability,
@@ -145,13 +149,20 @@ const SubscriptionServicePage = () => {
 
   // Monthly price from durationOptions — authoritative source
   const durationOption = selectedService?.durationOptions?.find(d => d.hours === sessionHours);
-  const monthlyPrice = durationOption?.price ?? selectedService?.price ?? 0;
+  const baseMonthlyPrice = durationOption?.price ?? selectedService?.price ?? 0;
+
+  // Apply frequency-based pricing multiplier
+  const monthlyPrice = Math.round(baseMonthlyPrice * currentFreq.priceMultiplier);
+
+  // Use custom amount if enabled, otherwise use calculated price
+  const finalMonthlyPrice = customAmountEnabled ? customAmount : monthlyPrice;
 
   // Per-visit breakdown (Urban Company style)
-  const perVisitPrice = currentFreq.visits > 0 ? Math.round(monthlyPrice / currentFreq.visits) : 0;
+  const perVisitPrice = currentFreq.visits > 0 ? Math.round(finalMonthlyPrice / currentFreq.visits) : 0;
 
-  // MRP / savings from originalPrice
-  const originalMonthlyPrice = durationOption?.originalPrice ?? 0;
+  // MRP / savings from originalPrice (apply multiplier to original as well)
+  const baseOriginalPrice = durationOption?.originalPrice ?? 0;
+  const originalMonthlyPrice = Math.round(baseOriginalPrice * currentFreq.priceMultiplier);
   const monthlySavings = originalMonthlyPrice > monthlyPrice ? originalMonthlyPrice - monthlyPrice : 0;
   const savingsPct = originalMonthlyPrice > 0 && monthlySavings > 0
     ? Math.round((monthlySavings / originalMonthlyPrice) * 100)
@@ -212,7 +223,7 @@ const SubscriptionServicePage = () => {
         bookingDate: startDate,
         startTime: preferredTime,
         endTime: getEndTime(),
-        totalAmount: monthlyPrice,
+        totalAmount: finalMonthlyPrice,
         bookingType: "monthly",
         isSubscription: true,
         subscriptionDetails: {
@@ -251,7 +262,7 @@ const SubscriptionServicePage = () => {
 
       setPendingPaymentBooking({
         bookingId: createdBookingId,
-        amount: monthlyPrice,
+        amount: finalMonthlyPrice,
         serviceName: selectedService.name,
       });
       toast.success("Subscription created. Complete payment here and upload the payment screenshot.", { duration: 5000 });
@@ -461,28 +472,36 @@ const SubscriptionServicePage = () => {
                   </h2>
                   <p className="text-xs text-muted-foreground mb-3">How often should the maid visit?</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {FREQUENCY_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.id}
-                        onClick={() => setFrequency(opt.id)}
-                        className={`p-3 rounded-xl border-2 text-left transition-all ${
-                          frequency === opt.id
-                            ? "border-blue-400 bg-blue-50"
-                            : "border-border hover:border-blue-300"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xl">{opt.icon}</span>
-                          <span className={`font-semibold text-sm ${frequency === opt.id ? "text-blue-700" : "text-foreground"}`}>
-                            {opt.label}
-                          </span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">{opt.desc}</p>
-                        <p className={`text-xs font-medium mt-0.5 ${frequency === opt.id ? "text-blue-600" : "text-muted-foreground"}`}>
-                          ~{opt.visits} visits/mo
-                        </p>
-                      </button>
-                    ))}
+                    {FREQUENCY_OPTIONS.map((opt) => {
+                      const freqPrice = Math.round(baseMonthlyPrice * opt.priceMultiplier);
+                      return (
+                        <button
+                          key={opt.id}
+                          onClick={() => setFrequency(opt.id)}
+                          className={`p-3 rounded-xl border-2 text-left transition-all ${
+                            frequency === opt.id
+                              ? "border-blue-400 bg-blue-50"
+                              : "border-border hover:border-blue-300"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xl">{opt.icon}</span>
+                            <span className={`font-semibold text-sm ${frequency === opt.id ? "text-blue-700" : "text-foreground"}`}>
+                              {opt.label}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                          <div className="flex items-center justify-between mt-1">
+                            <p className={`text-xs font-medium ${frequency === opt.id ? "text-blue-600" : "text-muted-foreground"}`}>
+                              ~{opt.visits} visits/mo
+                            </p>
+                            <p className={`text-sm font-bold ${frequency === opt.id ? "text-blue-700" : "text-foreground"}`}>
+                              ₹{freqPrice.toLocaleString("en-IN")}/mo
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -492,14 +511,39 @@ const SubscriptionServicePage = () => {
                     <p className="text-sm font-semibold text-blue-900">Your Plan</p>
                     <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full">{currentFreq.label}</span>
                   </div>
-                  <div className="flex items-end gap-2">
-                    {originalMonthlyPrice > monthlyPrice && (
+                  <div className="flex items-end gap-2 flex-wrap">
+                    {!customAmountEnabled && originalMonthlyPrice > monthlyPrice && (
                       <span className="text-sm text-muted-foreground line-through mb-1">₹{originalMonthlyPrice.toLocaleString("en-IN")}</span>
                     )}
-                    <span className="text-3xl font-bold text-blue-700">₹{monthlyPrice.toLocaleString("en-IN")}</span>
-                    <span className="text-sm text-blue-600 mb-1">/month</span>
+                    {customAmountEnabled ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <span className="text-2xl font-bold text-blue-700">₹</span>
+                        <input
+                          type="number"
+                          value={customAmount}
+                          onChange={(e) => setCustomAmount(Math.max(0, parseInt(e.target.value) || 0))}
+                          className="text-2xl font-bold text-blue-700 bg-white border-2 border-blue-400 rounded-lg px-3 py-1 w-32"
+                          min="0"
+                        />
+                        <span className="text-sm text-blue-600 mb-1">/month</span>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="text-3xl font-bold text-blue-700">₹{finalMonthlyPrice.toLocaleString("en-IN")}</span>
+                        <span className="text-sm text-blue-600 mb-1">/month</span>
+                      </>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (!customAmountEnabled) setCustomAmount(monthlyPrice);
+                        setCustomAmountEnabled(!customAmountEnabled);
+                      }}
+                      className="ml-auto text-xs text-blue-600 hover:text-blue-800 underline mb-1"
+                    >
+                      {customAmountEnabled ? "Reset" : "Edit Amount"}
+                    </button>
                   </div>
-                  {monthlySavings > 0 && (
+                  {!customAmountEnabled && monthlySavings > 0 && (
                     <p className="text-xs font-medium text-green-600">
                       You save ₹{monthlySavings.toLocaleString("en-IN")}/mo ({savingsPct}% off vs. one-time)
                     </p>
