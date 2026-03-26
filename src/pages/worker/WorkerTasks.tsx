@@ -95,7 +95,7 @@ const WorkerTasks = () => {
       try {
         await bookingsAPI.update(taskId, { status: 'pending-review', completedAt: new Date().toISOString() });
         await fetchTasks();
-        alert('Task submitted for admin approval. Please upload payment proof.');
+        alert('Task submitted for admin approval. Upload completion photos if needed and wait for review.');
       } catch (error) {
         console.error('Error completing task:', error);
         alert('Failed to complete task');

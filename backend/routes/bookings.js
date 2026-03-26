@@ -1536,6 +1536,16 @@ router.post('/',
         console.log(`✅ Worker ${workerUser.name} verified for location ${nearbyLocation.apartmentName}`);
       }
 
+      if (isSubscription && !worker) {
+        return res.status(400).json({
+          error: {
+            message: 'A worker must be selected before creating a subscription booking.',
+            status: 400,
+            code: 'SUBSCRIPTION_WORKER_REQUIRED'
+          }
+        });
+      }
+
       const resolvedStartTime = isSubscription ? subscriptionDetails?.preferredTime : startTime;
       const bookingWindow = resolveBookingWindow({
         serviceConfig,
@@ -1614,7 +1624,7 @@ router.post('/',
       }
 
       // Prepare booking data with validated location reference
-      const initialAssignedWorker = isSubscription ? undefined : (worker || undefined);
+      const initialAssignedWorker = worker || undefined;
 
       const bookingData = {
         customer: req.user._id,
@@ -1635,10 +1645,13 @@ router.post('/',
         },
         notes,
         assignmentMethod: initialAssignedWorker ? 'manual' : 'auto',
+        assignedAt: initialAssignedWorker ? new Date() : null,
+        confirmedAt: initialAssignedWorker ? new Date() : null,
         bookingType: bookingType || 'oneTime',
         isRecurring: ['daily', 'weekly', 'monthly', 'recurring-short', 'monthly-subscription'].includes(bookingType),
         preferences: preferences || {},
         scheduledDurationMinutes: bookingWindow.durationMinutes,
+        paymentStatus: isSubscription ? 'paid' : 'pending',
         ...(serviceDetails && { serviceDetails })
       };
 
@@ -1652,15 +1665,17 @@ router.post('/',
 
         bookingData.subscription = {
           isSubscription: true,
-          activationStatus: 'payment_pending',
-          activatedAt: null,
+          activationStatus: 'active',
+          activatedAt: new Date(),
           subscriptionStartDate: normalizedSubscriptionStartDate,
           subscriptionEndDate: resolvedSubscriptionEndDate,
           autoRenewal: subscriptionDetails.autoRenewal || false,
           allowPause: subscriptionDetails.allowPause || false,
-          fixedWorker: undefined,
+          fixedWorker: worker || undefined,
           durationPerSession: subscriptionDetails.durationPerSession || 1,
           preferredTime: subscriptionDetails.preferredTime,
+          isPrepaid: true,
+          prepaidAmount: totalAmount,
           // Split sessions: store multiple time windows when customer splits work across day
           ...(subscriptionDetails.splitSessions?.length > 0 && {
             splitSessions: subscriptionDetails.splitSessions
@@ -1677,8 +1692,7 @@ router.post('/',
           preferredTime: subscriptionDetails.preferredTime
         };
         
-        // Subscription stays inactive until payment proof is uploaded.
-        bookingData.status = 'pending';
+        bookingData.status = initialAssignedWorker ? 'confirmed' : 'pending';
       }
 
       // Add recurring schedule if it's a recurring booking (non-subscription)
@@ -3150,7 +3164,9 @@ router.post('/:id/generate-start-qr',
           return res.status(400).json({
             error: {
               message: 'Start QR can only be generated within 20 minutes of the scheduled service start time.',
-              status: 400
+              status: 400,
+              availableFrom: earliestQrGenerationTime.toISOString(),
+              scheduledStart: scheduledStartTime.toISOString()
             }
           });
         }
@@ -3607,10 +3623,21 @@ router.post('/:id/upload-payment-proof',
       const isAssignedWorker = Boolean(booking.worker && booking.worker.toString() === req.user._id.toString());
       const isBookingCustomer = booking.customer?.toString() === req.user._id.toString();
       const isSubscriptionBooking = booking.subscription?.isSubscription || ['daily', 'weekly', 'biweekly', 'monthly', 'monthly-subscription'].includes(booking.bookingType);
+      const isPrepaidSubscription = Boolean(isSubscriptionBooking && (booking.subscription?.isPrepaid || booking.paymentStatus === 'paid'));
 
       if (!(isAdmin || (isWorker && isAssignedWorker) || (isCustomer && isBookingCustomer && isSubscriptionBooking))) {
         return res.status(403).json({ 
           error: { message: 'You are not authorized to upload payment proof for this booking', status: 403 } 
+        });
+      }
+
+      if (isCustomer && isBookingCustomer && isPrepaidSubscription) {
+        return res.status(400).json({
+          error: {
+            message: 'This subscription visit is already prepaid. Payment proof is not required.',
+            status: 400,
+            code: 'SUBSCRIPTION_PREPAID'
+          }
         });
       }
 
@@ -3639,12 +3666,6 @@ router.post('/:id/upload-payment-proof',
 
       const { transactionId, transactionTime } = req.body;
 
-      const wasPendingSubscriptionApproval = Boolean(
-        isCustomer
-        && isSubscriptionBooking
-        && booking.subscription?.activationStatus === 'payment_pending'
-      );
-
       booking.paymentProofs.push(createPaymentProofEntry({
         photoUrl,
         uploadedBy: req.user._id,
@@ -3653,29 +3674,14 @@ router.post('/:id/upload-payment-proof',
       }));
       syncLatestPaymentProof(booking);
 
-      if (isCustomer && isSubscriptionBooking) {
-        booking.paymentStatus = 'paid';
-        if (booking.subscription) {
-          booking.subscription.activationStatus = 'approval_pending';
-          booking.subscription.activatedAt = null;
-        }
-      }
-
       await booking.save();
 
       let assignmentRetryResult = null;
-      if (wasPendingSubscriptionApproval) {
-        await booking.populate('customer', 'name email');
-        await booking.populate('service', 'name');
-        await notifySubscriptionApprovalAdmins(booking, req.user);
-      }
 
       console.log(`✅ ${req.user.role} ${isReupload ? 're-uploaded' : 'uploaded'} payment proof:`, photoUrl, transactionId ? `| TxnID: ${transactionId}` : '');
 
       res.json({ 
-        message: wasPendingSubscriptionApproval
-          ? 'Payment proof uploaded successfully. Subscription is now waiting for admin approval.'
-          : 'Payment proof uploaded successfully',
+        message: 'Payment proof uploaded successfully',
         paymentProof: booking.paymentProof,
         paymentProofs: booking.paymentProofs,
         subscriptionActivated: false,
@@ -3940,6 +3946,11 @@ router.post('/:id/admin-approve',
         return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
       }
 
+      const isPrepaidSubscription = Boolean(
+        booking.subscription?.isSubscription
+        && (booking.subscription?.isPrepaid || booking.paymentStatus === 'paid')
+      );
+
       if (booking.status !== 'pending-review') {
         return res.status(400).json({
           error: { message: `Booking is not pending review. Current status: ${booking.status}`, status: 400 }
@@ -3949,7 +3960,7 @@ router.post('/:id/admin-approve',
       // Require payment proof to be uploaded before approval
       const latestPaymentProof = getLatestPaymentProofEntry(booking);
 
-      if (!latestPaymentProof || !latestPaymentProof.url) {
+      if (!isPrepaidSubscription && (!latestPaymentProof || !latestPaymentProof.url)) {
         return res.status(400).json({
           error: { message: 'Payment proof must be uploaded before admin can approve completion', status: 400 }
         });

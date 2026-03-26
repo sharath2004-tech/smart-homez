@@ -93,6 +93,11 @@ interface Task {
     transactionId?: string;
     transactionTime?: string;
   };
+  subscription?: {
+    isSubscription?: boolean;
+    isPrepaid?: boolean;
+    prepaidAmount?: number;
+  };
 }
 
 interface TaskDetailModalProps {
@@ -149,8 +154,10 @@ const getScheduledDurationSeconds = (bookingDate: string, startTime: string, end
 };
 
 const getScheduledStartTimestamp = (bookingDate: string, startTime: string) => {
-  const bookingDay = bookingDate.includes('T') ? bookingDate.split('T')[0] : bookingDate;
-  return new Date(`${bookingDay}T${startTime}`).getTime();
+  const scheduledStart = new Date(bookingDate);
+  const [hours, minutes] = startTime.split(':').map(Number);
+  scheduledStart.setHours(hours || 0, minutes || 0, 0, 0);
+  return scheduledStart.getTime();
 };
 
 const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) => {
@@ -515,6 +522,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
   const qrVisibleFromTimestamp = scheduledStartTimestamp - (START_QR_VISIBLE_LEAD_MINUTES * 60 * 1000);
   const startQrWindowOpen = Number.isFinite(scheduledStartTimestamp) && Date.now() >= qrVisibleFromTimestamp;
   const minutesUntilQrVisible = Math.max(0, Math.ceil((qrVisibleFromTimestamp - Date.now()) / 60000));
+  const isPrepaidSubscription = Boolean(task.subscription?.isSubscription && task.subscription?.isPrepaid);
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
@@ -816,6 +824,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
           )}
 
           {/* Payment Information */}
+          {!isPrepaidSubscription && (
           <div className="card-elevated p-5">
             <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
               <DollarSign className="w-5 h-5 text-primary" />
@@ -841,6 +850,19 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
               </div>
             </div>
           </div>
+          )}
+
+          {isPrepaidSubscription && (
+            <div className="card-elevated p-5 bg-emerald-50 border-2 border-emerald-200">
+              <h3 className="font-bold text-foreground mb-3 flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-emerald-600" />
+                Subscription already prepaid
+              </h3>
+              <p className="text-sm text-emerald-800">
+                Payment for this subscription was completed before worker assignment. No collection or payment-proof upload is needed for this visit.
+              </p>
+            </div>
+          )}
 
           {/* QR Code Section - Only team head generates start QR */}
           {task.status !== 'completed' && !task.actualStartTime && (
@@ -1025,7 +1047,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
           )}
 
           {/* Payment QR and proof - shown for pending-review and completed tasks */}
-          {(task.status === 'pending-review' || task.status === 'completed') && task.actualEndTime && (
+          {!isPrepaidSubscription && (task.status === 'pending-review' || task.status === 'completed') && task.actualEndTime && (
             <div className="space-y-4">
               {/* Review Banner - only for pending-review */}
               {task.status === 'pending-review' && (

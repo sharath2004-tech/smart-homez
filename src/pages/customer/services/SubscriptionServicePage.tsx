@@ -1,6 +1,5 @@
 import AppLayout from "@/components/AppLayout";
 import ServiceLocationCard from "@/components/ServiceLocationCard";
-import SubscriptionPaymentStep from "@/components/SubscriptionPaymentStep";
 import { useServiceBookingAvailability } from "@/hooks/useServiceBookingAvailability";
 import { authAPI, bookingsAPI, servicesAPI } from "@/lib/api";
 import { motion } from "framer-motion";
@@ -72,12 +71,6 @@ interface UserProfile {
   }[];
 }
 
-interface PendingPaymentBooking {
-  bookingId: string;
-  amount: number;
-  serviceName: string;
-}
-
 // Fallback hours list if service has no durationOptions
 const FALLBACK_HOURS = [1, 1.5, 2, 2.5, 3];
 
@@ -94,8 +87,6 @@ const SubscriptionServicePage = () => {
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [pendingPaymentBooking, setPendingPaymentBooking] = useState<PendingPaymentBooking | null>(null);
-
   // Booking params
   const [frequency, setFrequency] = useState<FrequencyOptionId>("daily");
   const [sessionHours, setSessionHours] = useState(1);
@@ -322,17 +313,12 @@ const SubscriptionServicePage = () => {
         },
         notes: specialInstructions,
       } as Record<string, unknown>);
-      const createdBookingId = response?.booking?._id;
-      if (!createdBookingId) {
+      if (!response?.booking?._id) {
         throw new Error("Subscription booking was created but booking ID is missing");
       }
 
-      setPendingPaymentBooking({
-        bookingId: createdBookingId,
-        amount: monthlyPrice,
-        serviceName: selectedService.name,
-      });
-      toast.success("Subscription created. Complete payment here and upload the payment screenshot.", { duration: 5000 });
+      toast.success("Subscription created and activated successfully.", { duration: 5000 });
+      navigate('/customer/subscriptions');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Booking failed");
     } finally {
@@ -394,25 +380,6 @@ const SubscriptionServicePage = () => {
           resolvedLocation={resolvedLocation}
         />
 
-        {pendingPaymentBooking ? (
-          <div className="space-y-4">
-            <SubscriptionPaymentStep
-              bookingId={pendingPaymentBooking.bookingId}
-              amount={pendingPaymentBooking.amount}
-              title={`Complete payment for ${pendingPaymentBooking.serviceName}`}
-              description="For subscription services, payment is completed inside the booking workflow. Use the company UPI details or QR code below, then upload the payment screenshot."
-              successLabel="Payment screenshot uploaded"
-              onPaymentSubmitted={() => navigate('/customer/subscriptions')}
-            />
-            <button
-              type="button"
-              onClick={() => navigate('/customer/subscriptions')}
-              className="w-full rounded-2xl border border-border px-4 py-3 text-sm font-semibold text-foreground hover:bg-muted"
-            >
-              Go to my subscriptions
-            </button>
-          </div>
-        ) : (
           <>
             {/* Step indicator */}
             <div className="flex items-center gap-2">
@@ -871,7 +838,6 @@ const SubscriptionServicePage = () => {
           </motion.div>
             )}
           </>
-        )}
       </div>
     </AppLayout>
   );

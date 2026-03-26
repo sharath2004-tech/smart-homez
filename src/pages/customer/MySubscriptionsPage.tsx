@@ -1,8 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import SubscriptionCalendar from "@/components/SubscriptionCalendar";
-import SubscriptionPaymentStep from "@/components/SubscriptionPaymentStep";
 import { authAPI, bookingsAPI } from "@/lib/api";
-import { AlertTriangle, Calendar, CalendarDays, CheckCircle, Clock, CreditCard, Edit2, MapPin, RefreshCw, User, UserCheck, XCircle } from "lucide-react";
+import { AlertTriangle, Calendar, CalendarDays, CheckCircle, Clock, Edit2, MapPin, RefreshCw, User, UserCheck, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -85,7 +84,6 @@ const MySubscriptionsPage = () => {
   const [subscriptions, setSubscriptions] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [changingWorker, setChangingWorker] = useState<string | null>(null);
-  const [openPaymentFor, setOpenPaymentFor] = useState<string | null>(null);
   const [availableWorkers, setAvailableWorkers] = useState<Worker[]>([]);
   const [loadingWorkers, setLoadingWorkers] = useState(false);
   const [expandedCalendars, setExpandedCalendars] = useState<Set<string>>(new Set());
@@ -350,13 +348,9 @@ const MySubscriptionsPage = () => {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {subscription.subscription?.activationStatus === 'payment_pending' ? (
-                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                        Awaiting payment proof
-                      </span>
-                    ) : subscription.subscription?.activationStatus === 'approval_pending' ? (
+                    {subscription.subscription?.activationStatus === 'approval_pending' ? (
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
-                        Awaiting admin approval
+                        Setup under review
                       </span>
                     ) : subscription.subscription?.isPaused ? (
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300">
@@ -447,14 +441,8 @@ const MySubscriptionsPage = () => {
                       </div>
                     ) : (
                       <div className="rounded-lg bg-muted/60 px-3 py-3 text-sm text-muted-foreground">
-                        {subscription.subscription?.activationStatus === 'payment_pending'
-                          ? subscription.paymentProof?.reviewStatus === 'rejected'
-                            ? `Your previous payment proof was rejected${subscription.paymentProof.reviewNotes ? `: ${subscription.paymentProof.reviewNotes}` : '. Please upload a new screenshot to continue.'}`
-                            : 'Upload the subscription payment proof to move this booking into admin review.'
-                          : subscription.subscription?.activationStatus === 'approval_pending'
-                            ? subscription.paymentProof?.reviewStatus === 'approved'
-                              ? 'Your payment proof has been approved. Admin or super admin will lock the worker and activate the subscription soon.'
-                              : 'Your payment proof is under review. Admin or super admin will approve the schedule and lock the worker soon.'
+                        {subscription.subscription?.activationStatus === 'approval_pending'
+                            ? 'Admin or super admin is reviewing your subscription schedule or worker setup.'
                             : 'We’re assigning your worker for this cycle now. Their profile will show up here as soon as the schedule is locked.'}
                       </div>
                     )}
@@ -517,50 +505,6 @@ const MySubscriptionsPage = () => {
                     {subscription.subscription?.durationPerSession || 1}hr per session
                   </span>
                 </div>
-
-                {subscription.subscription?.activationStatus === 'payment_pending' && (
-                  <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 space-y-3">
-                    <div className="flex items-start justify-between gap-3 flex-wrap">
-                      <div>
-                        <p className="text-sm font-semibold text-amber-900 flex items-center gap-2">
-                          <CreditCard className="w-4 h-4" /> Complete payment proof upload
-                        </p>
-                        <p className="text-xs text-amber-700 mt-1 max-w-2xl">
-                          If you left the booking page before uploading the screenshot, no worries — you can continue from here and submit the payment proof now.
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => setOpenPaymentFor((current) => current === subscription._id ? null : subscription._id)}
-                        className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600"
-                      >
-                        {openPaymentFor === subscription._id ? 'Hide payment form' : 'Continue payment'}
-                      </button>
-                    </div>
-
-                    {subscription.paymentProof?.reviewStatus === 'rejected' && (
-                      <div className="rounded-xl border border-red-200 bg-red-50 p-3">
-                        <p className="text-sm font-semibold text-red-700">Previous payment proof was rejected</p>
-                        <p className="text-xs text-red-600 mt-1">
-                          {subscription.paymentProof.reviewNotes || 'Please upload a clearer or correct screenshot to continue with subscription approval.'}
-                        </p>
-                      </div>
-                    )}
-
-                    {openPaymentFor === subscription._id && (
-                      <SubscriptionPaymentStep
-                        bookingId={subscription._id}
-                        amount={subscription.totalAmount}
-                        title={`Finish payment for ${subscription.service.name}`}
-                        description="You can safely resume payment from here anytime before approval. Upload the screenshot once the transfer is complete and the admin team will review it."
-                        successLabel="Payment proof uploaded. Waiting for admin approval"
-                        onPaymentSubmitted={async () => {
-                          setOpenPaymentFor(null);
-                          await fetchData();
-                        }}
-                      />
-                    )}
-                  </div>
-                )}
 
                 {/* Actions */}
                 <div className="flex gap-2">

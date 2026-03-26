@@ -1,6 +1,5 @@
 import AppLayout from "@/components/AppLayout";
 import { RecurringScheduleSetup } from "@/components/RecurringScheduleSetup";
-import SubscriptionPaymentStep from "@/components/SubscriptionPaymentStep";
 import { SubscriptionPlanSelector } from "@/components/SubscriptionPlanSelector";
 import { Button } from "@/components/ui/button";
 import { useServiceBookingAvailability } from "@/hooks/useServiceBookingAvailability";
@@ -30,11 +29,6 @@ interface RecurringSchedule {
   specificDays?: string[];
   autoRenewal: boolean;
   pauseAllowed: boolean;
-}
-
-interface PendingPaymentBooking {
-  bookingId: string;
-  amount: number;
 }
 
 const addHoursToTime = (time: string, hours: number) => {
@@ -67,7 +61,6 @@ export default function SubscriptionBookingPage() {
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
-  const [pendingPaymentBooking, setPendingPaymentBooking] = useState<PendingPaymentBooking | null>(null);
   const [currentStep, setCurrentStep] = useState<'plan' | 'schedule' | 'confirm'>('plan');
   
   const [selectedPlan, setSelectedPlan] = useState<'oneTime' | 'daily' | 'weekly' | 'biweekly' | 'monthly'>('oneTime');
@@ -217,16 +210,12 @@ export default function SubscriptionBookingPage() {
         return;
       }
 
-      const createdBookingId = response?.booking?._id;
-      if (!createdBookingId) {
+      if (!response?.booking?._id) {
         throw new Error('Subscription booking was created but booking ID is missing');
       }
 
-      setPendingPaymentBooking({
-        bookingId: createdBookingId,
-        amount: calculateTotalPrice(),
-      });
-      toast.success('Subscription created. Complete payment here and upload the payment screenshot.');
+      toast.success('Subscription created and activated successfully.');
+      navigate('/customer/subscriptions');
     } catch (error) {
       console.error('Error creating booking:', error);
       const err = error as { response?: { data?: { message?: string } } };
@@ -353,16 +342,7 @@ export default function SubscriptionBookingPage() {
 
         {/* Content */}
         <div className="bg-card rounded-xl border border-border p-4 sm:p-5 md:p-6 mb-6">
-          {pendingPaymentBooking ? (
-            <SubscriptionPaymentStep
-              bookingId={pendingPaymentBooking.bookingId}
-              amount={pendingPaymentBooking.amount}
-              title="Complete subscription payment"
-              description="For subscription services, payment must be completed in the booking workflow itself. Use the UPI link or QR and then upload the screenshot here."
-              successLabel="Payment screenshot uploaded"
-              onPaymentSubmitted={() => navigate('/customer/bookings')}
-            />
-          ) : currentStep === 'plan' && (
+          {currentStep === 'plan' && (
             <SubscriptionPlanSelector
               selectedPlan={selectedPlan}
               onPlanChange={(plan) => {
@@ -455,7 +435,7 @@ export default function SubscriptionBookingPage() {
         </div>
 
         {/* Actions */}
-        {!pendingPaymentBooking && <div className="flex gap-4 justify-between">
+        <div className="flex gap-4 justify-between">
           {currentStep !== 'plan' && (
             <Button
               type="button"
@@ -507,7 +487,7 @@ export default function SubscriptionBookingPage() {
               {!booking && !checkingAvailability && hasResolvedLocation && <CheckCircle2 className="w-5 h-5" />}
             </Button>
           )}
-        </div>}
+        </div>
       </div>
     </AppLayout>
   );

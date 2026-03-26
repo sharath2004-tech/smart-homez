@@ -1,7 +1,6 @@
 import BookingOrderPrint from "@/components/BookingOrderPrint";
 import ChatModal from "@/components/ChatModal";
 import EmbeddedQRScanner from "@/components/EmbeddedQRScanner";
-import SubscriptionPaymentStep from "@/components/SubscriptionPaymentStep";
 import WorkerProfilePreviewDialog from "@/components/WorkerProfilePreviewDialog";
 import { API_BASE_URL, bookingsAPI } from "@/lib/api";
 import html2pdf from "html2pdf.js";
@@ -925,45 +924,11 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                 {t('customer.bookings.payment')}
               </h3>
 
-              {booking.subscription?.isSubscription && booking.subscription.activationStatus === 'payment_pending' && (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 space-y-3">
-                  <div>
-                    <p className="text-sm font-semibold text-amber-900">Payment proof still pending</p>
-                    <p className="text-xs text-amber-700 mt-1">
-                      You can continue the subscription payment from this booking page. Upload the screenshot here and the admin team will review it before the worker is approved.
-                    </p>
-                  </div>
-
-                  {booking.paymentProof?.reviewStatus === 'rejected' && (
-                    <div className="rounded-xl border border-red-200 bg-red-50 p-3">
-                      <p className="text-sm font-semibold text-red-700">Previous payment proof was rejected</p>
-                      <p className="text-xs text-red-600 mt-1">
-                        {booking.paymentProof.reviewNotes || 'Please upload a clearer or correct payment screenshot to continue the subscription approval.'}
-                      </p>
-                    </div>
-                  )}
-
-                  <SubscriptionPaymentStep
-                    bookingId={booking._id}
-                    amount={booking.totalAmount}
-                    title={`Complete payment for ${booking.service?.name || 'subscription'}`}
-                    description="You left before uploading the payment proof, but you can safely continue from this booking now. Once the screenshot is uploaded, admin or super admin will review and approve the subscription."
-                    successLabel="Payment proof uploaded. Waiting for admin approval"
-                    onPaymentSubmitted={async () => {
-                      await fetchBookingDetail(true);
-                      onRefresh();
-                    }}
-                  />
-                </div>
-              )}
-
               {booking.subscription?.isSubscription && booking.subscription.activationStatus === 'approval_pending' && (
                 <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
-                  <p className="text-sm font-semibold text-orange-900">Payment proof uploaded</p>
+                  <p className="text-sm font-semibold text-orange-900">Subscription setup under review</p>
                   <p className="text-xs text-orange-700 mt-1">
-                    {booking.paymentProof?.reviewStatus === 'approved'
-                      ? 'Your payment proof has been approved. Admin or super admin will assign the worker and activate the subscription shortly.'
-                      : 'Your payment screenshot is under review. Admin or super admin will approve the subscription and assign the worker after verification.'}
+                    Admin or super admin is reviewing the schedule or worker setup for this subscription.
                   </p>
                 </div>
               )}

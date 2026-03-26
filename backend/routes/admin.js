@@ -3294,15 +3294,6 @@ router.post('/manual-assign',
       }
 
       if (booking.subscription?.isSubscription) {
-        if (['payment_pending', 'approval_pending'].includes(booking.subscription.activationStatus || '') && !booking.paymentProof?.url) {
-          return res.status(400).json({
-            error: {
-              message: 'Payment proof must be uploaded before approving and assigning this subscription.',
-              status: 400
-            }
-          });
-        }
-
         const subscriptionCoverage = await evaluateWorkerCoverageForSubscription(booking, worker);
         if (!subscriptionCoverage.isFullCoverage) {
           const firstConflict = subscriptionCoverage.conflictDetails[0];
