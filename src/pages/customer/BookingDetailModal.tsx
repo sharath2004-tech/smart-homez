@@ -70,10 +70,12 @@ interface BreakRequest {
 
 interface Booking {
   _id: string;
+  parentBooking?: string | null;
   service?: Service | null;
   bookingType?: string;
   subscription?: {
     isSubscription: boolean;
+    isPrepaid?: boolean;
     activationStatus?: 'payment_pending' | 'approval_pending' | 'active';
   };
   cartItems?: { name: string; qty?: number; totalPrice: number }[];
@@ -490,6 +492,16 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
   const paymentSummary = booking
     ? getCustomerBookingPaymentSummary(booking, calculateTotalAmount())
     : null;
+  const isSubscriptionPaymentSettled = Boolean(
+    booking?.subscription?.isSubscription
+    && (
+      booking.subscription?.isPrepaid
+      || booking.paymentStatus === 'paid'
+      || booking.paymentProof?.reviewStatus === 'approved'
+      || booking.subscription?.activationStatus === 'approval_pending'
+      || booking.subscription?.activationStatus === 'active'
+    )
+  );
 
   const handlePrintToPDF = () => {
     if (!printRef.current || !booking) return;
@@ -1004,7 +1016,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                 </div>
               )}
 
-              {booking.subscription?.isSubscription && booking.subscription.activationStatus === 'payment_pending' && !booking.paymentProof?.url && (
+              {booking.subscription?.isSubscription && booking.subscription.activationStatus === 'payment_pending' && !booking.paymentProof?.url && !isSubscriptionPaymentSettled && (
                 <SubscriptionPaymentStep
                   bookingId={booking._id}
                   amount={booking.totalAmount}

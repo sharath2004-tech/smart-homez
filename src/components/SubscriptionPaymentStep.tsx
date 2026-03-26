@@ -113,7 +113,16 @@ export default function SubscriptionPaymentStep({
       onPaymentSubmitted?.();
     } catch (error) {
       console.error("Failed to upload subscription payment proof", error);
-      toast.error(error instanceof Error ? error.message : "Failed to upload payment proof");
+      const message = error instanceof Error ? error.message : "Failed to upload payment proof";
+
+      if (message.toLowerCase().includes("already prepaid")) {
+        setSubmitted(true);
+        toast.success("This subscription is already prepaid. No additional payment proof is needed.");
+        onPaymentSubmitted?.();
+        return;
+      }
+
+      toast.error(message);
     } finally {
       setUploading(false);
     }

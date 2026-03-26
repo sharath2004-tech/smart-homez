@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 interface Booking {
   _id: string;
+  parentBooking?: string | null;
   bookingDate: string;
   startTime: string;
   endTime: string;
@@ -15,6 +16,7 @@ interface Booking {
   bookingType: string;
   subscription?: {
     isSubscription: boolean;
+    isPrepaid?: boolean;
     activationStatus?: 'payment_pending' | 'approval_pending' | 'active';
     fixedWorker?: string;
     autoRenewal?: boolean;
@@ -66,6 +68,7 @@ interface Booking {
     reviewStatus?: 'pending' | 'approved' | 'rejected';
     reviewNotes?: string | null;
   };
+  paymentStatus?: string;
 }
 
 interface Worker {
@@ -126,6 +129,7 @@ const MySubscriptionsPage = () => {
       const subscriptionBookings = (bookingsData.bookings || [])
         .filter((booking: Booking) => 
           booking.subscription?.isSubscription && 
+          !booking.parentBooking &&
           booking.status !== 'cancelled' &&
           booking.status !== 'completed'
         )
@@ -285,6 +289,14 @@ const MySubscriptionsPage = () => {
     );
   }
 
+  const isSubscriptionPaymentSettled = (subscription: Booking) => Boolean(
+    subscription.subscription?.isPrepaid
+    || subscription.paymentStatus === 'paid'
+    || subscription.paymentProof?.reviewStatus === 'approved'
+    || subscription.subscription?.activationStatus === 'approval_pending'
+    || subscription.subscription?.activationStatus === 'active'
+  );
+
   return (
     <AppLayout userType="customer" userName={profile?.name || "Customer"}>
       <div className="max-w-6xl mx-auto p-4 sm:p-6">
@@ -338,6 +350,10 @@ const MySubscriptionsPage = () => {
         ) : (
           <div className="space-y-6">
             {subscriptions.map((subscription) => (
+              (() => {
+                const paymentSettled = isSubscriptionPaymentSettled(subscription);
+
+                return (
               <div key={subscription._id} className="card-elevated p-4 sm:p-5 md:p-6">
                 {/* Subscription Header */}
                 <div className="flex items-start justify-between mb-4 pb-4 border-b border-border">
@@ -350,9 +366,13 @@ const MySubscriptionsPage = () => {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {subscription.subscription?.activationStatus === 'payment_pending' ? (
+                    {subscription.subscription?.activationStatus === 'payment_pending' && !paymentSettled ? (
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
                         Payment proof required
+                      </span>
+                    ) : paymentSettled ? (
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                        Paid
                       </span>
                     ) : subscription.subscription?.activationStatus === 'approval_pending' ? (
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
@@ -447,10 +467,12 @@ const MySubscriptionsPage = () => {
                       </div>
                     ) : (
                       <div className="rounded-lg bg-muted/60 px-3 py-3 text-sm text-muted-foreground">
-                        {subscription.subscription?.activationStatus === 'payment_pending'
+                        {subscription.subscription?.activationStatus === 'payment_pending' && !paymentSettled
                           ? 'Upload your payment proof to start the admin approval and worker assignment process.'
                           : subscription.subscription?.activationStatus === 'approval_pending'
                           ? 'Admin or super admin is reviewing your subscription schedule or worker setup.'
+                          : paymentSettled
+                            ? 'Payment is already verified for this subscription. Worker assignment and future visits will continue from this plan.'
                             : 'We’re assigning your worker for this cycle now. Their profile will show up here as soon as the schedule is locked.'}
                       </div>
                     )}
@@ -541,7 +563,7 @@ const MySubscriptionsPage = () => {
                   )}
                 </div>
 
-                {subscription.subscription?.activationStatus === 'payment_pending' && (
+                {subscription.subscription?.activationStatus === 'payment_pending' && !paymentSettled && (
                   <div className="mt-4 space-y-4">
                     {subscription.paymentProof?.reviewStatus === 'pending' && subscription.paymentProof?.url ? (
                       <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
@@ -565,6 +587,12 @@ const MySubscriptionsPage = () => {
                         />
                       </>
                     )}
+                  </div>
+                )}
+
+                {paymentSettled && (
+                  <div className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                    Subscription payment is already completed and verified. You do not need to upload payment proof again for this plan or its visits.
                   </div>
                 )}
 
@@ -728,6 +756,8 @@ const MySubscriptionsPage = () => {
                   </div>
                 )}
               </div>
+                );
+              })()
             ))}
           </div>
         )}
