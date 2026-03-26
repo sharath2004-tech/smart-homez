@@ -4,8 +4,8 @@ import 'dotenv/config';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { performance } from 'node:perf_hooks';
+import { fileURLToPath } from 'node:url';
 
 import mongoose from 'mongoose';
 
