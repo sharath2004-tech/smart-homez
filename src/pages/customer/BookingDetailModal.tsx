@@ -186,6 +186,8 @@ const STATUS_ORDER: Record<string, number> = {
   pending: 0, confirmed: 1, 'in-progress': 2, 'pending-review': 3, completed: 4,
 };
 
+const DEFAULT_PAYMENT_METHOD = 'qr-upi';
+
 const BookingStatusStepper = ({ status }: { status: string }) => {
   if (status === 'cancelled') {
     return (
@@ -981,7 +983,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                   <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
                     <div className="flex items-center justify-between gap-3 rounded-xl bg-background/70 px-3 py-2">
                       <span>Payment method</span>
-                      <span className="font-medium text-foreground uppercase">{booking.paymentMethod || 'qr-upi'}</span>
+                      <span className="font-medium text-foreground uppercase">{booking.paymentMethod || DEFAULT_PAYMENT_METHOD}</span>
                     </div>
                     {booking.paymentProof?.transactionId && (
                       <div className="flex items-center justify-between gap-3 rounded-xl bg-background/70 px-3 py-2">
