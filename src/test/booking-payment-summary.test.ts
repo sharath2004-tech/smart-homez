@@ -73,4 +73,38 @@ describe('getCustomerBookingPaymentSummary', () => {
       pendingAmount: null,
     });
   });
+
+  it('treats approved subscriptions awaiting worker setup as paid', () => {
+    expect(getCustomerBookingPaymentSummary({
+      subscription: {
+        isSubscription: true,
+        activationStatus: 'approval_pending',
+      },
+      paymentStatus: 'pending',
+      paymentProof: {
+        reviewStatus: 'approved',
+      },
+    }, 999)).toEqual({
+      label: 'Paid',
+      tone: 'success',
+      description: 'Payment has been verified. Admin will assign a worker to activate your subscription.',
+      pendingAmount: null,
+    });
+  });
+
+  it('treats active prepaid subscriptions as settled', () => {
+    expect(getCustomerBookingPaymentSummary({
+      subscription: {
+        isSubscription: true,
+        isPrepaid: true,
+        activationStatus: 'active',
+      },
+      paymentStatus: 'pending',
+    }, 2499)).toEqual({
+      label: 'Paid',
+      tone: 'success',
+      description: 'Subscription payment has been received and verified for this plan.',
+      pendingAmount: null,
+    });
+  });
 });

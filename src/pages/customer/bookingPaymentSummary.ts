@@ -4,6 +4,7 @@ type CustomerBookingPaymentSummaryInput = {
   paymentStatus?: string | null;
   subscription?: {
     isSubscription?: boolean;
+    isPrepaid?: boolean;
     activationStatus?: 'payment_pending' | 'approval_pending' | 'active' | string;
   } | null;
   paymentProof?: {
@@ -44,6 +45,26 @@ export const getCustomerBookingPaymentSummary = (
       tone: 'info',
       description: 'Payment proof was uploaded successfully and is waiting for admin review.',
       pendingAmount,
+    };
+  }
+
+  if (
+    booking.subscription?.isSubscription
+    && (
+      booking.subscription?.isPrepaid
+      || booking.paymentStatus === 'paid'
+      || booking.paymentProof?.reviewStatus === 'approved'
+      || booking.subscription.activationStatus === 'approval_pending'
+      || booking.subscription.activationStatus === 'active'
+    )
+  ) {
+    return {
+      label: 'Paid',
+      tone: 'success',
+      description: booking.subscription.activationStatus === 'approval_pending'
+        ? 'Payment has been verified. Admin will assign a worker to activate your subscription.'
+        : 'Subscription payment has been received and verified for this plan.',
+      pendingAmount: null,
     };
   }
 

@@ -327,6 +327,11 @@ export const scheduleRecurringBookings = async () => {
         const timestamps = assignment.worker
           ? { assignedAt: new Date(), confirmedAt: new Date() }
           : {};
+        const inheritedSubscription = booking.subscription
+          ? (typeof booking.subscription.toObject === 'function'
+              ? booking.subscription.toObject()
+              : { ...booking.subscription })
+          : null;
 
         const nextBooking = new Booking({
           customer: booking.customer._id,
@@ -347,6 +352,8 @@ export const scheduleRecurringBookings = async () => {
           serviceDetails: booking.serviceDetails,
           slotDetails: booking.slotDetails,
           workforce: booking.workforce,
+          paymentStatus: booking.paymentStatus,
+          ...(inheritedSubscription ? { subscription: inheritedSubscription } : {}),
           status: assignment.status,
           ...timestamps
         });

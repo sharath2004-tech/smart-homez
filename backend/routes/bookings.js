@@ -392,6 +392,56 @@ const syncLatestPaymentProof = (booking) => {
 
 const getSubscriptionRootBookingId = (booking) => booking.parentBooking || booking._id;
 
+const getSubscriptionPaymentSource = async (booking) => {
+  const rootBookingId = getSubscriptionRootBookingId(booking);
+
+  if (!rootBookingId || String(rootBookingId) === String(booking._id)) {
+    return booking;
+  }
+
+  const rootBooking = await Booking.findById(rootBookingId)
+    .select('paymentStatus paymentProof paymentProofs subscription recurringSchedule totalAmount')
+    .lean();
+
+  return rootBooking || booking;
+};
+
+const mergeInheritedSubscriptionState = (bookingResponse, subscriptionSource) => {
+  if (!subscriptionSource?.subscription?.isSubscription) {
+    return bookingResponse;
+  }
+
+  const inheritedPaymentProof = subscriptionSource.paymentProof?.url
+    ? subscriptionSource.paymentProof
+    : syncLatestPaymentProof({
+        paymentProof: bookingResponse.paymentProof,
+        paymentProofs: subscriptionSource.paymentProofs || []
+      });
+  const latestPaymentProof = getLatestPaymentProofEntry(subscriptionSource);
+  const paymentAlreadyApproved = Boolean(
+    subscriptionSource.paymentStatus === 'paid'
+    || latestPaymentProof?.reviewStatus === 'approved'
+  );
+
+  return {
+    ...bookingResponse,
+    subscription: {
+      ...(subscriptionSource.subscription || {}),
+      ...(bookingResponse.subscription || {}),
+      isSubscription: true,
+      activationStatus: bookingResponse.subscription?.activationStatus || subscriptionSource.subscription.activationStatus,
+      fixedWorker: bookingResponse.subscription?.fixedWorker || subscriptionSource.subscription.fixedWorker,
+      isPrepaid: bookingResponse.subscription?.isPrepaid ?? subscriptionSource.subscription.isPrepaid ?? paymentAlreadyApproved,
+      prepaidAmount: bookingResponse.subscription?.prepaidAmount ?? subscriptionSource.subscription.prepaidAmount ?? null,
+    },
+    recurringSchedule: bookingResponse.recurringSchedule || subscriptionSource.recurringSchedule || null,
+    paymentStatus: paymentAlreadyApproved
+      ? 'paid'
+      : (bookingResponse.paymentStatus || subscriptionSource.paymentStatus || 'pending'),
+    paymentProof: bookingResponse.paymentProof?.url ? bookingResponse.paymentProof : inheritedPaymentProof,
+  };
+};
+
 const getComparableScheduleFromBooking = (booking) => {
   const isRecurringPattern = Boolean(
     booking?.subscription?.isSubscription
@@ -1375,6 +1425,15 @@ router.get('/:id', authenticate, async (req, res) => {
         bookingResponse = booking.toObject();
         bookingResponse.service = deepCleaningService;
       }
+    }
+
+    if (booking.parentBooking) {
+      const subscriptionSource = await getSubscriptionPaymentSource(booking);
+      const baseResponse = typeof bookingResponse.toObject === 'function'
+        ? bookingResponse.toObject()
+        : bookingResponse;
+
+      bookingResponse = mergeInheritedSubscriptionState(baseResponse, subscriptionSource);
     }
 
     res.json({ booking: bookingResponse });
@@ -3862,7 +3921,17 @@ router.post('/:id/upload-payment-proof',
       const isAssignedWorker = Boolean(booking.worker && booking.worker.toString() === req.user._id.toString());
       const isBookingCustomer = booking.customer?.toString() === req.user._id.toString();
       const isSubscriptionBooking = booking.subscription?.isSubscription || ['daily', 'weekly', 'biweekly', 'monthly', 'monthly-subscription'].includes(booking.bookingType);
-      const isPrepaidSubscription = Boolean(isSubscriptionBooking && booking.paymentStatus === 'paid');
+      const subscriptionPaymentSource = isSubscriptionBooking
+        ? await getSubscriptionPaymentSource(booking)
+        : booking;
+      const subscriptionPaymentProof = getLatestPaymentProofEntry(subscriptionPaymentSource);
+      const isPrepaidSubscription = Boolean(
+        isSubscriptionBooking && (
+          subscriptionPaymentSource?.subscription?.isPrepaid
+          || subscriptionPaymentSource?.paymentStatus === 'paid'
+          || subscriptionPaymentProof?.reviewStatus === 'approved'
+        )
+      );
 
       if (!(isAdmin || (isWorker && isAssignedWorker) || (isCustomer && isBookingCustomer && isSubscriptionBooking))) {
         return res.status(403).json({ 
@@ -3870,10 +3939,10 @@ router.post('/:id/upload-payment-proof',
         });
       }
 
-      if (isCustomer && isBookingCustomer && isPrepaidSubscription) {
+      if (isPrepaidSubscription) {
         return res.status(400).json({
           error: {
-            message: 'This subscription visit is already prepaid. Payment proof is not required.',
+            message: 'This subscription visit is already prepaid. Payment proof is not required for this visit.',
             status: 400,
             code: 'SUBSCRIPTION_PREPAID'
           }
@@ -4214,9 +4283,17 @@ router.post('/:id/admin-approve',
         return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
       }
 
+      const subscriptionPaymentSource = booking.parentBooking
+        ? await getSubscriptionPaymentSource(booking)
+        : booking;
+      const subscriptionPaymentProof = getLatestPaymentProofEntry(subscriptionPaymentSource);
       const isPrepaidSubscription = Boolean(
-        booking.subscription?.isSubscription
-        && booking.paymentStatus === 'paid'
+        (booking.subscription?.isSubscription || subscriptionPaymentSource?.subscription?.isSubscription)
+        && (
+          subscriptionPaymentSource?.subscription?.isPrepaid
+          || subscriptionPaymentSource?.paymentStatus === 'paid'
+          || subscriptionPaymentProof?.reviewStatus === 'approved'
+        )
       );
 
       if (booking.status !== 'pending-review') {
@@ -4236,6 +4313,10 @@ router.post('/:id/admin-approve',
 
       booking.status = 'completed';
       booking.completedAt = new Date();
+
+      if (isPrepaidSubscription) {
+        booking.paymentStatus = 'paid';
+      }
 
       // Mark all photos as verified
       if (booking.completionPhotos && booking.completionPhotos.length > 0) {
