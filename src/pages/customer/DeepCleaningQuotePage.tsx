@@ -3,6 +3,14 @@ import { Building2, CheckCircle, ChevronDown, Home, Loader2, MapPin, Phone, Uten
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
+const SIZE_UNITS = [
+  { value: "sq.ft", label: "Sq. ft" },
+  { value: "sq.yd", label: "Sq. yards" },
+  { value: "sq.m", label: "Sq. meters" },
+  { value: "gaj", label: "Gaj" },
+  { value: "acre", label: "Acres" },
+];
+
 const PROPERTY_TYPES = [
   { value: "villa",            label: "Villa",            icon: Home,          desc: "Independent house with garden" },
   { value: "bungalow",         label: "Bungalow",         icon: Home,          desc: "Large single-storey house" },
@@ -18,7 +26,7 @@ const DeepCleaningQuotePage = () => {
   const [form, setForm] = useState({
     name: "", phone: "", email: "",
     propertyType: "", propertyTypeCustom: "",
-    placeSize: "", city: "", message: ""
+    placeSize: "", placeSizeUnit: "sq.ft", city: "", message: ""
   });
   const [cities, setCities] = useState<CityOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -53,6 +61,7 @@ const DeepCleaningQuotePage = () => {
     if (!form.city.trim()) { setError("Please select your city"); return; }
     if (!form.placeSize.trim()) { setError("Please enter the place size"); return; }
 
+    const placeSizeCombined = `${form.placeSize.trim()} ${form.placeSizeUnit}`.trim();
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
@@ -62,7 +71,7 @@ const DeepCleaningQuotePage = () => {
           "Content-Type": "application/json",
           ...(token && { Authorization: `Bearer ${token}` }),
         },
-        body: JSON.stringify({ ...form, phone: "+91" + digits }),
+        body: JSON.stringify({ ...form, placeSize: placeSizeCombined, phone: "+91" + digits }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error?.message || "Submission failed");
@@ -226,13 +235,28 @@ const DeepCleaningQuotePage = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">Place Size <span className="text-destructive">*</span></label>
-                <input
-                  className="input-clean"
-                  placeholder="e.g. 2000 sq ft, 3 floors, 10 rooms"
-                  value={form.placeSize}
-                  onChange={set("placeSize")}
-                  required
-                />
+                <div className="flex gap-2">
+                  <input
+                    className="input-clean flex-1"
+                    placeholder="e.g. 2000"
+                    value={form.placeSize}
+                    onChange={set("placeSize")}
+                    required
+                  />
+                  <div className="relative min-w-[130px]">
+                    <select
+                      className="input-clean pr-10 appearance-none"
+                      value={form.placeSizeUnit}
+                      onChange={set("placeSizeUnit")}
+                    >
+                      {SIZE_UNITS.map(unit => (
+                        <option key={unit.value} value={unit.value}>{unit.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Pick a unit so you don’t have to type it manually.</p>
               </div>
             </div>
 

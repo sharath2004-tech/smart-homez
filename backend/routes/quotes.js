@@ -126,18 +126,24 @@ router.get('/', authenticate, authorize('admin', 'super_admin'), async (req, res
   try {
     let quotes;
     if (req.user.role === 'super_admin') {
-      quotes = await QuoteRequest.find().sort({ createdAt: -1 });
+      quotes = await QuoteRequest.find().sort({ createdAt: -1 }).lean();
     } else {
       // Admin: filter by cities in their assigned locations
       const locationIds = req.user.adminProfile?.assignedLocations?.map(l => l.locationId) || [];
       if (locationIds.length === 0) {
-        return res.json({ success: true, data: [] });
+        quotes = await QuoteRequest.find().sort({ createdAt: -1 }).lean();
+      } else {
+        const locations = await Location.find({ _id: { $in: locationIds } }).select('city');
+        const cities = [...new Set(locations.map(l => l.city).filter(Boolean))];
+
+        if (cities.length === 0) {
+          quotes = await QuoteRequest.find().sort({ createdAt: -1 }).lean();
+        } else {
+          quotes = await QuoteRequest.find({
+            city: { $in: cities.map(c => new RegExp(`^${c}$`, 'i')) }
+          }).sort({ createdAt: -1 }).lean();
+        }
       }
-      const locations = await Location.find({ _id: { $in: locationIds } }).select('city');
-      const cities = [...new Set(locations.map(l => l.city).filter(Boolean))];
-      quotes = await QuoteRequest.find({
-        city: { $in: cities.map(c => new RegExp(`^${c}$`, 'i')) }
-      }).sort({ createdAt: -1 });
     }
     res.json({ success: true, data: quotes });
   } catch (error) {

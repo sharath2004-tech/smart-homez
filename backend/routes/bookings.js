@@ -2594,7 +2594,6 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
 
     const oldDate = currentBookingDate;
     const oldWorker = booking.worker;
-    
     // Update booking schedule - update bookingDate and startTime
     booking.bookingDate = new Date(parsedNewDate);
     booking.startTime = newTime;
@@ -2620,8 +2619,66 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
       // Note: If booking crosses midnight, you may want to track this differently
       // For now, we'll just modulo the hours
     }
-    
-    booking.endTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+
+    const newEndTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+    booking.endTime = newEndTime;
+    booking.scheduledDurationMinutes = durationMinutes;
+
+    // Hard guard: prevent overlapping bookings for the same customer or assigned workers
+    const proposedSchedule = {
+      frequency: booking.subscription?.isSubscription
+        ? (booking.recurringSchedule?.frequency || booking.bookingType || 'daily')
+        : (booking.isRecurring ? (booking.bookingType || 'daily') : 'daily'),
+      startDate: newScheduledDate,
+      endDate: booking.subscription?.subscriptionEndDate
+        || booking.recurringSchedule?.endDate
+        || newScheduledDate,
+      selectedDays: booking.recurringSchedule?.selectedDays || [],
+      startTime: newTime,
+      endTime: newEndTime,
+    };
+
+    const customerConflict = await findScheduleConflict({
+      match: { customer: booking.customer?._id || booking.customer },
+      proposedSchedule,
+      excludeBookingId: booking._id,
+    });
+
+    if (customerConflict) {
+      const conflictDate = new Date(customerConflict.overlappingDate).toLocaleDateString();
+      return res.status(400).json({
+        error: {
+          message: `This schedule overlaps with another booking on ${conflictDate} between ${customerConflict.booking.startTime} and ${customerConflict.booking.endTime}. Please pick a different time.`,
+          status: 400,
+          code: 'CUSTOMER_BOOKING_CONFLICT',
+        }
+      });
+    }
+
+    const workerIds = getAssignedWorkerIdsForBooking(booking);
+    for (const workerId of workerIds) {
+      const workerConflict = await findScheduleConflict({
+        match: {
+          $or: [
+            { worker: workerId },
+            { 'supportStaff.worker': workerId }
+          ]
+        },
+        proposedSchedule,
+        excludeBookingId: booking._id,
+      });
+
+      if (workerConflict) {
+        const conflictDate = new Date(workerConflict.overlappingDate).toLocaleDateString();
+        return res.status(400).json({
+          error: {
+            message: `Assigned staff already has a booking on ${conflictDate} between ${workerConflict.booking.startTime} and ${workerConflict.booking.endTime}. Please choose another time.`,
+            status: 400,
+            code: 'WORKER_BOOKING_CONFLICT',
+          }
+        });
+      }
+    }
     
     // Check if original worker is available at new time
     // checkWorkerAvailability expects duration in hours

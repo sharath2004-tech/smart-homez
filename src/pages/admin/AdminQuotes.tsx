@@ -53,7 +53,12 @@ const AdminQuotes = () => {
     try {
       setLoading(true);
       const data = await api.get("/quotes");
-      setQuotes(data.data || []);
+      const payload = Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.quotes)
+          ? data.quotes
+          : [];
+      setQuotes(payload);
     } catch (err) {
       console.error("Failed to fetch quotes:", err);
     } finally {
