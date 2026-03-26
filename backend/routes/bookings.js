@@ -1416,6 +1416,10 @@ router.post('/',
         estimatedDuration
       } = req.body;
 
+      if (isSubscription && !worker && subscriptionDetails?.fixedWorker) {
+        worker = subscriptionDetails.fixedWorker;
+      }
+
       // Resolve service: if not provided, find a matching active service by bookingType
       if (!service) {
         const serviceTypeMap = {
@@ -1676,16 +1680,6 @@ router.post('/',
         }
 
         console.log(`✅ Worker ${workerUser.name} verified for location ${nearbyLocation.apartmentName}`);
-      }
-
-      if (isSubscription && !worker) {
-        return res.status(400).json({
-          error: {
-            message: 'A worker must be selected before creating a subscription booking.',
-            status: 400,
-            code: 'SUBSCRIPTION_WORKER_REQUIRED'
-          }
-        });
       }
 
       const resolvedStartTime = isSubscription ? subscriptionDetails?.preferredTime : startTime;
