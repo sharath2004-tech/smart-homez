@@ -291,6 +291,7 @@ const SubscriptionServicePage = () => {
   };
 
   const selectedStartWeekday = getWeekdayForDate(startDate);
+  const selectedDayLabels = selectedDays.map((day) => DAYS_OF_WEEK.find((item) => item.value === day)?.label || day);
 
   const toggleSelectedDay = (day: string) => {
     setSelectedDays((currentDays) => {
@@ -328,6 +329,49 @@ const SubscriptionServicePage = () => {
     }
 
     return true;
+  };
+
+  const renderDaySelector = ({ showStartDateHint = false }: { showStartDateHint?: boolean } = {}) => {
+    if (!requiresDaySelection) {
+      return null;
+    }
+
+    return (
+      <div className="space-y-3">
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">Choose service days</label>
+          <p className="text-xs text-muted-foreground">
+            {requiredSelectedDayCount
+              ? `Select exactly ${requiredSelectedDayCount} day${requiredSelectedDayCount > 1 ? 's' : ''}. Worker assignment and future blocking will follow only these weekdays.`
+              : 'Select the weekdays for this subscription.'}
+          </p>
+        </div>
+        <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+          {DAYS_OF_WEEK.map((day) => (
+            <button
+              key={day.value}
+              type="button"
+              onClick={() => toggleSelectedDay(day.value)}
+              className={`rounded-xl border-2 px-3 py-2 text-sm font-medium transition-all ${
+                selectedDays.includes(day.value)
+                  ? "border-blue-400 bg-blue-50 text-blue-700"
+                  : "border-border hover:border-blue-300 text-foreground"
+              }`}
+            >
+              {day.label}
+            </button>
+          ))}
+        </div>
+        <div className="rounded-xl bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-700">
+          {selectedDayLabels.length > 0
+            ? `Selected days: ${selectedDayLabels.join(", ")}`
+            : "No days selected yet."}
+          {showStartDateHint && selectedStartWeekday && (
+            <div className="mt-1">Start date day: {DAYS_OF_WEEK.find((day) => day.value === selectedStartWeekday)?.label}</div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   const handleBook = async () => {
@@ -619,6 +663,8 @@ const SubscriptionServicePage = () => {
                   </div>
                 </div>
 
+                {renderDaySelector()}
+
                 {/* Urban Company style pricing card */}
                 <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-300 space-y-3">
                   <div className="flex items-center justify-between">
@@ -659,6 +705,11 @@ const SubscriptionServicePage = () => {
                     <span className="text-xs text-blue-700 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Pause anytime</span>
                     <span className="text-xs text-blue-700 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Priority booking</span>
                   </div>
+                  {selectedDayLabels.length > 0 && (
+                    <div className="pt-1 border-t border-blue-200 text-xs text-blue-700">
+                      Service days: <span className="font-medium">{selectedDayLabels.join(', ')}</span>
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -710,42 +761,7 @@ const SubscriptionServicePage = () => {
               </div>
             </div>
 
-            {requiresDaySelection && (
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Choose service days</label>
-                  <p className="text-xs text-muted-foreground">
-                    {requiredSelectedDayCount
-                      ? `Select exactly ${requiredSelectedDayCount} day${requiredSelectedDayCount > 1 ? 's' : ''}. Worker assignment and future blocking will follow only these weekdays.`
-                      : 'Select the weekdays for this subscription.'}
-                  </p>
-                </div>
-                <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
-                  {DAYS_OF_WEEK.map((day) => (
-                    <button
-                      key={day.value}
-                      type="button"
-                      onClick={() => toggleSelectedDay(day.value)}
-                      className={`rounded-xl border-2 px-3 py-2 text-sm font-medium transition-all ${
-                        selectedDays.includes(day.value)
-                          ? "border-blue-400 bg-blue-50 text-blue-700"
-                          : "border-border hover:border-blue-300 text-foreground"
-                      }`}
-                    >
-                      {day.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="rounded-xl bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-700">
-                  {selectedDays.length > 0
-                    ? `Selected days: ${selectedDays.map((day) => DAYS_OF_WEEK.find((item) => item.value === day)?.label || day).join(", ")}`
-                    : "No days selected yet."}
-                  {selectedStartWeekday && (
-                    <div className="mt-1">Start date day: {DAYS_OF_WEEK.find((day) => day.value === selectedStartWeekday)?.label}</div>
-                  )}
-                </div>
-              </div>
-            )}
+            {renderDaySelector({ showStartDateHint: true })}
 
             {/* Session Split — available when 2h or more */}
             {sessionHours >= 2 && (

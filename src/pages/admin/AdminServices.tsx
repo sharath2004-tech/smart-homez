@@ -185,6 +185,13 @@ const DEFAULT_SUBSCRIPTION_FREQUENCY_CONFIGS: SubscriptionFrequencyConfig[] = [
   { id: 'weekly', label: 'Weekly', description: 'Once a week', visits: 4, priceMultiplier: 0.35, sortOrder: 3, isActive: true },
 ];
 
+const SUBSCRIPTION_FREQUENCY_ICONS: Record<SubscriptionFrequencyId, string> = {
+  daily: '📆',
+  'alt-days': '📅',
+  '3-days': '🗓️',
+  weekly: '📋',
+};
+
 const createDefaultDurationTier = (): ServiceDurationOption => ({
   hours: 1,
   price: 0,
@@ -1558,12 +1565,7 @@ const AdminServices = () => {
                     <div>
                       <p className="text-xs font-semibold text-foreground mb-2">Allowed Frequencies</p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {[
-                          { id: 'daily',    label: '📆 Daily',      desc: 'Every day · 30 visits/mo' },
-                          { id: 'alt-days', label: '📅 Alt Days',   desc: 'Mon/Wed/Fri · 13 visits/mo' },
-                          { id: '3-days',   label: '🗓️ 3× Week',   desc: 'Any 3 days · ~12 visits/mo' },
-                          { id: 'weekly',   label: '📋 Weekly',     desc: 'Once a week · 4 visits/mo' },
-                        ].map(freq => {
+                        {frequencyConfigs.map((freq) => {
                           const allowed = formData.subscriptionOptions?.allowedFrequencies || [];
                           const isChecked = allowed.includes(freq.id);
                           return (
@@ -1580,8 +1582,8 @@ const AdminServices = () => {
                                 className="mt-0.5 w-3.5 h-3.5 accent-purple-600"
                               />
                               <div>
-                                <p className="text-xs font-semibold text-foreground">{freq.label}</p>
-                                <p className="text-xs text-muted-foreground">{freq.desc}</p>
+                                <p className="text-xs font-semibold text-foreground">{SUBSCRIPTION_FREQUENCY_ICONS[freq.id]} {freq.label}</p>
+                                <p className="text-xs text-muted-foreground">{freq.description} · ~{freq.visits} visits/mo</p>
                               </div>
                             </label>
                           );

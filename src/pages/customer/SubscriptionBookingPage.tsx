@@ -144,6 +144,12 @@ export default function SubscriptionBookingPage() {
         toast.error(t('subscription.pleaseSelectStartDate'));
         return;
       }
+
+      if (selectedPlan === 'weekly' && (schedule.specificDays?.length || 0) === 0) {
+        toast.error('Please select your preferred days for the weekly plan.');
+        return;
+      }
+
       setCurrentStep('confirm');
     }
   };
@@ -170,6 +176,11 @@ export default function SubscriptionBookingPage() {
       const location = userLocation ? JSON.parse(userLocation) : null;
       const isSubscriptionBooking = selectedPlan !== 'oneTime';
       const selectedDays = selectedPlan === 'weekly' ? (schedule.specificDays || []) : [];
+
+      if (selectedPlan === 'weekly' && selectedDays.length === 0) {
+        toast.error('Please select your preferred days for the weekly plan.');
+        return;
+      }
 
       const bookingData = {
         service: service?._id,
@@ -389,7 +400,11 @@ export default function SubscriptionBookingPage() {
               selectedPlan={selectedPlan}
               onPlanChange={(plan) => {
                 setSelectedPlan(plan);
-                setSchedule(prev => ({ ...prev, frequency: plan === 'oneTime' ? 'daily' : plan }));
+                setSchedule(prev => ({
+                  ...prev,
+                  frequency: plan === 'oneTime' ? 'daily' : plan,
+                  specificDays: plan === 'weekly' ? (prev.specificDays || []) : []
+                }));
               }}
               basePrice={service?.price || 0}
             />

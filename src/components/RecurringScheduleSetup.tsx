@@ -38,6 +38,7 @@ export function RecurringScheduleSetup({ schedule, onChange, bookingType }: Recu
 
   const toggleDay = (day: string) => {
     const currentDays = schedule.specificDays || [];
+
     const newDays = currentDays.includes(day)
       ? currentDays.filter(d => d !== day)
       : [...currentDays, day];

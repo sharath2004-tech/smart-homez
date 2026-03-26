@@ -124,7 +124,7 @@ const BookServicePage = () => {
   const [subscriptionEndDate, setSubscriptionEndDate] = useState('');
   const [preferredTime, setPreferredTime] = useState('09:00');
   const [durationPerSession, setDurationPerSession] = useState(1);
-  const [selectedDays, setSelectedDays] = useState<string[]>(['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [autoRenewal, setAutoRenewal] = useState(true);
   const [allowPause, setAllowPause] = useState(true);
 
@@ -369,7 +369,7 @@ const BookServicePage = () => {
         return;
       }
       if (bookingType === 'weekly' && selectedDays.length === 0) {
-        toast.error('Please select at least one day for weekly subscription');
+        toast.error('Please select your preferred days for weekly subscription');
         return;
       }
       if (isSubscriptionStartTimeExpired(subscriptionStartDate, preferredTime)) {
@@ -1195,7 +1195,7 @@ const BookServicePage = () => {
                     <p className="text-xs text-muted-foreground mt-2">
                       {selectedDays.length > 0 
                         ? `Selected: ${selectedDays.length} day${selectedDays.length > 1 ? 's' : ''} per week`
-                        : 'Please select at least one day'
+                        : 'Please select your preferred day(s)'
                       }
                     </p>
                   </div>
