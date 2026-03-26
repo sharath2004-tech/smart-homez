@@ -348,7 +348,11 @@ const MySubscriptionsPage = () => {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {subscription.subscription?.activationStatus === 'approval_pending' ? (
+                    {subscription.subscription?.activationStatus === 'payment_pending' ? (
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                        Payment proof required
+                      </span>
+                    ) : subscription.subscription?.activationStatus === 'approval_pending' ? (
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
                         Setup under review
                       </span>
@@ -441,8 +445,10 @@ const MySubscriptionsPage = () => {
                       </div>
                     ) : (
                       <div className="rounded-lg bg-muted/60 px-3 py-3 text-sm text-muted-foreground">
-                        {subscription.subscription?.activationStatus === 'approval_pending'
-                            ? 'Admin or super admin is reviewing your subscription schedule or worker setup.'
+                        {subscription.subscription?.activationStatus === 'payment_pending'
+                          ? 'Upload your payment proof to start the admin approval and worker assignment process.'
+                          : subscription.subscription?.activationStatus === 'approval_pending'
+                          ? 'Admin or super admin is reviewing your subscription schedule or worker setup.'
                             : 'We’re assigning your worker for this cycle now. Their profile will show up here as soon as the schedule is locked.'}
                       </div>
                     )}

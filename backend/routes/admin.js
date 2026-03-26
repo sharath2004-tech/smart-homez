@@ -3318,17 +3318,18 @@ router.post('/manual-assign',
       booking.assignedAt = new Date();
       if (booking.subscription?.isSubscription) {
         booking.subscription.fixedWorker = workerId;
-        if (['payment_pending', 'approval_pending'].includes(booking.subscription.activationStatus || '')) {
-          booking.subscription.activationStatus = 'active';
-          booking.subscription.activatedAt = new Date();
-        }
         const latestPaymentProof = getLatestPaymentProof(booking);
-        if (latestPaymentProof?.url) {
-          latestPaymentProof.verified = true;
-          latestPaymentProof.reviewStatus = 'approved';
-          latestPaymentProof.reviewedBy = latestPaymentProof.reviewedBy || req.user._id;
-          latestPaymentProof.reviewedAt = latestPaymentProof.reviewedAt || new Date();
-          booking.paymentProof = latestPaymentProof;
+        const hasApprovedPayment = Boolean(
+          booking.paymentStatus === 'paid'
+          || latestPaymentProof?.reviewStatus === 'approved'
+        );
+
+        if (hasApprovedPayment) {
+          booking.subscription.activationStatus = 'active';
+          booking.subscription.activatedAt = booking.subscription.activatedAt || new Date();
+        } else {
+          booking.subscription.activationStatus = 'payment_pending';
+          booking.subscription.activatedAt = null;
         }
       }
       booking.notes = `${booking.notes || ''}${booking.notes ? '\n' : ''}${previousWorkerId ? 'Reassigned' : 'Assigned'} by ${req.user.role}${reason ? `: ${reason}` : ''}`;

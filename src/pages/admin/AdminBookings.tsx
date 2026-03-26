@@ -1136,7 +1136,7 @@ const AdminBookings = () => {
                 <p><span className="font-semibold text-sky-800">Current worker:</span> {reassignBooking.worker?.name || 'Unassigned'}</p>
                 <p className="text-muted-foreground mt-1">
                   {reassignBooking.subscription?.isSubscription
-                    ? 'Workers are ranked by how many upcoming subscription visits they can cover before you approve the plan.'
+                    ? 'Workers are ranked by how many upcoming subscription visits they can cover. Assigning a worker will not activate the subscription until payment proof is approved.'
                     : 'Only workers available for this booking time and location are shown.'}
                 </p>
               </div>
@@ -1190,7 +1190,7 @@ const AdminBookings = () => {
                       disabled={teamActionLoading}
                       className="px-3 py-2 text-xs font-semibold rounded-lg bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-60"
                     >
-                      {teamActionLoading ? 'Saving…' : reassignBooking.subscription?.isSubscription ? 'Approve & Assign' : 'Assign'}
+                      {teamActionLoading ? 'Saving…' : reassignBooking.subscription?.isSubscription ? 'Assign Worker' : 'Assign'}
                     </button>
                   </div>
                 ))}

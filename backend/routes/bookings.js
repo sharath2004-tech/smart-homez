@@ -1787,7 +1787,7 @@ router.post('/',
         isRecurring: ['daily', 'weekly', 'monthly', 'recurring-short', 'monthly-subscription'].includes(bookingType),
         preferences: preferences || {},
         scheduledDurationMinutes: bookingWindow.durationMinutes,
-        paymentStatus: isSubscription ? 'paid' : 'pending',
+        paymentStatus: 'pending',
         ...(serviceDetails && { serviceDetails })
       };
 
@@ -1801,8 +1801,8 @@ router.post('/',
 
         bookingData.subscription = {
           isSubscription: true,
-          activationStatus: 'active',
-          activatedAt: new Date(),
+          activationStatus: 'payment_pending',
+          activatedAt: null,
           subscriptionStartDate: normalizedSubscriptionStartDate,
           subscriptionEndDate: resolvedSubscriptionEndDate,
           autoRenewal: subscriptionDetails.autoRenewal || false,
@@ -3828,7 +3828,7 @@ router.post('/:id/upload-payment-proof',
       const isAssignedWorker = Boolean(booking.worker && booking.worker.toString() === req.user._id.toString());
       const isBookingCustomer = booking.customer?.toString() === req.user._id.toString();
       const isSubscriptionBooking = booking.subscription?.isSubscription || ['daily', 'weekly', 'biweekly', 'monthly', 'monthly-subscription'].includes(booking.bookingType);
-      const isPrepaidSubscription = Boolean(isSubscriptionBooking && (booking.subscription?.isPrepaid || booking.paymentStatus === 'paid'));
+      const isPrepaidSubscription = Boolean(isSubscriptionBooking && booking.paymentStatus === 'paid');
 
       if (!(isAdmin || (isWorker && isAssignedWorker) || (isCustomer && isBookingCustomer && isSubscriptionBooking))) {
         return res.status(403).json({ 
@@ -3954,8 +3954,12 @@ router.post('/:id/payment-proof-review',
       syncLatestPaymentProof(booking);
 
       if (action === 'approve') {
-        if (booking.subscription?.isSubscription && booking.subscription.activationStatus === 'payment_pending') {
-          booking.subscription.activationStatus = 'approval_pending';
+        booking.paymentStatus = 'paid';
+
+        if (booking.subscription?.isSubscription) {
+          const hasAssignedWorker = Boolean(booking.subscription.fixedWorker || booking.worker);
+          booking.subscription.activationStatus = hasAssignedWorker ? 'active' : 'approval_pending';
+          booking.subscription.activatedAt = hasAssignedWorker ? (booking.subscription.activatedAt || new Date()) : null;
         }
       } else {
         booking.paymentStatus = 'pending';
@@ -4153,7 +4157,7 @@ router.post('/:id/admin-approve',
 
       const isPrepaidSubscription = Boolean(
         booking.subscription?.isSubscription
-        && (booking.subscription?.isPrepaid || booking.paymentStatus === 'paid')
+        && booking.paymentStatus === 'paid'
       );
 
       if (booking.status !== 'pending-review') {

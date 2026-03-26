@@ -214,7 +214,7 @@ export default function SubscriptionBookingPage() {
         throw new Error('Subscription booking was created but booking ID is missing');
       }
 
-      toast.success('Subscription created and activated successfully.');
+      toast.success('Subscription created. Upload payment proof and wait for admin approval to activate it.');
       navigate('/customer/subscriptions');
     } catch (error) {
       console.error('Error creating booking:', error);
