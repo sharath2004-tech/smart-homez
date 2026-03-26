@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { settingsAPI } from "@/lib/api";
 import { cropQRFromImage } from "@/utils/cropQRFromImage";
-import { Building, CreditCard, FileText, Lock, Save, Upload } from "lucide-react";
+import { Building, CreditCard, DollarSign, FileText, Lock, Save, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -53,58 +53,101 @@ interface Settings {
   };
 }
 
+const createDefaultSettings = (): Settings => ({
+  payment: {
+    upiId: 'healthyhomez@upi',
+    upiName: 'Healthy Homez',
+    qrCodeImage: null
+  },
+  company: {
+    name: 'Healthy Homez',
+    phone: '',
+    email: '',
+    address: '',
+    defaultState: 'Maharashtra'
+  },
+  booking: {
+    overtimeRate: 2.5,
+    cancellationHours: 24,
+    serviceRadius: 500
+  },
+  earnings: {
+    platformCommissionRate: 0,
+    bookingConvenienceFee: 0,
+    minPayoutAmount: 500,
+    payoutSchedule: 'weekly',
+    instantPayoutFee: 0,
+    payoutDay: 1,
+    autoPayoutEnabled: false
+  },
+  subscriptions: {
+    workerPlans: {
+      basic: { price: 0, commissionRate: 0 },
+      pro: { price: 0, commissionRate: 0 },
+      premium: { price: 0, commissionRate: 0 }
+    },
+    customerPlans: {
+      basic: { price: 0, discountRate: 0 },
+      premium: { price: 0, discountRate: 0 }
+    }
+  },
+  cancellationPolicy: {
+    fullRefundHours: 1,
+    partialRefundPercentage: 0,
+    partialRefundHours: 0.5,
+    cancellationCharge: 100,
+    noRefundHours: 0
+  }
+});
+
+const mergeSettingsWithDefaults = (incoming?: Partial<Settings> | null): Settings => {
+  const defaults = createDefaultSettings();
+
+  return {
+    payment: { ...defaults.payment, ...(incoming?.payment || {}) },
+    company: { ...defaults.company, ...(incoming?.company || {}) },
+    booking: { ...defaults.booking, ...(incoming?.booking || {}) },
+    earnings: { ...defaults.earnings, ...(incoming?.earnings || {}) },
+    subscriptions: {
+      workerPlans: {
+        basic: {
+          ...defaults.subscriptions.workerPlans.basic,
+          ...(incoming?.subscriptions?.workerPlans?.basic || {})
+        },
+        pro: {
+          ...defaults.subscriptions.workerPlans.pro,
+          ...(incoming?.subscriptions?.workerPlans?.pro || {})
+        },
+        premium: {
+          ...defaults.subscriptions.workerPlans.premium,
+          ...(incoming?.subscriptions?.workerPlans?.premium || {})
+        }
+      },
+      customerPlans: {
+        basic: {
+          ...defaults.subscriptions.customerPlans.basic,
+          ...(incoming?.subscriptions?.customerPlans?.basic || {})
+        },
+        premium: {
+          ...defaults.subscriptions.customerPlans.premium,
+          ...(incoming?.subscriptions?.customerPlans?.premium || {})
+        }
+      }
+    },
+    cancellationPolicy: {
+      ...defaults.cancellationPolicy,
+      ...(incoming?.cancellationPolicy || {})
+    }
+  };
+};
+
 const AdminSettings = () => {
   const navigate = useNavigate();
   const { role, name, isSuperAdmin } = useAdminRole();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingQR, setUploadingQR] = useState(false);
-  const [settings, setSettings] = useState<Settings>({
-    payment: {
-      upiId: 'healthyhomez@upi',
-      upiName: 'Healthy Homez',
-      qrCodeImage: null
-    },
-    company: {
-      name: 'Healthy Homez',
-      phone: '',
-      email: '',
-      address: '',
-      defaultState: 'Maharashtra'
-    },
-    booking: {
-      overtimeRate: 2.5,
-      cancellationHours: 24,
-      serviceRadius: 500
-    },
-    earnings: {
-      platformCommissionRate: 0,
-      bookingConvenienceFee: 0,
-      minPayoutAmount: 500,
-      payoutSchedule: 'weekly',
-      instantPayoutFee: 0,
-      payoutDay: 1,
-      autoPayoutEnabled: false
-    },
-    subscriptions: {
-      workerPlans: {
-        basic: { price: 0, commissionRate: 0 },
-        pro: { price: 0, commissionRate: 0 },
-        premium: { price: 0, commissionRate: 0 }
-      },
-      customerPlans: {
-        basic: { price: 0, discountRate: 0 },
-        premium: { price: 0, discountRate: 0 }
-      }
-    },
-    cancellationPolicy: {
-      fullRefundHours: 1,
-      partialRefundPercentage: 0,
-      partialRefundHours: 0.5,
-      cancellationCharge: 100,
-      noRefundHours: 0
-    }
-  });
+  const [settings, setSettings] = useState<Settings>(createDefaultSettings());
 
   useEffect(() => {
     fetchSettings();
@@ -114,7 +157,7 @@ const AdminSettings = () => {
     try {
       setLoading(true);
       const response = await settingsAPI.getAdminSettings();
-      setSettings(response.settings);
+      setSettings(mergeSettingsWithDefaults(response.settings));
     } catch (error) {
       console.error('Error fetching settings:', error);
       alert('Failed to load settings');
