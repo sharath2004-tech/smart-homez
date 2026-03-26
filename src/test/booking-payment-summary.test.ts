@@ -29,6 +29,25 @@ describe('getCustomerBookingPaymentSummary', () => {
     });
   });
 
+  it('shows verification pending for uploaded subscription proof still awaiting review', () => {
+    expect(getCustomerBookingPaymentSummary({
+      subscription: {
+        isSubscription: true,
+        activationStatus: 'payment_pending',
+      },
+      paymentStatus: 'pending',
+      paymentProof: {
+        url: '/uploads/completion-photos/proof.png',
+        reviewStatus: 'pending',
+      },
+    }, 4500)).toEqual({
+      label: 'Verification pending',
+      tone: 'info',
+      description: 'Payment proof was uploaded successfully and is waiting for admin review.',
+      pendingAmount: 4500,
+    });
+  });
+
   it('uses rejection notes for rejected payment proof', () => {
     expect(getCustomerBookingPaymentSummary({
       paymentStatus: 'worker-confirmed',

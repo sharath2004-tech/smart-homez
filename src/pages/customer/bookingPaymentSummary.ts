@@ -7,6 +7,7 @@ type CustomerBookingPaymentSummaryInput = {
     activationStatus?: 'payment_pending' | 'approval_pending' | 'active' | string;
   } | null;
   paymentProof?: {
+    url?: string | null;
     reviewStatus?: 'pending' | 'approved' | 'rejected' | string;
     reviewNotes?: string | null;
   } | null;
@@ -27,21 +28,30 @@ export const getCustomerBookingPaymentSummary = (
 ): CustomerBookingPaymentSummary => {
   const pendingAmount = totalAmountDue > 0 ? roundAmount(totalAmountDue) : null;
 
-  if (booking.subscription?.isSubscription && booking.subscription.activationStatus === 'payment_pending') {
-    return {
-      label: 'Pending payment',
-      tone: 'warning',
-      description: 'Complete or upload the subscription payment so admin can review and activate your plan.',
-      pendingAmount,
-    };
-  }
-
   if (booking.paymentProof?.reviewStatus === 'rejected') {
     return {
       label: 'Payment rejected',
       tone: 'danger',
       description: booking.paymentProof.reviewNotes?.trim()
         || 'The uploaded payment proof was rejected. Please upload a fresh proof or contact support.',
+      pendingAmount,
+    };
+  }
+
+  if (booking.paymentProof?.url && booking.paymentProof?.reviewStatus === 'pending') {
+    return {
+      label: 'Verification pending',
+      tone: 'info',
+      description: 'Payment proof was uploaded successfully and is waiting for admin review.',
+      pendingAmount,
+    };
+  }
+
+  if (booking.subscription?.isSubscription && booking.subscription.activationStatus === 'payment_pending') {
+    return {
+      label: 'Pending payment',
+      tone: 'warning',
+      description: 'Complete or upload the subscription payment so admin can review and activate your plan.',
       pendingAmount,
     };
   }
