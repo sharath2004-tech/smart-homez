@@ -339,6 +339,120 @@ const getLatestPaymentProof = (booking) => {
   return booking.paymentProof?.url ? booking.paymentProof : null;
 };
 
+const toMinutesOfDay = (timeValue) => {
+  if (typeof timeValue !== 'string' || !/^\d{2}:\d{2}$/.test(timeValue)) {
+    return null;
+  }
+
+  const [hours, minutes] = timeValue.split(':').map(Number);
+  if (
+    !Number.isInteger(hours)
+    || !Number.isInteger(minutes)
+    || hours < 0
+    || hours > 23
+    || minutes < 0
+    || minutes > 59
+  ) {
+    return null;
+  }
+
+  return (hours * 60) + minutes;
+};
+
+const hasWindowOverlap = (leftStart, leftEnd, rightStart, rightEnd) => {
+  const leftStartMinutes = toMinutesOfDay(leftStart);
+  const leftEndMinutes = toMinutesOfDay(leftEnd);
+  const rightStartMinutes = toMinutesOfDay(rightStart);
+  const rightEndMinutes = toMinutesOfDay(rightEnd);
+
+  if (
+    leftStartMinutes === null
+    || leftEndMinutes === null
+    || rightStartMinutes === null
+    || rightEndMinutes === null
+  ) {
+    return false;
+  }
+
+  return leftStartMinutes < rightEndMinutes && leftEndMinutes > rightStartMinutes;
+};
+
+const getBookingRootId = (booking) => (booking?.parentBooking || booking?._id)?.toString?.() || null;
+
+const buildComparableOccurrenceWindows = async (booking, { maxOccurrences = 45 } = {}) => {
+  if (booking?.subscription?.isSubscription && !booking?.parentBooking) {
+    return buildSubscriptionOccurrenceWindows(booking, { maxOccurrences });
+  }
+
+  return [
+    {
+      bookingId: booking._id,
+      bookingDate: startOfDay(booking.bookingDate),
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      source: 'single'
+    }
+  ];
+};
+
+const findCustomerFutureConflictForSubscription = async (booking, { maxOccurrences = 45 } = {}) => {
+  if (!booking?.subscription?.isSubscription) {
+    return null;
+  }
+
+  const targetWindows = await buildComparableOccurrenceWindows(booking, { maxOccurrences });
+  if (!targetWindows.length) {
+    return null;
+  }
+
+  const rootBookingId = getBookingRootId(booking);
+  const today = startOfDay(new Date());
+  const customerId = booking.customer?._id || booking.customer;
+
+  const candidateFilter = {
+    customer: customerId,
+    status: { $in: ['pending', 'confirmed', 'in-progress'] },
+    bookingDate: { $gte: today },
+    _id: { $ne: booking._id }
+  };
+
+  if (rootBookingId) {
+    candidateFilter.$and = [
+      { _id: { $ne: rootBookingId } },
+      { parentBooking: { $ne: rootBookingId } }
+    ];
+  }
+
+  const candidateBookings = await Booking.find(candidateFilter)
+    .select('_id parentBooking bookingDate startTime endTime subscription recurringSchedule')
+    .lean();
+
+  for (const candidate of candidateBookings) {
+    const candidateWindows = await buildComparableOccurrenceWindows(candidate, { maxOccurrences });
+
+    for (const targetWindow of targetWindows) {
+      for (const candidateWindow of candidateWindows) {
+        if (!sameDay(targetWindow.bookingDate, candidateWindow.bookingDate)) {
+          continue;
+        }
+
+        if (hasWindowOverlap(targetWindow.startTime, targetWindow.endTime, candidateWindow.startTime, candidateWindow.endTime)) {
+          return {
+            conflictingBookingId: candidate._id,
+            date: targetWindow.bookingDate,
+            startTime: targetWindow.startTime,
+            endTime: targetWindow.endTime,
+            conflictingStartTime: candidateWindow.startTime,
+            conflictingEndTime: candidateWindow.endTime,
+          };
+        }
+      }
+    }
+  }
+
+  return null;
+};
+
 // ============== SUPER ADMIN ROUTES ==============
 
 // @route   POST /api/admin/locations
@@ -3309,6 +3423,21 @@ router.post('/manual-assign',
             }
           });
         }
+
+        const latestPaymentProof = getLatestPaymentProof(booking);
+        const hasApprovedPayment = Boolean(
+          booking.paymentStatus === 'paid'
+          || latestPaymentProof?.reviewStatus === 'approved'
+        );
+
+        if (!hasApprovedPayment) {
+          return res.status(400).json({
+            error: {
+              message: 'Approve the customer payment proof before assigning a worker to this subscription.',
+              status: 400
+            }
+          });
+        }
       }
 
       const previousWorkerId = booking.worker?.toString() || null;
@@ -3326,8 +3455,14 @@ router.post('/manual-assign',
         );
 
         if (hasApprovedPayment) {
-          booking.subscription.activationStatus = 'active';
-          booking.subscription.activatedAt = booking.subscription.activatedAt || new Date();
+          const customerScheduleConflict = await findCustomerFutureConflictForSubscription(booking);
+          if (customerScheduleConflict) {
+            booking.subscription.activationStatus = 'approval_pending';
+            booking.subscription.activatedAt = null;
+          } else {
+            booking.subscription.activationStatus = 'active';
+            booking.subscription.activatedAt = booking.subscription.activatedAt || new Date();
+          }
         } else {
           booking.subscription.activationStatus = 'payment_pending';
           booking.subscription.activatedAt = null;
@@ -3351,7 +3486,7 @@ router.post('/manual-assign',
           title: 'Subscription worker assigned',
           message: booking.subscription.activationStatus === 'active'
             ? `${booking.worker?.name || 'A worker'} has been assigned to your subscription and the plan is now active.`
-            : `${booking.worker?.name || 'A worker'} has been assigned to your subscription. It will activate after payment proof approval is completed.`,
+            : `${booking.worker?.name || 'A worker'} has been assigned to your subscription. It will activate after admin completes schedule verification.`,
           priority: 'high',
           data: {
             bookingId: booking._id,
@@ -3364,7 +3499,7 @@ router.post('/manual-assign',
           userId: workerId,
           type: 'booking',
           title: 'Subscription assigned to you',
-          message: `You have been assigned to ${booking.service?.name || 'a subscription'}${booking.subscription.activationStatus === 'active' ? ' and it is active.' : '. The customer payment review is still pending.'}`,
+          message: `You have been assigned to ${booking.service?.name || 'a subscription'}${booking.subscription.activationStatus === 'active' ? ' and it is active.' : '. Activation is pending admin schedule verification.'}`,
           priority: 'medium',
           data: {
             bookingId: booking._id,

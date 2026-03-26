@@ -502,6 +502,11 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
       || booking.subscription?.activationStatus === 'active'
     )
   );
+  const shouldShowSubscriptionPaymentStep = Boolean(
+    booking?.subscription?.isSubscription
+    && !isSubscriptionPaymentSettled
+    && booking.subscription?.activationStatus !== 'active'
+  );
 
   const handlePrintToPDF = () => {
     if (!printRef.current || !booking) return;
@@ -1016,13 +1021,17 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                 </div>
               )}
 
-              {booking.subscription?.isSubscription && booking.subscription.activationStatus === 'payment_pending' && !booking.paymentProof?.url && !isSubscriptionPaymentSettled && (
+              {shouldShowSubscriptionPaymentStep && (
                 <SubscriptionPaymentStep
                   bookingId={booking._id}
                   amount={booking.totalAmount}
-                  title="Upload subscription payment proof"
-                  description="This subscription is waiting for payment proof. Complete the payment and upload the screenshot here so your region admin or super admin can review it and continue the activation process."
-                  successLabel="Payment proof uploaded. Waiting for admin review"
+                  title={booking.paymentProof?.reviewStatus === 'rejected' ? 'Re-upload subscription payment proof' : 'Upload subscription payment proof'}
+                  description={booking.paymentProof?.reviewStatus === 'rejected'
+                    ? 'Your previous payment proof was rejected. Please upload a clear payment screenshot so admin can verify and continue activation.'
+                    : 'This subscription is waiting for payment proof. Complete the payment and upload the screenshot here so your region admin or super admin can review it and continue the activation process.'}
+                  successLabel={booking.paymentProof?.reviewStatus === 'rejected'
+                    ? 'Updated payment proof uploaded. Waiting for admin review'
+                    : 'Payment proof uploaded. Waiting for admin review'}
                   onPaymentSubmitted={() => {
                     fetchBookingDetail();
                     onRefresh();

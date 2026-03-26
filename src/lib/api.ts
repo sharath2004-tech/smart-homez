@@ -245,7 +245,24 @@ async function apiCall(endpoint: string, options: RequestInit = {}, timeoutMs = 
         const errorMessages = data.errors.map((err: { msg: string }) => err.msg).join(', ');
         throw new Error(errorMessages || 'Validation failed');
       }
-      throw new Error(data.message || data.error?.message || 'API request failed');
+
+      const error = new Error(data.message || data.error?.message || 'API request failed') as Error & {
+        status?: number;
+        code?: string;
+        isExpectedBusinessError?: boolean;
+      };
+      error.status = response.status;
+      error.code = data.error?.code || data.code;
+
+      const expectedBusinessCodes = new Set([
+        'CUSTOMER_BOOKING_CONFLICT',
+        'WORKER_BOOKING_CONFLICT',
+        'SLOT_JUST_FILLED',
+        'NO_WORKER_AVAILABLE_FOR_SLOT',
+      ]);
+      error.isExpectedBusinessError = expectedBusinessCodes.has(error.code || '') || response.status === 409;
+
+      throw error;
     }
 
     return data;
@@ -253,7 +270,12 @@ async function apiCall(endpoint: string, options: RequestInit = {}, timeoutMs = 
     if (error instanceof Error && error.name === 'AbortError') {
       throw new Error('Request timed out. The server may be starting up — please try again.');
     }
-    console.error(`API Error [${endpoint}]:`, error);
+    const typedError = error as Error & { isExpectedBusinessError?: boolean };
+    if (typedError.isExpectedBusinessError) {
+      console.warn(`API Notice [${endpoint}]:`, error);
+    } else {
+      console.error(`API Error [${endpoint}]:`, error);
+    }
     throw error;
   } finally {
     clearTimeout(timerId);

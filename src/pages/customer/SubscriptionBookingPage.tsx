@@ -234,9 +234,22 @@ export default function SubscriptionBookingPage() {
       });
       toast.success('Subscription created. Complete the payment below and upload the payment proof to continue.');
     } catch (error) {
-      console.error('Error creating booking:', error);
-      const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err.response?.data?.message || 'Failed to create booking');
+      const rawMessage = error instanceof Error
+        ? error.message
+        : 'Failed to create booking';
+      const isExpectedConflict =
+        rawMessage.toLowerCase().includes('already have another booking')
+        || rawMessage.toLowerCase().includes('already has a booking')
+        || rawMessage.toLowerCase().includes('conflict')
+        || rawMessage.toLowerCase().includes('slot was just taken');
+
+      if (isExpectedConflict) {
+        console.warn('Subscription booking blocked by schedule conflict:', rawMessage);
+      } else {
+        console.error('Error creating booking:', error);
+      }
+
+      toast.error(rawMessage);
     } finally {
       setBooking(false);
     }

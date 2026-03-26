@@ -502,7 +502,13 @@ const findScheduleConflict = async ({
       'subscription.isSubscription': true,
       parentBooking: null,
       bookingDate: { $lte: comparisonEnd },
-      status: { $in: ['pending', 'confirmed', 'in-progress'] },
+      $or: [
+        { status: { $in: ['pending', 'confirmed', 'in-progress'] } },
+        {
+          status: 'completed',
+          'subscription.activationStatus': 'active'
+        }
+      ],
       $or: [
         { 'subscription.subscriptionEndDate': null },
         { 'subscription.subscriptionEndDate': { $gte: comparisonStart } },
@@ -4055,6 +4061,7 @@ router.post('/:id/payment-proof-review',
 
       const { action, reason } = req.body;
       const trimmedReason = typeof reason === 'string' ? reason.trim() : '';
+      let activationConflict = null;
 
       latestPaymentProof.reviewStatus = action === 'approve' ? 'approved' : 'rejected';
       latestPaymentProof.reviewNotes = trimmedReason || null;
@@ -4068,8 +4075,20 @@ router.post('/:id/payment-proof-review',
 
         if (booking.subscription?.isSubscription) {
           const hasAssignedWorker = Boolean(booking.subscription.fixedWorker || booking.worker);
-          booking.subscription.activationStatus = hasAssignedWorker ? 'active' : 'approval_pending';
-          booking.subscription.activatedAt = hasAssignedWorker ? (booking.subscription.activatedAt || new Date()) : null;
+
+          if (hasAssignedWorker) {
+            const proposedSchedule = getComparableScheduleFromBooking(booking);
+            const subscriptionRootId = getSubscriptionRootBookingId(booking);
+            activationConflict = await findScheduleConflict({
+              match: { customer: booking.customer },
+              proposedSchedule,
+              excludeBookingId: subscriptionRootId,
+            });
+          }
+
+          const canActivate = hasAssignedWorker && !activationConflict;
+          booking.subscription.activationStatus = canActivate ? 'active' : 'approval_pending';
+          booking.subscription.activatedAt = canActivate ? (booking.subscription.activatedAt || new Date()) : null;
         }
       } else {
         booking.paymentStatus = 'pending';
@@ -4089,7 +4108,7 @@ router.post('/:id/payment-proof-review',
           message: action === 'approve'
             ? (booking.subscription.activationStatus === 'active'
                 ? `Payment proof for ${booking.service?.name || 'your subscription'} was approved and the subscription is now active.`
-                : `Payment proof for ${booking.service?.name || 'your subscription'} was approved. Admin will assign a worker after checking future availability.`)
+                : `Payment proof for ${booking.service?.name || 'your subscription'} was approved. Admin will complete worker and future schedule checks before activation.`)
             : `Payment proof for ${booking.service?.name || 'your subscription'} was rejected.${trimmedReason ? ` Reason: ${trimmedReason}` : ''}`,
           priority: 'high',
           data: {
@@ -4108,7 +4127,15 @@ router.post('/:id/payment-proof-review',
           subscription: booking.subscription,
           paymentProof: booking.paymentProof,
           paymentProofs: booking.paymentProofs
-        }
+        },
+        activationConflict: activationConflict
+          ? {
+              bookingId: activationConflict.booking?._id || null,
+              date: activationConflict.overlappingDate,
+              startTime: activationConflict.booking?.startTime || null,
+              endTime: activationConflict.booking?.endTime || null,
+            }
+          : null,
       });
     } catch (error) {
       console.error('Payment proof review error:', error);

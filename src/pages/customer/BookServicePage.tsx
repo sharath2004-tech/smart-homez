@@ -498,8 +498,19 @@ const BookServicePage = () => {
         navigate('/customer/bookings');
       }
     } catch (error: unknown) {
-      console.error('Booking error:', error);
       const rawMsg = error instanceof Error ? error.message : 'Failed to create booking';
+      const isExpectedConflict =
+        rawMsg.toLowerCase().includes('already have another booking')
+        || rawMsg.toLowerCase().includes('already has a booking')
+        || rawMsg.toLowerCase().includes('conflict')
+        || rawMsg.toLowerCase().includes('slot was just taken');
+
+      if (isExpectedConflict) {
+        console.warn('Booking blocked by schedule conflict:', rawMsg);
+      } else {
+        console.error('Booking error:', error);
+      }
+
       // Surface holiday rejection with extra context
       if (rawMsg.toLowerCase().includes('holiday') || rawMsg.toLowerCase().includes('not available on')) {
         toast.error(rawMsg, { duration: 6000 });
