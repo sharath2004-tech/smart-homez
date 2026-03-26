@@ -1100,8 +1100,8 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                   )}
                 </div>
 
-              {/* Step 3: Payment Proof Upload - Show after payment QR is displayed */}
-              {paymentQRImage && (
+              {/* Step 3: Payment Proof Upload - Show after payment QR is displayed (not for subscription bookings) */}
+              {paymentQRImage && !task.subscription?.isSubscription && (
                 <div className="card-elevated p-5 bg-gradient-to-br from-amber-50 to-yellow-50 border-2 border-amber-200">
                   <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
                     <Camera className="w-5 h-5 text-amber-600" />
