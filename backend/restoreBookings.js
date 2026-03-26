@@ -89,7 +89,7 @@ const backupFile = process.argv[2];
 if (!backupFile) {
   console.log('Usage: node restoreBookings.js <backup-file-path>');
   console.log('\nExample:');
-  console.log('  node restoreBookings.js ./backups/bookings-backup-2026-03-13T16-39-06.json');
+  console.log('  node restoreBookings.js ./backups/bookings-backup-YYYY-MM-DDTHH-mm-ss.json');
   process.exit(1);
 }
 
