@@ -34,7 +34,7 @@ router.post('/', async (req, res) => {
     if (authHeader?.startsWith('Bearer ')) {
       try {
         const decoded = jwt.verify(authHeader.replace('Bearer ', ''), process.env.JWT_SECRET);
-        userId = decoded.id || decoded._id || null;
+        userId = decoded.userId || decoded.id || decoded._id || null;
       } catch { /* ignore invalid/expired token */ }
     }
 
@@ -112,7 +112,26 @@ router.post('/', async (req, res) => {
 // @access  Private (customer)
 router.get('/mine', authenticate, async (req, res) => {
   try {
-    const quotes = await QuoteRequest.find({ userId: req.user._id }).sort({ createdAt: -1 });
+    const query = [{ userId: req.user._id }];
+
+    const phoneDigits = String(req.user?.phone || '').replace(/\D/g, '').slice(-10);
+    if (phoneDigits.length === 10) {
+      query.push({
+        userId: null,
+        phone: { $regex: `${phoneDigits}$` }
+      });
+
+      // Self-heal legacy records created before userId extraction fix
+      await QuoteRequest.updateMany(
+        {
+          userId: null,
+          phone: { $regex: `${phoneDigits}$` }
+        },
+        { $set: { userId: req.user._id } }
+      );
+    }
+
+    const quotes = await QuoteRequest.find({ $or: query }).sort({ createdAt: -1 });
     res.json({ success: true, data: quotes });
   } catch (error) {
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
