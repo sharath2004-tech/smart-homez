@@ -217,6 +217,16 @@ const MySubscriptionsPage = () => {
 
   const handlePauseSubscription = async (bookingId: string) => {
     try {
+      if (!pauseRequestForm.requestedStartDate || !pauseRequestForm.requestedEndDate) {
+        toast.error('Please select both pause start date and end date');
+        return;
+      }
+
+      if (pauseRequestForm.requestedEndDate < pauseRequestForm.requestedStartDate) {
+        toast.error('Pause end date cannot be before pause start date');
+        return;
+      }
+
       setSubmittingPauseRequest(true);
       const token = localStorage.getItem('token');
       const response = await fetch(
@@ -690,6 +700,8 @@ const MySubscriptionsPage = () => {
                           <input
                             type="date"
                             value={pauseRequestForm.requestedStartDate}
+                            min={new Date().toISOString().split('T')[0]}
+                            required
                             onChange={(event) => setPauseRequestForm((current) => ({
                               ...current,
                               requestedStartDate: event.target.value,
@@ -706,7 +718,8 @@ const MySubscriptionsPage = () => {
                           <input
                             type="date"
                             value={pauseRequestForm.requestedEndDate}
-                            min={pauseRequestForm.requestedStartDate || undefined}
+                            min={pauseRequestForm.requestedStartDate || new Date().toISOString().split('T')[0]}
+                            required
                             onChange={(event) => setPauseRequestForm((current) => ({
                               ...current,
                               requestedEndDate: event.target.value,

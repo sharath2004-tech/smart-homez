@@ -2393,6 +2393,33 @@ router.delete('/:id', authenticate, async (req, res) => {
       refundReason = 'Booking has already started. No refund applicable.';
     }
 
+    const isRootSubscriptionCancellation = Boolean(
+      booking.subscription?.isSubscription
+      && !booking.parentBooking
+    );
+    let cancelledFutureVisits = 0;
+
+    if (isRootSubscriptionCancellation) {
+      const today = startOfDay(now);
+      const childVisitFilter = {
+        parentBooking: booking._id,
+        bookingDate: { $gte: today },
+        status: { $in: ['pending', 'confirmed'] },
+      };
+
+      const childVisitsCount = await Booking.countDocuments(childVisitFilter);
+      if (childVisitsCount > 0) {
+        await Booking.updateMany(childVisitFilter, {
+          $set: {
+            status: 'cancelled',
+            cancellationReason: req.body.reason || 'Subscription cancelled by customer',
+            cancellationDate: now,
+          }
+        });
+        cancelledFutureVisits = childVisitsCount;
+      }
+    }
+
     // Update booking
     booking.status = 'cancelled';
     booking.cancellationReason = req.body.reason || 'Cancelled by customer';
@@ -2455,6 +2482,7 @@ router.delete('/:id', authenticate, async (req, res) => {
     res.json({ 
       message: 'Booking cancelled successfully', 
       booking,
+      cancelledFutureVisits,
       refund: {
         amount: refundAmount,
         percentage: refundPercentage,
@@ -5259,7 +5287,29 @@ router.post('/:id/pause-subscription',
         reason = '',
       } = req.body || {};
 
-      if (requestedStartDate && requestedEndDate && new Date(requestedEndDate) < new Date(requestedStartDate)) {
+      if (!requestedStartDate || !requestedEndDate) {
+        return res.status(400).json({
+          error: { message: 'Pause start date and end date are required', status: 400 }
+        });
+      }
+
+      const normalizedPauseStartDate = startOfDay(requestedStartDate);
+      const normalizedPauseEndDate = startOfDay(requestedEndDate);
+      const today = startOfDay(new Date());
+
+      if (Number.isNaN(normalizedPauseStartDate.getTime()) || Number.isNaN(normalizedPauseEndDate.getTime())) {
+        return res.status(400).json({
+          error: { message: 'Pause start date and end date must be valid dates', status: 400 }
+        });
+      }
+
+      if (normalizedPauseStartDate < today) {
+        return res.status(400).json({
+          error: { message: 'Pause start date cannot be in the past', status: 400 }
+        });
+      }
+
+      if (normalizedPauseEndDate < normalizedPauseStartDate) {
         return res.status(400).json({
           error: { message: 'Pause end date cannot be before pause start date', status: 400 }
         });
@@ -5268,8 +5318,8 @@ router.post('/:id/pause-subscription',
       booking.subscription.pauseRequestStatus = 'pending';
       booking.subscription.pauseRequestedAt = new Date();
       booking.subscription.pauseRequestedBy = req.user._id;
-      booking.subscription.pauseRequestStartDate = requestedStartDate ? startOfDay(requestedStartDate) : null;
-      booking.subscription.pauseRequestEndDate = requestedEndDate ? startOfDay(requestedEndDate) : null;
+      booking.subscription.pauseRequestStartDate = normalizedPauseStartDate;
+      booking.subscription.pauseRequestEndDate = normalizedPauseEndDate;
       booking.subscription.pauseRequestReason = reason || '';
       booking.subscription.pauseReviewedAt = null;
       booking.subscription.pauseReviewedBy = null;
