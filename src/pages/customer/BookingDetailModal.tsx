@@ -4,7 +4,7 @@ import EmbeddedQRScanner from "@/components/EmbeddedQRScanner";
 import WorkerProfilePreviewDialog from "@/components/WorkerProfilePreviewDialog";
 import { API_BASE_URL, bookingsAPI } from "@/lib/api";
 import html2pdf from "html2pdf.js";
-import { ArrowLeft, Calendar, Camera, CheckCircle, ClipboardCheck, Clock3, Coffee, DollarSign, Download, MapPin, MessageCircle, Pause, Phone, Play, Printer, QrCode, Timer, User, X, XCircle } from "lucide-react";
+import { ArrowLeft, Calendar, Camera, CheckCircle, ClipboardCheck, Clock3, Coffee, Download, IndianRupee, MapPin, MessageCircle, Pause, Phone, Play, Printer, QrCode, Timer, User, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ReviewModal from "./ReviewModal";
@@ -920,7 +920,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
             {/* Payment Section */}
             <div className="space-y-3">
               <h3 className="font-semibold text-foreground flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-primary" />
+                <IndianRupee className="w-5 h-5 text-primary" />
                 {t('customer.bookings.payment')}
               </h3>
 

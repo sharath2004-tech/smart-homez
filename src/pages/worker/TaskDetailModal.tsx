@@ -6,8 +6,8 @@ import {
     Camera,
     CheckCircle,
     Coffee,
-    DollarSign,
     Home,
+    IndianRupee,
     MapPin,
     MessageCircle,
     Navigation,
@@ -315,7 +315,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       alert(t('worker.taskDetail.qrGenerated'));
     } catch (error) {
       console.error('Error generating QR:', error);
-      alert(t('worker.taskDetail.failedGenerateQR'));
+      alert((error as Error).message || t('worker.taskDetail.failedGenerateQR'));
     }
   };
 
@@ -827,7 +827,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
           {!isPrepaidSubscription && (
           <div className="card-elevated p-5">
             <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-primary" />
+              <IndianRupee className="w-5 h-5 text-primary" />
               {t('worker.taskDetail.amountToCollect')}
             </h3>
             <div className="space-y-2">
@@ -896,8 +896,13 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                       {t('worker.taskDetail.generateStartQR')}
                     </button>
                     <p className="text-sm text-muted-foreground mt-3">
-                      QR becomes available only within {START_QR_VISIBLE_LEAD_MINUTES} minutes of the scheduled start time.
+                      Start QR becomes available {START_QR_VISIBLE_LEAD_MINUTES} minutes before service time and stays available until the service starts.
                     </p>
+                    {Date.now() > scheduledStartTimestamp && (
+                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3">
+                        Scheduled start time has already passed. Generate the QR now so the customer can begin the visit. Admin will be notified about the late start.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -1062,7 +1067,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
               {/* Step 2: Payment QR Code */}
               <div className="card-elevated p-5 bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200">
                   <h3 className="font-bold text-foreground mb-3 flex items-center justify-center gap-2">
-                    <DollarSign className="w-5 h-5 text-purple-600" />
+                    <IndianRupee className="w-5 h-5 text-purple-600" />
                     {t('worker.taskDetail.step2PaymentQR')} 💳
                   </h3>
                   
@@ -1090,7 +1095,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
                         onClick={generatePaymentQR}
                         className="btn-brand py-3 px-6"
                       >
-                        <DollarSign className="w-5 h-5 inline-block mr-2" />
+                        <IndianRupee className="w-5 h-5 inline-block mr-2" />
                         {t('worker.taskDetail.showPaymentQR')}
                       </button>
                     </div>

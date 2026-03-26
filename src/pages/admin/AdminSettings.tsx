@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { settingsAPI } from "@/lib/api";
 import { cropQRFromImage } from "@/utils/cropQRFromImage";
-import { Building, CreditCard, DollarSign, FileText, Lock, Save, Upload } from "lucide-react";
+import { Building, CreditCard, FileText, IndianRupee, Lock, Save, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -487,7 +487,7 @@ const AdminSettings = () => {
                   Overtime Rate (₹ per minute)
                 </label>
                 <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <IndianRupee className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <input
                     type="number"
                     step="0.5"

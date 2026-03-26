@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { API_BASE_URL, adminAPI, bookingsAPI, businessExpensesAPI } from "@/lib/api";
-import { DollarSign, Edit2, Plus, Trash2, TrendingDown, TrendingUp, Upload, X } from "lucide-react";
+import { Edit2, IndianRupee, Plus, Trash2, TrendingDown, TrendingUp, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -604,7 +604,7 @@ const AdminExpenses = () => {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-bold text-foreground flex items-center gap-3 mb-2">
-              <DollarSign className="h-9 w-9 text-primary" />
+              <IndianRupee className="h-9 w-9 text-primary" />
               Business Expenses
             </h1>
             <p className="text-muted-foreground">Track and manage all business expenses</p>

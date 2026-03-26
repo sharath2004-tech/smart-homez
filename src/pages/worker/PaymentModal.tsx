@@ -1,5 +1,5 @@
 import { bookingsAPI, locationsAPI, qrPaymentsAPI } from "@/lib/api";
-import { ArrowLeft, Camera, CheckCircle, DollarSign, MapPin, QrCode, Upload } from "lucide-react";
+import { ArrowLeft, Camera, CheckCircle, IndianRupee, MapPin, QrCode, Upload } from "lucide-react";
 import QRCodeLib from "qrcode";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -220,7 +220,7 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
                 {/* Amount Section */}
                 <div className="bg-green-50 border-2 border-green-200 p-6 rounded-xl text-center">
                   <div className="flex items-center justify-center gap-2 mb-2">
-                    <DollarSign className="w-6 h-6 text-green-600" />
+                    <IndianRupee className="w-6 h-6 text-green-600" />
                     <p className="text-sm text-green-700 font-medium">{t('worker.paymentModal.amountToCollect')}</p>
                   </div>
                   <p className="text-4xl font-bold text-green-600">₹{qrPayment.amount}</p>

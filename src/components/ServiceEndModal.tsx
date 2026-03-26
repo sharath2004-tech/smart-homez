@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { bookingsAPI } from "@/lib/api";
-import { AlertCircle, CheckCircle, DollarSign, QrCode, Timer } from "lucide-react";
+import { AlertCircle, CheckCircle, IndianRupee, QrCode, Timer } from "lucide-react";
 import { useState } from "react";
 import EmbeddedQRScanner from "./EmbeddedQRScanner";
 
@@ -253,7 +253,7 @@ const ServiceEndModal = ({
           {/* Estimated Charges */}
           <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg space-y-2">
             <div className="flex items-center gap-2 text-sm font-medium">
-              <DollarSign className="w-4 h-4" />
+              <IndianRupee className="w-4 h-4" />
               Estimated Final Charges
             </div>
             <div className="space-y-1 text-sm">

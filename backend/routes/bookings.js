@@ -524,6 +524,72 @@ const notifySubscriptionPauseAdmins = async (booking, requestedBy, reason = '', 
   })));
 };
 
+const getRelevantAdminsForBooking = async (booking) => {
+  const adminFilter = { role: { $in: ['admin', 'super_admin'] }, isActive: true };
+  const admins = await User.find(adminFilter).select('_id adminProfile.assignedLocations role').lean();
+  const bookingLocationId = booking.location?.locationId?.toString?.() || null;
+
+  return admins.filter((admin) => {
+    if (admin.role === 'super_admin') {
+      return true;
+    }
+
+    const assignedLocationIds = (admin.adminProfile?.assignedLocations || [])
+      .map((location) => location.locationId?.toString())
+      .filter(Boolean);
+
+    if (!bookingLocationId) {
+      return assignedLocationIds.length === 0;
+    }
+
+    if (assignedLocationIds.length === 0) {
+      return false;
+    }
+
+    return assignedLocationIds.includes(bookingLocationId);
+  });
+};
+
+const notifyAdminsAboutLateBookingStart = async ({ booking, kind, delayMinutes = 0, workerName = 'Worker', serviceName = 'Service' }) => {
+  const relevantAdmins = await getRelevantAdminsForBooking(booking);
+  if (!relevantAdmins.length) {
+    return false;
+  }
+
+  const roundedDelayMinutes = Math.max(1, Math.round(delayMinutes));
+  const notificationPayload = kind === 'qr-generated'
+    ? {
+        title: 'Late start QR generated',
+        message: `${workerName} generated the start QR ${roundedDelayMinutes} minute${roundedDelayMinutes === 1 ? '' : 's'} after the scheduled start for ${serviceName}.`,
+        eventKey: 'late_start_qr_generated'
+      }
+    : {
+        title: 'Service started late',
+        message: `${serviceName} was started ${roundedDelayMinutes} minute${roundedDelayMinutes === 1 ? '' : 's'} after the scheduled time by ${workerName}.`,
+        eventKey: 'late_service_start'
+      };
+
+  await Promise.all(relevantAdmins.map((admin) => notificationService.sendNotification({
+    userId: admin._id,
+    type: 'delay',
+    title: notificationPayload.title,
+    message: notificationPayload.message,
+    priority: 'high',
+    data: {
+      bookingId: booking._id,
+      workerId: booking.worker?._id || booking.worker || null,
+      customerId: booking.customer?._id || booking.customer || null,
+      locationId: booking.location?.locationId || null,
+      serviceName,
+      workerName,
+      delayMinutes: roundedDelayMinutes,
+      eventKey: notificationPayload.eventKey,
+    }
+  })));
+
+  return true;
+};
+
 const getTimeWindowMinutes = (startTime, endTime) => {
   const startMinutes = timeStringToMinutes(startTime);
   const endMinutes = timeStringToMinutes(endTime);
@@ -3155,15 +3221,16 @@ router.post('/:id/generate-start-qr',
         });
       }
 
+      const now = new Date();
+      const scheduledStartTime = getBookingScheduledStartDateTime(booking);
+      const earliestQrGenerationTime = new Date(scheduledStartTime.getTime() - (20 * 60 * 1000));
+
       if (req.user.role !== 'admin') {
-        const now = new Date();
-        const scheduledStartTime = getBookingScheduledStartDateTime(booking);
-        const earliestQrGenerationTime = new Date(scheduledStartTime.getTime() - (20 * 60 * 1000));
 
         if (now < earliestQrGenerationTime) {
           return res.status(400).json({
             error: {
-              message: 'Start QR can only be generated within 20 minutes of the scheduled service start time.',
+              message: 'Start QR becomes available 20 minutes before the scheduled service time and stays available until the service starts.',
               status: 400,
               availableFrom: earliestQrGenerationTime.toISOString(),
               scheduledStart: scheduledStartTime.toISOString()
@@ -3183,6 +3250,30 @@ router.post('/:id/generate-start-qr',
       booking.jobDescriptionAcknowledgedAt = new Date();
       
       await booking.save();
+
+      const minutesLate = Math.max(0, (now.getTime() - scheduledStartTime.getTime()) / 60000);
+      if (
+        req.user.role !== 'admin'
+        && minutesLate > 0
+        && !booking.lateStartQrNotificationSentAt
+      ) {
+        try {
+          const notificationSent = await notifyAdminsAboutLateBookingStart({
+            booking,
+            kind: 'qr-generated',
+            delayMinutes: minutesLate,
+            workerName: req.user.name || 'Worker',
+            serviceName: booking.service?.name || 'Service',
+          });
+
+          if (notificationSent) {
+            booking.lateStartQrNotificationSentAt = new Date();
+            await booking.save();
+          }
+        } catch (notificationError) {
+          console.error('Late QR generation notification error:', notificationError);
+        }
+      }
 
       res.json({ 
         message: 'Service start QR code generated successfully',
@@ -3286,6 +3377,28 @@ router.post('/:id/scan-start-qr',
       booking.status = 'in-progress';
       
       await booking.save();
+
+      const scheduledStartTime = getBookingScheduledStartDateTime(booking);
+      const minutesLate = Math.max(0, (now.getTime() - scheduledStartTime.getTime()) / 60000);
+
+      if (minutesLate > 0 && !booking.lateActualStartNotificationSentAt) {
+        try {
+          const notificationSent = await notifyAdminsAboutLateBookingStart({
+            booking,
+            kind: 'service-started',
+            delayMinutes: minutesLate,
+            workerName: booking.worker?.name || 'Worker',
+            serviceName: booking.service?.name || 'Service',
+          });
+
+          if (notificationSent) {
+            booking.lateActualStartNotificationSentAt = new Date();
+            await booking.save();
+          }
+        } catch (notificationError) {
+          console.error('Late actual start notification error:', notificationError);
+        }
+      }
 
       res.json({ 
         message: 'Service started successfully',
