@@ -108,6 +108,89 @@ const parsePositiveNumber = (value) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
 
+const DEFAULT_BUSINESS_TIMEZONE = 'Asia/Kolkata';
+
+const getValidTimeZone = (timeZone) => {
+  try {
+    const resolved = typeof timeZone === 'string' && timeZone.trim()
+      ? timeZone.trim()
+      : DEFAULT_BUSINESS_TIMEZONE;
+    new Intl.DateTimeFormat('en-US', { timeZone: resolved }).format(new Date());
+    return resolved;
+  } catch {
+    return DEFAULT_BUSINESS_TIMEZONE;
+  }
+};
+
+const getZonedDateParts = (date = new Date(), timeZone = DEFAULT_BUSINESS_TIMEZONE) => {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: getValidTimeZone(timeZone),
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+
+  const parts = formatter.formatToParts(date);
+  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+
+  return {
+    year: Number(map.year),
+    month: Number(map.month),
+    day: Number(map.day),
+    hours: Number(map.hour),
+    minutes: Number(map.minute),
+    dateKey: `${map.year}-${map.month}-${map.day}`,
+  };
+};
+
+const getComparableDateTimeValue = (dateKey, time = '00:00') => {
+  if (typeof dateKey !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+    return null;
+  }
+
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const minutes = timeStringToMinutes(time);
+
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day) || minutes === null) {
+    return null;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return Date.UTC(year, month - 1, day, hours, mins, 0, 0);
+};
+
+const getBookingScheduledStartContext = (booking, timeZone = DEFAULT_BUSINESS_TIMEZONE) => {
+  const bookingDateKey = getZonedDateParts(new Date(booking.bookingDate), timeZone).dateKey;
+  const startTime = booking?.startTime || '00:00';
+  const scheduledValue = getComparableDateTimeValue(bookingDateKey, startTime);
+  const earliestQrValue = scheduledValue === null ? null : scheduledValue - (20 * 60 * 1000);
+  const startMinutes = timeStringToMinutes(startTime);
+
+  return {
+    bookingDateKey,
+    startTime,
+    scheduledValue,
+    earliestQrValue,
+    availableFromTime: startMinutes === null ? null : minutesToTimeString(startMinutes - 20),
+  };
+};
+
+const getCurrentTimeContext = (timeZone = DEFAULT_BUSINESS_TIMEZONE) => {
+  const nowParts = getZonedDateParts(new Date(), timeZone);
+
+  return {
+    nowParts,
+    nowValue: getComparableDateTimeValue(
+      nowParts.dateKey,
+      `${String(nowParts.hours).padStart(2, '0')}:${String(nowParts.minutes).padStart(2, '0')}`,
+    ),
+  };
+};
+
 const timeStringToMinutes = (time) => {
   if (typeof time !== 'string' || !/^\d{2}:\d{2}$/.test(time)) {
     return null;
@@ -297,13 +380,6 @@ const syncLatestPaymentProof = (booking) => {
       };
 
   return booking.paymentProof;
-};
-
-const getBookingScheduledStartDateTime = (booking) => {
-  const scheduledStart = new Date(booking.bookingDate);
-  const [hours, minutes] = (booking.startTime || '00:00').split(':').map(Number);
-  scheduledStart.setHours(hours || 0, minutes || 0, 0, 0);
-  return scheduledStart;
 };
 
 const getSubscriptionRootBookingId = (booking) => booking.parentBooking || booking._id;
@@ -3222,18 +3298,31 @@ router.post('/:id/generate-start-qr',
       }
 
       const now = new Date();
-      const scheduledStartTime = getBookingScheduledStartDateTime(booking);
-      const earliestQrGenerationTime = new Date(scheduledStartTime.getTime() - (20 * 60 * 1000));
+      const businessHoursConfig = await BusinessHours.getConfig().catch(() => null);
+      const bookingTimeZone = getValidTimeZone(businessHoursConfig?.timezone);
+      const { nowValue } = getCurrentTimeContext(bookingTimeZone);
+      const {
+        bookingDateKey,
+        startTime,
+        scheduledValue,
+        earliestQrValue,
+        availableFromTime,
+      } = getBookingScheduledStartContext(booking, bookingTimeZone);
 
       if (req.user.role !== 'admin') {
 
-        if (now < earliestQrGenerationTime) {
+        if (
+          nowValue !== null
+          && earliestQrValue !== null
+          && nowValue < earliestQrValue
+        ) {
           return res.status(400).json({
             error: {
               message: 'Start QR becomes available 20 minutes before the scheduled service time and stays available until the service starts.',
               status: 400,
-              availableFrom: earliestQrGenerationTime.toISOString(),
-              scheduledStart: scheduledStartTime.toISOString()
+              availableFromLocal: availableFromTime ? `${bookingDateKey} ${availableFromTime}` : null,
+              scheduledStartLocal: `${bookingDateKey} ${startTime}`,
+              timeZone: bookingTimeZone,
             }
           });
         }
@@ -3251,7 +3340,10 @@ router.post('/:id/generate-start-qr',
       
       await booking.save();
 
-      const minutesLate = Math.max(0, (now.getTime() - scheduledStartTime.getTime()) / 60000);
+      const minutesLate = (
+        nowValue !== null
+        && scheduledValue !== null
+      ) ? Math.max(0, (nowValue - scheduledValue) / 60000) : 0;
       if (
         req.user.role !== 'admin'
         && minutesLate > 0
@@ -3378,8 +3470,14 @@ router.post('/:id/scan-start-qr',
       
       await booking.save();
 
-      const scheduledStartTime = getBookingScheduledStartDateTime(booking);
-      const minutesLate = Math.max(0, (now.getTime() - scheduledStartTime.getTime()) / 60000);
+      const businessHoursConfig = await BusinessHours.getConfig().catch(() => null);
+      const bookingTimeZone = getValidTimeZone(businessHoursConfig?.timezone);
+      const { nowValue } = getCurrentTimeContext(bookingTimeZone);
+      const { scheduledValue } = getBookingScheduledStartContext(booking, bookingTimeZone);
+      const minutesLate = (
+        nowValue !== null
+        && scheduledValue !== null
+      ) ? Math.max(0, (nowValue - scheduledValue) / 60000) : 0;
 
       if (minutesLate > 0 && !booking.lateActualStartNotificationSentAt) {
         try {

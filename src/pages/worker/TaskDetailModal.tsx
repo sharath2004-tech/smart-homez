@@ -154,10 +154,8 @@ const getScheduledDurationSeconds = (bookingDate: string, startTime: string, end
 };
 
 const getScheduledStartTimestamp = (bookingDate: string, startTime: string) => {
-  const scheduledStart = new Date(bookingDate);
-  const [hours, minutes] = startTime.split(':').map(Number);
-  scheduledStart.setHours(hours || 0, minutes || 0, 0, 0);
-  return scheduledStart.getTime();
+  const bookingDay = bookingDate.includes('T') ? bookingDate.split('T')[0] : bookingDate;
+  return new Date(`${bookingDay}T${startTime}`).getTime();
 };
 
 const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) => {
