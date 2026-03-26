@@ -1,6 +1,7 @@
 import BookingOrderPrint from "@/components/BookingOrderPrint";
 import ChatModal from "@/components/ChatModal";
 import EmbeddedQRScanner from "@/components/EmbeddedQRScanner";
+import SubscriptionPaymentStep from "@/components/SubscriptionPaymentStep";
 import WorkerProfilePreviewDialog from "@/components/WorkerProfilePreviewDialog";
 import { API_BASE_URL, bookingsAPI } from "@/lib/api";
 import { getCustomerBookingPaymentSummary } from "@/pages/customer/bookingPaymentSummary";
@@ -1001,6 +1002,20 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                     )}
                   </div>
                 </div>
+              )}
+
+              {booking.subscription?.isSubscription && booking.subscription.activationStatus === 'payment_pending' && !booking.paymentProof?.url && (
+                <SubscriptionPaymentStep
+                  bookingId={booking._id}
+                  amount={booking.totalAmount}
+                  title="Upload subscription payment proof"
+                  description="This subscription is waiting for payment proof. Complete the payment and upload the screenshot here so your region admin or super admin can review it and continue the activation process."
+                  successLabel="Payment proof uploaded. Waiting for admin review"
+                  onPaymentSubmitted={() => {
+                    fetchBookingDetail();
+                    onRefresh();
+                  }}
+                />
               )}
 
               <div className="bg-muted p-4 rounded-xl space-y-2">
