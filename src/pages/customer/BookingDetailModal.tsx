@@ -3,6 +3,7 @@ import ChatModal from "@/components/ChatModal";
 import EmbeddedQRScanner from "@/components/EmbeddedQRScanner";
 import WorkerProfilePreviewDialog from "@/components/WorkerProfilePreviewDialog";
 import { API_BASE_URL, bookingsAPI } from "@/lib/api";
+import { getCustomerBookingPaymentSummary } from "@/pages/customer/bookingPaymentSummary";
 import html2pdf from "html2pdf.js";
 import { ArrowLeft, Calendar, Camera, CheckCircle, ClipboardCheck, Clock3, Coffee, Download, IndianRupee, MapPin, MessageCircle, Pause, Phone, Play, Printer, QrCode, Timer, User, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -89,6 +90,7 @@ interface Booking {
   endTime: string;
   status: string;
   totalAmount: number;
+  paymentMethod?: string;
   actualStartTime?: string;
   actualEndTime?: string;
   serviceStartQRCode?: string;
@@ -102,6 +104,8 @@ interface Booking {
     verified?: boolean;
     reviewStatus?: 'pending' | 'approved' | 'rejected';
     reviewNotes?: string | null;
+    transactionId?: string | null;
+    transactionTime?: string | null;
   };
   breakRequests?: BreakRequest[];
   isOnBreak?: boolean;
@@ -479,6 +483,10 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
     const overtimeAmount = overtimeMinutes > 0 ? overtimeMinutes * OVERTIME_RATE : 0;
     return baseAmount + overtimeAmount;
   };
+
+  const paymentSummary = booking
+    ? getCustomerBookingPaymentSummary(booking, calculateTotalAmount())
+    : null;
 
   const handlePrintToPDF = () => {
     if (!printRef.current || !booking) return;
@@ -930,6 +938,66 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                   <p className="text-xs text-orange-700 mt-1">
                     Admin or super admin is reviewing the schedule or worker setup for this subscription.
                   </p>
+                </div>
+              )}
+
+              {paymentSummary && (
+                <div className={`rounded-2xl border p-4 ${
+                  paymentSummary.tone === 'success'
+                    ? 'border-green-200 bg-green-50'
+                    : paymentSummary.tone === 'danger'
+                    ? 'border-red-200 bg-red-50'
+                    : paymentSummary.tone === 'info'
+                    ? 'border-sky-200 bg-sky-50'
+                    : 'border-amber-200 bg-amber-50'
+                }`}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-foreground">Payment status</p>
+                      <div className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                        paymentSummary.tone === 'success'
+                          ? 'bg-green-100 text-green-700'
+                          : paymentSummary.tone === 'danger'
+                          ? 'bg-red-100 text-red-700'
+                          : paymentSummary.tone === 'info'
+                          ? 'bg-sky-100 text-sky-700'
+                          : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {paymentSummary.label}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{paymentSummary.description}</p>
+                    </div>
+
+                    <div className="min-w-[140px] text-left sm:text-right">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        {paymentSummary.pendingAmount !== null ? 'Pending payment' : 'Amount settled'}
+                      </p>
+                      <p className="text-xl font-bold text-foreground">
+                        ₹{(paymentSummary.pendingAmount ?? calculateTotalAmount()).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                    <div className="flex items-center justify-between gap-3 rounded-xl bg-background/70 px-3 py-2">
+                      <span>Payment method</span>
+                      <span className="font-medium text-foreground uppercase">{booking.paymentMethod || 'qr-upi'}</span>
+                    </div>
+                    {booking.paymentProof?.transactionId && (
+                      <div className="flex items-center justify-between gap-3 rounded-xl bg-background/70 px-3 py-2">
+                        <span>Transaction ID</span>
+                        <span className="font-medium text-foreground">{booking.paymentProof.transactionId}</span>
+                      </div>
+                    )}
+                    {booking.paymentProof?.transactionTime && (
+                      <div className="flex items-center justify-between gap-3 rounded-xl bg-background/70 px-3 py-2 sm:col-span-2">
+                        <span>Payment time</span>
+                        <span className="font-medium text-foreground">
+                          {new Date(booking.paymentProof.transactionTime).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
