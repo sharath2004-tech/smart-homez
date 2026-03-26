@@ -14,6 +14,7 @@ import User from '../models/User.js';
 import WorkerEarnings from '../models/WorkerEarnings.js';
 import WorkerSalaryRequest from '../models/WorkerSalaryRequest.js';
 import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/emailService.js';
+import notificationService from '../utils/notificationService.js';
 import { getNextRecurringScheduleDate } from '../utils/recurringSchedule.js';
 import { checkSlotAvailability } from '../utils/slotManagement.js';
 import {
@@ -3342,6 +3343,35 @@ router.post('/manual-assign',
       await booking.save();
 
       await booking.populate('worker', 'name email phone');
+
+      if (booking.subscription?.isSubscription) {
+        await notificationService.sendNotification({
+          userId: booking.customer,
+          type: 'booking',
+          title: 'Subscription worker assigned',
+          message: booking.subscription.activationStatus === 'active'
+            ? `${booking.worker?.name || 'A worker'} has been assigned to your subscription and the plan is now active.`
+            : `${booking.worker?.name || 'A worker'} has been assigned to your subscription. It will activate after payment proof approval is completed.`,
+          priority: 'high',
+          data: {
+            bookingId: booking._id,
+            workerId,
+            subscriptionStatus: booking.subscription.activationStatus || null,
+          }
+        });
+
+        await notificationService.sendNotification({
+          userId: workerId,
+          type: 'booking',
+          title: 'Subscription assigned to you',
+          message: `You have been assigned to ${booking.service?.name || 'a subscription'}${booking.subscription.activationStatus === 'active' ? ' and it is active.' : '. The customer payment review is still pending.'}`,
+          priority: 'medium',
+          data: {
+            bookingId: booking._id,
+            customerId: booking.customer,
+          }
+        });
+      }
 
       res.json({
         success: true,

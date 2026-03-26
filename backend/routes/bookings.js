@@ -3881,6 +3881,13 @@ router.post('/:id/upload-payment-proof',
 
       await booking.save();
 
+      if (booking.subscription?.isSubscription && isCustomer && isBookingCustomer) {
+        await notifySubscriptionApprovalAdmins(booking, {
+          _id: req.user._id,
+          name: req.user.name || 'Customer'
+        });
+      }
+
       let assignmentRetryResult = null;
 
       console.log(`✅ ${req.user.role} ${isReupload ? 're-uploaded' : 'uploaded'} payment proof:`, photoUrl, transactionId ? `| TxnID: ${transactionId}` : '');
@@ -3970,6 +3977,24 @@ router.post('/:id/payment-proof-review',
       }
 
       await booking.save();
+
+      if (booking.subscription?.isSubscription) {
+        await notificationService.sendNotification({
+          userId: booking.customer._id,
+          type: 'payment',
+          title: action === 'approve' ? 'Subscription payment approved' : 'Subscription payment rejected',
+          message: action === 'approve'
+            ? (booking.subscription.activationStatus === 'active'
+                ? `Payment proof for ${booking.service?.name || 'your subscription'} was approved and the subscription is now active.`
+                : `Payment proof for ${booking.service?.name || 'your subscription'} was approved. Admin will assign a worker after checking future availability.`)
+            : `Payment proof for ${booking.service?.name || 'your subscription'} was rejected.${trimmedReason ? ` Reason: ${trimmedReason}` : ''}`,
+          priority: 'high',
+          data: {
+            bookingId: booking._id,
+            subscriptionStatus: booking.subscription.activationStatus || null,
+          }
+        });
+      }
 
       res.json({
         success: true,

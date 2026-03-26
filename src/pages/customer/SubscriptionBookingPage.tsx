@@ -1,5 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { RecurringScheduleSetup } from "@/components/RecurringScheduleSetup";
+import SubscriptionPaymentStep from "@/components/SubscriptionPaymentStep";
 import { SubscriptionPlanSelector } from "@/components/SubscriptionPlanSelector";
 import { Button } from "@/components/ui/button";
 import { useServiceBookingAvailability } from "@/hooks/useServiceBookingAvailability";
@@ -61,6 +62,8 @@ export default function SubscriptionBookingPage() {
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
+  const [createdSubscription, setCreatedSubscription] = useState<{ bookingId: string; amount: number } | null>(null);
+  const [paymentSubmitted, setPaymentSubmitted] = useState(false);
   const [currentStep, setCurrentStep] = useState<'plan' | 'schedule' | 'confirm'>('plan');
   
   const [selectedPlan, setSelectedPlan] = useState<'oneTime' | 'daily' | 'weekly' | 'biweekly' | 'monthly'>('oneTime');
@@ -214,8 +217,11 @@ export default function SubscriptionBookingPage() {
         throw new Error('Subscription booking was created but booking ID is missing');
       }
 
-      toast.success('Subscription created. Upload payment proof and wait for admin approval to activate it.');
-      navigate('/customer/subscriptions');
+      setCreatedSubscription({
+        bookingId: response.booking._id,
+        amount: Number(response.booking.totalAmount || calculateTotalPrice()),
+      });
+      toast.success('Subscription created. Complete the payment below and upload the payment proof to continue.');
     } catch (error) {
       console.error('Error creating booking:', error);
       const err = error as { response?: { data?: { message?: string } } };
@@ -241,6 +247,42 @@ export default function SubscriptionBookingPage() {
   return (
     <AppLayout userType="customer" userName={profile?.name}>
       <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6">
+        {createdSubscription ? (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-2xl p-6 border border-primary/20">
+              <h1 className="text-3xl font-bold mb-2">Subscription created</h1>
+              <p className="text-muted-foreground">
+                Your plan is saved. Complete the payment and upload the proof so your region admin or super admin can review it,
+                assign the worker for future visits, and activate the subscription.
+              </p>
+            </div>
+
+            <SubscriptionPaymentStep
+              bookingId={createdSubscription.bookingId}
+              amount={createdSubscription.amount}
+              onPaymentSubmitted={() => setPaymentSubmitted(true)}
+            />
+
+            <div className="flex flex-wrap gap-3 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => navigate('/customer/subscriptions')}
+              >
+                View My Subscriptions
+              </Button>
+              {paymentSubmitted && (
+                <Button
+                  type="button"
+                  onClick={() => navigate('/customer/subscriptions')}
+                >
+                  Continue
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+        <>
         {/* Header */}
         <div className="mb-6">
           <Link 
@@ -488,6 +530,8 @@ export default function SubscriptionBookingPage() {
             </Button>
           )}
         </div>
+        </>
+        )}
       </div>
     </AppLayout>
   );

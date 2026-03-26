@@ -1,5 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import SubscriptionCalendar from "@/components/SubscriptionCalendar";
+import SubscriptionPaymentStep from "@/components/SubscriptionPaymentStep";
 import { authAPI, bookingsAPI } from "@/lib/api";
 import { AlertTriangle, Calendar, CalendarDays, CheckCircle, Clock, Edit2, MapPin, RefreshCw, User, UserCheck, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -61,6 +62,7 @@ interface Booking {
   };
   totalAmount: number;
   paymentProof?: {
+    url?: string | null;
     reviewStatus?: 'pending' | 'approved' | 'rejected';
     reviewNotes?: string | null;
   };
@@ -538,6 +540,33 @@ const MySubscriptionsPage = () => {
                     )
                   )}
                 </div>
+
+                {subscription.subscription?.activationStatus === 'payment_pending' && (
+                  <div className="mt-4 space-y-4">
+                    {subscription.paymentProof?.reviewStatus === 'pending' && subscription.paymentProof?.url ? (
+                      <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                        Payment proof uploaded successfully. Your region admin or super admin is reviewing it now.
+                      </div>
+                    ) : (
+                      <>
+                        {subscription.paymentProof?.reviewStatus === 'rejected' && (
+                          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                            Payment proof was rejected{subscription.paymentProof.reviewNotes ? `: ${subscription.paymentProof.reviewNotes}` : '. Please upload a new screenshot.'}
+                          </div>
+                        )}
+
+                        <SubscriptionPaymentStep
+                          bookingId={subscription._id}
+                          amount={subscription.totalAmount}
+                          title="Complete subscription payment"
+                          description="Pay for this subscription and upload the payment proof. Your region admin or super admin will review it first, then assign an available worker whose future schedule has no conflicts."
+                          successLabel="Payment proof uploaded. Waiting for regional admin review"
+                          onPaymentSubmitted={fetchData}
+                        />
+                      </>
+                    )}
+                  </div>
+                )}
 
                 {subscription.subscription?.pauseRequestStatus === 'rejected' && subscription.subscription?.pauseReviewNote && (
                   <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
