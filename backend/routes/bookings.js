@@ -108,6 +108,14 @@ const parsePositiveNumber = (value) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
 
+const VALID_WEEKDAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+const REQUIRED_SELECTED_DAY_COUNT_BY_FREQUENCY = {
+  weekly: 1,
+  '3-days': 3,
+  'alt-days': 3,
+};
+
 const DEFAULT_BUSINESS_TIMEZONE = 'Asia/Kolkata';
 
 const getValidTimeZone = (timeZone) => {
@@ -1452,14 +1460,40 @@ router.post('/',
             } 
           });
         }
-        if (subscriptionDetails.frequency === 'weekly' && (!subscriptionDetails.selectedDays || subscriptionDetails.selectedDays.length === 0)) {
-          return res.status(400).json({ 
-            error: { 
-              message: 'Weekly subscriptions require at least one day to be selected', 
-              status: 400 
-            } 
+
+        const normalizedFrequency = typeof subscriptionDetails.frequency === 'string'
+          ? subscriptionDetails.frequency.trim().toLowerCase()
+          : '';
+        const normalizedSelectedDays = Array.isArray(subscriptionDetails.selectedDays)
+          ? [...new Set(
+              subscriptionDetails.selectedDays
+                .map((day) => typeof day === 'string' ? day.trim().toLowerCase() : null)
+                .filter((day) => VALID_WEEKDAY_NAMES.includes(day))
+            )]
+          : [];
+        const requiredSelectedDayCount = REQUIRED_SELECTED_DAY_COUNT_BY_FREQUENCY[normalizedFrequency];
+        const startDateWeekday = VALID_WEEKDAY_NAMES[new Date(subscriptionDetails.startDate).getDay()];
+
+        subscriptionDetails.selectedDays = normalizedSelectedDays;
+
+        if (requiredSelectedDayCount && normalizedSelectedDays.length !== requiredSelectedDayCount) {
+          return res.status(400).json({
+            error: {
+              message: `This subscription plan requires exactly ${requiredSelectedDayCount} selected service day${requiredSelectedDayCount > 1 ? 's' : ''}.`,
+              status: 400,
+            }
           });
         }
+
+        if (normalizedSelectedDays.length > 0 && startDateWeekday && !normalizedSelectedDays.includes(startDateWeekday)) {
+          return res.status(400).json({
+            error: {
+              message: 'Subscription start date must fall on one of the selected service days.',
+              status: 400,
+            }
+          });
+        }
+
         if (subscriptionDetails.endDate && new Date(subscriptionDetails.endDate) < new Date(subscriptionDetails.startDate)) {
           return res.status(400).json({
             error: {

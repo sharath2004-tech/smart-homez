@@ -79,6 +79,22 @@ const TIME_SLOTS = [
   "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00",
 ];
 
+const DAYS_OF_WEEK = [
+  { value: "sunday", label: "Sun" },
+  { value: "monday", label: "Mon" },
+  { value: "tuesday", label: "Tue" },
+  { value: "wednesday", label: "Wed" },
+  { value: "thursday", label: "Thu" },
+  { value: "friday", label: "Fri" },
+  { value: "saturday", label: "Sat" },
+] as const;
+
+const REQUIRED_DAY_COUNT_BY_FREQUENCY: Partial<Record<FrequencyOptionId, number>> = {
+  weekly: 1,
+  "3-days": 3,
+  "alt-days": 3,
+};
+
 const SubscriptionServicePage = () => {
   const navigate = useNavigate();
   const [services, setServices] = useState<Service[]>([]);
@@ -92,6 +108,7 @@ const SubscriptionServicePage = () => {
   const [sessionHours, setSessionHours] = useState(1);
   const [startDate, setStartDate] = useState("");
   const [preferredTime, setPreferredTime] = useState("09:00");
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [autoRenewal, setAutoRenewal] = useState(true);
   const [genderPref, setGenderPref] = useState<"any" | "male" | "female">("any");
   const [specialInstructions, setSpecialInstructions] = useState("");
@@ -174,6 +191,17 @@ const SubscriptionServicePage = () => {
     });
   }, [selectedService, availableFrequencyOptions]);
 
+  useEffect(() => {
+    setSelectedDays((currentDays) => {
+      if (frequency === "daily") {
+        return [];
+      }
+
+      const requiredCount = REQUIRED_DAY_COUNT_BY_FREQUENCY[frequency];
+      return requiredCount ? currentDays.slice(0, requiredCount) : currentDays;
+    });
+  }, [frequency]);
+
   // Reset split state whenever hours change
   useEffect(() => {
     if (sessionHours < 2) setSplitEnabled(false);
@@ -207,6 +235,8 @@ const SubscriptionServicePage = () => {
   const currentFreq = availableFrequencyOptions.find((option) => option.id === frequency)
     || availableFrequencyOptions[0]
     || DEFAULT_FREQUENCY_OPTIONS[0];
+  const requiresDaySelection = frequency !== "daily";
+  const requiredSelectedDayCount = REQUIRED_DAY_COUNT_BY_FREQUENCY[frequency] || null;
 
   // Monthly price from durationOptions — authoritative source
   const durationOption = selectedService?.durationOptions?.find(d => d.hours === sessionHours);
@@ -251,6 +281,55 @@ const SubscriptionServicePage = () => {
     session1HoursOptions.push(h);
   }
 
+  const getWeekdayForDate = (dateValue: string) => {
+    if (!dateValue) return null;
+
+    const parsed = new Date(`${dateValue}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return null;
+
+    return DAYS_OF_WEEK[parsed.getDay()]?.value || null;
+  };
+
+  const selectedStartWeekday = getWeekdayForDate(startDate);
+
+  const toggleSelectedDay = (day: string) => {
+    setSelectedDays((currentDays) => {
+      if (currentDays.includes(day)) {
+        return currentDays.filter((existingDay) => existingDay !== day);
+      }
+
+      if (requiredSelectedDayCount && currentDays.length >= requiredSelectedDayCount) {
+        toast.error(`Select exactly ${requiredSelectedDayCount} day${requiredSelectedDayCount > 1 ? 's' : ''} for this plan.`);
+        return currentDays;
+      }
+
+      return [...currentDays, day];
+    });
+  };
+
+  const validateSelectedDays = () => {
+    if (!requiresDaySelection) {
+      return true;
+    }
+
+    if (selectedDays.length === 0) {
+      toast.error("Please select the weekdays for this subscription.");
+      return false;
+    }
+
+    if (requiredSelectedDayCount && selectedDays.length !== requiredSelectedDayCount) {
+      toast.error(`Please select exactly ${requiredSelectedDayCount} day${requiredSelectedDayCount > 1 ? 's' : ''} for this plan.`);
+      return false;
+    }
+
+    if (selectedStartWeekday && !selectedDays.includes(selectedStartWeekday)) {
+      toast.error("Start date must fall on one of your selected service days.");
+      return false;
+    }
+
+    return true;
+  };
+
   const handleBook = async () => {
     if (isOutOfRegion) {
       await requestService(selectedService?.name);
@@ -268,6 +347,7 @@ const SubscriptionServicePage = () => {
 
     if (!selectedService) return toast.error("Please select a service");
     if (!startDate) return toast.error("Please select a start date");
+    if (!validateSelectedDays()) return;
 
     if (!resolvedLocation) {
       toast.error("Please pin your selected service location or enable auto location before booking.");
@@ -288,7 +368,7 @@ const SubscriptionServicePage = () => {
           startDate,
           endDate: getEndDate(),
           frequency,
-          selectedDays: [],
+          selectedDays,
           preferredTime,
           durationPerSession: sessionHours,
           autoRenewal,
@@ -610,6 +690,9 @@ const SubscriptionServicePage = () => {
                   onChange={(e) => setStartDate(e.target.value)}
                   className="w-full rounded-xl border border-input bg-card px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
                 />
+                {requiresDaySelection && selectedStartWeekday && selectedDays.length > 0 && !selectedDays.includes(selectedStartWeekday) && (
+                  <p className="mt-1 text-xs text-amber-600">Choose a start date that matches one of your selected service days.</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
@@ -626,6 +709,43 @@ const SubscriptionServicePage = () => {
                 </select>
               </div>
             </div>
+
+            {requiresDaySelection && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Choose service days</label>
+                  <p className="text-xs text-muted-foreground">
+                    {requiredSelectedDayCount
+                      ? `Select exactly ${requiredSelectedDayCount} day${requiredSelectedDayCount > 1 ? 's' : ''}. Worker assignment and future blocking will follow only these weekdays.`
+                      : 'Select the weekdays for this subscription.'}
+                  </p>
+                </div>
+                <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                  {DAYS_OF_WEEK.map((day) => (
+                    <button
+                      key={day.value}
+                      type="button"
+                      onClick={() => toggleSelectedDay(day.value)}
+                      className={`rounded-xl border-2 px-3 py-2 text-sm font-medium transition-all ${
+                        selectedDays.includes(day.value)
+                          ? "border-blue-400 bg-blue-50 text-blue-700"
+                          : "border-border hover:border-blue-300 text-foreground"
+                      }`}
+                    >
+                      {day.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="rounded-xl bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-700">
+                  {selectedDays.length > 0
+                    ? `Selected days: ${selectedDays.map((day) => DAYS_OF_WEEK.find((item) => item.value === day)?.label || day).join(", ")}`
+                    : "No days selected yet."}
+                  {selectedStartWeekday && (
+                    <div className="mt-1">Start date day: {DAYS_OF_WEEK.find((day) => day.value === selectedStartWeekday)?.label}</div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Session Split — available when 2h or more */}
             {sessionHours >= 2 && (
@@ -742,6 +862,7 @@ const SubscriptionServicePage = () => {
               <button
                 onClick={() => {
                   if (!startDate) return toast.error("Please select a start date");
+                  if (!validateSelectedDays()) return;
                   setStep(3);
                 }}
                 className="flex-1 py-3 rounded-2xl bg-blue-500 hover:bg-blue-600 text-white font-semibold transition-colors"
@@ -785,6 +906,13 @@ const SubscriptionServicePage = () => {
                 <Calendar className="w-3.5 h-3.5" />
                 <span>Starts: {new Date(startDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</span>
               </div>
+
+              {selectedDays.length > 0 && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>Selected days: {selectedDays.map((day) => DAYS_OF_WEEK.find((item) => item.value === day)?.label || day).join(', ')}</span>
+                </div>
+              )}
             </div>
 
             {/* Urban Company cost breakdown */}
