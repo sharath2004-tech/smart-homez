@@ -1,5 +1,5 @@
 import { ArrowLeft, Home, LogOut, Menu } from "lucide-react";
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { LanguageSelector } from "./LanguageSelector";
 
@@ -31,6 +31,14 @@ export const AppHeader = memo(({
   showBusinessHours,
   businessHoursText
 }: AppHeaderProps) => {
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [avatarUrl]);
+
+  const showAvatarImage = Boolean(avatarUrl && !avatarLoadFailed);
+
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between px-4 py-3 bg-card border-b border-border backdrop-blur-sm bg-card/95">
       {/* Left side */}
@@ -82,8 +90,13 @@ export const AppHeader = memo(({
           tabIndex={0}
           onKeyDown={(e) => e.key === "Enter" && onProfileClick?.()}
         >
-          {avatarUrl ? (
-            <img src={avatarUrl} alt={userName} className="w-7 h-7 rounded-full object-cover" />
+          {showAvatarImage ? (
+            <img
+              src={avatarUrl || undefined}
+              alt={userName}
+              className="w-7 h-7 rounded-full object-cover"
+              onError={() => setAvatarLoadFailed(true)}
+            />
           ) : (
             <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
               {initials}
@@ -95,12 +108,13 @@ export const AppHeader = memo(({
         </div>
 
         {/* Mobile user avatar */}
-        {avatarUrl ? (
+        {showAvatarImage ? (
           <img
-            src={avatarUrl}
+            src={avatarUrl || undefined}
             alt={userName}
             className="sm:hidden w-8 h-8 rounded-full object-cover cursor-pointer"
             onClick={onProfileClick}
+            onError={() => setAvatarLoadFailed(true)}
             title="View profile"
           />
         ) : (
