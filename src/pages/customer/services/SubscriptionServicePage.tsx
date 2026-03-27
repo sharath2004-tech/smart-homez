@@ -1,5 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import ServiceLocationCard from "@/components/ServiceLocationCard";
+import SubscriptionPaymentStep from "@/components/SubscriptionPaymentStep";
 import { useServiceBookingAvailability } from "@/hooks/useServiceBookingAvailability";
 import { authAPI, bookingsAPI, servicesAPI } from "@/lib/api";
 import { motion } from "framer-motion";
@@ -13,6 +14,7 @@ import {
     Star,
     User,
     Zap,
+    CheckCircle2,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -103,6 +105,8 @@ const SubscriptionServicePage = () => {
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [createdSubscription, setCreatedSubscription] = useState<{ bookingId: string; amount: number } | null>(null);
+  const [paymentSubmitted, setPaymentSubmitted] = useState(false);
   // Booking params
   const [frequency, setFrequency] = useState<FrequencyOptionId>("daily");
   const [sessionHours, setSessionHours] = useState(1);
@@ -441,8 +445,12 @@ const SubscriptionServicePage = () => {
         throw new Error("Subscription booking was created but booking ID is missing");
       }
 
-      toast.success("Subscription created and activated successfully.", { duration: 5000 });
-      navigate('/customer/subscriptions');
+      setCreatedSubscription({
+        bookingId: response.booking._id,
+        amount: Number(response.booking.totalAmount || monthlyPrice),
+      });
+      setPaymentSubmitted(false);
+      toast.success("Subscription created. Complete the payment and upload the proof to continue.", { duration: 5000 });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Booking failed");
     } finally {
@@ -467,6 +475,76 @@ const SubscriptionServicePage = () => {
   return (
     <AppLayout userType="customer" userName={profile?.name || "Guest"}>
       <div className="max-w-2xl mx-auto px-3 sm:px-4 md:px-6 pb-24 space-y-5">
+
+        {createdSubscription ? (
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
+            <div className="rounded-2xl border border-green-200 bg-green-50 p-5">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="w-6 h-6 text-green-600 mt-0.5" />
+                <div>
+                  <h2 className="text-xl font-bold text-foreground">Subscription created</h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Your plan is saved. Pay now and upload the payment proof so admin or super admin can review it and activate the subscription.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card p-4 space-y-2">
+              <p className="text-sm font-semibold text-foreground">Plan summary</p>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Service</span>
+                <span className="font-medium text-foreground">{selectedService?.name}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Frequency</span>
+                <span className="font-medium text-foreground">{currentFreq.label}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Start date</span>
+                <span className="font-medium text-foreground">{new Date(startDate).toLocaleDateString("en-IN")}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Preferred time</span>
+                <span className="font-medium text-foreground">{preferredTime} → {getEndTime()}</span>
+              </div>
+            </div>
+
+            <SubscriptionPaymentStep
+              bookingId={createdSubscription.bookingId}
+              amount={createdSubscription.amount}
+              title="Complete subscription payment"
+              description="Pay the subscription amount using the company QR or UPI, then upload the payment proof. Your subscription will move to admin review after that."
+              successLabel="Payment proof uploaded. Waiting for admin review"
+              onPaymentSubmitted={() => {
+                setPaymentSubmitted(true);
+              }}
+            />
+
+            {paymentSubmitted && (
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-700">
+                Payment proof uploaded successfully. You can now track this plan from <span className="font-semibold">My Subscriptions</span>.
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => navigate('/customer/subscriptions')}
+                className="flex-1 py-3 rounded-2xl bg-blue-500 hover:bg-blue-600 text-white font-semibold transition-colors"
+              >
+                Go to My Subscriptions
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/customer/bookings')}
+                className="flex-1 py-3 rounded-2xl border border-border text-foreground font-semibold hover:bg-muted transition-colors"
+              >
+                View Bookings
+              </button>
+            </div>
+          </motion.div>
+        ) : (
 
         {/* Header */}
         <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="flex items-center gap-3">
@@ -982,6 +1060,7 @@ const SubscriptionServicePage = () => {
           </motion.div>
             )}
           </>
+        )}
       </div>
     </AppLayout>
   );

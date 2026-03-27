@@ -8,6 +8,7 @@
  */
 
 import twilio from 'twilio';
+import { isWhatsAppOtpConfigured, sendWhatsAppOtp, verifyWhatsAppOtp } from './whatsappService.js';
 
 // In-memory storage for OTP request IDs (use Redis in production)
 const otpStore = new Map();
@@ -26,6 +27,7 @@ const MSG91_OTP_EXPIRY = parseInt(process.env.MSG91_OTP_EXPIRY) || 600; // 10 mi
 
 const USE_MSG91 = MSG91_AUTH_KEY && MSG91_TEMPLATE_ID;
 const TWILIO_FALLBACK_ENABLED = process.env.TWILIO_ENABLED === 'true';
+const OTP_DELIVERY_CHANNEL = process.env.OTP_DELIVERY_CHANNEL || 'sms';
 
 /**
  * Phone number normalization to E.164 format
@@ -418,6 +420,10 @@ export async function sendOTP(phone, options = {}) {
   const e164 = toE164(phone);
 
   try {
+    if (OTP_DELIVERY_CHANNEL === 'whatsapp' && isWhatsAppOtpConfigured()) {
+      return await sendWhatsAppOtp(e164);
+    }
+
     if (USE_MSG91) {
       return await sendSMSOTP(e164, options);
     } else if (TWILIO_FALLBACK_ENABLED) {
@@ -450,6 +456,10 @@ export async function verifyOTP(phone, code) {
   const e164 = toE164(phone);
 
   try {
+    if (OTP_DELIVERY_CHANNEL === 'whatsapp' && isWhatsAppOtpConfigured()) {
+      return await verifyWhatsAppOtp(e164, code);
+    }
+
     if (USE_MSG91) {
       return await verifySMSOTP(e164, code);
     } else if (TWILIO_FALLBACK_ENABLED) {

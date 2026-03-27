@@ -17,6 +17,7 @@ import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/
 import notificationService from '../utils/notificationService.js';
 import { getNextRecurringScheduleDate } from '../utils/recurringSchedule.js';
 import { checkSlotAvailability } from '../utils/slotManagement.js';
+import { isWhatsAppConfigured, sendWhatsAppMessage } from '../utils/whatsappService.js';
 import {
     evaluateWorkerEffectiveAvailability,
     isWorkerAssignedToBooking,
@@ -24,8 +25,20 @@ import {
     isWorkerEligibleForAssignment
 } from '../utils/workerAvailability.js';
 
-// Send temporary password via SMS (plain message, not Twilio Verify)
+// Send temporary password via preferred phone channel (WhatsApp first, SMS fallback)
 async function sendTemporaryPasswordSMS(phone, name, temporaryPassword) {
+  const body = `Hi ${name}, welcome to Healthy Homez! Your temporary password is: ${temporaryPassword} Please log in and change it immediately. App: ${process.env.FRONTEND_URL || 'https://healthyhomez.app'}`;
+
+  if (isWhatsAppConfigured()) {
+    try {
+      await sendWhatsAppMessage({ phone, message: body });
+      console.log(`✅ Temporary password sent on WhatsApp to ${phone}`);
+      return { success: true, channel: 'whatsapp' };
+    } catch (error) {
+      console.warn('⚠️ WhatsApp credential delivery failed, falling back to SMS:', error.message);
+    }
+  }
+
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
   const from = process.env.TWILIO_PHONE_NUMBER;
@@ -37,7 +50,6 @@ async function sendTemporaryPasswordSMS(phone, name, temporaryPassword) {
     const client = twilio(sid, token);
     const digits = phone.replace(/\D/g, '').slice(-10);
     const to = `+91${digits}`;
-    const body = `Hi ${name}, welcome to Healthy Homez! Your temporary password is: ${temporaryPassword}  Please log in and change it immediately. App: ${process.env.FRONTEND_URL || 'https://healthyhomez.app'}`;
     await client.messages.create({ body, from, to });
     console.log(`✅ Temporary password SMS sent to ${to}`);
     return { success: true };
@@ -101,7 +113,7 @@ const buildCredentialDeliveryResults = (credentialDelivery, phone) => {
   }
 
   if (credentialDelivery === 'phone' || credentialDelivery === 'both') {
-    results.sms = phone ? 'queued' : 'skipped: phone not provided';
+    results.phone = phone ? 'queued' : 'skipped: phone not provided';
   }
 
   return results;
@@ -118,7 +130,7 @@ const queueWorkerCredentialDelivery = ({ credentialDelivery, email, phone, name,
 
     if ((credentialDelivery === 'phone' || credentialDelivery === 'both') && phone) {
       const result = await sendTemporaryPasswordSMS(phone, name, temporaryPassword);
-      deliveryResults.sms = result.success ? 'sent' : `failed: ${result.reason}`;
+      deliveryResults.phone = result.success ? (result.channel || 'sent') : `failed: ${result.reason}`;
     }
 
     console.log(`📨 Worker credential delivery completed for ${email}:`, deliveryResults);

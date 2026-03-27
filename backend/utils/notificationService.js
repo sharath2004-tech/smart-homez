@@ -4,8 +4,10 @@
  * REQ-C-010: Change Notifications
  */
 
+import twilio from 'twilio';
 import Notification from '../models/Notification.js';
 import User from '../models/User.js';
+import { sendWhatsAppMessage as sendWhatsAppBusinessMessage } from './whatsappService.js';
 
 /**
  * Notification Types for REQ-C-010
@@ -168,22 +170,7 @@ function getChannelsForNotificationType(type, prefs) {
  * TODO: Integrate with WhatsApp Business API or Twilio
  */
 async function sendWhatsAppMessage({ phone, message }) {
-  // Placeholder for WhatsApp API integration
-  // Example: Twilio WhatsApp, WhatsApp Business API, etc.
-  
-  console.log('📱 [WhatsApp - Placeholder]');
-  console.log(`To: ${phone}`);
-  console.log(`Message: ${message}`);
-  
-  // TODO: Implement actual WhatsApp sending logic
-  // const twilioClient = twilio(accountSid, authToken);
-  // await twilioClient.messages.create({
-  //   from: 'whatsapp:+14155238886',
-  //   to: `whatsapp:${phone}`,
-  //   body: message
-  // });
-
-  return Promise.resolve({ success: true, channel: 'whatsapp' });
+  return sendWhatsAppBusinessMessage({ phone, message });
 }
 
 /**
@@ -191,21 +178,29 @@ async function sendWhatsAppMessage({ phone, message }) {
  * TODO: Integrate with SMS provider (Twilio, AWS SNS, etc.)
  */
 async function sendSMS({ phone, message }) {
-  // Placeholder for SMS API integration
-  
-  console.log('📨 [SMS - Placeholder]');
-  console.log(`To: ${phone}`);
-  console.log(`Message: ${message}`);
-  
-  // TODO: Implement actual SMS sending logic
-  // const twilioClient = twilio(accountSid, authToken);
-  // await twilioClient.messages.create({
-  //   from: '+1234567890',
-  //   to: phone,
-  //   body: message
-  // });
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const from = process.env.TWILIO_PHONE_NUMBER;
 
-  return Promise.resolve({ success: true, channel: 'sms' });
+  if (!sid || !token || !from) {
+    throw new Error('Twilio SMS service not configured');
+  }
+
+  const digits = String(phone).replace(/\D/g, '').slice(-10);
+  if (digits.length < 10) {
+    throw new Error('Enter a valid 10-digit mobile number');
+  }
+
+  const client = twilio(sid, token);
+  const to = `+91${digits}`;
+
+  await client.messages.create({
+    body: message,
+    from,
+    to,
+  });
+
+  return { success: true, channel: 'sms', to };
 }
 
 /**
