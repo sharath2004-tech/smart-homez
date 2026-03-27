@@ -502,10 +502,20 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
       || booking.subscription?.activationStatus === 'active'
     )
   );
-  const shouldShowSubscriptionPaymentStep = Boolean(
-    booking?.subscription?.isSubscription
-    && !isSubscriptionPaymentSettled
-    && booking.subscription?.activationStatus !== 'active'
+  const isBookingPaymentSettled = Boolean(
+    booking
+    && (
+      booking.paymentStatus === 'paid'
+      || booking.paymentProof?.reviewStatus === 'approved'
+      || isSubscriptionPaymentSettled
+    )
+  );
+  const shouldShowPaymentProofStep = Boolean(
+    booking
+    && !isBookingPaymentSettled
+    && booking.status !== 'cancelled'
+    && booking.status !== 'completed'
+    && paymentSummary?.pendingAmount !== null
   );
 
   const handlePrintToPDF = () => {
@@ -1021,14 +1031,19 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                 </div>
               )}
 
-              {shouldShowSubscriptionPaymentStep && (
+              {shouldShowPaymentProofStep && (
                 <SubscriptionPaymentStep
                   bookingId={booking._id}
                   amount={booking.totalAmount}
-                  title={booking.paymentProof?.reviewStatus === 'rejected' ? 'Re-upload subscription payment proof' : 'Upload subscription payment proof'}
+                  amountLabel={booking.subscription?.isSubscription ? 'Subscription amount' : 'Booking amount'}
+                  title={booking.paymentProof?.reviewStatus === 'rejected'
+                    ? 'Re-upload payment proof'
+                    : 'Upload payment proof'}
                   description={booking.paymentProof?.reviewStatus === 'rejected'
-                    ? 'Your previous payment proof was rejected. Please upload a clear payment screenshot so admin can verify and continue activation.'
-                    : 'This subscription is waiting for payment proof. Complete the payment and upload the screenshot here so your region admin or super admin can review it and continue the activation process.'}
+                    ? 'Your previous payment proof was rejected. Please upload a clear payment screenshot so admin can verify it.'
+                    : booking.subscription?.isSubscription
+                      ? 'This subscription is waiting for payment proof. Complete the payment and upload the screenshot here so your region admin or super admin can review it and continue the activation process.'
+                      : 'Payment is pending for this booking. Complete the payment and upload the screenshot here so admin can verify it.'}
                   successLabel={booking.paymentProof?.reviewStatus === 'rejected'
                     ? 'Updated payment proof uploaded. Waiting for admin review'
                     : 'Payment proof uploaded. Waiting for admin review'}

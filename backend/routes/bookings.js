@@ -3954,6 +3954,7 @@ router.post('/:id/upload-payment-proof',
       const isCustomer = req.user.role === 'customer';
       const isAssignedWorker = Boolean(booking.worker && booking.worker.toString() === req.user._id.toString());
       const isBookingCustomer = booking.customer?.toString() === req.user._id.toString();
+      const isCustomerSelfUpload = Boolean(isCustomer && isBookingCustomer);
       const isSubscriptionBooking = booking.subscription?.isSubscription || ['daily', 'weekly', 'biweekly', 'monthly', 'monthly-subscription'].includes(booking.bookingType);
       const subscriptionPaymentSource = isSubscriptionBooking
         ? await getSubscriptionPaymentSource(booking)
@@ -3967,9 +3968,18 @@ router.post('/:id/upload-payment-proof',
         )
       );
 
-      if (!(isAdmin || (isWorker && isAssignedWorker) || (isCustomer && isBookingCustomer && isSubscriptionBooking))) {
+      if (!(isAdmin || (isWorker && isAssignedWorker) || isCustomerSelfUpload)) {
         return res.status(403).json({ 
           error: { message: 'You are not authorized to upload payment proof for this booking', status: 403 } 
+        });
+      }
+
+      if (isCustomerSelfUpload && booking.status === 'cancelled') {
+        return res.status(400).json({
+          error: {
+            message: 'Cancelled bookings cannot accept payment proof uploads.',
+            status: 400
+          }
         });
       }
 
@@ -3983,9 +3993,9 @@ router.post('/:id/upload-payment-proof',
         });
       }
 
-      // Customer can upload subscription payment proof during booking flow; worker/admin remain completion-flow only
+      // Customers can upload payment proof from booking details; worker/admin remain completion-flow only.
       if (
-        !(isCustomer && isBookingCustomer && isSubscriptionBooking)
+        !isCustomerSelfUpload
         && booking.status !== 'completed'
         && booking.status !== 'pending-review'
       ) {

@@ -10,6 +10,7 @@ interface SubscriptionPaymentStepProps {
   description?: string;
   onPaymentSubmitted?: () => void;
   successLabel?: string;
+  amountLabel?: string;
 }
 
 interface PaymentSettings {
@@ -39,6 +40,7 @@ export default function SubscriptionPaymentStep({
   description = "Pay using the company UPI ID or QR code, then upload your payment screenshot. Admin or super admin will review the plan and assign the worker before activation.",
   onPaymentSubmitted,
   successLabel = "Payment proof uploaded. Waiting for admin approval",
+  amountLabel = "Subscription amount",
 }: SubscriptionPaymentStepProps) {
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null);
   const [loadingSettings, setLoadingSettings] = useState(true);
@@ -145,7 +147,7 @@ export default function SubscriptionPaymentStep({
 
       <div className="rounded-xl border border-border bg-muted/40 p-4 flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Subscription amount</p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">{amountLabel}</p>
           <p className="text-2xl font-bold text-primary">₹{amount.toLocaleString("en-IN")}</p>
         </div>
         <div className="text-xs text-muted-foreground">
