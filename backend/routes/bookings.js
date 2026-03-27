@@ -29,10 +29,11 @@ import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
 import { getNextRecurringScheduleDate } from '../utils/recurringSchedule.js';
 import { checkSlotAvailability } from '../utils/slotManagement.js';
 import {
-  findFirstOverlappingOccurrence,
+  buildRecurringOccurrences,
   getNextBookableDate,
   getSubscriptionConflictWindowEnd,
   isRequestedDateTimeInPast,
+  timeRangesOverlap,
 } from '../utils/subscriptionScheduling.js';
 import { checkIfOnTime, updateWorkerStats } from '../utils/updateWorkerStats.js';
 import { assignWorkerToBooking, reassignWorker } from '../utils/workerAssignment.js';
@@ -468,6 +469,46 @@ const getComparableScheduleFromBooking = (booking) => {
   };
 };
 
+const buildCancelledOccurrenceMap = (cancelledBookings) => {
+  const cancelledByDateKey = new Map();
+
+  cancelledBookings.forEach((booking) => {
+    if (!booking?.bookingDate) {
+      return;
+    }
+
+    const dateKey = startOfDay(booking.bookingDate).getTime();
+    const window = {
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+    };
+    const existing = cancelledByDateKey.get(dateKey) || [];
+    existing.push(window);
+    cancelledByDateKey.set(dateKey, existing);
+  });
+
+  return cancelledByDateKey;
+};
+
+const hasCancelledOccurrenceOverlap = ({
+  cancelledByDateKey,
+  dateKey,
+  proposedStartTime,
+  proposedEndTime,
+}) => {
+  if (!cancelledByDateKey || !cancelledByDateKey.has(dateKey)) {
+    return false;
+  }
+
+  const cancelledWindows = cancelledByDateKey.get(dateKey) || [];
+  return cancelledWindows.some((window) => timeRangesOverlap(
+    proposedStartTime,
+    proposedEndTime,
+    window.startTime,
+    window.endTime,
+  ));
+};
+
 const findScheduleConflict = async ({
   match,
   proposedSchedule,
@@ -528,19 +569,74 @@ const findScheduleConflict = async ({
     candidateMap.set(booking._id.toString(), booking);
   });
 
+  const proposedOccurrences = buildRecurringOccurrences({
+    frequency: proposedSchedule.frequency,
+    startDate: proposedSchedule.startDate,
+    selectedDays: proposedSchedule.selectedDays || [],
+    endDate: proposedSchedule.endDate || null,
+    rangeStart: comparisonStart,
+    rangeEnd: comparisonEnd,
+  });
+  const proposedKeys = new Set(proposedOccurrences.map((date) => startOfDay(date).getTime()));
+  const cancelledOccurrenceCache = new Map();
+
   for (const booking of candidateMap.values()) {
     const existingSchedule = getComparableScheduleFromBooking(booking);
-    const overlappingDate = findFirstOverlappingOccurrence({
-      proposedSchedule,
-      existingSchedule,
+    if (!timeRangesOverlap(
+      proposedSchedule.startTime,
+      proposedSchedule.endTime,
+      existingSchedule.startTime,
+      existingSchedule.endTime,
+    )) {
+      continue;
+    }
+
+    const existingOccurrences = buildRecurringOccurrences({
+      frequency: existingSchedule.frequency,
+      startDate: existingSchedule.startDate,
+      selectedDays: existingSchedule.selectedDays || [],
+      endDate: existingSchedule.endDate || null,
       rangeStart: comparisonStart,
       rangeEnd: comparisonEnd,
     });
 
-    if (overlappingDate) {
+    let cancelledByDateKey = null;
+    if (booking?.subscription?.isSubscription && !booking.parentBooking) {
+      const bookingId = booking._id.toString();
+      if (cancelledOccurrenceCache.has(bookingId)) {
+        cancelledByDateKey = cancelledOccurrenceCache.get(bookingId);
+      } else {
+        const cancelledChildVisits = await Booking.find({
+          parentBooking: booking._id,
+          bookingDate: { $gte: comparisonStart, $lte: comparisonEnd },
+          status: 'cancelled',
+        })
+          .select('bookingDate startTime endTime')
+          .lean();
+
+        cancelledByDateKey = buildCancelledOccurrenceMap(cancelledChildVisits);
+        cancelledOccurrenceCache.set(bookingId, cancelledByDateKey);
+      }
+    }
+
+    for (const occurrence of existingOccurrences) {
+      const dateKey = startOfDay(occurrence).getTime();
+      if (!proposedKeys.has(dateKey)) {
+        continue;
+      }
+
+      if (hasCancelledOccurrenceOverlap({
+        cancelledByDateKey,
+        dateKey,
+        proposedStartTime: proposedSchedule.startTime,
+        proposedEndTime: proposedSchedule.endTime,
+      })) {
+        continue;
+      }
+
       return {
         booking,
-        overlappingDate,
+        overlappingDate: occurrence,
       };
     }
   }
