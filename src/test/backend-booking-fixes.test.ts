@@ -12,9 +12,11 @@ import {
 } from '../../backend/utils/deepCleaningValidation.js';
 import { getNextRecurringScheduleDate } from '../../backend/utils/recurringSchedule.js';
 import {
+    buildRecurringOccurrences,
     findFirstOverlappingOccurrence,
     getSubscriptionConflictWindowEnd,
     isRequestedDateTimeInPast,
+    timeRangesOverlap,
 } from '../../backend/utils/subscriptionScheduling.js';
 import {
     getMinimumSubscriptionStartDate,
@@ -214,6 +216,87 @@ describe('recurring schedule helpers', () => {
       now: new Date('2026-03-26T09:05:00.000Z'),
       bufferMinutes: 30,
     })).toBe(false);
+  });
+
+  it('allows rebooking when the only overlapping subscription root is not active', () => {
+    const proposedSchedule = {
+      frequency: 'daily',
+      startDate: new Date('2026-03-28T00:00:00.000Z'),
+      endDate: new Date('2026-03-28T00:00:00.000Z'),
+      selectedDays: [],
+      startTime: '09:00',
+      endTime: '10:30',
+    };
+
+    const inactiveRootBooking = {
+      bookingDate: new Date('2026-03-28T00:00:00.000Z'),
+      startTime: '09:00',
+      endTime: '10:30',
+      bookingType: 'monthly-subscription',
+      isRecurring: false,
+      parentBooking: null,
+      status: 'pending',
+      subscription: {
+        isSubscription: true,
+        activationStatus: 'payment_pending',
+        subscriptionStartDate: new Date('2026-03-28T00:00:00.000Z'),
+        subscriptionEndDate: null,
+      },
+      recurringSchedule: {
+        frequency: 'daily',
+        startDate: new Date('2026-03-28T00:00:00.000Z'),
+        endDate: null,
+        selectedDays: [],
+      },
+    };
+
+    const isSubscriptionRootBooking = Boolean(
+      inactiveRootBooking.subscription?.isSubscription && !inactiveRootBooking.parentBooking
+    );
+
+    const isActiveSubscriptionRootBooking = Boolean(
+      isSubscriptionRootBooking
+      && inactiveRootBooking.subscription?.activationStatus === 'active'
+      && ['pending', 'confirmed', 'in-progress', 'completed'].includes(inactiveRootBooking.status)
+    );
+
+    const shouldBlock = (() => {
+      if (isSubscriptionRootBooking && !isActiveSubscriptionRootBooking) {
+        return false;
+      }
+
+      if (!timeRangesOverlap(
+        proposedSchedule.startTime,
+        proposedSchedule.endTime,
+        inactiveRootBooking.startTime,
+        inactiveRootBooking.endTime,
+      )) {
+        return false;
+      }
+
+      const proposedOccurrences = buildRecurringOccurrences({
+        frequency: proposedSchedule.frequency,
+        startDate: proposedSchedule.startDate,
+        selectedDays: proposedSchedule.selectedDays,
+        endDate: proposedSchedule.endDate,
+        rangeStart: proposedSchedule.startDate,
+        rangeEnd: getSubscriptionConflictWindowEnd(proposedSchedule.startDate, proposedSchedule.endDate),
+      });
+
+      const existingOccurrences = buildRecurringOccurrences({
+        frequency: inactiveRootBooking.recurringSchedule.frequency,
+        startDate: inactiveRootBooking.recurringSchedule.startDate,
+        selectedDays: inactiveRootBooking.recurringSchedule.selectedDays,
+        endDate: inactiveRootBooking.recurringSchedule.endDate,
+        rangeStart: proposedSchedule.startDate,
+        rangeEnd: getSubscriptionConflictWindowEnd(proposedSchedule.startDate, proposedSchedule.endDate),
+      });
+
+      const proposedKeys = new Set(proposedOccurrences.map((date) => date.getTime()));
+      return existingOccurrences.some((date) => proposedKeys.has(date.getTime()));
+    })();
+
+    expect(shouldBlock).toBe(false);
   });
 });
 

@@ -469,6 +469,16 @@ const getComparableScheduleFromBooking = (booking) => {
   };
 };
 
+const isSubscriptionRootBooking = (booking) => Boolean(
+  booking?.subscription?.isSubscription && !booking?.parentBooking
+);
+
+const isActiveSubscriptionRootBooking = (booking) => Boolean(
+  isSubscriptionRootBooking(booking)
+  && booking?.subscription?.activationStatus === 'active'
+  && ['pending', 'confirmed', 'in-progress', 'completed'].includes(booking?.status)
+);
+
 const buildCancelledOccurrenceMap = (cancelledBookings) => {
   const cancelledByDateKey = new Map();
 
@@ -545,13 +555,10 @@ const findScheduleConflict = async ({
       bookingDate: { $lte: comparisonEnd },
       $and: [
         {
-          $or: [
-            { status: { $in: ['pending', 'confirmed', 'in-progress'] } },
-            {
-              status: 'completed',
-              'subscription.activationStatus': 'active'
-            }
-          ],
+          status: { $in: ['pending', 'confirmed', 'in-progress', 'completed'] },
+        },
+        {
+          'subscription.activationStatus': 'active',
         },
         {
           $or: [
@@ -587,6 +594,10 @@ const findScheduleConflict = async ({
   const cancelledOccurrenceCache = new Map();
 
   for (const booking of candidateMap.values()) {
+    if (isSubscriptionRootBooking(booking) && !isActiveSubscriptionRootBooking(booking)) {
+      continue;
+    }
+
     const existingSchedule = getComparableScheduleFromBooking(booking);
     if (!timeRangesOverlap(
       proposedSchedule.startTime,
