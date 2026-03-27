@@ -10,9 +10,9 @@
 import Booking from '../models/Booking.js';
 import { startOfDay } from './recurringSchedule.js';
 import {
-  buildRecurringOccurrences,
-  getSubscriptionConflictWindowEnd,
-  timeRangesOverlap,
+    buildRecurringOccurrences,
+    getSubscriptionConflictWindowEnd,
+    timeRangesOverlap,
 } from './subscriptionScheduling.js';
 
 /**
