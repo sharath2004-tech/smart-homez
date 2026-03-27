@@ -181,6 +181,108 @@
     "withSubscription": "with subscription",
     "startSubscription": "Start Subscription"
   },
+  "subscriptionPage": {
+    "loading": "Loading subscriptions...",
+    "title": "My Subscriptions",
+    "subtitle": "Manage your active subscriptions, payment status, and assigned workers",
+    "frequencyLabel": "{{frequency}} subscription",
+    "toasts": {
+      "loadFailed": "Failed to load subscriptions",
+      "workersLoadFailed": "Failed to load available workers",
+      "workerChangeSent": "Worker change request sent to admin successfully.",
+      "workerChangeFailed": "Failed to change worker",
+      "pauseRequestSent": "Pause request sent to admin successfully",
+      "pauseRequestFailed": "Failed to pause subscription",
+      "resumeSuccess": "Subscription resumed successfully",
+      "resumeFailed": "Failed to resume subscription"
+    },
+    "renewal": {
+      "expires": "{{service}} subscription expires {{when}}",
+      "today": "today",
+      "tomorrow": "tomorrow",
+      "inDays": "in {{count}} days",
+      "description": "Renew before {{date}} to keep your service uninterrupted.",
+      "action": "Renew"
+    },
+    "empty": {
+      "title": "No Active Subscriptions",
+      "description": "You don't have any active subscriptions yet.",
+      "action": "Browse Services"
+    },
+    "badges": {
+      "paymentRequired": "Payment proof required",
+      "paid": "Paid",
+      "review": "Setup under review",
+      "paused": "Paused",
+      "pausePending": "Pause request pending",
+      "active": "Active"
+    },
+    "labels": {
+      "time": "Time",
+      "started": "Started",
+      "ends": "Ends",
+      "location": "Location"
+    },
+    "worker": {
+      "title": "Assigned Worker",
+      "change": "Change",
+      "help": "After the first visit starts, you can request an admin-approved worker change for future visits.",
+      "modalTitle": "Request Worker Change",
+      "modalDescription": "Pick the worker you want and we’ll send the request to admin for approval.",
+      "loading": "Loading workers...",
+      "noneAvailable": "No workers available",
+      "jobs_one": "1 job",
+      "jobs_other": "{{count}} jobs",
+      "unassigned": {
+        "paymentPending": "Upload your payment proof to start the admin approval and worker assignment process.",
+        "review": "Admin or super admin is reviewing your subscription schedule or worker setup.",
+        "paid": "Payment is already verified for this subscription. Worker assignment and future visits will continue from this plan.",
+        "assigning": "We’re assigning your worker for this cycle now. Their profile will show up here as soon as the schedule is locked."
+      }
+    },
+    "calendar": {
+      "serviceDays": "Service Days",
+      "view": "View Calendar",
+      "hide": "Hide Calendar"
+    },
+    "features": {
+      "autoRenewal": "Auto-renewal enabled",
+      "pauseAvailable": "Pause available",
+      "durationPerSession": "{{count}}hr per session"
+    },
+    "actions": {
+      "resume": "Resume",
+      "pausePending": "Pause request pending admin approval",
+      "requestPause": "Request Pause"
+    },
+    "payment": {
+      "pendingReview": "Payment proof uploaded successfully. Your region admin or super admin is reviewing it now.",
+      "rejected": "Payment proof was rejected. Please upload a new screenshot.",
+      "rejectedWithNote": "Payment proof was rejected: {{note}}. Please upload a new screenshot.",
+      "stepTitle": "Complete subscription payment",
+      "stepDescription": "Pay for this subscription and upload the payment proof. Your region admin or super admin will review it first, then assign an available worker whose future schedule has no conflicts.",
+      "stepSuccess": "Payment proof uploaded. Waiting for regional admin review",
+      "verified": "Subscription payment is already completed and verified. You do not need to upload payment proof again for this plan or its visits."
+    },
+    "pause": {
+      "modalTitle": "Request subscription pause",
+      "modalDescription": "Tell admin when you want the break to start and end. They’ll review it before the subscription is paused.",
+      "startDate": "Pause start date",
+      "endDate": "Pause end date",
+      "reason": "Reason for pause",
+      "reasonPlaceholder": "Example: Travelling for 2 days, please pause the visits.",
+      "send": "Send Request",
+      "sending": "Sending...",
+      "rejectedUpdate": "Pause request update: {{note}}",
+      "sentOn": "Your pause request was sent on {{date}}.",
+      "breakWindowStart": "Requested break: {{date}}",
+      "breakWindowEnd": "to {{date}}",
+      "validation": {
+        "datesRequired": "Please select both pause start date and end date",
+        "endBeforeStart": "Pause end date cannot be before pause start date"
+      }
+    }
+  },
   "days": {
     "monday": "Monday",
     "tuesday": "Tuesday",

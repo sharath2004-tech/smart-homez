@@ -53,7 +53,7 @@ const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
-const SUBSCRIPTION_FLOW_NOTIFICATIONS_ENABLED = false;
+const SUBSCRIPTION_FLOW_NOTIFICATIONS_ENABLED = process.env.SUBSCRIPTION_FLOW_NOTIFICATIONS_ENABLED !== 'false';
 
 const findDeepCleaningServiceFallback = async () => {
   const directMatch = await Service.findOne({
@@ -786,6 +786,28 @@ const notifySubscriptionPauseAdmins = async (booking, requestedBy, reason = '', 
       reason,
     }
   })));
+
+  const assignedWorkerId = booking.subscription?.fixedWorker?.toString?.()
+    || booking.worker?._id?.toString?.()
+    || booking.worker?.toString?.()
+    || null;
+
+  if (assignedWorkerId) {
+    await notificationService.sendNotification({
+      userId: assignedWorkerId,
+      type: 'system',
+      title: 'Subscription pause requested',
+      message: `${requestedBy.name || 'A customer'} requested a pause for ${booking.service?.name || 'a subscription'}${requestedWindow ? ` (${requestedWindow})` : ''}.`,
+      priority: 'high',
+      data: {
+        bookingId: booking._id,
+        requestedBy: requestedBy._id,
+        requestedStartDate,
+        requestedEndDate,
+        reason,
+      }
+    });
+  }
 };
 
 const getRelevantAdminsForBooking = async (booking) => {
@@ -5369,7 +5391,8 @@ router.post('/:id/pause-subscription',
     try {
       const booking = await Booking.findById(req.params.id)
         .populate('customer', 'name email')
-        .populate('service', 'name');
+        .populate('service', 'name')
+        .populate('worker', 'name email phone');
       
       if (!booking) {
         return res.status(404).json({ 
@@ -5377,35 +5400,53 @@ router.post('/:id/pause-subscription',
         });
       }
 
+      const subscriptionBookingId = getSubscriptionRootBookingId(booking);
+      const subscriptionBooking = subscriptionBookingId.toString() === booking._id.toString()
+        ? booking
+        : await Booking.findById(subscriptionBookingId)
+            .populate('customer', 'name email')
+            .populate('service', 'name')
+            .populate('worker', 'name email phone');
+
+      if (!subscriptionBooking) {
+        return res.status(404).json({
+          error: { message: 'Subscription root booking not found', status: 404 }
+        });
+      }
+
       // Verify this is a subscription booking
-      if (!booking.subscription?.isSubscription) {
+      if (!subscriptionBooking.subscription?.isSubscription) {
         return res.status(400).json({ 
           error: { message: 'This is not a subscription booking', status: 400 } 
         });
       }
 
       // Verify customer owns this subscription
-      if (booking.customer.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      const subscriptionCustomerId = subscriptionBooking.customer?._id?.toString?.()
+        || subscriptionBooking.customer?.toString?.()
+        || null;
+
+      if (subscriptionCustomerId !== req.user._id.toString() && req.user.role !== 'admin') {
         return res.status(403).json({ 
           error: { message: 'Not authorized to modify this subscription', status: 403 } 
         });
       }
 
       // Check if pause is allowed
-      if (!booking.subscription.allowPause) {
+      if (!subscriptionBooking.subscription.allowPause) {
         return res.status(400).json({ 
           error: { message: 'This subscription does not allow pausing', status: 400 } 
         });
       }
 
       // Check if already paused
-      if (booking.subscription.isPaused) {
+      if (subscriptionBooking.subscription.isPaused) {
         return res.status(400).json({ 
           error: { message: 'Subscription is already paused', status: 400 } 
         });
       }
 
-      if (booking.subscription.pauseRequestStatus === 'pending') {
+      if (subscriptionBooking.subscription.pauseRequestStatus === 'pending') {
         return res.status(400).json({
           error: { message: 'A pause request is already pending admin review', status: 400 }
         });
@@ -5445,28 +5486,28 @@ router.post('/:id/pause-subscription',
         });
       }
 
-      booking.subscription.pauseRequestStatus = 'pending';
-      booking.subscription.pauseRequestedAt = new Date();
-      booking.subscription.pauseRequestedBy = req.user._id;
-      booking.subscription.pauseRequestStartDate = normalizedPauseStartDate;
-      booking.subscription.pauseRequestEndDate = normalizedPauseEndDate;
-      booking.subscription.pauseRequestReason = reason || '';
-      booking.subscription.pauseReviewedAt = null;
-      booking.subscription.pauseReviewedBy = null;
-      booking.subscription.pauseReviewNote = '';
+      subscriptionBooking.subscription.pauseRequestStatus = 'pending';
+      subscriptionBooking.subscription.pauseRequestedAt = new Date();
+      subscriptionBooking.subscription.pauseRequestedBy = req.user._id;
+      subscriptionBooking.subscription.pauseRequestStartDate = normalizedPauseStartDate;
+      subscriptionBooking.subscription.pauseRequestEndDate = normalizedPauseEndDate;
+      subscriptionBooking.subscription.pauseRequestReason = reason || '';
+      subscriptionBooking.subscription.pauseReviewedAt = null;
+      subscriptionBooking.subscription.pauseReviewedBy = null;
+      subscriptionBooking.subscription.pauseReviewNote = '';
       
-      await booking.save();
+      await subscriptionBooking.save();
       await notifySubscriptionPauseAdmins(
-        booking,
+        subscriptionBooking,
         req.user,
         reason,
-        booking.subscription.pauseRequestStartDate,
-        booking.subscription.pauseRequestEndDate,
+        subscriptionBooking.subscription.pauseRequestStartDate,
+        subscriptionBooking.subscription.pauseRequestEndDate,
       );
 
       res.json({ 
         message: 'Pause request sent to admin successfully',
-        booking
+        booking: subscriptionBooking
       });
 
     } catch (error) {
@@ -5603,45 +5644,60 @@ router.post('/:id/resume-subscription',
         });
       }
 
+      const subscriptionBookingId = getSubscriptionRootBookingId(booking);
+      const subscriptionBooking = subscriptionBookingId.toString() === booking._id.toString()
+        ? booking
+        : await Booking.findById(subscriptionBookingId);
+
+      if (!subscriptionBooking) {
+        return res.status(404).json({
+          error: { message: 'Subscription root booking not found', status: 404 }
+        });
+      }
+
       // Verify this is a subscription booking
-      if (!booking.subscription?.isSubscription) {
+      if (!subscriptionBooking.subscription?.isSubscription) {
         return res.status(400).json({ 
           error: { message: 'This is not a subscription booking', status: 400 } 
         });
       }
 
       // Verify customer owns this subscription
-      if (booking.customer.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      const subscriptionCustomerId = subscriptionBooking.customer?._id?.toString?.()
+        || subscriptionBooking.customer?.toString?.()
+        || null;
+
+      if (subscriptionCustomerId !== req.user._id.toString() && req.user.role !== 'admin') {
         return res.status(403).json({ 
           error: { message: 'Not authorized to modify this subscription', status: 403 } 
         });
       }
 
       // Check if actually paused
-      if (!booking.subscription.isPaused) {
+      if (!subscriptionBooking.subscription.isPaused) {
         return res.status(400).json({ 
           error: { message: 'Subscription is not paused', status: 400 } 
         });
       }
 
       // Resume the subscription
-      booking.subscription.isPaused = false;
-      booking.subscription.resumedAt = new Date();
-      booking.subscription.pauseRequestStatus = 'none';
-      booking.subscription.pauseRequestedAt = null;
-      booking.subscription.pauseRequestedBy = null;
-      booking.subscription.pauseRequestStartDate = null;
-      booking.subscription.pauseRequestEndDate = null;
-      booking.subscription.pauseRequestReason = '';
-      booking.subscription.pauseReviewedAt = null;
-      booking.subscription.pauseReviewedBy = null;
-      booking.subscription.pauseReviewNote = '';
+      subscriptionBooking.subscription.isPaused = false;
+      subscriptionBooking.subscription.resumedAt = new Date();
+      subscriptionBooking.subscription.pauseRequestStatus = 'none';
+      subscriptionBooking.subscription.pauseRequestedAt = null;
+      subscriptionBooking.subscription.pauseRequestedBy = null;
+      subscriptionBooking.subscription.pauseRequestStartDate = null;
+      subscriptionBooking.subscription.pauseRequestEndDate = null;
+      subscriptionBooking.subscription.pauseRequestReason = '';
+      subscriptionBooking.subscription.pauseReviewedAt = null;
+      subscriptionBooking.subscription.pauseReviewedBy = null;
+      subscriptionBooking.subscription.pauseReviewNote = '';
       
-      await booking.save();
+      await subscriptionBooking.save();
 
       res.json({ 
         message: 'Subscription resumed successfully',
-        booking
+        booking: subscriptionBooking
       });
 
     } catch (error) {

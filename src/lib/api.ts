@@ -738,7 +738,31 @@ export const bookingsAPI = {
     return apiCall(`/bookings/${id}/payment-proof-review`, {
       method: 'POST',
       body: JSON.stringify({ action, reason })
-    });
+    }, 35000);
+  },
+
+  changeSubscriptionWorker: async (id: string, workerId: string, reason?: string) => {
+    return apiCall(`/bookings/${id}/change-subscription-worker`, {
+      method: 'POST',
+      body: JSON.stringify({ workerId, reason })
+    }, 35000);
+  },
+
+  pauseSubscription: async (id: string, payload: {
+    requestedStartDate: string | null;
+    requestedEndDate: string | null;
+    reason?: string;
+  }) => {
+    return apiCall(`/bookings/${id}/pause-subscription`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }, 35000);
+  },
+
+  resumeSubscription: async (id: string) => {
+    return apiCall(`/bookings/${id}/resume-subscription`, {
+      method: 'POST'
+    }, 35000);
   },
 
   initChecklist: (id: string, items: string[]) =>
@@ -1354,14 +1378,14 @@ export const adminAPI = {
   },
 
   getAvailableWorkersForBooking: async (bookingId: string) => {
-    return apiCall(`/admin/bookings/${bookingId}/available-workers`);
+    return apiCall(`/admin/bookings/${bookingId}/available-workers`, {}, 35000);
   },
 
   manualAssign: async (bookingId: string, workerId: string, reason?: string) => {
     return apiCall('/admin/manual-assign', {
       method: 'POST',
       body: JSON.stringify({ bookingId, workerId, reason })
-    });
+    }, 60000);
   },
 
   // Customer Management
