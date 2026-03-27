@@ -543,16 +543,22 @@ const findScheduleConflict = async ({
       'subscription.isSubscription': true,
       parentBooking: null,
       bookingDate: { $lte: comparisonEnd },
-      $or: [
-        { status: { $in: ['pending', 'confirmed', 'in-progress'] } },
+      $and: [
         {
-          status: 'completed',
-          'subscription.activationStatus': 'active'
-        }
-      ],
-      $or: [
-        { 'subscription.subscriptionEndDate': null },
-        { 'subscription.subscriptionEndDate': { $gte: comparisonStart } },
+          $or: [
+            { status: { $in: ['pending', 'confirmed', 'in-progress'] } },
+            {
+              status: 'completed',
+              'subscription.activationStatus': 'active'
+            }
+          ],
+        },
+        {
+          $or: [
+            { 'subscription.subscriptionEndDate': null },
+            { 'subscription.subscriptionEndDate': { $gte: comparisonStart } },
+          ],
+        },
       ],
     })
       .select('bookingDate startTime endTime bookingType isRecurring recurringSchedule subscription parentBooking service')
