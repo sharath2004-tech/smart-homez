@@ -484,10 +484,14 @@ const isSubscriptionRootBooking = (booking) => Boolean(
   booking?.subscription?.isSubscription && !booking?.parentBooking
 );
 
-const isActiveSubscriptionRootBooking = (booking) => Boolean(
+const isBlockingSubscriptionRootBooking = (booking, { includeInactiveRoots = false } = {}) => Boolean(
   isSubscriptionRootBooking(booking)
-  && booking?.subscription?.activationStatus === 'active'
-  && ['pending', 'confirmed', 'in-progress', 'completed'].includes(booking?.status)
+  && ['pending', 'confirmed', 'in-progress', 'pending-review', 'completed'].includes(booking?.status)
+  && (
+    includeInactiveRoots
+      ? true
+      : booking?.subscription?.activationStatus === 'active'
+  )
 );
 
 const buildCancelledOccurrenceMap = (cancelledBookings) => {
@@ -534,6 +538,7 @@ const findScheduleConflict = async ({
   match,
   proposedSchedule,
   excludeBookingId = null,
+  includeInactiveSubscriptionRoots = false,
 }) => {
   const comparisonStart = startOfDay(proposedSchedule.startDate);
   const comparisonEnd = getSubscriptionConflictWindowEnd(
@@ -566,10 +571,7 @@ const findScheduleConflict = async ({
       bookingDate: { $lte: comparisonEnd },
       $and: [
         {
-          status: { $in: ['pending', 'confirmed', 'in-progress', 'completed'] },
-        },
-        {
-          'subscription.activationStatus': 'active',
+          status: { $in: ['pending', 'confirmed', 'in-progress', 'pending-review', 'completed'] },
         },
         {
           $or: [
@@ -577,6 +579,9 @@ const findScheduleConflict = async ({
             { 'subscription.subscriptionEndDate': { $gte: comparisonStart } },
           ],
         },
+        ...(!includeInactiveSubscriptionRoots ? [{
+          'subscription.activationStatus': 'active',
+        }] : []),
       ],
     })
       .select('bookingDate startTime endTime bookingType isRecurring recurringSchedule subscription parentBooking service')
@@ -605,7 +610,9 @@ const findScheduleConflict = async ({
   const cancelledOccurrenceCache = new Map();
 
   for (const booking of candidateMap.values()) {
-    if (isSubscriptionRootBooking(booking) && !isActiveSubscriptionRootBooking(booking)) {
+    if (isSubscriptionRootBooking(booking) && !isBlockingSubscriptionRootBooking(booking, {
+      includeInactiveRoots: includeInactiveSubscriptionRoots,
+    })) {
       continue;
     }
 
@@ -1974,6 +1981,7 @@ router.post('/',
       const customerConflict = await findScheduleConflict({
         match: { customer: req.user._id },
         proposedSchedule,
+        includeInactiveSubscriptionRoots: true,
       });
 
       if (customerConflict) {
