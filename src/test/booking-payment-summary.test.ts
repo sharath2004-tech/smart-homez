@@ -92,11 +92,10 @@ describe('getCustomerBookingPaymentSummary', () => {
     });
   });
 
-  it('treats active prepaid subscriptions as settled', () => {
+  it('treats active subscriptions as settled once the plan is active', () => {
     expect(getCustomerBookingPaymentSummary({
       subscription: {
         isSubscription: true,
-        isPrepaid: true,
         activationStatus: 'active',
       },
       paymentStatus: 'pending',
@@ -105,6 +104,22 @@ describe('getCustomerBookingPaymentSummary', () => {
       tone: 'success',
       description: 'Subscription payment has been received and verified for this plan.',
       pendingAmount: null,
+    });
+  });
+
+  it('does not treat prepaid-plan subscriptions as paid before proof is verified', () => {
+    expect(getCustomerBookingPaymentSummary({
+      subscription: {
+        isSubscription: true,
+        isPrepaid: true,
+        activationStatus: 'payment_pending',
+      },
+      paymentStatus: 'pending',
+    }, 2499)).toEqual({
+      label: 'Pending payment',
+      tone: 'warning',
+      description: 'Complete or upload the subscription payment so admin can review and activate your plan.',
+      pendingAmount: 2499,
     });
   });
 });

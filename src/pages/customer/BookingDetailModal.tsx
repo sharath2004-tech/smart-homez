@@ -492,11 +492,14 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
   const paymentSummary = booking
     ? getCustomerBookingPaymentSummary(booking, calculateTotalAmount())
     : null;
+  const isSubscriptionChildVisit = Boolean(
+    booking?.subscription?.isSubscription
+    && booking?.parentBooking
+  );
   const isSubscriptionPaymentSettled = Boolean(
     booking?.subscription?.isSubscription
     && (
-      booking.subscription?.isPrepaid
-      || booking.paymentStatus === 'paid'
+      booking.paymentStatus === 'paid'
       || booking.paymentProof?.reviewStatus === 'approved'
       || booking.subscription?.activationStatus === 'approval_pending'
       || booking.subscription?.activationStatus === 'active'
@@ -513,6 +516,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
   const shouldShowPaymentProofStep = Boolean(
     booking
     && !isBookingPaymentSettled
+    && !isSubscriptionChildVisit
     && booking.status !== 'cancelled'
     && booking.status !== 'completed'
     && paymentSummary?.pendingAmount !== null

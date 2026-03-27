@@ -51,8 +51,7 @@ export const getCustomerBookingPaymentSummary = (
   if (
     booking.subscription?.isSubscription
     && (
-      booking.subscription?.isPrepaid
-      || booking.paymentStatus === 'paid'
+      booking.paymentStatus === 'paid'
       || booking.paymentProof?.reviewStatus === 'approved'
       || booking.subscription.activationStatus === 'approval_pending'
       || booking.subscription.activationStatus === 'active'

@@ -443,6 +443,17 @@ const mergeInheritedSubscriptionState = (bookingResponse, subscriptionSource) =>
   };
 };
 
+const isSubscriptionPaymentSettled = (booking) => {
+  const latestPaymentProof = getLatestPaymentProofEntry(booking);
+
+  return Boolean(
+    booking?.paymentStatus === 'paid'
+    || latestPaymentProof?.reviewStatus === 'approved'
+    || booking?.subscription?.activationStatus === 'approval_pending'
+    || booking?.subscription?.activationStatus === 'active'
+  );
+};
+
 const getComparableScheduleFromBooking = (booking) => {
   const isRecurringPattern = Boolean(
     booking?.subscription?.isSubscription
@@ -4073,11 +4084,9 @@ router.post('/:id/upload-payment-proof',
         ? await getSubscriptionPaymentSource(booking)
         : booking;
       const subscriptionPaymentProof = getLatestPaymentProofEntry(subscriptionPaymentSource);
-      const isPrepaidSubscription = Boolean(
+      const isSettledSubscriptionPayment = Boolean(
         isSubscriptionBooking && (
-          subscriptionPaymentSource?.subscription?.isPrepaid
-          || subscriptionPaymentSource?.paymentStatus === 'paid'
-          || subscriptionPaymentProof?.reviewStatus === 'approved'
+          isSubscriptionPaymentSettled(subscriptionPaymentSource)
         )
       );
 
@@ -4096,7 +4105,7 @@ router.post('/:id/upload-payment-proof',
         });
       }
 
-      if (isPrepaidSubscription) {
+      if (isSettledSubscriptionPayment) {
         return res.status(400).json({
           error: {
             message: 'This subscription visit is already prepaid. Payment proof is not required for this visit.',
@@ -4465,12 +4474,10 @@ router.post('/:id/admin-approve',
         ? await getSubscriptionPaymentSource(booking)
         : booking;
       const subscriptionPaymentProof = getLatestPaymentProofEntry(subscriptionPaymentSource);
-      const isPrepaidSubscription = Boolean(
+      const isSettledSubscriptionPayment = Boolean(
         (booking.subscription?.isSubscription || subscriptionPaymentSource?.subscription?.isSubscription)
         && (
-          subscriptionPaymentSource?.subscription?.isPrepaid
-          || subscriptionPaymentSource?.paymentStatus === 'paid'
-          || subscriptionPaymentProof?.reviewStatus === 'approved'
+          isSubscriptionPaymentSettled(subscriptionPaymentSource)
         )
       );
 
@@ -4483,7 +4490,7 @@ router.post('/:id/admin-approve',
       // Require payment proof to be uploaded before approval
       const latestPaymentProof = getLatestPaymentProofEntry(booking);
 
-      if (!isPrepaidSubscription && (!latestPaymentProof || !latestPaymentProof.url)) {
+      if (!isSettledSubscriptionPayment && (!latestPaymentProof || !latestPaymentProof.url)) {
         return res.status(400).json({
           error: { message: 'Payment proof must be uploaded before admin can approve completion', status: 400 }
         });
@@ -4492,7 +4499,7 @@ router.post('/:id/admin-approve',
       booking.status = 'completed';
       booking.completedAt = new Date();
 
-      if (isPrepaidSubscription) {
+      if (isSettledSubscriptionPayment) {
         booking.paymentStatus = 'paid';
       }
 

@@ -300,8 +300,7 @@ const MySubscriptionsPage = () => {
   }
 
   const isSubscriptionPaymentSettled = (subscription: Booking) => Boolean(
-    subscription.subscription?.isPrepaid
-    || subscription.paymentStatus === 'paid'
+    subscription.paymentStatus === 'paid'
     || subscription.paymentProof?.reviewStatus === 'approved'
     || subscription.subscription?.activationStatus === 'approval_pending'
     || subscription.subscription?.activationStatus === 'active'

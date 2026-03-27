@@ -309,7 +309,12 @@ const AdminBookings = () => {
 
   const isPrepaidSubscription = (booking: Booking) => Boolean(
     booking.subscription?.isSubscription
-    && (booking.subscription?.isPrepaid || booking.paymentStatus === 'paid')
+    && (
+      booking.paymentStatus === 'paid'
+      || getLatestPaymentProof(booking)?.reviewStatus === 'approved'
+      || booking.subscription?.activationStatus === 'approval_pending'
+      || booking.subscription?.activationStatus === 'active'
+    )
   );
 
   const hasProofs = (b: Booking) => !!(b.completionPhoto?.url || getPaymentProofs(b).length > 0 || (b.completionPhotos && b.completionPhotos.length > 0));
