@@ -130,6 +130,7 @@ const AdminBookings = () => {
   const [exporting, setExporting] = useState(false);
   const [selectedProofBooking, setSelectedProofBooking] = useState<Booking | null>(null);
   const [approvingBookingId, setApprovingBookingId] = useState<string | null>(null);
+  const [reviewingPaymentBookingId, setReviewingPaymentBookingId] = useState<string | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocation, setSelectedLocation] = useState("");
   const [noRegionAssigned, setNoRegionAssigned] = useState(false);
@@ -307,6 +308,14 @@ const AdminBookings = () => {
     return proofs.length > 0 ? proofs[proofs.length - 1] : undefined;
   };
 
+  const canReviewPaymentProof = (booking: Booking) => Boolean(getLatestPaymentProof(booking)?.url);
+
+  const getPaymentReviewStatus = (booking: Booking) => {
+    const latestProof = getLatestPaymentProof(booking);
+    if (!latestProof?.url) return 'missing';
+    return latestProof.reviewStatus || (latestProof.verified ? 'approved' : 'pending');
+  };
+
   const isPrepaidSubscription = (booking: Booking) => Boolean(
     booking.subscription?.isSubscription
     && (
@@ -330,6 +339,30 @@ const AdminBookings = () => {
       alert((error as Error).message || 'Failed to approve booking');
     } finally {
       setApprovingBookingId(null);
+    }
+  };
+
+  const handleReviewPaymentProof = async (booking: Booking, action: 'approve' | 'reject') => {
+    try {
+      setReviewingPaymentBookingId(booking._id);
+      const response = await bookingsAPI.reviewPaymentProof(booking._id, action);
+      const updatedBooking = {
+        ...booking,
+        paymentStatus: response.booking?.paymentStatus || booking.paymentStatus,
+        subscription: response.booking?.subscription || booking.subscription,
+        paymentProof: response.booking?.paymentProof || booking.paymentProof,
+        paymentProofs: response.booking?.paymentProofs || booking.paymentProofs,
+      } as Booking;
+
+      setBookings((prev) => prev.map((item) => item._id === booking._id ? { ...item, ...updatedBooking } : item));
+      setSelectedProofBooking((prev) => prev && prev._id === booking._id ? { ...prev, ...updatedBooking } : prev);
+
+      alert(action === 'approve' ? 'Payment proof approved successfully' : 'Payment proof rejected successfully');
+    } catch (error) {
+      console.error('Payment proof review error:', error);
+      alert((error as Error).message || `Failed to ${action} payment proof`);
+    } finally {
+      setReviewingPaymentBookingId(null);
     }
   };
 
@@ -453,7 +486,14 @@ const AdminBookings = () => {
       setAvailableWorkers([]);
       alert('Worker reassigned successfully');
     } catch (e) {
-      alert((e as Error).message || 'Failed to reassign worker');
+      const message = (e as Error).message || 'Failed to reassign worker';
+      if (message.toLowerCase().includes('approve the customer payment proof')) {
+        setSelectedProofBooking(reassignBooking);
+        setReassignBooking(null);
+        alert('Approve the payment proof first in the proof window, then assign the worker.');
+      } else {
+        alert(message);
+      }
     } finally {
       setTeamActionLoading(false);
     }
@@ -853,6 +893,18 @@ const AdminBookings = () => {
     }
   };
 
+  const shouldShowProofAction = (booking: Booking) => {
+    if (booking.bookingType === 'deep-cleaning-cart') {
+      return true;
+    }
+
+    if (canReviewPaymentProof(booking)) {
+      return true;
+    }
+
+    return ['completed', 'pending-review'].includes(booking.status);
+  };
+
   if (loading) {
     return (
       <AppLayout userType={role} userName={name}>
@@ -1056,19 +1108,19 @@ const AdminBookings = () => {
                             {b.workforce?.totalWorkerWage ? `₹${b.workforce.totalWorkerWage}` : 'Wages'}
                           </button>
                         )}
-                        {(b.status === 'completed' || b.status === 'pending-review') ? (
+                        {shouldShowProofAction(b) ? (
                           <button
                             onClick={() => {
                               setSelectedProofBooking(b);
                             }}
                             className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors ${
                               hasProofs(b)
-                                ? b.status === 'pending-review' ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                ? getPaymentReviewStatus(b) === 'pending' ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                                 : 'bg-muted text-muted-foreground hover:bg-muted/70'
                             }`}
                           >
                             <Eye className="w-3.5 h-3.5" />
-                            {b.status === 'pending-review' ? '⏳ Review' : (
+                            {canReviewPaymentProof(b) && getPaymentReviewStatus(b) === 'pending' ? '💳 Review Payment' : (
                               hasProofs(b) ? (
                                 <span>
                                   {[
@@ -1451,6 +1503,37 @@ const AdminBookings = () => {
                   </div>
                 )}
               </div>
+
+              {canReviewPaymentProof(selectedProofBooking) && (
+                <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-sky-900">Payment review actions</p>
+                    <p className="text-xs text-sky-800 mt-1">
+                      Both admin and super admin can approve or reject the latest customer payment proof here before assigning a worker.
+                    </p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      onClick={() => handleReviewPaymentProof(selectedProofBooking, 'approve')}
+                      disabled={reviewingPaymentBookingId === selectedProofBooking._id || getPaymentReviewStatus(selectedProofBooking) === 'approved'}
+                      className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-semibold text-sm hover:bg-emerald-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {reviewingPaymentBookingId === selectedProofBooking._id
+                        ? 'Saving review…'
+                        : getPaymentReviewStatus(selectedProofBooking) === 'approved'
+                          ? 'Payment Approved'
+                          : 'Approve Payment'}
+                    </button>
+                    <button
+                      onClick={() => handleReviewPaymentProof(selectedProofBooking, 'reject')}
+                      disabled={reviewingPaymentBookingId === selectedProofBooking._id}
+                      className="flex-1 py-2.5 border border-red-200 text-red-700 rounded-xl font-semibold text-sm hover:bg-red-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {reviewingPaymentBookingId === selectedProofBooking._id ? 'Saving review…' : 'Reject Payment'}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Approve Button for pending-review bookings */}
               {selectedProofBooking.status === 'pending-review' && (
