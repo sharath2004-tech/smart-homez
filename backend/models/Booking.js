@@ -779,10 +779,131 @@ const bookingSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// ── Pre-save overlap guard (last-resort safety net) ─────────────────────────
+// Catches overlapping bookings that slip through route-level checks
+// (e.g. race conditions, cron jobs, alternate creation paths).
+bookingSchema.pre('save', async function preSaveOverlapGuard(next) {
+  // Only guard NEW bookings — updates and child visits are exempt
+  if (!this.isNew) return next();
+  if (this.parentBooking) return next();
+  if (this.status === 'cancelled') return next();
+  if (!this.customer || !this.startTime || !this.endTime || !this.bookingDate) return next();
+
+  const parseTimeToMinutes = (time) => {
+    if (typeof time !== 'string' || !/^\d{2}:\d{2}$/.test(time)) return null;
+    const [hours, minutes] = time.split(':').map(Number);
+    return (hours * 60) + minutes;
+  };
+
+  const startMin = parseTimeToMinutes(this.startTime);
+  const endMin = parseTimeToMinutes(this.endTime);
+  if (startMin === null || endMin === null) return next();
+
+  const isSubscription = Boolean(this.subscription?.isSubscription);
+  const bookingDate = new Date(this.bookingDate);
+  const dayStart = new Date(bookingDate);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(bookingDate);
+  dayEnd.setHours(23, 59, 59, 999);
+
+  // For subscriptions, check whether an identical subscription root already exists
+  if (isSubscription) {
+    const subEnd = this.subscription.subscriptionEndDate || new Date('2099-01-01');
+    const duplicate = await mongoose.model('Booking').findOne({
+      customer: this.customer,
+      _id: { $ne: this._id },
+      'subscription.isSubscription': true,
+      parentBooking: null,
+      status: { $nin: ['cancelled'] },
+      startTime: { $lt: this.endTime },
+      endTime: { $gt: this.startTime },
+      bookingDate: { $lte: subEnd },
+      $or: [
+        { 'subscription.subscriptionEndDate': null },
+        { 'subscription.subscriptionEndDate': { $gte: dayStart } },
+      ],
+    }).select('_id').lean();
+
+    if (duplicate) {
+      const err = new Error('You already have an overlapping subscription for this time slot.');
+      err.status = 409;
+      err.code = 'DUPLICATE_SUBSCRIPTION';
+      return next(err);
+    }
+  }
+
+  // For all bookings: check same-day same-time overlap with existing bookings
+  const overlap = await mongoose.model('Booking').findOne({
+    customer: this.customer,
+    _id: { $ne: this._id },
+    bookingDate: { $gte: dayStart, $lte: dayEnd },
+    status: { $in: ['pending', 'confirmed', 'in-progress'] },
+    startTime: { $lt: this.endTime },
+    endTime: { $gt: this.startTime },
+  }).select('_id').lean();
+
+  if (overlap) {
+    const err = new Error('You already have another booking at this time.');
+    err.status = 409;
+    err.code = 'BOOKING_OVERLAP';
+    return next(err);
+  }
+
+  // Check against subscription roots that span this date
+  const subRootOverlap = await mongoose.model('Booking').findOne({
+    customer: this.customer,
+    _id: { $ne: this._id },
+    'subscription.isSubscription': true,
+    parentBooking: null,
+    status: { $nin: ['cancelled'] },
+    bookingDate: { $lte: dayEnd },
+    startTime: { $lt: this.endTime },
+    endTime: { $gt: this.startTime },
+    $or: [
+      { 'subscription.subscriptionEndDate': null },
+      { 'subscription.subscriptionEndDate': { $gte: dayStart } },
+    ],
+  }).select('_id recurringSchedule bookingType subscription').lean();
+
+  if (subRootOverlap) {
+    // For daily subscriptions the overlap is certain.
+    // For weekly/monthly: verify the subscription actually has an occurrence today.
+    const freq = subRootOverlap.recurringSchedule?.frequency || subRootOverlap.bookingType || 'daily';
+    if (freq === 'daily') {
+      const err = new Error('You already have a daily subscription at this time.');
+      err.status = 409;
+      err.code = 'BOOKING_OVERLAP_SUBSCRIPTION';
+      return next(err);
+    }
+
+    // Weekly check: see if today's weekday is in the selected days
+    const selectedDays = subRootOverlap.recurringSchedule?.selectedDays || [];
+    if (selectedDays.length > 0) {
+      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const todayName = dayNames[bookingDate.getDay()];
+      if (selectedDays.map(d => d.toLowerCase()).includes(todayName)) {
+        const err = new Error('You already have a subscription scheduled at this time on this day.');
+        err.status = 409;
+        err.code = 'BOOKING_OVERLAP_SUBSCRIPTION';
+        return next(err);
+      }
+    } else {
+      // No selectedDays means it runs every matching frequency cycle
+      const err = new Error('You already have an overlapping subscription at this time.');
+      err.status = 409;
+      err.code = 'BOOKING_OVERLAP_SUBSCRIPTION';
+      return next(err);
+    }
+  }
+
+  return next();
+});
+
 // Index for faster queries
 bookingSchema.index({ customer: 1, bookingDate: -1 });
 bookingSchema.index({ worker: 1, bookingDate: -1 });
 bookingSchema.index({ status: 1 });
+bookingSchema.index({ customer: 1, 'subscription.isSubscription': 1, parentBooking: 1, status: 1 });
 
 const Booking = mongoose.model('Booking', bookingSchema);
 

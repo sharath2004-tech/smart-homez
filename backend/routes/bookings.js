@@ -2337,7 +2337,8 @@ router.post('/',
         name: error.name,
         code: error.code
       });
-      res.status(500).json({ error: { message: error.message || 'Server error', status: 500 } });
+      const status = error.status || 500;
+      res.status(status).json({ error: { message: error.message || 'Server error', status, code: error.code || undefined } });
     }
   }
 );

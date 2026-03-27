@@ -8,6 +8,7 @@ import Location from '../models/Location.js';
 import Service from '../models/Service.js';
 import User from '../models/User.js';
 import { assignWorkersWithBackup } from '../utils/advancedWorkerAssignment.js';
+import { findCustomerConflict } from '../utils/bookingConflict.js';
 import {
     buildBookingDateTime,
     buildVerifiedCartItems,
@@ -556,26 +557,21 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
     const endM = totalMinutes % 60;
     const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
 
-    const startOfRequestedDay = new Date(bookingStartDateTime);
-    startOfRequestedDay.setHours(0, 0, 0, 0);
-    const endOfRequestedDay = new Date(bookingStartDateTime);
-    endOfRequestedDay.setHours(23, 59, 59, 999);
+    // ── Full overlap check (covers one-time, child visits AND subscription roots) ──
+    const { conflict: hasConflict, existingBooking: conflictBooking } = await findCustomerConflict({
+      customerId: req.user._id,
+      proposedDate: bookingStartDateTime,
+      proposedEndDate: null,
+      proposedStartTime: startTime,
+      proposedEndTime: endTime,
+    });
 
-    const customerConflict = await Booking.findOne({
-      customer: req.user._id,
-      bookingDate: { $gte: startOfRequestedDay, $lte: endOfRequestedDay },
-      status: { $in: ['pending', 'confirmed', 'in-progress'] },
-      startTime: { $lt: endTime },
-      endTime: { $gt: startTime },
-    })
-      .select('startTime endTime')
-      .lean();
-
-    if (customerConflict) {
+    if (hasConflict) {
       return res.status(400).json({
         error: {
-          message: `You already have another booking between ${customerConflict.startTime} and ${customerConflict.endTime}. Please choose a different time.`,
+          message: `You already have another booking between ${conflictBooking.startTime} and ${conflictBooking.endTime}. Please choose a different time.`,
           status: 400,
+          code: 'CUSTOMER_BOOKING_CONFLICT',
         },
       });
     }
@@ -730,7 +726,8 @@ router.post('/booking', authenticate, authorize('customer'), async (req, res) =>
     res.status(201).json({ success: true, booking: finalBooking, totalAmount: calculatedTotal });
   } catch (err) {
     console.error('Deep cleaning booking error:', err);
-    res.status(500).json({ error: { message: err.message, status: 500 } });
+    const status = err.status || 500;
+    res.status(status).json({ error: { message: err.message, status, code: err.code || undefined } });
   }
 });
 
