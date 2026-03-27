@@ -486,7 +486,7 @@ const isSubscriptionRootBooking = (booking) => Boolean(
 
 const isBlockingSubscriptionRootBooking = (booking, { includeInactiveRoots = false } = {}) => Boolean(
   isSubscriptionRootBooking(booking)
-  && ['pending', 'confirmed', 'in-progress', 'pending-review', 'completed'].includes(booking?.status)
+  && ['pending', 'confirmed', 'in-progress'].includes(booking?.status)
   && (
     includeInactiveRoots
       ? true
@@ -553,10 +553,23 @@ const findScheduleConflict = async ({
       }
     : {};
 
+  // Fetch IDs of cancelled subscription roots so we can exclude their orphaned child visits
+  const cancelledRootIds = await Booking.find({
+    ...match,
+    'subscription.isSubscription': true,
+    parentBooking: null,
+    status: 'cancelled',
+  }).distinct('_id');
+
+  const cancelledParentFilter = cancelledRootIds.length > 0
+    ? { parentBooking: { $nin: cancelledRootIds } }
+    : {};
+
   const [candidateBookings, activeSubscriptionRoots] = await Promise.all([
     Booking.find({
       ...match,
       ...exclusionFilter,
+      ...cancelledParentFilter,
       bookingDate: { $gte: comparisonStart, $lte: comparisonEnd },
       status: { $in: ['pending', 'confirmed', 'in-progress'] },
     })
@@ -571,7 +584,7 @@ const findScheduleConflict = async ({
       bookingDate: { $lte: comparisonEnd },
       $and: [
         {
-          status: { $in: ['pending', 'confirmed', 'in-progress', 'pending-review', 'completed'] },
+          status: { $in: ['pending', 'confirmed', 'in-progress'] },
         },
         {
           $or: [
@@ -2120,10 +2133,9 @@ router.post('/',
           customer: req.user._id,
           'subscription.isSubscription': true,
           parentBooking: null,
-          status: { $nin: ['cancelled'] },
-          'recurringSchedule.frequency': subscriptionDetails.frequency || bookingType,
-          startTime: bookingWindow.startTime,
-          endTime: bookingWindow.endTime,
+          status: { $in: ['pending', 'confirmed', 'in-progress'] },
+          startTime: { $lt: bookingWindow.endTime },
+          endTime: { $gt: bookingWindow.startTime },
           bookingDate: { $lte: resolvedSubscriptionEndDate || new Date('2099-01-01') },
           $or: [
             { 'subscription.subscriptionEndDate': null },
@@ -2586,11 +2598,11 @@ router.delete('/:id', authenticate, async (req, res) => {
     let cancelledFutureVisits = 0;
 
     if (isRootSubscriptionCancellation) {
-      const today = startOfDay(now);
+      // Cancel ALL non-completed child visits (not just future ones) to prevent
+      // orphaned child visits from blocking new bookings for this customer.
       const childVisitFilter = {
         parentBooking: booking._id,
-        bookingDate: { $gte: today },
-        status: { $in: ['pending', 'confirmed'] },
+        status: { $in: ['pending', 'confirmed', 'in-progress'] },
       };
 
       const childVisitsCount = await Booking.countDocuments(childVisitFilter);

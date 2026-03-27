@@ -56,12 +56,25 @@ export async function findCustomerConflict({
     : {};
 
   // Two queries in parallel:
+  // Fetch IDs of cancelled subscription roots to exclude their orphaned child visits
+  const cancelledRootIds = await Booking.find({
+    customer: customerId,
+    'subscription.isSubscription': true,
+    parentBooking: null,
+    status: 'cancelled',
+  }).distinct('_id');
+
+  const cancelledParentFilter = cancelledRootIds.length > 0
+    ? { parentBooking: { $nin: cancelledRootIds } }
+    : {};
+
   //  1. Regular / child-visit bookings whose bookingDate falls within the window
   //  2. Subscription root bookings whose subscription date-range overlaps the window
   const [candidateBookings, subscriptionRoots] = await Promise.all([
     Booking.find({
       customer: customerId,
       ...exclusionFilter,
+      ...cancelledParentFilter,
       bookingDate: { $gte: comparisonStart, $lte: comparisonEnd },
       status: { $in: ['pending', 'confirmed', 'in-progress'] },
     })
@@ -72,7 +85,7 @@ export async function findCustomerConflict({
       ...exclusionFilter,
       'subscription.isSubscription': true,
       parentBooking: null,
-      status: { $nin: ['cancelled'] },
+      status: { $in: ['pending', 'confirmed', 'in-progress'] },
       bookingDate: { $lte: comparisonEnd },
       $or: [
         { 'subscription.subscriptionEndDate': null },

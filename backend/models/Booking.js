@@ -814,7 +814,7 @@ bookingSchema.pre('save', async function preSaveOverlapGuard(next) {
       _id: { $ne: this._id },
       'subscription.isSubscription': true,
       parentBooking: null,
-      status: { $nin: ['cancelled'] },
+      status: { $in: ['pending', 'confirmed', 'in-progress'] },
       startTime: { $lt: this.endTime },
       endTime: { $gt: this.startTime },
       bookingDate: { $lte: subEnd },
@@ -833,9 +833,22 @@ bookingSchema.pre('save', async function preSaveOverlapGuard(next) {
   }
 
   // For all bookings: check same-day same-time overlap with existing bookings
+  // Exclude child visits whose parent subscription root has been cancelled
+  const cancelledRootIds = await mongoose.model('Booking').find({
+    customer: this.customer,
+    'subscription.isSubscription': true,
+    parentBooking: null,
+    status: 'cancelled',
+  }).distinct('_id');
+
+  const cancelledParentFilter = cancelledRootIds.length > 0
+    ? { parentBooking: { $nin: cancelledRootIds } }
+    : {};
+
   const overlap = await mongoose.model('Booking').findOne({
     customer: this.customer,
     _id: { $ne: this._id },
+    ...cancelledParentFilter,
     bookingDate: { $gte: dayStart, $lte: dayEnd },
     status: { $in: ['pending', 'confirmed', 'in-progress'] },
     startTime: { $lt: this.endTime },
@@ -855,7 +868,7 @@ bookingSchema.pre('save', async function preSaveOverlapGuard(next) {
     _id: { $ne: this._id },
     'subscription.isSubscription': true,
     parentBooking: null,
-    status: { $nin: ['cancelled'] },
+    status: { $in: ['pending', 'confirmed', 'in-progress'] },
     bookingDate: { $lte: dayEnd },
     startTime: { $lt: this.endTime },
     endTime: { $gt: this.startTime },
