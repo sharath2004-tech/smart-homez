@@ -8,13 +8,13 @@ import {
     AlertCircle,
     Calendar,
     CheckCircle,
+    CheckCircle2,
     ChevronLeft,
     Clock,
     RefreshCw,
     Star,
     User,
     Zap,
-    CheckCircle2,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -545,7 +545,7 @@ const SubscriptionServicePage = () => {
             </div>
           </motion.div>
         ) : (
-
+        <>
         {/* Header */}
         <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="flex items-center gap-3">
           <Link to="/customer/services" className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center hover:bg-border transition-colors">
@@ -1060,6 +1060,7 @@ const SubscriptionServicePage = () => {
           </motion.div>
             )}
           </>
+        </>
         )}
       </div>
     </AppLayout>
