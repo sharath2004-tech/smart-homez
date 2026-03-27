@@ -2111,6 +2111,37 @@ router.post('/',
 
       const booking = new Booking(bookingData);
 
+      // ── Atomic pre-save duplicate guard (prevents race conditions) ────
+      // Two simultaneous requests can both pass the earlier findScheduleConflict
+      // check before either booking is saved. This atomic findOne right before
+      // save catches overlaps that slipped through the TOCTOU window.
+      if (isSubscription && subscriptionDetails) {
+        const duplicateRoot = await Booking.findOne({
+          customer: req.user._id,
+          'subscription.isSubscription': true,
+          parentBooking: null,
+          status: { $nin: ['cancelled'] },
+          'recurringSchedule.frequency': subscriptionDetails.frequency || bookingType,
+          startTime: bookingWindow.startTime,
+          endTime: bookingWindow.endTime,
+          bookingDate: { $lte: resolvedSubscriptionEndDate || new Date('2099-01-01') },
+          $or: [
+            { 'subscription.subscriptionEndDate': null },
+            { 'subscription.subscriptionEndDate': { $gte: requestedBookingDate } },
+          ],
+        }).select('_id').lean();
+
+        if (duplicateRoot) {
+          return res.status(409).json({
+            error: {
+              message: 'You already have an overlapping subscription for this service and time slot. Please cancel the existing one first or choose a different time.',
+              status: 409,
+              code: 'DUPLICATE_SUBSCRIPTION',
+            },
+          });
+        }
+      }
+
       await booking.save();
 
       // Always attempt auto-assignment unless explicitly disabled (autoAssign !== false)
