@@ -211,6 +211,7 @@
     },
     "badges": {
       "paymentRequired": "Payment proof required",
+      "proofSubmitted": "Proof submitted",
       "paid": "Paid",
       "review": "Setup under review",
       "paused": "Paused",
@@ -235,6 +236,7 @@
       "jobs_other": "{{count}} jobs",
       "unassigned": {
         "paymentPending": "Upload your payment proof to start the admin approval and worker assignment process.",
+        "proofSubmitted": "Your payment proof has been submitted and is awaiting admin review. Worker assignment will follow once the proof is approved.",
         "review": "Admin or super admin is reviewing your subscription schedule or worker setup.",
         "paid": "Payment is already verified for this subscription. Worker assignment and future visits will continue from this plan.",
         "assigning": "We’re assigning your worker for this cycle now. Their profile will show up here as soon as the schedule is locked."
@@ -257,6 +259,7 @@
     },
     "payment": {
       "pendingReview": "Payment proof uploaded successfully. Your region admin or super admin is reviewing it now.",
+      "approvalPending": "Your payment proof has been verified. Admin is finalizing your subscription schedule and assigning a worker. This may take a short while.",
       "rejected": "Payment proof was rejected. Please upload a new screenshot.",
       "rejectedWithNote": "Payment proof was rejected: {{note}}. Please upload a new screenshot.",
       "stepTitle": "Complete subscription payment",

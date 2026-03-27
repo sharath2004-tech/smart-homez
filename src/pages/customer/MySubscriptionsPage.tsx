@@ -257,7 +257,6 @@ const MySubscriptionsPage = () => {
   const isSubscriptionPaymentSettled = (subscription: Booking) => Boolean(
     subscription.paymentStatus === 'paid'
     || subscription.paymentProof?.reviewStatus === 'approved'
-    || subscription.subscription?.activationStatus === 'approval_pending'
     || subscription.subscription?.activationStatus === 'active'
   );
 
@@ -321,6 +320,11 @@ const MySubscriptionsPage = () => {
             {subscriptions.map((subscription) => (
               (() => {
                 const paymentSettled = isSubscriptionPaymentSettled(subscription);
+                const proofSubmittedPending = Boolean(
+                  subscription.subscription?.activationStatus === 'payment_pending'
+                  && subscription.paymentProof?.reviewStatus === 'pending'
+                  && subscription.paymentProof?.url
+                );
 
                 return (
               <div key={subscription._id} className="card-elevated p-4 sm:p-5 md:p-6">
@@ -335,17 +339,21 @@ const MySubscriptionsPage = () => {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {subscription.subscription?.activationStatus === 'payment_pending' && !paymentSettled ? (
+                    {proofSubmittedPending ? (
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                          {t('subscriptionPage.badges.proofSubmitted')}
+                      </span>
+                    ) : subscription.subscription?.activationStatus === 'payment_pending' && !paymentSettled ? (
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
                           {t('subscriptionPage.badges.paymentRequired')}
-                      </span>
-                    ) : paymentSettled ? (
-                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
-                          {t('subscriptionPage.badges.paid')}
                       </span>
                     ) : subscription.subscription?.activationStatus === 'approval_pending' ? (
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
                           {t('subscriptionPage.badges.review')}
+                      </span>
+                    ) : paymentSettled ? (
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                          {t('subscriptionPage.badges.paid')}
                       </span>
                     ) : subscription.subscription?.isPaused ? (
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300">
@@ -436,7 +444,9 @@ const MySubscriptionsPage = () => {
                       </div>
                     ) : (
                       <div className="rounded-lg bg-muted/60 px-3 py-3 text-sm text-muted-foreground">
-                        {subscription.subscription?.activationStatus === 'payment_pending' && !paymentSettled
+                        {proofSubmittedPending
+                          ? t('subscriptionPage.worker.unassigned.proofSubmitted')
+                          : subscription.subscription?.activationStatus === 'payment_pending' && !paymentSettled
                           ? t('subscriptionPage.worker.unassigned.paymentPending')
                           : subscription.subscription?.activationStatus === 'approval_pending'
                           ? t('subscriptionPage.worker.unassigned.review')
@@ -558,6 +568,12 @@ const MySubscriptionsPage = () => {
                         />
                       </>
                     )}
+                  </div>
+                )}
+
+                {subscription.subscription?.activationStatus === 'approval_pending' && (
+                  <div className="mt-4 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-700">
+                    {t('subscriptionPage.payment.approvalPending')}
                   </div>
                 )}
 
