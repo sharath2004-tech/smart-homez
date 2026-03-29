@@ -3,8 +3,8 @@ import LocationSelector, { type LocationData } from "@/components/LocationSelect
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { authAPI, bookingsAPI, dashboardPreferencesAPI, locationsAPI, serviceAreasAPI, servicesAPI, setStoredCustomerLocation } from "@/lib/api";
 import { motion } from "framer-motion";
-import { AlertCircle, ArrowRight, Bell, ChevronRight, Clock, MapPin, RefreshCw, Settings, Star } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { AlertCircle, ArrowRight, Bell, ChevronRight, Clock, Loader2, MapPin, RefreshCw, Search, Settings, Star, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -145,6 +145,51 @@ const CustomerDashboard = () => {
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   const [showLocationSelector, setShowLocationSelector] = useState(false);
   const { latitude, longitude, error: locationError, loading: locationLoading, refetch } = useGeolocation();
+
+  // ── Search state ────────────────────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<CustomerServiceRecord[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Search: debounced API call ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        setSearchLoading(true);
+        const res = await servicesAPI.getAll({ search: searchQuery.trim(), isActive: true, limit: 8 });
+        setSearchResults(res.services || []);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 280);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // ── Search: close dropdown on outside click ─────────────────────────────────
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchFocused(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const getServicePath = useCallback((service: CustomerServiceRecord) => {
+    if (service.subscriptionOptions?.enabled) return `/customer/subscribe/${service._id}`;
+    if (service.isQuoteService) return '/customer/deep-cleaning';
+    return `/customer/book/${service._id}`;
+  }, []);
 
   const getDashboardLinkedService = useCallback((service: DashboardConfiguredService) => {
     if (service.linkedServiceId) {
@@ -514,6 +559,82 @@ const CustomerDashboard = () => {
             <span className="text-sm text-foreground line-clamp-2 break-words">{displayAddress}</span>
             <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto shrink-0 group-hover:translate-x-1 transition-transform" />
           </button>
+        </motion.div>
+
+        {/* Search bar */}
+        <motion.div variants={itemVariants}>
+          <div ref={searchRef} className="relative">
+            <div className={`flex items-center gap-2 rounded-xl border bg-card px-3 py-2.5 transition-all ${searchFocused ? "border-primary ring-2 ring-primary/20" : "border-border"}`}>
+              {searchLoading
+                ? <Loader2 className="w-4 h-4 text-muted-foreground shrink-0 animate-spin" />
+                : <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+              }
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                placeholder="Search services — deep clean, maid, AC..."
+                className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => { setSearchQuery(""); setSearchResults([]); searchInputRef.current?.focus(); }}
+                  className="shrink-0 p-0.5 rounded hover:bg-muted transition-colors"
+                >
+                  <X className="w-3.5 h-3.5 text-muted-foreground" />
+                </button>
+              )}
+            </div>
+
+            {/* Search dropdown */}
+            {searchFocused && searchQuery.trim() && (
+              <div className="absolute z-50 mt-1 w-full bg-card border border-border rounded-xl shadow-lg overflow-hidden">
+                {searchLoading && searchResults.length === 0 ? (
+                  <div className="px-4 py-3 text-sm text-muted-foreground text-center">Searching…</div>
+                ) : searchResults.length === 0 ? (
+                  <div className="px-4 py-3 text-sm text-muted-foreground text-center">
+                    No services found for "<span className="font-medium text-foreground">{searchQuery}</span>"
+                  </div>
+                ) : (
+                  <>
+                    {searchResults.map((service) => (
+                      <Link
+                        key={service._id}
+                        to={getServicePath(service)}
+                        onClick={() => { setSearchFocused(false); setSearchQuery(""); }}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border last:border-b-0"
+                      >
+                        <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center text-base shrink-0">
+                          {service.serviceCategory === "instant_services" ? "⚡"
+                            : service.serviceCategory === "subscription_services" ? "📅"
+                            : service.serviceCategory === "deep_cleaning" ? "✨"
+                            : service.isQuoteService ? "📋"
+                            : "🧹"}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{service.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {service.subscriptionOptions?.enabled ? "Subscription" : service.isQuoteService ? "Custom Quote" : "Book Instantly"}
+                          </p>
+                        </div>
+                        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      </Link>
+                    ))}
+                    <Link
+                      to={`/customer/services?search=${encodeURIComponent(searchQuery)}`}
+                      onClick={() => setSearchFocused(false)}
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 bg-muted/50 text-sm text-primary font-medium hover:bg-muted transition-colors"
+                    >
+                      See all results for "{searchQuery}" <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </motion.div>
 
         {/* Ongoing Booking — top priority */}

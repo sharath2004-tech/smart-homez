@@ -19,6 +19,7 @@ import dashboardPreferencesRoutes from './routes/dashboardPreferences.js';
 import deepCleaningRoutes from './routes/deepCleaning.js';
 import earningsRoutes from './routes/earnings.js';
 import helpRoutes from './routes/help.js';
+import homeConfigRoutes from './routes/homeConfig.js';
 import leavesRoutes from './routes/leaves.js';
 import locationRequestsRoutes from './routes/locationRequests.js';
 import locationRoutes from './routes/locations.js';
@@ -231,6 +232,7 @@ app.use('/api/business-expenses', businessExpensesRoutes);
 app.use('/api/location-requests', locationRequestsRoutes);
 app.use('/api/reliability', reliabilityRoutes);
 app.use('/api/dashboard-preferences', dashboardPreferencesRoutes);
+app.use('/api/home-config', homeConfigRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

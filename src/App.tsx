@@ -59,6 +59,7 @@ import AdminDashboardPreferences from "./pages/admin/AdminDashboardPreferences";
 import AdminDeepCleaningConfig from "./pages/admin/AdminDeepCleaningConfig";
 import AdminExpenses from "./pages/admin/AdminExpenses";
 import AdminHelpMessages from "./pages/admin/AdminHelpMessages";
+import AdminHomeConfig from "./pages/admin/AdminHomeConfig";
 import AdminLeaves from "./pages/admin/AdminLeaves";
 import AdminLocations from "./pages/admin/AdminLocations";
 import AdminQuotes from "./pages/admin/AdminQuotes";
@@ -159,6 +160,7 @@ const App = () => (
           <Route path="/admin/customers/:customerId" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminCustomerDetails /></ProtectedRoute>} />
           <Route path="/admin/expenses" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminExpenses /></ProtectedRoute>} />
           <Route path="/admin/dashboard-preferences" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminDashboardPreferences /></ProtectedRoute>} />
+          <Route path="/admin/home-config" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminHomeConfig /></ProtectedRoute>} />
           <Route path="/admin/subscription-sections" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminSubscriptionSections /></ProtectedRoute>} />
           <Route path="/admin/workforce" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminWorkforce /></ProtectedRoute>} />
           <Route path="/admin/worker-schedule" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminWorkerSchedule /></ProtectedRoute>} />

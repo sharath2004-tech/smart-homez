@@ -144,6 +144,7 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
     { to: "/admin/help-messages",      icon: MessageSquare,   label: "Help Messages" },
     { to: "/admin/locations",          icon: MapPin,          label: t('nav.locations') },
     { to: "/admin/services",           icon: Wrench,          label: t('nav.services') },
+    { to: "/admin/home-config",        icon: LayoutDashboard, label: "Home Screen Config" },
     { to: "/admin/dashboard-preferences", icon: Settings2,    label: "Dashboard Preferences" },
     { to: "/admin/settings",           icon: Settings,        label: t('nav.settings') },
     { to: "/change-password",          icon: KeyRound,        label: passwordMenuLabel },
@@ -167,6 +168,7 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
       defaultOpen: false,
       items: [
         { to: "/admin/services", icon: Wrench, label: t('nav.services') },
+        { to: "/admin/home-config", icon: LayoutDashboard, label: "Home Screen Config" },
         { to: "/admin/dashboard-preferences", icon: Settings2, label: "Dashboard Preferences" },
       ]
     },
@@ -230,6 +232,7 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
     { to: "/super-admin/help-messages",      icon: MessageSquare,   label: "Help Messages" },
     { to: "/super-admin/locations",          icon: MapPin,          label: "Locations & Admins" },
     { to: "/super-admin/services",           icon: Wrench,          label: t('nav.services') },
+    { to: "/admin/home-config",              icon: LayoutDashboard, label: "Home Screen Config" },
     { to: "/super-admin/heatmap",            icon: BarChart3,       label: "Worker Heatmap" },
     { to: "/super-admin/settings",           icon: Settings,        label: t('nav.settings') },
     { to: "/change-password",                icon: KeyRound,        label: passwordMenuLabel },
@@ -255,6 +258,7 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
       defaultOpen: false,
       items: [
         { to: "/super-admin/services", icon: Wrench, label: t('nav.services') },
+        { to: "/admin/home-config", icon: LayoutDashboard, label: "Home Screen Config" },
         { to: "/admin/dashboard-preferences", icon: Settings2, label: "Dashboard Preferences" },
       ]
     },

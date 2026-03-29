@@ -2140,6 +2140,34 @@ export const dashboardPreferencesAPI = {
   }
 };
 
+export const homeConfigAPI = {
+  /** Public: get active sections with resolved services (customer home screen) */
+  getSections: async () => apiCall('/home-config'),
+
+  /** Admin: get all sections including inactive */
+  getAdminSections: async () => apiCall('/home-config/admin'),
+
+  /** Add a new section */
+  addSection: async (data: Record<string, unknown>) =>
+    apiCall('/home-config/sections', { method: 'POST', body: JSON.stringify(data) }),
+
+  /** Partial-update a section */
+  updateSection: async (sectionId: string, data: Record<string, unknown>) =>
+    apiCall(`/home-config/sections/${sectionId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  /** Reorder sections */
+  reorderSections: async (order: Array<{ sectionId: string; sortOrder: number }>) =>
+    apiCall('/home-config/sections/reorder', { method: 'PUT', body: JSON.stringify({ order }) }),
+
+  /** Delete a section */
+  deleteSection: async (sectionId: string) =>
+    apiCall(`/home-config/sections/${sectionId}`, { method: 'DELETE' }),
+
+  /** Bulk replace all sections */
+  saveSections: async (sections: unknown[]) =>
+    apiCall('/home-config', { method: 'PUT', body: JSON.stringify({ sections }) })
+};
+
 export default {
   auth: authAPI,
   services: servicesAPI,
@@ -2156,6 +2184,7 @@ export default {
   reviews: reviewsAPI,
   reliability: reliabilityAPI,
   reviewAnalytics: reviewAnalyticsAPI,
-  dashboardPreferences: dashboardPreferencesAPI
+  dashboardPreferences: dashboardPreferencesAPI,
+  homeConfig: homeConfigAPI
 };
 
