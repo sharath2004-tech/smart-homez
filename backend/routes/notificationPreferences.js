@@ -6,6 +6,8 @@
 import express from 'express';
 import { authenticate } from '../middleware/auth.js';
 import User from '../models/User.js';
+import { isMsg91WhatsAppConfigured } from '../utils/msg91WhatsappService.js';
+import { isWhatsAppConfigured, sendWhatsAppMessage } from '../utils/whatsappService.js';
 const router = express.Router();
 
 // @route   GET /api/notification-preferences
@@ -246,6 +248,55 @@ router.delete('/consent/sms', authenticate, async (req, res) => {
   } catch (error) {
     console.error('SMS consent revoke error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   GET /api/notification-preferences/whatsapp/status
+// @desc    Check MSG91 WhatsApp configuration status
+// @access  Private
+router.get('/whatsapp/status', authenticate, async (req, res) => {
+  try {
+    res.json({
+      msg91Configured: isMsg91WhatsAppConfigured(),
+      whatsappConfigured: isWhatsAppConfigured(),
+      otpChannel: process.env.OTP_DELIVERY_CHANNEL || 'sms',
+      integratedNumber: process.env.MSG91_WHATSAPP_INTEGRATED_NUMBER ? '***' + process.env.MSG91_WHATSAPP_INTEGRATED_NUMBER.slice(-4) : null,
+    });
+  } catch (error) {
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   POST /api/notification-preferences/whatsapp/test
+// @desc    Send a test WhatsApp message to the authenticated user
+// @access  Private
+router.post('/whatsapp/test', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('phone name');
+
+    if (!user?.phone) {
+      return res.status(400).json({ error: { message: 'No phone number on file', status: 400 } });
+    }
+
+    if (!isWhatsAppConfigured()) {
+      return res.status(503).json({ error: { message: 'WhatsApp service is not configured', status: 503 } });
+    }
+
+    const result = await sendWhatsAppMessage({
+      phone: user.phone,
+      message: `Hi ${user.name || 'there'}! 👋 This is a test message from Healthy Homez. WhatsApp notifications are working perfectly.`,
+      templateKey: 'WELCOME',
+      variables: { name: user.name || 'there' },
+    });
+
+    res.json({
+      success: true,
+      message: 'Test WhatsApp message sent',
+      channel: result.channel,
+    });
+  } catch (error) {
+    console.error('WhatsApp test error:', error);
+    res.status(500).json({ error: { message: error.message || 'Failed to send test message', status: 500 } });
   }
 });
 

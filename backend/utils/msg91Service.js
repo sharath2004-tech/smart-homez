@@ -8,6 +8,7 @@
  */
 
 import twilio from 'twilio';
+import { isMsg91WhatsAppConfigured, sendMsg91WhatsAppOtp } from './msg91WhatsappService.js';
 import { isWhatsAppOtpConfigured, sendWhatsAppOtp, verifyWhatsAppOtp } from './whatsappService.js';
 
 // In-memory storage for OTP request IDs (use Redis in production)
@@ -420,6 +421,26 @@ export async function sendOTP(phone, options = {}) {
   const e164 = toE164(phone);
 
   try {
+    // MSG91 WhatsApp OTP (preferred channel)
+    if (OTP_DELIVERY_CHANNEL === 'msg91_whatsapp' && isMsg91WhatsAppConfigured()) {
+      const otp = String(Math.floor(100000 + Math.random() * 900000));
+      const result = await sendMsg91WhatsAppOtp({ phone: e164, otp, expiryMinutes: Math.floor(MSG91_OTP_EXPIRY / 60) });
+      if (result.success) {
+        // Store OTP for verification
+        otpStore.set(e164, {
+          requestId: 'msg91_whatsapp',
+          otp,
+          sentAt: Date.now(),
+          expiresAt: Date.now() + (MSG91_OTP_EXPIRY * 1000)
+        });
+        incrementRateLimit(e164);
+        console.log(`✅ OTP sent via MSG91 WhatsApp to ${phone}`);
+        return { success: true, requestId: 'msg91_whatsapp', message: 'OTP sent via WhatsApp' };
+      }
+      console.warn('⚠️ MSG91 WhatsApp OTP failed, falling through to other channels…');
+    }
+
+    // Twilio WhatsApp OTP
     if (OTP_DELIVERY_CHANNEL === 'whatsapp' && isWhatsAppOtpConfigured()) {
       return await sendWhatsAppOtp(e164);
     }
@@ -456,6 +477,24 @@ export async function verifyOTP(phone, code) {
   const e164 = toE164(phone);
 
   try {
+    // MSG91 WhatsApp OTP verification (stored locally)
+    if (OTP_DELIVERY_CHANNEL === 'msg91_whatsapp') {
+      const stored = otpStore.get(e164);
+      if (stored && stored.requestId === 'msg91_whatsapp') {
+        if (Date.now() > stored.expiresAt) {
+          otpStore.delete(e164);
+          throw new Error('OTP has expired. Please request a new one.');
+        }
+        if (stored.otp === String(code)) {
+          otpStore.delete(e164);
+          console.log(`✅ OTP verified (MSG91 WhatsApp) for ${phone}`);
+          return { verified: true, message: 'OTP verified successfully' };
+        }
+        throw new Error('Invalid OTP. Please try again.');
+      }
+      // Fall through to other methods if no stored OTP
+    }
+
     if (OTP_DELIVERY_CHANNEL === 'whatsapp' && isWhatsAppOtpConfigured()) {
       return await verifyWhatsAppOtp(e164, code);
     }

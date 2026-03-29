@@ -1,13 +1,16 @@
 /**
  * Multi-Channel Notification Service
- * Supports: In-App, SMS, WhatsApp
+ * Supports: In-App, SMS, WhatsApp (MSG91 primary)
  * REQ-C-010: Change Notifications
+ *
+ * Every notification is automatically sent via WhatsApp (MSG91) to the
+ * registered phone number, in addition to in-app and optional SMS.
  */
 
 import twilio from 'twilio';
 import Notification from '../models/Notification.js';
 import User from '../models/User.js';
-import { sendWhatsAppMessage as sendWhatsAppBusinessMessage } from './whatsappService.js';
+import { isWhatsAppConfigured, sendWhatsAppMessage as sendWhatsAppBusinessMessage } from './whatsappService.js';
 
 /**
  * Notification Types for REQ-C-010
@@ -86,14 +89,15 @@ export const sendNotification = async (options) => {
       }
     }
 
-    // 2. WhatsApp Notification (Cost-effective priority)
-    if (channelsToUse.includes(NOTIFICATION_CHANNELS.WHATSAPP) && 
-        prefs.whatsapp?.enabled && 
-        user.phone) {
+    // 2. WhatsApp Notification — ALWAYS send if user has a phone number
+    //    MSG91 is the primary channel; Twilio is automatic fallback inside sendWhatsAppBusinessMessage
+    if (user.phone && isWhatsAppConfigured()) {
       try {
         await sendWhatsAppMessage({
           phone: user.phone,
-          message: formatWhatsAppMessage(title, message, data)
+          message: formatWhatsAppMessage(title, message, data),
+          notificationType: type,
+          variables: data
         });
         results.whatsapp = true;
         console.log(`✅ WhatsApp notification sent to ${user.phone}`);
@@ -101,7 +105,7 @@ export const sendNotification = async (options) => {
         console.error('WhatsApp notification failed:', error);
         
         // Fallback to SMS if WhatsApp fails and SMS is enabled
-        if (prefs.sms?.enabled) {
+        if (prefs.sms?.enabled && !channelsToUse.includes(NOTIFICATION_CHANNELS.SMS)) {
           channelsToUse.push(NOTIFICATION_CHANNELS.SMS);
         }
       }
@@ -166,11 +170,11 @@ function getChannelsForNotificationType(type, prefs) {
 }
 
 /**
- * Send WhatsApp message (Integration placeholder)
- * TODO: Integrate with WhatsApp Business API or Twilio
+ * Send WhatsApp message via MSG91 (primary) with Twilio fallback
+ * Passes notificationType and variables for template-based delivery
  */
-async function sendWhatsAppMessage({ phone, message }) {
-  return sendWhatsAppBusinessMessage({ phone, message });
+async function sendWhatsAppMessage({ phone, message, notificationType, variables }) {
+  return sendWhatsAppBusinessMessage({ phone, message, notificationType, variables });
 }
 
 /**

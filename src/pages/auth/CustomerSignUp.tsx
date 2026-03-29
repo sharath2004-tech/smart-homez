@@ -10,7 +10,7 @@ import {
     MapPin,
     Navigation,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 // Google OAuth types (will be used once @react-oauth/google is installed)
@@ -19,9 +19,21 @@ declare global {
     google?: {
       accounts: {
         id: {
-          initialize: (config: { client_id: string; callback: (response: CredentialResponse) => void }) => void;
+          initialize: (config: {
+            client_id: string;
+            callback: (response: CredentialResponse) => void;
+            auto_select?: boolean;
+            cancel_on_tap_outside?: boolean;
+            itp_support?: boolean;
+          }) => void;
           renderButton: (element: HTMLElement, options: { theme: string; size: string; text: string }) => void;
-          prompt: () => void;
+          prompt: (notification?: (n: {
+            isNotDisplayed: () => boolean;
+            isSkippedMoment: () => boolean;
+            isDismissedMoment: () => boolean;
+            getNotDisplayedReason: () => string;
+            getSkippedReason: () => string;
+          }) => void) => void;
         };
       };
     };
@@ -89,7 +101,7 @@ const CustomerSignUp = () => {
   const [googleInitialized, setGoogleInitialized] = useState(false);
 
   // Google OAuth handler
-  const handleGoogleSuccess = async (credential: string) => {
+  const handleGoogleSuccess = useCallback(async (credential: string) => {
     setLoading(true);
     setError("");
     try {
@@ -118,18 +130,34 @@ const CustomerSignUp = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // Initialize Google Sign-In once
+  // Initialize Google Sign-In — polls until GSI script is ready (async defer)
   useEffect(() => {
-    if (window.google && !googleInitialized) {
+    if (googleInitialized) return;
+
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId || clientId === 'your_google_client_id.apps.googleusercontent.com') return;
+
+    const initGoogle = () => {
+      if (!window.google?.accounts?.id) return false;
       window.google.accounts.id.initialize({
-        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
-        callback: (response: CredentialResponse) => handleGoogleSuccess(response.credential)
+        client_id: clientId,
+        callback: (response: CredentialResponse) => handleGoogleSuccess(response.credential),
+        auto_select: false,
+        cancel_on_tap_outside: true,
+        itp_support: true,
       });
       setGoogleInitialized(true);
+      return true;
+    };
+
+    if (!initGoogle()) {
+      const interval = setInterval(() => { if (initGoogle()) clearInterval(interval); }, 100);
+      const timeout = setTimeout(() => clearInterval(interval), 10000);
+      return () => { clearInterval(interval); clearTimeout(timeout); };
     }
-  }, [googleInitialized]);
+  }, [googleInitialized, handleGoogleSuccess]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -435,11 +463,24 @@ const CustomerSignUp = () => {
                 <button
                   type="button"
                   onClick={() => {
-                    if (!window.google || !googleInitialized) {
-                      setError("Google Sign-In is not available. Please use email signup.");
+                    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+                    if (!clientId || clientId === 'your_google_client_id.apps.googleusercontent.com') {
+                      setError("Google Sign-In is not configured. Please contact support.");
                       return;
                     }
-                    window.google.accounts.id.prompt();
+                    if (!window.google?.accounts?.id || !googleInitialized) {
+                      setError("Google Sign-In is still loading. Please try again in a moment.");
+                      return;
+                    }
+                    setError("");
+                    window.google.accounts.id.prompt((notification) => {
+                      if (notification.isNotDisplayed()) {
+                        setError(
+                          `Google Sign-In popup was blocked (${notification.getNotDisplayedReason() || 'unknown'}). ` +
+                          "Allow pop-ups for this site or try a different browser."
+                        );
+                      }
+                    });
                   }}
                   disabled={loading}
                   className="w-full flex items-center justify-center gap-3 py-3 px-4 border-2 border-border rounded-xl font-semibold hover:bg-accent transition-colors disabled:opacity-50"

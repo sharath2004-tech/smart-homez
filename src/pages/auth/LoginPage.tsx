@@ -10,8 +10,20 @@ declare global {
     google?: {
       accounts: {
         id: {
-          initialize: (config: { client_id: string; callback: (response: { credential: string }) => void }) => void;
-          prompt: () => void;
+          initialize: (config: {
+            client_id: string;
+            callback: (response: { credential: string }) => void;
+            auto_select?: boolean;
+            cancel_on_tap_outside?: boolean;
+            itp_support?: boolean;
+          }) => void;
+          prompt: (notification?: (n: {
+            isNotDisplayed: () => boolean;
+            isSkippedMoment: () => boolean;
+            isDismissedMoment: () => boolean;
+            getNotDisplayedReason: () => string;
+            getSkippedReason: () => string;
+          }) => void) => void;
         };
       };
     };
@@ -64,14 +76,30 @@ const LoginPage = () => {
     }
   }, []);
 
-  // Initialize Google Sign-In once
+  // Initialize Google Sign-In — polls until GSI script is ready (async defer)
   useEffect(() => {
-    if (window.google && !googleInitialized) {
+    if (googleInitialized) return;
+
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId || clientId === 'your_google_client_id.apps.googleusercontent.com') return;
+
+    const initGoogle = () => {
+      if (!window.google?.accounts?.id) return false;
       window.google.accounts.id.initialize({
-        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || "",
+        client_id: clientId,
         callback: (response) => handleGoogleLogin(response.credential),
+        auto_select: false,
+        cancel_on_tap_outside: true,
+        itp_support: true,
       });
       setGoogleInitialized(true);
+      return true;
+    };
+
+    if (!initGoogle()) {
+      const interval = setInterval(() => { if (initGoogle()) clearInterval(interval); }, 100);
+      const timeout = setTimeout(() => clearInterval(interval), 10000);
+      return () => { clearInterval(interval); clearTimeout(timeout); };
     }
   }, [googleInitialized, handleGoogleLogin]);
 
@@ -218,11 +246,25 @@ const LoginPage = () => {
   };
 
   const triggerGoogleSignIn = () => {
-    if (!window.google || !googleInitialized) {
-      setError("Google Sign-In is not available. Please use email or OTP login.");
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId || clientId === 'your_google_client_id.apps.googleusercontent.com') {
+      setError("Google Sign-In is not configured. Please contact support.");
       return;
     }
-    window.google.accounts.id.prompt();
+    if (!window.google?.accounts?.id || !googleInitialized) {
+      setError("Google Sign-In is still loading. Please try again in a moment.");
+      return;
+    }
+    setError("");
+    window.google.accounts.id.prompt((notification) => {
+      if (notification.isNotDisplayed()) {
+        setError(
+          `Google Sign-In popup was blocked (${notification.getNotDisplayedReason() || 'unknown'}). ` +
+          "Allow pop-ups for this site or try a different browser."
+        );
+      }
+      // isSkippedMoment = user dismissed; no error needed
+    });
   };
 
   const tabs = [
