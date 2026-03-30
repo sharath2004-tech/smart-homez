@@ -97,7 +97,7 @@ const HelpPage = ({ userType = "customer" }: HelpPageProps) => {
 
   return (
     <AppLayout userType={userType} userName={profile?.name || "Loading..."}>
-      <div className="max-w-2xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 animate-fade-in pb-20 md:pb-0">
+      <div className="w-full px-4 sm:px-5 md:px-7 lg:px-10 space-y-6 animate-fade-in pb-20 md:pb-0">
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold font-heading text-foreground mb-1 flex items-center gap-2">

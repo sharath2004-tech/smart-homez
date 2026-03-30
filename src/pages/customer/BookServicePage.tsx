@@ -678,8 +678,8 @@ const BookServicePage = () => {
   if (loading) {
     return (
       <AppLayout userType="customer" userName={profile?.name || "Loading..."}>
-        <div className="max-w-2xl mx-auto py-12 text-center">
-          <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full mx-auto mb-3"></div>
+        <div className="w-full py-16 flex flex-col items-center gap-4">
+          <div className="sweep-loader"><span className="dot w-3 h-3" /><span className="dot w-3 h-3" /><span className="dot w-3 h-3" /></div>
           <p className="text-sm text-muted-foreground">Loading service...</p>
         </div>
       </AppLayout>
@@ -710,7 +710,7 @@ const BookServicePage = () => {
 
   return (
     <AppLayout userType="customer" userName={profile?.name || "Guest"}>
-      <div className="max-w-2xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 pb-20 md:pb-0">
+      <div className="w-full px-4 sm:px-5 md:px-7 lg:px-10 space-y-6 pb-20 md:pb-0">
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold font-heading text-foreground">Book Service</h1>

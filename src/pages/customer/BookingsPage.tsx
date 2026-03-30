@@ -224,7 +224,7 @@ const BookingsPage = () => {
 
   return (
     <AppLayout userType="customer" userName={profile?.name || "Loading..."}>
-      <div className="max-w-2xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 animate-fade-in pb-20 md:pb-0">
+      <div className="w-full px-4 sm:px-5 md:px-7 lg:px-10 space-y-6 animate-fade-in pb-20 md:pb-0">
         {/* Header */}
         <div className="card-elevated p-5">
           <div className="flex items-start justify-between">
@@ -279,9 +279,9 @@ const BookingsPage = () => {
         {/* Bookings List */}
         <div className="space-y-4">
           {loading ? (
-            <div className="card-elevated p-12 text-center">
-              <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full mx-auto"></div>
-              <p className="text-sm text-muted-foreground mt-4">{t('customer.bookings.loadingBookings')}</p>
+            <div className="card-elevated p-12 flex flex-col items-center gap-4">
+              <div className="sweep-loader"><span className="dot w-2.5 h-2.5" /><span className="dot w-2.5 h-2.5" /><span className="dot w-2.5 h-2.5" /></div>
+              <p className="text-sm text-muted-foreground">{t('customer.bookings.loadingBookings')}</p>
             </div>
           ) : bookings.length === 0 ? (
             <div className="card-elevated p-12 text-center">

@@ -454,3 +454,105 @@
   background: rgba(255, 255, 255, 0.6);
   animation: ripple 0.6s ease-out;
 }
+
+/* ============================================
+   PAGE SWEEP TRANSITION
+   Cleaning-themed sweep animation on navigation
+   ============================================ */
+
+@keyframes pageSweep {
+  0%   { transform: translateX(-110%); opacity: 0; }
+  12%  { opacity: 1; }
+  82%  { opacity: 0.7; }
+  100% { transform: translateX(110%); opacity: 0; }
+}
+
+.page-sweep-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 65%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9998;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(16, 185, 129, 0.04) 18%,
+    rgba(16, 185, 129, 0.13) 42%,
+    rgba(16, 185, 129, 0.20) 55%,
+    rgba(255, 255, 255, 0.07) 68%,
+    transparent 100%
+  );
+  transform: translateX(-110%);
+}
+
+.page-sweep-overlay.sweeping {
+  animation: pageSweep 0.72s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* Page content entrance — staggered reveal on every navigation */
+@keyframes pageContentEnter {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.page-enter-wrapper {
+  animation: pageContentEnter 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ============================================
+   SWEEP LOADER  (replaces rotating circle)
+   Three bouncing dots in brand colour
+   ============================================ */
+
+@keyframes bounceDot {
+  0%, 55%, 100% { transform: translateY(0);   opacity: 0.35; }
+  28%            { transform: translateY(-9px); opacity: 1;    }
+}
+
+.sweep-loader {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sweep-loader .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: hsl(var(--primary));
+  animation: bounceDot 1.3s ease-in-out infinite;
+}
+.sweep-loader .dot:nth-child(1) { animation-delay: 0s;    }
+.sweep-loader .dot:nth-child(2) { animation-delay: 0.18s; }
+.sweep-loader .dot:nth-child(3) { animation-delay: 0.36s; }
+
+/* Small variant */
+.sweep-loader-sm .dot { width: 6px; height: 6px; }
+
+/* Thin horizontal bar sweep (for compact loaders) */
+@keyframes sweepBarMove {
+  0%   { transform: translateX(-120%); }
+  100% { transform: translateX(320%);  }
+}
+
+.sweep-bar-loader {
+  position: relative;
+  width: 72px;
+  height: 3px;
+  background: hsl(var(--muted));
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.sweep-bar-loader::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 38%;
+  background: linear-gradient(90deg, transparent, hsl(var(--primary)), transparent);
+  border-radius: 2px;
+  animation: sweepBarMove 1.15s ease-in-out infinite;
+}

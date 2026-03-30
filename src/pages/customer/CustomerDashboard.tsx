@@ -504,7 +504,7 @@ const CustomerDashboard = () => {
   return (
     <AppLayout userType="customer" userName={profile?.name || "Loading..."}>
       <motion.div 
-        className="max-w-4xl mx-auto px-3 sm:px-4 md:px-6 space-y-8 pb-20 md:pb-0"
+        className="w-full px-4 sm:px-5 md:px-7 lg:px-10 space-y-8 pb-20 md:pb-0"
         variants={containerVariants}
         initial="hidden"
         animate="visible"

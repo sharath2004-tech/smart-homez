@@ -288,7 +288,7 @@ const MaidServicePage = () => {
 
   return (
     <AppLayout userType="customer" userName={profile?.name}>
-      <div className="max-w-4xl mx-auto px-3 sm:px-4 md:px-6">
+      <div className="w-full px-4 sm:px-5 md:px-7 lg:px-10">
         {/* Header */}
         <div className="mb-6">
           <Link to="/customer/services" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4">

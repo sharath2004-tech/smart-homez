@@ -3,6 +3,7 @@ import { AlertTriangle, BarChart3, Bell, Building, Calendar, ClipboardCheck, Cre
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import "../animations.css";
 import "../styles/sidebar-enhancements.css";
 import { AppHeader } from "./AppHeader";
 import { CollapsibleSidebar } from "./CollapsibleSidebar";
@@ -441,7 +442,9 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
 
         {/* Page Content - This is the only part that re-renders */}
         <main className="flex-1 overflow-y-auto">
-          {children}
+          <div key={location.pathname} className="page-enter-wrapper">
+            {children}
+          </div>
         </main>
       </div>
 

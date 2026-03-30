@@ -458,7 +458,7 @@ export default function DeepCleaningPage() {
 
   return (
     <AppLayout userType="customer" userName={profile?.name}>
-      <div className="max-w-2xl mx-auto px-3 sm:px-4 md:px-6 pb-36">
+      <div className="w-full px-4 sm:px-5 md:px-7 lg:px-10 pb-36">
 
         {/* ── Hero ──────────────────────────────────────────────────────────── */}
         <motion.div

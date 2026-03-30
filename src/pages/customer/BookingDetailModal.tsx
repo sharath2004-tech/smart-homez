@@ -562,9 +562,9 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl p-8 max-w-md w-full">
-          <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full mx-auto"></div>
-          <p className="text-center mt-4 text-muted-foreground">{t('customer.bookings.loadingDetails')}</p>
+        <div className="bg-white rounded-2xl p-8 max-w-md w-full flex flex-col items-center gap-4">
+          <div className="sweep-loader"><span className="dot w-3 h-3" /><span className="dot w-3 h-3" /><span className="dot w-3 h-3" /></div>
+          <p className="text-center text-muted-foreground">{t('customer.bookings.loadingDetails')}</p>
         </div>
       </div>
     );

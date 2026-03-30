@@ -5,12 +5,12 @@ import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardList, ShieldCheck, Sparkl
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import {
-  type ConfigItem,
-  type DeepCleaningCategory,
-  type DeepCleaningConfig,
-  type UserProfile,
-  getCategoryMeta,
-  getStartingPrice
+    type ConfigItem,
+    type DeepCleaningCategory,
+    type DeepCleaningConfig,
+    type UserProfile,
+    getCategoryMeta,
+    getStartingPrice
 } from "./deepCleaningTemplate";
 
 const getPrimaryAction = (category: DeepCleaningCategory | null) => {
@@ -152,7 +152,7 @@ const DeepCleaningCategoryPage = () => {
 
   return (
     <AppLayout userType="customer" userName={profile?.name || "Guest"}>
-      <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 pb-20 space-y-8">
+      <div className="w-full px-4 sm:px-5 md:px-7 lg:px-10 pb-20 space-y-8">
         <motion.section
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}

@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ConfirmProvider } from "@/hooks/useConfirm";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { PageSweep } from "./components/PageSweep";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 // Public pages
@@ -104,6 +105,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <PageSweep />
         <Routes>
           {/* Public */}
           <Route path="/" element={<LandingPage />} />

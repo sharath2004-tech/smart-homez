@@ -493,8 +493,8 @@ const ProfilePage = () => {
   if (loading) {
     return (
       <AppLayout userType="customer" userName="Loading...">
-        <div className="max-w-2xl mx-auto flex items-center justify-center py-20">
-          <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full"></div>
+        <div className="w-full flex flex-col items-center justify-center gap-4 py-20">
+          <div className="sweep-loader"><span className="dot w-3 h-3" /><span className="dot w-3 h-3" /><span className="dot w-3 h-3" /></div>
         </div>
       </AppLayout>
     );
