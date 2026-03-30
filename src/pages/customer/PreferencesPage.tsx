@@ -1,5 +1,4 @@
 import AppLayout from "@/components/AppLayout";
-import { useConfirm } from "@/hooks/useConfirm";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -21,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/hooks/useConfirm";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { authAPI, preferencesAPI } from "@/lib/api";
 import {
