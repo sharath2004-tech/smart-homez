@@ -2102,14 +2102,33 @@ const AdminServices = () => {
                   </div>
                   {/* Worker Search Radius Slider */}
                   <div>
-                    <label className="block text-xs font-medium text-foreground mb-2">
-                      Worker Search Radius:&nbsp;
-                      <span className="text-orange-700 font-bold">
-                        {(formData.workerSearchRadiusKm ?? 10) < 1
-                          ? `${Math.round((formData.workerSearchRadiusKm ?? 10) * 1000)} m`
-                          : `${formData.workerSearchRadiusKm ?? 10} km`}
-                      </span>
-                    </label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-xs font-medium text-foreground">
+                        Worker Search Radius:&nbsp;
+                        <span className="text-orange-700 font-bold">
+                          {(formData.workerSearchRadiusKm ?? 10) < 1
+                            ? `${Math.round((formData.workerSearchRadiusKm ?? 10) * 1000)} m`
+                            : `${formData.workerSearchRadiusKm ?? 10} km`}
+                        </span>
+                      </label>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min={0.1}
+                          max={100}
+                          step={0.1}
+                          value={formData.workerSearchRadiusKm ?? 10}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            if (!isNaN(val) && val >= 0.1 && val <= 100) {
+                              setFormData({ ...formData, workerSearchRadiusKm: val });
+                            }
+                          }}
+                          className="w-20 text-xs text-center border border-orange-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                        />
+                        <span className="text-xs text-muted-foreground">km</span>
+                      </div>
+                    </div>
                     <input
                       type="range"
                       min={0.1}
