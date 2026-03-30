@@ -207,9 +207,7 @@ router.post('/',
         originalPrice, isActive, isQuoteService,
         workerSearchRadiusKm, allowBreakRequests,
         suggestedServices, dos, donts,
-        displayOrder, serviceCategory,
-        // Catalog linkage
-        catalogCategoryId, catalogSubcategory
+        displayOrder, serviceCategory
       } = req.body;
 
       const servicePayload = {
@@ -224,8 +222,7 @@ router.post('/',
         originalPrice, isActive, isQuoteService,
         workerSearchRadiusKm, allowBreakRequests,
         suggestedServices, dos, donts,
-        displayOrder, serviceCategory,
-        catalogCategoryId, catalogSubcategory
+        displayOrder, serviceCategory
       };
 
       // Admins cannot create services directly — their request goes to super admin for approval
@@ -403,9 +400,7 @@ const handleServiceUpdate = async (req, res) => {
       // Service capabilities
       suggestedServices, dos, donts,
       isQuoteService,
-      displayOrder, serviceCategory,
-      // Catalog linkage
-      catalogCategoryId, catalogSubcategory
+      displayOrder, serviceCategory
     } = req.body;
 
     // Admins cannot directly edit pricing — they must submit a price change request
@@ -486,8 +481,6 @@ const handleServiceUpdate = async (req, res) => {
     if ('donts' in req.body) updateData.donts = donts;
     if ('displayOrder' in req.body) updateData.displayOrder = displayOrder;
     if ('serviceCategory' in req.body) updateData.serviceCategory = serviceCategory;
-    if ('catalogCategoryId' in req.body) updateData.catalogCategoryId = catalogCategoryId;
-    if ('catalogSubcategory' in req.body) updateData.catalogSubcategory = catalogSubcategory;
 
     const service = await Service.findByIdAndUpdate(
       req.params.id,

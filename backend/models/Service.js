@@ -39,18 +39,6 @@ const serviceSchema = new mongoose.Schema({
     min: 0.1,
     max: 100
   },
-  // Link to ServiceCatalog category (admin-managed grouping)
-  catalogCategoryId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'ServiceCatalog',
-    default: null,
-  },
-  // Subcategory slug within the catalog category
-  catalogSubcategory: {
-    type: String,
-    default: null,
-    trim: true,
-  },
   // Used to control display order in customer-facing service lists
   displayOrder: {
     type: Number,

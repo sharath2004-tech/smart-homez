@@ -1,5 +1,5 @@
 import { API_ORIGIN, api, authAPI, settingsAPI } from "@/lib/api";
-import { AlertTriangle, BarChart3, Bell, Building, Calendar, ClipboardCheck, CreditCard, FileText, Grid3x3, HelpCircle, IndianRupee, KeyRound, Layers, LayoutDashboard, MapPin, MessageSquare, RefreshCw, Settings, Settings2, TrendingUp, User, UserCircle, Users, Wrench } from "lucide-react";
+import { AlertTriangle, BarChart3, Bell, Building, Calendar, ClipboardCheck, CreditCard, FileText, Grid3x3, HelpCircle, IndianRupee, KeyRound, LayoutDashboard, MapPin, MessageSquare, RefreshCw, Settings, Settings2, TrendingUp, User, UserCircle, Users, Wrench } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -144,7 +144,6 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
     { to: "/admin/help-messages",      icon: MessageSquare,   label: "Help Messages" },
     { to: "/admin/locations",          icon: MapPin,          label: t('nav.locations') },
     { to: "/admin/services",           icon: Wrench,          label: t('nav.services') },
-    { to: "/admin/service-catalog",    icon: Layers,          label: "Service Catalog" },
     { to: "/admin/home-config",        icon: LayoutDashboard, label: "Home Screen Config" },
     { to: "/admin/dashboard-preferences", icon: Settings2,    label: "Dashboard Preferences" },
     { to: "/admin/settings",           icon: Settings,        label: t('nav.settings') },
@@ -169,7 +168,6 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
       defaultOpen: false,
       items: [
         { to: "/admin/services", icon: Wrench, label: t('nav.services') },
-        { to: "/admin/service-catalog", icon: Layers, label: "Service Catalog" },
         { to: "/admin/home-config", icon: LayoutDashboard, label: "Home Screen Config" },
         { to: "/admin/dashboard-preferences", icon: Settings2, label: "Dashboard Preferences" },
       ]
@@ -234,7 +232,6 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
     { to: "/super-admin/help-messages",      icon: MessageSquare,   label: "Help Messages" },
     { to: "/super-admin/locations",          icon: MapPin,          label: "Locations & Admins" },
     { to: "/super-admin/services",           icon: Wrench,          label: t('nav.services') },
-    { to: "/super-admin/service-catalog",    icon: Layers,          label: "Service Catalog" },
     { to: "/admin/home-config",              icon: LayoutDashboard, label: "Home Screen Config" },
     { to: "/super-admin/heatmap",            icon: BarChart3,       label: "Worker Heatmap" },
     { to: "/super-admin/settings",           icon: Settings,        label: t('nav.settings') },
@@ -261,7 +258,6 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
       defaultOpen: false,
       items: [
         { to: "/super-admin/services", icon: Wrench, label: t('nav.services') },
-        { to: "/super-admin/service-catalog", icon: Layers, label: "Service Catalog" },
         { to: "/admin/home-config", icon: LayoutDashboard, label: "Home Screen Config" },
         { to: "/admin/dashboard-preferences", icon: Settings2, label: "Dashboard Preferences" },
       ]
