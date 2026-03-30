@@ -394,7 +394,6 @@ export default function DeepCleaningPage() {
     };
 
     if (autoOpenedItemRef.current === requestedItemId) {
-      highlightItem();
       return;
     }
 
@@ -444,7 +443,7 @@ export default function DeepCleaningPage() {
     });
 
     highlightItem();
-  }, [items, requestedItemId, tierSelects]);
+  }, [items, requestedItemId]);
 
   if (loading) return (
     <AppLayout userType="customer" userName={profile?.name}>
