@@ -1,8 +1,8 @@
 import AppLayout from "@/components/AppLayout";
 import LocationSelector, { LocationData } from "@/components/LocationSelector";
-import { authAPI, serviceAreasAPI, servicesAPI, setStoredCustomerLocation } from "@/lib/api";
+import { authAPI, serviceAreasAPI, servicesAPI, settingsAPI, setStoredCustomerLocation } from "@/lib/api";
 import { motion } from "framer-motion";
-import { Clock, MapPin, Search, Sparkles, Users } from "lucide-react";
+import { CalendarClock, Clock, MapPin, Search, Sparkles, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -66,10 +66,28 @@ const ServicesPage = () => {
   const [showLocationSelector, setShowLocationSelector] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   const [requestingServiceId, setRequestingServiceId] = useState<string | null>(null);
+  const [todayAvailableSlotCount, setTodayAvailableSlotCount] = useState<number | null>(null);
+
+  // Count how many of today's slots are still in the future
+  const countFutureSlots = (slots: string[]): number => {
+    const now = new Date();
+    const nowMins = now.getHours() * 60 + now.getMinutes() + 30; // 30-min buffer
+    return slots.filter((t) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m > nowMins;
+    }).length;
+  };
 
   useEffect(() => {
     fetchProfile();
-    
+    // Fetch today's available slot count once
+    const today = new Date().toISOString().split('T')[0];
+    settingsAPI.getAvailableSlotsByDate(today)
+      .then((data: { slots?: string[] }) => {
+        setTodayAvailableSlotCount(countFutureSlots(data?.slots || []));
+      })
+      .catch(() => setTodayAvailableSlotCount(null));
+
     // Check if user has a saved location
     const savedLocation = localStorage.getItem('userLocation');
     if (savedLocation) {
@@ -459,11 +477,30 @@ const ServicesPage = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <h3 className="font-bold font-heading text-foreground text-sm">{service.name}</h3>
-                        {service.availability && (
-                          <span className={`shrink-0 text-xs ${service.availability.available ? 'badge-success' : 'badge-warning'}`}>
-                            {service.availability.available ? t('customer.services.available') : t('customer.services.limited')}
-                          </span>
-                        )}
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          {service.availability && (
+                            <span className={`text-xs ${service.availability.available ? 'badge-success' : 'badge-warning'}`}>
+                              {service.availability.available ? t('customer.services.available') : t('customer.services.limited')}
+                            </span>
+                          )}
+                          {/* Slot count badge — skip for deep cleaning (quote) and subscriptions */}
+                          {!service.isQuoteService && !service.subscriptionOptions?.enabled && todayAvailableSlotCount !== null && (
+                            <span className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                              todayAvailableSlotCount === 0
+                                ? 'bg-red-100 text-red-700'
+                                : todayAvailableSlotCount <= 4
+                                ? 'bg-amber-100 text-amber-700'
+                                : 'bg-primary/10 text-primary'
+                            }`}>
+                              <CalendarClock className="w-3 h-3" />
+                              {todayAvailableSlotCount === 0
+                                ? 'Fully booked today'
+                                : todayAvailableSlotCount <= 4
+                                ? `${todayAvailableSlotCount} slots left`
+                                : `${todayAvailableSlotCount} slots today`}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{service.description}</p>
                     </div>

@@ -4,7 +4,7 @@ import { useServiceBookingAvailability } from "@/hooks/useServiceBookingAvailabi
 import { authAPI, bookingsAPI, servicesAPI, settingsAPI } from "@/lib/api";
 import { getCustomerPlanFrequencyLabel } from "@/utils/subscriptionPlanDetails";
 import { getMinimumSubscriptionStartDate, isSubscriptionStartTimeExpired } from "@/utils/subscriptionStartRules";
-import { Calendar, Clock, Info, MapPin, Sparkles, Star, User, Users, Zap } from "lucide-react";
+import { Calendar, CalendarClock, Clock, Info, MapPin, Sparkles, Star, User, Users, Zap } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -919,6 +919,29 @@ const BookServicePage = () => {
                   <label className="block text-sm font-medium text-foreground mb-3">
                     Select Time Slot
                   </label>
+
+                  {/* Slot availability summary */}
+                  {selectedDate && !loadingSlots && availableSlots.length > 0 && (
+                    (() => {
+                      const openCount = availableSlots.filter(t => !isSlotUnavailable(t)).length;
+                      return (
+                        <div className={`mb-3 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium ${
+                          openCount === 0
+                            ? 'bg-red-50 text-red-700 border border-red-200'
+                            : openCount <= 4
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : 'bg-primary/5 text-primary border border-primary/20'
+                        }`}>
+                          <CalendarClock className="w-3.5 h-3.5 shrink-0" />
+                          {openCount === 0
+                            ? 'No slots available on this date'
+                            : openCount <= 4
+                            ? `Only ${openCount} slot${openCount !== 1 ? 's' : ''} left on this date`
+                            : `${openCount} slots available on this date`}
+                        </div>
+                      );
+                    })()
+                  )}
 
                   {/* Period tabs */}
                   <div className="flex gap-2 mb-4">
