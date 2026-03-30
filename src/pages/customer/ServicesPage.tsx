@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import LocationSelector, { LocationData } from "@/components/LocationSelector";
 import { authAPI, serviceAreasAPI, serviceCatalogAPI, servicesAPI, setStoredCustomerLocation } from "@/lib/api";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, ChevronUp, Clock, MapPin, Search, Sparkles, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
