@@ -458,7 +458,7 @@ export default function DeepCleaningPage() {
 
   return (
     <AppLayout userType="customer" userName={profile?.name}>
-      <div className="w-full px-4 sm:px-5 md:px-7 lg:px-10 pb-36">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 md:px-8 pb-36">
 
         {/* ── Hero ──────────────────────────────────────────────────────────── */}
         <motion.div
@@ -574,7 +574,7 @@ export default function DeepCleaningPage() {
         </div>
 
         {/* ── Category Tabs ─────────────────────────────────────────────────── */}
-        <div className="flex gap-2 overflow-x-auto pb-1 mb-1 scrollbar-hide">
+        <div className="flex gap-2 overflow-x-auto pb-1 mb-1 scrollbar-hide md:flex-wrap md:overflow-x-visible">
           {categories.map((cat, i) => {
             const isActive = cat.id === activeCategory;
             const hasItems = Object.values(cart).some(e => e.category === cat.id);
@@ -607,7 +607,7 @@ export default function DeepCleaningPage() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -direction * 35 }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="space-y-3"
+            className="grid grid-cols-1 md:grid-cols-2 gap-3"
           >
             {items.length === 0 ? (
               <div className="text-center py-16 text-muted-foreground">
@@ -636,9 +636,9 @@ export default function DeepCleaningPage() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 120, opacity: 0 }}
             transition={{ type: "spring", stiffness: 340, damping: 28 }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-md border-t border-border p-4"
+            className="fixed bottom-0 left-0 right-0 md:left-64 z-50 bg-card/95 backdrop-blur-md border-t border-border p-4"
           >
-            <div className="max-w-2xl mx-auto">
+            <div className="max-w-3xl mx-auto">
               <AnimatePresence>
                 {belowMin && (
                   <motion.p initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
@@ -699,7 +699,7 @@ export default function DeepCleaningPage() {
             <motion.div
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               transition={{ type: "spring", stiffness: 300, damping: 32 }}
-              className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl p-3 sm:p-4 md:p-5 lg:p-6 max-h-[88vh] overflow-y-auto shadow-2xl"
+              className="fixed bottom-0 left-0 right-0 md:left-64 z-50 bg-card rounded-t-3xl p-4 sm:p-5 md:p-6 max-h-[88vh] overflow-y-auto shadow-2xl"
             >
               {success ? (
                 <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
