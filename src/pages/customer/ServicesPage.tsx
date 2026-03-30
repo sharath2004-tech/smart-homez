@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import LocationSelector, { LocationData } from "@/components/LocationSelector";
-import { authAPI, serviceAreasAPI, servicesAPI, settingsAPI, setStoredCustomerLocation } from "@/lib/api";
+import { authAPI, serviceAreasAPI, servicesAPI, setStoredCustomerLocation, settingsAPI } from "@/lib/api";
 import { motion } from "framer-motion";
 import { CalendarClock, Clock, MapPin, Search, Sparkles, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
