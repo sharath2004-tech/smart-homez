@@ -4,6 +4,7 @@ import { api, authAPI, serviceAreasAPI, setStoredCustomerLocation } from "@/lib/
 import { AnimatePresence, motion } from "framer-motion";
 import { Calendar, CheckCircle, Clock, MapPin, Minus, Plus, ShoppingCart, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -629,7 +630,7 @@ export default function DeepCleaningPage() {
 
       {/* ── Sticky Cart Bar ───────────────────────────────────────────────────── */}
       <AnimatePresence>
-        {cartTotal > 0 && (
+        {cartTotal > 0 && createPortal(
           <motion.div
             initial={{ y: 120, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -685,21 +686,25 @@ export default function DeepCleaningPage() {
               </div>
             </div>
           </motion.div>
-        )}
+        , document.body)}
       </AnimatePresence>
 
-      {/* ── Booking Modal (bottom sheet) ──────────────────────────────────────── */}
+      {/* ── Booking Modal ──────────────────────────────────────────────────────────── */}
       <AnimatePresence>
-        {showModal && (
+        {showModal && createPortal(
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+              className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm"
               onClick={() => !booking && setShowModal(false)} />
-            <motion.div
-              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              transition={{ type: "spring", stiffness: 300, damping: 32 }}
-              className="fixed bottom-0 left-0 right-0 md:left-64 z-50 bg-card rounded-t-3xl p-4 sm:p-5 md:p-6 max-h-[88vh] overflow-y-auto shadow-2xl"
-            >
+            {/* Mobile: slides up from bottom | Desktop: centered dialog */}
+            <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center md:p-6 pointer-events-none">
+              <motion.div
+                initial={{ y: "100%", opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: "100%", opacity: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 32 }}
+                className="bg-card rounded-t-3xl md:rounded-2xl w-full md:max-w-xl max-h-[88vh] overflow-y-auto shadow-2xl p-5 md:p-6 pointer-events-auto"
+              >
               {success ? (
                 <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
                   className="flex flex-col items-center py-10 gap-4">
@@ -792,9 +797,10 @@ export default function DeepCleaningPage() {
                   </motion.button>
                 </>
               )}
-            </motion.div>
+              </motion.div>
+            </div>
           </>
-        )}
+        , document.body)}
       </AnimatePresence>
 
       {showLocationSelector && (
