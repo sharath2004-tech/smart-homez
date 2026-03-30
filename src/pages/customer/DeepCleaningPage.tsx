@@ -629,15 +629,16 @@ export default function DeepCleaningPage() {
       </div>
 
       {/* ── Sticky Cart Bar ───────────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {cartTotal > 0 && createPortal(
-          <motion.div
-            initial={{ y: 120, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 120, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 340, damping: 28 }}
-            className="fixed bottom-0 left-0 right-0 md:left-64 z-50 bg-card/95 backdrop-blur-md border-t border-border p-4"
-          >
+      {createPortal(
+        <AnimatePresence>
+          {cartTotal > 0 && (
+            <motion.div
+              initial={{ y: 120, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 120, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 340, damping: 28 }}
+              className="fixed bottom-0 left-0 right-0 md:left-64 z-50 bg-card/95 backdrop-blur-md border-t border-border p-4"
+            >
             <div className="max-w-3xl mx-auto">
               <AnimatePresence>
                 {belowMin && (
@@ -686,13 +687,15 @@ export default function DeepCleaningPage() {
               </div>
             </div>
           </motion.div>
-        , document.body)}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
+      , document.body)}
 
       {/* ── Booking Modal ──────────────────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {showModal && createPortal(
-          <>
+      {createPortal(
+        <AnimatePresence>
+          {showModal && (
+            <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm"
               onClick={() => !booking && setShowModal(false)} />
@@ -800,8 +803,9 @@ export default function DeepCleaningPage() {
               </motion.div>
             </div>
           </>
-        , document.body)}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
+      , document.body)}
 
       {showLocationSelector && (
         <LocationSelector
