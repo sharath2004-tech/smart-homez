@@ -3,6 +3,7 @@ import { useConfirm } from "@/hooks/useConfirm";
 import { authAPI, servicesAPI, superAdminAPI } from "@/lib/api";
 import { AlertTriangle, CheckCircle, Clock, Edit, Info, Plus, Save, Search, Sparkles, Trash2, X, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -1106,7 +1107,7 @@ const AdminServices = () => {
         )}
 
         {/* Add/Edit Form Modal */}
-        {showForm && (
+        {showForm && createPortal(
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-card rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="sticky top-0 bg-card border-b border-border p-3 sm:p-4 md:p-5 flex items-center justify-between">
@@ -2236,11 +2237,11 @@ const AdminServices = () => {
               </form>
             </div>
           </div>
-        )}
+        , document.body)}
       </div>
 
       {/* Reject Reason Modal */}
-      {rejectModalId && (
+      {rejectModalId && createPortal(
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-card rounded-2xl max-w-md w-full p-6 space-y-4">
             <h3 className="text-lg font-bold text-foreground">Reject Service Request</h3>
@@ -2264,7 +2265,7 @@ const AdminServices = () => {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </AppLayout>
   );
 };
