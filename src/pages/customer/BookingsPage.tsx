@@ -3,6 +3,7 @@ import RescheduleModal from "@/components/RescheduleModal";
 import WorkerProfilePreviewDialog from "@/components/WorkerProfilePreviewDialog";
 import WorkerTrackingMap from "@/components/WorkerTrackingMap";
 import { Badge } from "@/components/ui/badge";
+import { useConfirm } from "@/hooks/useConfirm";
 import { authAPI, bookingsAPI } from "@/lib/api";
 import { Calendar, CalendarPlus, Clock, MapPin, Phone, QrCode, RefreshCw, Star } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -73,6 +74,7 @@ const statusConfig: Record<string, { label: string; bg: string; text: string }> 
 
 const BookingsPage = () => {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const routeLocation = useLocation();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<{ name: string } | null>(null);
@@ -146,7 +148,7 @@ const BookingsPage = () => {
   };
 
   const handleCancelBooking = async (bookingId: string) => {
-    if (!confirm(t('customer.bookings.cancelConfirm'))) return;
+    if (!await confirm(t('customer.bookings.cancelConfirm'))) return;
 
     try {
       await bookingsAPI.cancel(bookingId);

@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 interface WorkerLeave {
   _id: string;
   date: string;
+  dates?: string[];
   reason: string;
   status: 'pending' | 'approved' | 'rejected';
   requestedAt: string;
@@ -454,7 +455,7 @@ const AdminLeaves = () => {
                                 <Calendar className="w-5 h-5 text-primary" />
                               </div>
                               <div>
-                                <span className="text-lg font-bold text-foreground">{formatDate(leave.date)}</span>
+                                <span className="text-lg font-bold text-foreground">{leave.dates && leave.dates.length > 1 ? leave.dates.map(d => formatDate(d)).join(', ') : formatDate(leave.date)}</span>
                                 <p className="text-xs text-muted-foreground">Requested {formatDateTime(leave.requestedAt)}</p>
                               </div>
                             </div>
@@ -646,7 +647,7 @@ const AdminLeaves = () => {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-lg font-bold text-foreground mb-1">{formatDate(leave.date)}</p>
+                          <p className="text-lg font-bold text-foreground mb-1">{leave.dates && leave.dates.length > 1 ? leave.dates.map(d => formatDate(d)).join(', ') : formatDate(leave.date)}</p>
                           <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
                             <CheckCircle className="w-3 h-3" />
                             Approved

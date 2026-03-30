@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useConfirm } from "@/hooks/useConfirm";
 import { useToast } from "@/hooks/use-toast";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { businessExpensesAPI } from "@/lib/api";
@@ -34,6 +35,7 @@ interface Expense {
 const BusinessExpenses = () => {
   const { role, name } = useAdminRole();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [grandTotal, setGrandTotal] = useState(0);
   const [summary, setSummary] = useState<Array<{ _id: string; total: number; count: number }>>([]);
@@ -112,7 +114,7 @@ const BusinessExpenses = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this expense?")) return;
+    if (!await confirm("Delete this expense?")) return;
     try {
       await businessExpensesAPI.delete(id);
       toast({ title: "Success", description: "Expense deleted" });

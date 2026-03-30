@@ -1,5 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { ImageCropDialog } from "@/components/ImageCropDialog";
+import { useConfirm } from "@/hooks/useConfirm";
 import { API_ORIGIN, authAPI, locationsAPI, usersAPI } from "@/lib/api";
 import { Bell, Camera, Check, ChevronRight, Edit2, Eye, EyeOff, Loader2, MapPin, Plus, Star, Trash2, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -53,6 +54,7 @@ const resolveProfileImageUrl = (value?: string | null) => {
 
 const ProfilePage = () => {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<Stats>({ totalBookings: 0, preferredWorkers: [], monthsActive: 0 });
   const [loading, setLoading] = useState(true);
@@ -397,7 +399,7 @@ const ProfilePage = () => {
   };
 
   const handleDeleteAddress = async (addressId: string) => {
-    if (!confirm(t('customer.profile.confirmDeleteAddress'))) return;
+    if (!await confirm(t('customer.profile.confirmDeleteAddress'))) return;
     
     try {
       await usersAPI.deleteAddress(addressId);

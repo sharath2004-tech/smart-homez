@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useConfirm } from "@/hooks/useConfirm";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { API_BASE_URL, adminAPI, bookingsAPI, businessExpensesAPI } from "@/lib/api";
 import { Edit2, IndianRupee, Plus, Trash2, TrendingDown, TrendingUp, Upload, X } from "lucide-react";
@@ -184,6 +185,7 @@ const getFileIdentity = (file: File) => `${file.name}-${file.size}-${file.lastMo
 
 const AdminExpenses = () => {
   const { role, name } = useAdminRole();
+  const confirm = useConfirm();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
@@ -443,7 +445,7 @@ const AdminExpenses = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this expense?")) return;
+    if (!await confirm("Are you sure you want to delete this expense?")) return;
 
     try {
       await businessExpensesAPI.delete(id);

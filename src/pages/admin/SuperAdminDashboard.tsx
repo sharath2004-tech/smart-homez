@@ -1,5 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import ListPagination from "@/components/admin/ListPagination";
+import { useConfirm } from "@/hooks/useConfirm";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { superAdminAPI } from "@/lib/api";
 import ExcelJS from "exceljs";
@@ -133,6 +134,7 @@ const BOOKINGS_PAGE_SIZE = 10;
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const SuperAdminDashboard = () => {
+  const confirm = useConfirm();
   const { t } = useTranslation();
   const { name } = useAdminRole();
   const [overview, setOverview] = useState<LocationOverview[]>([]);
@@ -267,7 +269,7 @@ const SuperAdminDashboard = () => {
   }, [bookingsPage, bookingsTotalPages]);
 
   const handleArchiveWorker = async (workerId: string) => {
-    if (!confirm("Archive this worker? They will be deactivated but their history is preserved.")) return;
+    if (!await confirm("Archive this worker? They will be deactivated but their history is preserved.")) return;
     try {
       await superAdminAPI.archiveWorker(workerId);
       fetchLocationData(selectedLocationId, bookingsPage);
@@ -277,7 +279,7 @@ const SuperAdminDashboard = () => {
   };
 
   const handleUnarchiveWorker = async (workerId: string) => {
-    if (!confirm("Restore this worker? They will be reactivated.")) return;
+    if (!await confirm("Restore this worker? They will be reactivated.")) return;
     try {
       await superAdminAPI.unarchiveWorker(workerId);
       fetchLocationData(selectedLocationId, bookingsPage);

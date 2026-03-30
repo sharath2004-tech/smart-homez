@@ -1,3 +1,4 @@
+import { useConfirm } from "@/hooks/useConfirm";
 import { bookingsAPI, reviewsAPI } from "@/lib/api";
 import { ArrowLeft, Star } from "lucide-react";
 import { useState } from "react";
@@ -15,6 +16,7 @@ interface ReviewModalProps {
 
 const ReviewModal = ({ bookingId, workers, onClose, onReviewSubmitted }: ReviewModalProps) => {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const [overallRating, setOverallRating] = useState(0);
   const [qualityRating, setQualityRating] = useState(0);
   const [timelinessRating, setTimelinessRating] = useState(0);
@@ -76,8 +78,8 @@ const ReviewModal = ({ bookingId, workers, onClose, onReviewSubmitted }: ReviewM
     }
   };
 
-  const handleSkip = () => {
-    if (confirm(t('customer.review.skipConfirm'))) {
+  const handleSkip = async () => {
+    if (await confirm(t('customer.review.skipConfirm'))) {
       onClose();
     }
   };

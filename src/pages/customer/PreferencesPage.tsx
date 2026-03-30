@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useConfirm } from "@/hooks/useConfirm";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -81,6 +82,7 @@ interface Preferences {
 
 const PreferencesPage = () => {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const [profile, setProfile] = useState<{ name: string } | null>(null);
   const [preferences, setPreferences] = useState<Preferences>({});
   const [availableWorkers, setAvailableWorkers] = useState<Worker[]>([]);
@@ -196,7 +198,7 @@ const PreferencesPage = () => {
   };
 
   const handleRemoveException = async (workerId: string) => {
-    if (!confirm('Remove this worker from exception list?')) return;
+    if (!await confirm('Remove this worker from exception list?')) return;
     
     try {
       await preferencesAPI.removeException(workerId);

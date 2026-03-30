@@ -232,9 +232,11 @@ const userSchema = new mongoose.Schema({
     },
     leaves: [{
       date: {
-        type: Date,
-        required: true
+        type: Date
       },
+      dates: [{
+        type: Date
+      }],
       reason: {
         type: String,
         maxlength: 200

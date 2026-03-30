@@ -3,6 +3,7 @@ import ChatModal from "@/components/ChatModal";
 import EmbeddedQRScanner from "@/components/EmbeddedQRScanner";
 import SubscriptionPaymentStep from "@/components/SubscriptionPaymentStep";
 import WorkerProfilePreviewDialog from "@/components/WorkerProfilePreviewDialog";
+import { useConfirm } from "@/hooks/useConfirm";
 import { API_BASE_URL, bookingsAPI } from "@/lib/api";
 import { getCustomerBookingPaymentSummary } from "@/pages/customer/bookingPaymentSummary";
 import html2pdf from "html2pdf.js";
@@ -245,6 +246,7 @@ const BookingStatusStepper = ({ status }: { status: string }) => {
 
 const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModalProps) => {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
   const [showScanner, setShowScanner] = useState(false);
@@ -381,7 +383,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
   }, [bookingId, fetchBookingDetail, onRefresh, t]);
 
   const handleDirectEndService = useCallback(async () => {
-    if (!confirm(t('customer.bookings.confirmEndService'))) {
+    if (!await confirm(t('customer.bookings.confirmEndService'))) {
       return;
     }
 

@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useConfirm } from "@/hooks/useConfirm";
 import { adminAPI, authAPI, locationRequestsAPI, locationsAPI, superAdminAPI } from "@/lib/api";
 import { cropQRFromImage } from "@/utils/cropQRFromImage";
 import * as L from 'leaflet';
@@ -100,6 +101,7 @@ const indianCities = [
 ];
 
 const AdminLocations = () => {
+  const confirm = useConfirm();
   const [locations, setLocations] = useState<Location[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [loading, setLoading] = useState(true);
@@ -213,7 +215,7 @@ const AdminLocations = () => {
   };
 
   const handleDeleteLocation = async (locationId: string, locationName: string) => {
-    if (!confirm(`Are you sure you want to delete "${locationName}"? This action cannot be undone.`)) {
+    if (!await confirm(`Are you sure you want to delete "${locationName}"? This action cannot be undone.`)) {
       return;
     }
 
@@ -247,7 +249,7 @@ const AdminLocations = () => {
   };
 
   const handleDeleteAdmin = async (adminId: string, adminName: string) => {
-    if (!confirm(`Are you sure you want to delete admin "${adminName}"? This action cannot be undone.`)) {
+    if (!await confirm(`Are you sure you want to delete admin "${adminName}"? This action cannot be undone.`)) {
       return;
     }
 
@@ -367,7 +369,7 @@ const AdminLocations = () => {
   const handleDeletePaymentQR = async () => {
     if (!selectedLocation) return;
     
-    if (!confirm('Remove custom payment QR? Workers will use the default payment method.')) {
+    if (!await confirm('Remove custom payment QR? Workers will use the default payment method.')) {
       return;
     }
 

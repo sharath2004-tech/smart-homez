@@ -1542,11 +1542,14 @@ export const preferencesAPI = {
 // ====== Leaves Management APIs ======
 
 export const leavesAPI = {
-  // Apply for leave (Worker)
-  applyLeave: async (date: string, reason?: string) => {
+  // Apply for leave (Worker) - supports multiple dates
+  applyLeave: async (dates: string | string[], reason?: string) => {
+    const payload = Array.isArray(dates)
+      ? { dates, reason }
+      : { date: dates, reason };
     return apiCall('/leaves/apply', {
       method: 'POST',
-      body: JSON.stringify({ date, reason })
+      body: JSON.stringify(payload)
     });
   },
 

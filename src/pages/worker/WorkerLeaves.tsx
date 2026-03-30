@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { useConfirm } from '@/hooks/useConfirm';
 import { useToast } from '@/hooks/use-toast';
 import { authAPI, leavesAPI } from '@/lib/api';
 import { Calendar as CalendarIcon, CheckCircle, Clock, Info, XCircle } from 'lucide-react';
@@ -14,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 interface Leave {
   _id: string;
   date: string;
+  dates?: string[];
   reason: string;
   status: 'pending' | 'approved' | 'rejected';
   requestedAt: string;
@@ -67,7 +69,8 @@ const formatLeaveDate = (value: string) => {
 const WorkerLeaves = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const [selectedDate, setSelectedDate] = useState<Date>();
+  const confirm = useConfirm();
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [reason, setReason] = useState('');
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [profile, setProfile] = useState<WorkerProfile>({ monthlyLeaveQuota: 2, leavesUsedThisMonth: 0 });
@@ -110,17 +113,19 @@ const WorkerLeaves = () => {
 
   const [penaltyWarning, setPenaltyWarning] = useState(false);
 
-  const checkPenalty = (date: Date | undefined) => {
-    if (!date) { setPenaltyWarning(false); return; }
+  const checkPenalty = (dates: Date[]) => {
+    if (!dates || dates.length === 0) { setPenaltyWarning(false); return; }
     const now = new Date();
-    // Normalize to local midnight so the comparison is day-boundary based
-    const leaveStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
-    const hoursUntilLeave = (leaveStart.getTime() - now.getTime()) / (1000 * 60 * 60);
-    setPenaltyWarning(hoursUntilLeave >= 0 && hoursUntilLeave < 24);
+    const hasShortNotice = dates.some(date => {
+      const leaveStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+      const hoursUntilLeave = (leaveStart.getTime() - now.getTime()) / (1000 * 60 * 60);
+      return hoursUntilLeave >= 0 && hoursUntilLeave < 24;
+    });
+    setPenaltyWarning(hasShortNotice);
   };
 
   const handleApplyLeave = async () => {
-    if (!selectedDate) {
+    if (selectedDates.length === 0) {
       toast({
         title: t('common.error'),
         description: t('worker.leaves.pleaseSelectDate'),
@@ -129,14 +134,29 @@ const WorkerLeaves = () => {
       return;
     }
 
-    // Warn about penalty but allow submission
-    if (penaltyWarning && !confirm(t('worker.leaves.penaltyConfirmMessage', { amount: '1,500' }))) {
-      return;
-    }
+    // Build confirmation message
+    const dateStrings = selectedDates
+      .sort((a, b) => a.getTime() - b.getTime())
+      .map(d => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }));
+    
+    const confirmMessage = penaltyWarning
+      ? `You are requesting leave for ${selectedDates.length} day(s):\n${dateStrings.join(', ')}\n\n⚠️ A penalty of ₹1,500 will apply because one or more dates are within 24 hours.\n\nDo you want to proceed?`
+      : `You are requesting leave for ${selectedDates.length} day(s):\n${dateStrings.join(', ')}\n\nDo you want to proceed?`;
+
+    const confirmed = await confirm({
+      title: penaltyWarning ? '⚠️ Leave Request with Penalty' : 'Confirm Leave Request',
+      description: confirmMessage,
+      confirmLabel: penaltyWarning ? 'Submit with Penalty' : 'Submit',
+      cancelLabel: 'Cancel',
+      variant: penaltyWarning ? 'destructive' : 'default'
+    });
+
+    if (!confirmed) return;
 
     setIsSubmitting(true);
     try {
-      const response = await leavesAPI.applyLeave(toLocalDateValue(selectedDate), reason.trim());
+      const dateValues = selectedDates.map(d => toLocalDateValue(d));
+      const response = await leavesAPI.applyLeave(dateValues, reason.trim());
 
       if (response.penaltyApplied) {
         toast({
@@ -147,11 +167,11 @@ const WorkerLeaves = () => {
       } else {
         toast({
           title: t('common.success'),
-          description: t('worker.leaves.leaveSubmitted')
+          description: `Leave request submitted for ${selectedDates.length} day(s)`
         });
       }
 
-      setSelectedDate(undefined);
+      setSelectedDates([]);
       setPenaltyWarning(false);
       setReason('');
       fetchLeaves();
@@ -200,6 +220,11 @@ const WorkerLeaves = () => {
     // Disable dates that already have a leave request
     const dateStr = toLocalDateValue(date);
     return leaves.some(leave => {
+      // Check dates array (new multi-day format)
+      if (leave.dates && leave.dates.length > 0) {
+        return leave.dates.some(d => toStoredLeaveDateKey(d) === dateStr);
+      }
+      // Check single date (legacy)
       const leaveDate = toStoredLeaveDateKey(leave.date);
       return leaveDate === dateStr;
     });
@@ -237,13 +262,19 @@ const WorkerLeaves = () => {
             <CardContent className="space-y-4">
               <div className="flex justify-center">
                 <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={(date) => { setSelectedDate(date); checkPenalty(date); }}
+                  mode="multiple"
+                  selected={selectedDates}
+                  onSelect={(dates) => { setSelectedDates(dates || []); checkPenalty(dates || []); }}
                   disabled={isDateDisabled}
                   className="rounded-md border"
                 />
               </div>
+
+              {selectedDates.length > 0 && (
+                <div className="text-sm text-center text-muted-foreground">
+                  {selectedDates.length} day(s) selected
+                </div>
+              )}
 
               {/* 24-hour penalty warning */}
               {penaltyWarning && (
@@ -271,7 +302,7 @@ const WorkerLeaves = () => {
 
               <Button
                 onClick={handleApplyLeave}
-                disabled={!selectedDate || isSubmitting || remainingLeaves <= 0}
+                disabled={selectedDates.length === 0 || isSubmitting || remainingLeaves <= 0}
                 className="w-full"
               >
                 <CalendarIcon className="w-4 h-4 mr-2" />
@@ -300,7 +331,11 @@ const WorkerLeaves = () => {
                   </p>
                 ) : (
                   leaves
-                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                    .sort((a, b) => {
+                      const dateA = a.dates?.[0] || a.date;
+                      const dateB = b.dates?.[0] || b.date;
+                      return new Date(dateB).getTime() - new Date(dateA).getTime();
+                    })
                     .map((leave) => (
                       <div
                         key={leave._id}
@@ -310,11 +345,19 @@ const WorkerLeaves = () => {
                           <div className="flex items-center gap-2">
                             <CalendarIcon className="w-4 h-4 text-muted-foreground" />
                             <span className="font-medium">
-                              {formatLeaveDate(leave.date)}
+                              {leave.dates && leave.dates.length > 1
+                                ? leave.dates.map(d => formatLeaveDate(d)).join(', ')
+                                : formatLeaveDate(leave.date)}
                             </span>
                           </div>
                           {getStatusBadge(leave.status)}
                         </div>
+
+                        {leave.dates && leave.dates.length > 1 && (
+                          <p className="text-xs text-muted-foreground">
+                            {leave.dates.length} days
+                          </p>
+                        )}
 
                         {leave.reason && (
                           <p className="text-sm text-muted-foreground">

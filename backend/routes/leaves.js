@@ -40,13 +40,13 @@ const parseLeaveDate = (value, { endOfDay = false } = {}) => {
 /**
  * Apply for leave (Worker only)
  * POST /api/leaves/apply
+ * Accepts { dates: string[], reason?: string } for multi-day OR legacy { date: string, reason?: string }
  */
 router.post(
   '/apply',
   authenticate,
   authorize('worker'),
   [
-    body('date').isISO8601().withMessage('Valid date is required'),
     body('reason').optional().isString().isLength({ max: 200 }).withMessage('Reason must be less than 200 characters')
   ],
   async (req, res) => {
@@ -56,8 +56,30 @@ router.post(
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { date, reason } = req.body;
+      const { date, dates, reason } = req.body;
       const workerId = req.user._id;
+
+      // Normalize to array of date strings
+      const rawDates = dates && Array.isArray(dates) ? dates : date ? [date] : [];
+      if (rawDates.length === 0) {
+        return res.status(400).json({ message: 'At least one date is required' });
+      }
+      if (rawDates.length > 10) {
+        return res.status(400).json({ message: 'Cannot apply for more than 10 days at once' });
+      }
+
+      // Parse all dates
+      const parsedDates = [];
+      for (const d of rawDates) {
+        const parsed = parseLeaveDate(d);
+        if (!parsed) {
+          return res.status(400).json({ message: `Invalid date: ${d}` });
+        }
+        parsedDates.push(parsed);
+      }
+
+      // Sort dates
+      parsedDates.sort((a, b) => a.getTime() - b.getTime());
 
       // Get worker
       const worker = await User.findById(workerId);
@@ -65,36 +87,48 @@ router.post(
         return res.status(404).json({ message: 'Worker not found' });
       }
 
-      // Check if already have leave on this date
-      const leaveDate = parseLeaveDate(date);
-      if (!leaveDate) {
-        return res.status(400).json({ message: 'Valid date is required' });
-      }
-
-      // Enforce 24-hour advance notice rule
       const now = new Date();
-      const hoursUntilLeave = (leaveDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-      const penaltyApplied = hoursUntilLeave < 24 && hoursUntilLeave >= 0;
-      if (hoursUntilLeave < 0) {
-        return res.status(400).json({ message: 'Cannot apply leave for a past date' });
-      }
 
-      const existingLeave = worker.workerProfile.leaves.find(leave => {
-        const leaveDateOnly = new Date(leave.date);
-        leaveDateOnly.setHours(0, 0, 0, 0);
-        return leaveDateOnly.getTime() === leaveDate.getTime();
-      });
+      // Validate each date
+      let penaltyApplied = false;
+      for (const leaveDate of parsedDates) {
+        const hoursUntilLeave = (leaveDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+        if (hoursUntilLeave < 0) {
+          return res.status(400).json({ message: `Cannot apply leave for a past date: ${leaveDate.toISOString().split('T')[0]}` });
+        }
+        if (hoursUntilLeave < 24) {
+          penaltyApplied = true;
+        }
 
-      if (existingLeave) {
-        return res.status(400).json({ 
-          message: 'Leave request already exists for this date',
-          status: existingLeave.status
+        // Check for existing leave on each date
+        const existingLeave = worker.workerProfile.leaves.find(leave => {
+          // Check single date (legacy)
+          if (leave.date) {
+            const leaveDateOnly = new Date(leave.date);
+            leaveDateOnly.setHours(0, 0, 0, 0);
+            return leaveDateOnly.getTime() === leaveDate.getTime();
+          }
+          // Check dates array
+          if (leave.dates && leave.dates.length > 0) {
+            return leave.dates.some(ld => {
+              const ldOnly = new Date(ld);
+              ldOnly.setHours(0, 0, 0, 0);
+              return ldOnly.getTime() === leaveDate.getTime();
+            });
+          }
+          return false;
         });
+
+        if (existingLeave) {
+          return res.status(400).json({ 
+            message: `Leave request already exists for ${leaveDate.toISOString().split('T')[0]}`,
+            status: existingLeave.status
+          });
+        }
       }
 
       // Check monthly quota
       const currentMonth = new Date().getMonth();
-      const currentYear = new Date().getFullYear();
       const lastResetMonth = worker.workerProfile.lastLeaveReset ? new Date(worker.workerProfile.lastLeaveReset).getMonth() : -1;
       
       // Reset if different month
@@ -103,17 +137,19 @@ router.post(
         worker.workerProfile.lastLeaveReset = new Date();
       }
 
-      if (worker.workerProfile.leavesUsedThisMonth >= worker.workerProfile.monthlyLeaveQuota) {
+      const remainingQuota = worker.workerProfile.monthlyLeaveQuota - worker.workerProfile.leavesUsedThisMonth;
+      if (parsedDates.length > remainingQuota) {
         return res.status(400).json({ 
-          message: `Monthly leave quota exceeded (${worker.workerProfile.monthlyLeaveQuota} leaves per month)`,
+          message: `Not enough leave quota. Requesting ${parsedDates.length} day(s) but only ${remainingQuota} remaining this month.`,
           leavesUsed: worker.workerProfile.leavesUsedThisMonth,
           quota: worker.workerProfile.monthlyLeaveQuota
         });
       }
 
-      // Add leave request
+      // Add leave request (single entry with multiple dates)
       worker.workerProfile.leaves.push({
-        date: leaveDate,
+        date: parsedDates[0], // first date for backward compatibility
+        dates: parsedDates,
         reason: reason || '',
         status: 'pending',
         requestedAt: new Date(),
@@ -123,12 +159,14 @@ router.post(
 
       await worker.save();
 
+      const newLeave = worker.workerProfile.leaves[worker.workerProfile.leaves.length - 1];
+
       res.status(201).json({
-        message: 'Leave request submitted successfully',
-        leave: worker.workerProfile.leaves[worker.workerProfile.leaves.length - 1],
+        message: `Leave request submitted for ${parsedDates.length} day(s)`,
+        leave: newLeave,
         penaltyApplied,
         penaltyAmount: penaltyApplied ? 1500 : 0,
-        penaltyMessage: penaltyApplied ? 'A penalty of ₹1500 has been applied because the leave was not requested at least 24 hours in advance.' : null
+        penaltyMessage: penaltyApplied ? 'A penalty of ₹1500 has been applied because one or more leave dates are within 24 hours.' : null
       });
     } catch (error) {
       console.error('Apply leave error:', error);
@@ -184,42 +222,49 @@ router.put(
       leave.approvedBy = adminId;
 
       if (status === 'approved') {
-        // Increment leaves used
-        worker.workerProfile.leavesUsedThisMonth += 1;
-
-        // Get all bookings for this worker on the leave date
-        const leaveDate = new Date(leave.date);
-        leaveDate.setHours(0, 0, 0, 0);
+        // Count days in this leave (use dates array if available, else single date)
+        const leaveDates = leave.dates && leave.dates.length > 0 ? leave.dates : [leave.date];
+        const daysCount = leaveDates.length;
         
-        const nextDay = new Date(leaveDate);
-        nextDay.setDate(nextDay.getDate() + 1);
+        // Increment leaves used by number of days
+        worker.workerProfile.leavesUsedThisMonth += daysCount;
 
-        const affectedBookings = await Booking.find({
-          worker: workerId,
-          bookingDate: { $gte: leaveDate, $lt: nextDay },
-          status: { $in: ['pending', 'confirmed'] }
-        });
-
-        // Auto-reassign all affected bookings
+        // Get all bookings for this worker on all leave dates
         const reassignmentResults = [];
-        for (const booking of affectedBookings) {
-          const result = await handleWorkerReassignment(
-            booking._id, 
-            Booking, 
-            'worker-on-leave'
-          );
-          reassignmentResults.push({
-            bookingId: booking._id,
-            ...result
+        for (const ld of leaveDates) {
+          const leaveDate = new Date(ld);
+          leaveDate.setHours(0, 0, 0, 0);
+          
+          const nextDay = new Date(leaveDate);
+          nextDay.setDate(nextDay.getDate() + 1);
+
+          const affectedBookings = await Booking.find({
+            worker: workerId,
+            bookingDate: { $gte: leaveDate, $lt: nextDay },
+            status: { $in: ['pending', 'confirmed'] }
           });
+
+          // Auto-reassign all affected bookings
+          for (const booking of affectedBookings) {
+            const result = await handleWorkerReassignment(
+              booking._id, 
+              Booking, 
+              'worker-on-leave'
+            );
+            reassignmentResults.push({
+              bookingId: booking._id,
+              date: ld,
+              ...result
+            });
+          }
         }
 
         await worker.save();
 
         return res.json({
-          message: 'Leave approved and bookings reassigned',
+          message: `Leave approved for ${daysCount} day(s) and bookings reassigned`,
           leave,
-          affectedBookings: affectedBookings.length,
+          totalDays: daysCount,
           reassignmentResults
         });
       } else {

@@ -2,6 +2,7 @@ import ListPagination from "@/components/admin/ListPagination";
 import AppLayout from "@/components/AppLayout";
 import { ReliabilityScoreCard } from "@/components/ReliabilityScoreCard";
 import { WorkerRatingAnalytics } from "@/components/WorkerRatingAnalytics";
+import { useConfirm } from "@/hooks/useConfirm";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { adminAPI, API_BASE_URL, reliabilityAPI, reviewAnalyticsAPI, superAdminAPI } from "@/lib/api";
 import { AlertTriangle, Archive, ArchiveRestore, BarChart3, CheckCircle, Clock, Edit, Eye, EyeOff, FileText, Info, Loader2, MapPin, Plus, Search, Star, TrendingUp, Upload, X, XCircle } from "lucide-react";
@@ -258,6 +259,7 @@ const formatMinutes = (mins: number) => {
 const AdminWorkers = () => {
   const WORKERS_PER_PAGE = 8;
   const { role, name, isSuperAdmin } = useAdminRole();
+  const confirm = useConfirm();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -492,7 +494,7 @@ const AdminWorkers = () => {
   };
 
   const handleUnarchiveWorker = async (workerId: string) => {
-    if (!confirm('Restore this worker? They will be reactivated.')) return;
+    if (!await confirm('Restore this worker? They will be reactivated.')) return;
     try {
       await workerCollectionApi.unarchiveWorker(workerId);
       alert('Worker restored successfully');
@@ -538,7 +540,7 @@ const AdminWorkers = () => {
 
   const handleResetWorkerPassword = async () => {
     if (!editWorker) return;
-    if (!confirm(`Generate a new temporary password for ${editWorker.name}? This will invalidate their current password.`)) return;
+    if (!await confirm(`Generate a new temporary password for ${editWorker.name}? This will invalidate their current password.`)) return;
 
     setResettingPassword(true);
     try {

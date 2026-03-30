@@ -1,5 +1,6 @@
 import AppLayout from '@/components/AppLayout';
 import { Badge } from '@/components/ui/badge';
+import { useConfirm } from '@/hooks/useConfirm';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminRole } from '@/hooks/useAdminRole';
 import { helpAPI } from '@/lib/api';
@@ -52,6 +53,7 @@ function fmtDate(iso: string) {
 const AdminHelpMessages = () => {
   const { toast } = useToast();
   const { role, name } = useAdminRole();
+  const confirm = useConfirm();
 
   const [messages, setMessages] = useState<HelpMessage[]>([]);
   const [counts, setCounts] = useState<Counts>({ total: 0, new: 0, read: 0, resolved: 0 });
@@ -124,7 +126,7 @@ const AdminHelpMessages = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this message permanently?')) return;
+    if (!await confirm('Delete this message permanently?')) return;
     setDeletingId(id);
     try {
       await helpAPI.deleteMessage(id);

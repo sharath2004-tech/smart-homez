@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useConfirm } from "@/hooks/useConfirm";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { api, servicesAPI } from "@/lib/api";
 import {
@@ -510,6 +511,7 @@ function SectionCard({
 
 const AdminHomeConfig = () => {
   const { role, name } = useAdminRole();
+  const confirm = useConfirm();
   const [sections, setSections] = useState<HomeSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -584,7 +586,7 @@ const AdminHomeConfig = () => {
   };
 
   const handleDelete = async (sectionId: string) => {
-    if (!confirm("Delete this section? Customers will no longer see it on the home screen.")) return;
+    if (!await confirm("Delete this section? Customers will no longer see it on the home screen.")) return;
     try {
       const res = await api.delete(`/home-config/sections/${sectionId}`);
       setSections((res.sections || []).sort((a: HomeSection, b: HomeSection) => a.sortOrder - b.sortOrder));

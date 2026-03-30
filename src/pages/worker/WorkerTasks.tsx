@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useConfirm } from "@/hooks/useConfirm";
 import { authAPI, bookingsAPI, workersAPI } from "@/lib/api";
 import { Calendar, CheckCircle, Clock, MapPin, Package, User } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -41,6 +42,7 @@ interface Profile {
 
 const WorkerTasks = () => {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [currentTask, setCurrentTask] = useState<Task | null>(null);
   const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
@@ -91,7 +93,7 @@ const WorkerTasks = () => {
   };
 
   const handleCompleteTask = async (taskId: string) => {
-    if (confirm('Mark this task as completed? It will be sent for admin approval.')) {
+    if (await confirm('Mark this task as completed? It will be sent for admin approval.')) {
       try {
         await bookingsAPI.update(taskId, { status: 'pending-review', completedAt: new Date().toISOString() });
         await fetchTasks();

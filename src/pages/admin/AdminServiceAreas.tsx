@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useConfirm } from "@/hooks/useConfirm";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { API_BASE_URL, serviceAreasAPI } from "@/lib/api";
 import L from "leaflet";
@@ -69,6 +70,7 @@ interface RequestAnalytics {
 
 const AdminServiceAreas = () => {
   const { role, name } = useAdminRole();
+  const confirm = useConfirm();
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<Map<string, { marker: L.Marker; circle?: L.Circle }>>(new Map());
@@ -431,7 +433,7 @@ const AdminServiceAreas = () => {
   };
 
   const handleDeleteArea = async (areaId: string) => {
-    if (!confirm('Are you sure you want to delete this service area?')) return;
+    if (!await confirm('Are you sure you want to delete this service area?')) return;
 
     try {
       const response = await fetch(`${API_BASE_URL}/admin/service-areas/${areaId}`, {

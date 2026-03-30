@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useConfirm } from "@/hooks/useConfirm";
 import { authAPI, servicesAPI, superAdminAPI } from "@/lib/api";
 import { AlertTriangle, CheckCircle, Clock, Edit, Info, Plus, Save, Search, Sparkles, Trash2, X, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -313,6 +314,7 @@ const SERVICE_TYPE_CARDS = [
 
 const AdminServices = () => {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
@@ -596,7 +598,7 @@ const AdminServices = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this service?')) return;
+    if (!await confirm('Are you sure you want to delete this service?')) return;
 
     try {
       await servicesAPI.delete(id);

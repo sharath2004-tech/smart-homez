@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useConfirm } from "@/hooks/useConfirm";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { api, servicesAPI } from "@/lib/api";
 import { AnimatePresence, motion } from "framer-motion";
@@ -198,6 +199,7 @@ const sanitizeConfigItem = (item: ConfigItem): ConfigItem => ({
 
 export default function AdminDeepCleaningConfig() {
   const { name, role, isSuperAdmin } = useAdminRole();
+  const confirm = useConfirm();
   const [config, setConfig]           = useState<Config | null>(null);
   const [liveConfig, setLiveConfig]   = useState<Config | null>(null);
   const [loading, setLoading]         = useState(true);
@@ -491,8 +493,8 @@ export default function AdminDeepCleaningConfig() {
     saveAll(next);
   };
 
-  const deleteItem = (id: string) => {
-    if (!config || !confirm("Delete this item?")) return;
+  const deleteItem = async (id: string) => {
+    if (!config || !await confirm("Delete this item?")) return;
     saveAll(config.items.filter(i => i.id !== id));
   };
 
@@ -542,8 +544,8 @@ export default function AdminDeepCleaningConfig() {
     saveAll(config?.items ?? [], minCart, next);
   };
 
-  const deleteCategory = (id: string) => {
-    if (!confirm("Delete this category? Items in this category will no longer appear in the customer view.")) return;
+  const deleteCategory = async (id: string) => {
+    if (!await confirm("Delete this category? Items in this category will no longer appear in the customer view.")) return;
     const next = categories.filter(c => c.id !== id);
     setCategories(next);
     if (activeCategory === id) setActiveCategory(next.find(c => c.isActive)?.id ?? next[0]?.id ?? "");

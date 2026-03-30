@@ -1,4 +1,5 @@
 import AppLayout from "@/components/AppLayout";
+import { useConfirm } from "@/hooks/useConfirm";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { api } from "@/lib/api";
 import { AlertTriangle, Edit, Eye, EyeOff, Plus, Search, Trash2, X } from "lucide-react";
@@ -29,6 +30,7 @@ const COLORS = ['blue', 'teal', 'green', 'purple', 'orange', 'red', 'pink', 'yel
 
 const AdminSubscriptionSections = () => {
   const { role, name } = useAdminRole();
+  const confirm = useConfirm();
   const [sections, setSections] = useState<SubscriptionSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState("");
@@ -122,7 +124,7 @@ const AdminSubscriptionSections = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this section? This cannot be undone.")) return;
+    if (!await confirm("Are you sure you want to delete this section? This cannot be undone.")) return;
 
     try {
       await api.delete(`/subscription-sections/${id}`);
