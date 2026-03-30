@@ -16,6 +16,12 @@ interface Service {
   duration: number;
   tags?: string[];
   requirements?: string[];
+  dos?: string[];
+  sizeParameters?: {
+    enabled: boolean;
+    sizeType?: string;
+    options?: Array<{ value: string; label: string; price: number; duration?: number }>;
+  };
 }
 
 interface UserProfile {
@@ -257,30 +263,32 @@ const MiniCleanServicePage = () => {
           </motion.div>
         )}
 
-        {/* Quantity */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <h3 className="font-semibold text-foreground mb-2">
-            How many {meta.unitLabel.toLowerCase()}s?
-          </h3>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-              className="w-10 h-10 rounded-xl border-2 border-border flex items-center justify-center hover:border-primary transition-colors"
-            >
-              <Minus className="w-4 h-4" />
-            </button>
-            <span className="text-2xl font-bold text-foreground w-8 text-center">{quantity}</span>
-            <button
-              onClick={() => setQuantity((q) => Math.min(10, q + 1))}
-              className="w-10 h-10 rounded-xl border-2 border-border flex items-center justify-center hover:border-primary transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-            <span className="text-sm text-muted-foreground ml-1">
-              {quantity} × ₹{service.price.toLocaleString('en-IN')} = <span className="font-bold text-foreground">₹{totalAmount.toLocaleString('en-IN')}</span>
-            </span>
-          </div>
-        </motion.div>
+        {/* Quantity — only shown when admin explicitly enables sizeParameters */}
+        {service.sizeParameters?.enabled && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+            <h3 className="font-semibold text-foreground mb-2">
+              How many {meta.unitLabel.toLowerCase()}s?
+            </h3>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                className="w-10 h-10 rounded-xl border-2 border-border flex items-center justify-center hover:border-primary transition-colors"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+              <span className="text-2xl font-bold text-foreground w-8 text-center">{quantity}</span>
+              <button
+                onClick={() => setQuantity((q) => Math.min(10, q + 1))}
+                className="w-10 h-10 rounded-xl border-2 border-border flex items-center justify-center hover:border-primary transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+              <span className="text-sm text-muted-foreground ml-1">
+                {quantity} × ₹{service.price.toLocaleString('en-IN')} = <span className="font-bold text-foreground">₹{totalAmount.toLocaleString('en-IN')}</span>
+              </span>
+            </div>
+          </motion.div>
+        )}
 
         {/* Date & Time */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
