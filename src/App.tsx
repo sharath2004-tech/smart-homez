@@ -65,6 +65,7 @@ import AdminLocations from "./pages/admin/AdminLocations";
 import AdminQuotes from "./pages/admin/AdminQuotes";
 import AdminSalarySettlements from "./pages/admin/AdminSalarySettlements";
 import AdminServiceAreas from "./pages/admin/AdminServiceAreas";
+import AdminServiceCatalog from "./pages/admin/AdminServiceCatalog";
 import AdminServices from "./pages/admin/AdminServices";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminSOS from "./pages/admin/AdminSOS";
@@ -167,6 +168,7 @@ const App = () => (
           <Route path="/admin/worker-requests" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminWorkerRequests /></ProtectedRoute>} />
           <Route path="/admin/leaves" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminLeaves /></ProtectedRoute>} />
           <Route path="/admin/services" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminServices /></ProtectedRoute>} />
+          <Route path="/admin/service-catalog" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminServiceCatalog /></ProtectedRoute>} />
           <Route path="/admin/deep-cleaning-config" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminDeepCleaningConfig /></ProtectedRoute>} />
           <Route path="/admin/workers" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminWorkers /></ProtectedRoute>} />
           <Route path="/admin/locations" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminLocations /></ProtectedRoute>} />
@@ -195,6 +197,7 @@ const App = () => (
           <Route path="/super-admin/demand-requests" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminServiceAreas /></ProtectedRoute>} />
           <Route path="/super-admin/service-areas" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminServiceAreas /></ProtectedRoute>} />
           <Route path="/super-admin/services" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminServices /></ProtectedRoute>} />
+          <Route path="/super-admin/service-catalog" element={<ProtectedRoute allowedRoles={['super_admin']}><AdminServiceCatalog /></ProtectedRoute>} />
           <Route path="/super-admin/settings" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminSettings /></ProtectedRoute>} />
           <Route path="/super-admin/notifications" element={<ProtectedRoute allowedRoles={['super_admin']}><NotificationsPage /></ProtectedRoute>} />
           <Route path="/super-admin/deep-cleaning-config" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminDeepCleaningConfig /></ProtectedRoute>} />

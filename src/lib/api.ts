@@ -539,6 +539,41 @@ export const servicesAPI = {
   }
 };
 
+// ====== Service Catalog APIs ======
+
+export const serviceCatalogAPI = {
+  getAll: async (params?: { activeOnly?: boolean }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.activeOnly) queryParams.append('activeOnly', 'true');
+    const qs = queryParams.toString();
+    return apiCall(`/service-catalog${qs ? `?${qs}` : ''}`);
+  },
+
+  getById: async (idOrSlug: string) => {
+    return apiCall(`/service-catalog/${encodeURIComponent(idOrSlug)}`);
+  },
+
+  create: async (data: Record<string, unknown>) => {
+    return apiCall('/service-catalog', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  update: async (id: string, data: Record<string, unknown>) => {
+    return apiCall(`/service-catalog/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiCall(`/service-catalog/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 // ====== Bookings APIs ======
 
 export const bookingsAPI = {
@@ -2185,6 +2220,7 @@ export default {
   reliability: reliabilityAPI,
   reviewAnalytics: reviewAnalyticsAPI,
   dashboardPreferences: dashboardPreferencesAPI,
-  homeConfig: homeConfigAPI
+  homeConfig: homeConfigAPI,
+  serviceCatalog: serviceCatalogAPI
 };
 

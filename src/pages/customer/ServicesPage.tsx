@@ -1,8 +1,8 @@
 import AppLayout from "@/components/AppLayout";
 import LocationSelector, { LocationData } from "@/components/LocationSelector";
-import { authAPI, serviceAreasAPI, servicesAPI, setStoredCustomerLocation } from "@/lib/api";
-import { motion } from "framer-motion";
-import { Clock, MapPin, Search, Sparkles, Users } from "lucide-react";
+import { authAPI, serviceAreasAPI, serviceCatalogAPI, servicesAPI, setStoredCustomerLocation } from "@/lib/api";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronDown, ChevronUp, Clock, MapPin, Search, Sparkles, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -23,6 +23,25 @@ interface Service {
     workersCount: number;
     reason: string;
   };
+}
+
+interface CatalogSubcategory {
+  name: string;
+  slug: string;
+  description?: string;
+  icon?: string;
+  pricingHint?: string;
+}
+
+interface CatalogCategory {
+  _id: string;
+  name: string;
+  icon?: string;
+  color?: string;
+  description?: string;
+  pricingHint?: string;
+  serviceCount: number;
+  subcategories: CatalogSubcategory[];
 }
 
 const SERVICE_CATEGORIES = [
@@ -66,9 +85,14 @@ const ServicesPage = () => {
   const [showLocationSelector, setShowLocationSelector] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   const [requestingServiceId, setRequestingServiceId] = useState<string | null>(null);
+  const [catalogCategories, setCatalogCategories] = useState<CatalogCategory[]>([]);
+  const [expandedCatalogId, setExpandedCatalogId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProfile();
+    serviceCatalogAPI.getAll({ activeOnly: true })
+      .then((data: { categories: CatalogCategory[] }) => setCatalogCategories(data.categories || []))
+      .catch(() => {/* silently ignore if catalog not seeded yet */});
     
     // Check if user has a saved location
     const savedLocation = localStorage.getItem('userLocation');
@@ -392,6 +416,73 @@ const ServicesPage = () => {
               </Link>
             </div>
           </motion.div>
+
+          {/* Service Catalog — Browse by Category */}
+          {catalogCategories.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="space-y-3"
+            >
+              <h3 className="text-sm font-semibold text-foreground px-1">Browse All Services</h3>
+              <div className="space-y-2">
+                {catalogCategories.map((cat) => (
+                  <div key={cat._id} className="rounded-2xl border border-border overflow-hidden">
+                    <button
+                      onClick={() => setExpandedCatalogId(expandedCatalogId === cat._id ? null : cat._id)}
+                      className="w-full flex items-center gap-3 px-4 py-3 bg-card hover:bg-accent/40 transition-colors text-left"
+                    >
+                      <span className="text-2xl">{cat.icon || '🏠'}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-foreground">{cat.name}</p>
+                        {cat.pricingHint && (
+                          <p className="text-xs text-muted-foreground">{cat.pricingHint}</p>
+                        )}
+                      </div>
+                      {cat.serviceCount > 0 && (
+                        <span className="text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full shrink-0">
+                          {cat.serviceCount} service{cat.serviceCount !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                      {expandedCatalogId === cat._id
+                        ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
+                        : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />}
+                    </button>
+
+                    <AnimatePresence>
+                      {expandedCatalogId === cat._id && cat.subcategories.length > 0 && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden border-t border-border bg-muted/30"
+                        >
+                          <div className="p-3 flex flex-wrap gap-2">
+                            {cat.subcategories.map((sub) => (
+                              <div
+                                key={sub.slug}
+                                className="flex items-center gap-1.5 bg-background border border-border rounded-xl px-3 py-2"
+                              >
+                                {sub.icon && <span className="text-sm">{sub.icon}</span>}
+                                <div>
+                                  <p className="text-xs font-medium text-foreground">{sub.name}</p>
+                                  {sub.pricingHint && (
+                                    <p className="text-[10px] text-muted-foreground">{sub.pricingHint}</p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
 
           {/* Search */}
           <motion.div
