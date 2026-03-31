@@ -2,7 +2,6 @@ import AppLayout from '@/components/AppLayout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -66,11 +65,39 @@ const formatLeaveDate = (value: string) => {
   });
 };
 
+const localToday = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const getDatesInRange = (startStr: string, endStr: string): Date[] => {
+  const [sy, sm, sd] = startStr.split('-').map(Number);
+  const [ey, em, ed] = endStr.split('-').map(Number);
+  const start = new Date(sy, sm - 1, sd);
+  const end = new Date(ey, em - 1, ed);
+  const cur = new Date(start);
+  const dates: Date[] = [];
+  while (cur <= end) {
+    dates.push(new Date(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
+};
+
+const LEAVE_TYPES = [
+  { value: 'sick', label: 'Sick Leave', icon: '🏥', color: 'text-red-600 bg-red-50 border-red-200' },
+  { value: 'vacation', label: 'Vacation', icon: '🌴', color: 'text-green-600 bg-green-50 border-green-200' },
+  { value: 'personal', label: 'Personal', icon: '👤', color: 'text-blue-600 bg-blue-50 border-blue-200' },
+  { value: 'emergency', label: 'Emergency', icon: '🚨', color: 'text-orange-600 bg-orange-50 border-orange-200' },
+];
+
 const WorkerLeaves = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
   const confirm = useConfirm();
-  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
+  const [leaveType, setLeaveType] = useState<string>('sick');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [profile, setProfile] = useState<WorkerProfile>({ monthlyLeaveQuota: 2, leavesUsedThisMonth: 0 });
@@ -113,19 +140,19 @@ const WorkerLeaves = () => {
 
   const [penaltyWarning, setPenaltyWarning] = useState(false);
 
-  const checkPenalty = (dates: Date[]) => {
-    if (!dates || dates.length === 0) { setPenaltyWarning(false); return; }
+  const checkPenalty = (start: string, end: string) => {
+    if (!start) { setPenaltyWarning(false); return; }
+    const dates = getDatesInRange(start, end || start);
     const now = new Date();
     const hasShortNotice = dates.some(date => {
-      const leaveStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
-      const hoursUntilLeave = (leaveStart.getTime() - now.getTime()) / (1000 * 60 * 60);
+      const hoursUntilLeave = (date.getTime() - now.getTime()) / (1000 * 60 * 60);
       return hoursUntilLeave >= 0 && hoursUntilLeave < 24;
     });
     setPenaltyWarning(hasShortNotice);
   };
 
   const handleApplyLeave = async () => {
-    if (selectedDates.length === 0) {
+    if (!startDate) {
       toast({
         title: t('common.error'),
         description: t('worker.leaves.pleaseSelectDate'),
@@ -134,14 +161,18 @@ const WorkerLeaves = () => {
       return;
     }
 
+    const effectiveEnd = endDate || startDate;
+    const dateObjs = getDatesInRange(startDate, effectiveEnd);
+
     // Build confirmation message
-    const dateStrings = selectedDates
-      .sort((a, b) => a.getTime() - b.getTime())
-      .map(d => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }));
-    
+    const dateStrings = dateObjs.map(d =>
+      d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    );
+    const selectedLeaveType = LEAVE_TYPES.find(lt => lt.value === leaveType)?.label || leaveType;
+
     const confirmMessage = penaltyWarning
-      ? `You are requesting leave for ${selectedDates.length} day(s):\n${dateStrings.join(', ')}\n\n⚠️ A penalty of ₹1,500 will apply because one or more dates are within 24 hours.\n\nDo you want to proceed?`
-      : `You are requesting leave for ${selectedDates.length} day(s):\n${dateStrings.join(', ')}\n\nDo you want to proceed?`;
+      ? `You are requesting ${selectedLeaveType} for ${dateObjs.length} day(s):\n${dateStrings.join(', ')}\n\n⚠️ A penalty of ₹1,500 will apply because one or more dates are within 24 hours.\n\nDo you want to proceed?`
+      : `You are requesting ${selectedLeaveType} for ${dateObjs.length} day(s):\n${dateStrings.join(', ')}\n\nDo you want to proceed?`;
 
     const confirmed = await confirm({
       title: penaltyWarning ? '⚠️ Leave Request with Penalty' : 'Confirm Leave Request',
@@ -155,8 +186,9 @@ const WorkerLeaves = () => {
 
     setIsSubmitting(true);
     try {
-      const dateValues = selectedDates.map(d => toLocalDateValue(d));
-      const response = await leavesAPI.applyLeave(dateValues, reason.trim());
+      const dateValues = dateObjs.map(d => toLocalDateValue(d));
+      const fullReason = reason.trim() ? `[${selectedLeaveType}] ${reason.trim()}` : `[${selectedLeaveType}]`;
+      const response = await leavesAPI.applyLeave(dateValues, fullReason);
 
       if (response.penaltyApplied) {
         toast({
@@ -167,11 +199,13 @@ const WorkerLeaves = () => {
       } else {
         toast({
           title: t('common.success'),
-          description: `Leave request submitted for ${selectedDates.length} day(s)`
+          description: `${selectedLeaveType} submitted for ${dateObjs.length} day(s)`
         });
       }
 
-      setSelectedDates([]);
+      setStartDate('');
+      setEndDate('');
+      setLeaveType('sick');
       setPenaltyWarning(false);
       setReason('');
       fetchLeaves();
@@ -211,25 +245,6 @@ const WorkerLeaves = () => {
     }
   };
 
-  const isDateDisabled = (date: Date) => {
-    // Disable past dates
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (date < today) return true;
-
-    // Disable dates that already have a leave request
-    const dateStr = toLocalDateValue(date);
-    return leaves.some(leave => {
-      // Check dates array (new multi-day format)
-      if (leave.dates && leave.dates.length > 0) {
-        return leave.dates.some(d => toStoredLeaveDateKey(d) === dateStr);
-      }
-      // Check single date (legacy)
-      const leaveDate = toStoredLeaveDateKey(leave.date);
-      return leaveDate === dateStr;
-    });
-  };
-
   const remainingLeaves = profile.monthlyLeaveQuota - profile.leavesUsedThisMonth;
 
   return (
@@ -259,22 +274,80 @@ const WorkerLeaves = () => {
               <CardTitle>{t('worker.leaves.applyForLeave')}</CardTitle>
               <CardDescription>{t('worker.leaves.reason')}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-center">
-                <Calendar
-                  mode="multiple"
-                  selected={selectedDates}
-                  onSelect={(dates) => { setSelectedDates(dates || []); checkPenalty(dates || []); }}
-                  disabled={isDateDisabled}
-                  className="rounded-md border"
-                />
+            <CardContent className="space-y-5">
+              {/* Leave Type */}
+              <div className="space-y-2">
+                <label className="text-sm font-semibold">Leave Type <span className="text-red-500">*</span></label>
+                <div className="grid grid-cols-2 gap-2">
+                  {LEAVE_TYPES.map(lt => (
+                    <button
+                      key={lt.value}
+                      type="button"
+                      onClick={() => setLeaveType(lt.value)}
+                      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                        leaveType === lt.value
+                          ? 'bg-primary text-white border-primary shadow-sm'
+                          : 'bg-white text-foreground border-gray-200 hover:border-primary/50'
+                      }`}
+                    >
+                      <span>{lt.icon}</span>
+                      {lt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {selectedDates.length > 0 && (
-                <div className="text-sm text-center text-muted-foreground">
-                  {selectedDates.length} day(s) selected
+              {/* Date Range */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold">
+                    Start Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    min={localToday()}
+                    value={startDate}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setStartDate(val);
+                      const newEnd = endDate && val <= endDate ? endDate : val;
+                      setEndDate(newEnd);
+                      checkPenalty(val, newEnd);
+                    }}
+                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                  />
                 </div>
-              )}
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold">End Date</label>
+                  <input
+                    type="date"
+                    min={startDate || localToday()}
+                    value={endDate}
+                    onChange={e => {
+                      setEndDate(e.target.value);
+                      checkPenalty(startDate, e.target.value);
+                    }}
+                    disabled={!startDate}
+                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                </div>
+              </div>
+
+              {/* Days summary pill */}
+              {startDate && (() => {
+                const days = getDatesInRange(startDate, endDate || startDate).length;
+                const activeType = LEAVE_TYPES.find(lt => lt.value === leaveType);
+                return (
+                  <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium ${activeType?.color ?? ''}`}>
+                    <CalendarIcon className="w-4 h-4" />
+                    <span>{days} day{days !== 1 ? 's' : ''}</span>
+                    <span className="font-normal opacity-70 ml-1">
+                      {formatLeaveDate(startDate).split(',').slice(0, 2).join(',')}
+                      {days > 1 && endDate ? ` – ${formatLeaveDate(endDate).split(',').slice(0, 2).join(',')}` : ''}
+                    </span>
+                  </div>
+                );
+              })()}
 
               {/* 24-hour penalty warning */}
               {penaltyWarning && (
@@ -285,8 +358,9 @@ const WorkerLeaves = () => {
                 </Alert>
               )}
 
-              <div className="space-y-2">
-                <label htmlFor="leaveReason" className="text-sm font-medium">{t('worker.leaves.reasonOptional')}</label>
+              {/* Reason */}
+              <div className="space-y-1.5">
+                <label htmlFor="leaveReason" className="text-sm font-semibold">{t('worker.leaves.reasonOptional')}</label>
                 <Textarea
                   id="leaveReason"
                   placeholder={t('worker.leaves.enterReason')}
@@ -295,14 +369,12 @@ const WorkerLeaves = () => {
                   maxLength={200}
                   rows={3}
                 />
-                <p className="text-xs text-muted-foreground text-right">
-                  {reason.length}/200
-                </p>
+                <p className="text-xs text-muted-foreground text-right">{reason.length}/200</p>
               </div>
 
               <Button
                 onClick={handleApplyLeave}
-                disabled={selectedDates.length === 0 || isSubmitting || remainingLeaves <= 0}
+                disabled={!startDate || isSubmitting || remainingLeaves <= 0}
                 className="w-full"
               >
                 <CalendarIcon className="w-4 h-4 mr-2" />
