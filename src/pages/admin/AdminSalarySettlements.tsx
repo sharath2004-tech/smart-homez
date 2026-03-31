@@ -9,18 +9,17 @@ import { useToast } from '@/hooks/use-toast';
 import { useAdminRole } from '@/hooks/useAdminRole';
 import { api } from '@/lib/api';
 import {
-  AlertCircle,
-  CheckCircle,
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  IndianRupee,
-  Loader2,
-  RefreshCw,
-  Search,
-  Send,
-  User,
-  XCircle
+    AlertCircle,
+    CheckCircle,
+    ChevronDown,
+    ChevronUp,
+    IndianRupee,
+    Loader2,
+    RefreshCw,
+    Search,
+    Send,
+    User,
+    XCircle
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -273,14 +272,11 @@ function buildPerformanceSummaryFromBookings(bookings: BookingDetail[] = []): Pe
 }
 
 const STATUS_META = {
-  pending:  { label: 'Pending',  badge: 'bg-amber-100 text-amber-800',  icon: Clock },
+  pending:  { label: 'Pending',  badge: 'bg-amber-100 text-amber-800',  icon: IndianRupee },
   approved: { label: 'Approved', badge: 'bg-blue-100 text-blue-800',    icon: CheckCircle },
   rejected: { label: 'Rejected', badge: 'bg-red-100 text-red-800',      icon: XCircle },
   paid:     { label: 'Paid',     badge: 'bg-green-100 text-green-800',  icon: CheckCircle }
 } as const;
-
-const TABS = ['all', 'paid'] as const;
-type Tab = typeof TABS[number];
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -288,7 +284,6 @@ const AdminSalarySettlements = () => {
   const { name, role } = useAdminRole();
   const { toast } = useToast();
 
-  const [tab, setTab] = useState<Tab>('all');
   const [requests, setRequests] = useState<SalaryRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -328,8 +323,7 @@ const AdminSalarySettlements = () => {
   const fetchRequests = useCallback(async () => {
     setLoading(true);
     try {
-      const query = tab === 'all' ? '' : `?status=${tab}`;
-      const data = await api.get(`/salary-requests/admin${query}`);
+      const data = await api.get('/salary-requests/admin?status=paid');
       setRequests(data.requests || []);
     } catch (err) {
       console.error('Fetch requests error:', err);
@@ -337,7 +331,7 @@ const AdminSalarySettlements = () => {
     } finally {
       setLoading(false);
     }
-  }, [tab, toast]);
+  }, [toast]);
 
   useEffect(() => {
     fetchRequests();
@@ -775,20 +769,6 @@ const AdminSalarySettlements = () => {
         <div>
           <h2 className="text-lg font-semibold text-foreground mb-3">Salary History</h2>
 
-        {/* Tabs */}
-        <div className="flex gap-1 bg-muted rounded-lg p-1 w-full overflow-x-auto mb-4">
-          {TABS.map(t => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`flex-1 min-w-fit px-3 py-1.5 rounded-md text-sm font-medium transition-colors capitalize
-                ${tab === t ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-
         {/* List */}
         {loading ? (
           <div className="flex justify-center py-16">
@@ -798,7 +778,7 @@ const AdminSalarySettlements = () => {
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
               <IndianRupee className="w-10 h-10 mb-3 opacity-30" />
-              <p className="text-sm">No {tab === 'all' ? '' : tab} requests found</p>
+              <p className="text-sm">No salary payments found</p>
             </CardContent>
           </Card>
         ) : (
