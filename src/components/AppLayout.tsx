@@ -442,7 +442,15 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
 
         {/* Page Content - This is the only part that re-renders */}
         <main className="flex-1 overflow-y-auto">
-          <div key={location.pathname} className="page-enter-wrapper">
+          <div
+            key={location.pathname}
+            className="page-enter-wrapper"
+            onAnimationEnd={(e) => {
+              // Remove animation after it completes to release the stacking context,
+              // so fixed-position modals inside pages can properly overlay the viewport.
+              e.currentTarget.style.animation = 'none';
+            }}
+          >
             {children}
           </div>
         </main>
