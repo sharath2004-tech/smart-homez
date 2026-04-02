@@ -32,7 +32,28 @@ interface Task {
   totalAmount: number;
   actualStartTime?: string;
   actualEndTime?: string;
+  actualDurationMinutes?: number;
+  workforce?: {
+    wageType?: string;
+    wageRate?: number;
+    totalWorkerWage?: number;
+    workerCount?: number;
+  };
 }
+
+const getWorkerWage = (task: Task): number | null => {
+  const { workforce, actualDurationMinutes } = task;
+  if (!workforce?.wageRate && !workforce?.totalWorkerWage) return null;
+  if (workforce.totalWorkerWage && workforce.totalWorkerWage > 0) {
+    return Math.round(workforce.totalWorkerWage / Math.max(workforce.workerCount || 1, 1));
+  }
+  if (workforce.wageRate) {
+    if (workforce.wageType === 'per_session') return workforce.wageRate;
+    const hours = (actualDurationMinutes || 0) / 60;
+    return Math.round(workforce.wageRate * hours);
+  }
+  return null;
+};
 
 interface Profile {
   name: string;
@@ -187,7 +208,9 @@ const WorkerTasks = () => {
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <Package className="w-3.5 h-3.5 shrink-0" />
               <span className="text-muted-foreground font-normal">{t('worker.tasks.collectLabel')}</span>
-              <span className="text-primary">₹{task.totalAmount}</span>
+              <span className="text-primary">
+                {getWorkerWage(task) != null ? `₹${getWorkerWage(task)}` : '—'}
+              </span>
             </div>
           </div>
 

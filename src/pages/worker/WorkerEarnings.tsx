@@ -4,9 +4,6 @@ import { BarChart2, Calendar, Clock, Download, IndianRupee } from "lucide-react"
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-// Constants
-const HOURLY_RATE = 90;
-
 interface Earning {
   _id: string;
   service: {
@@ -23,7 +20,26 @@ interface Earning {
   actualDurationMinutes?: number;
   overtimeMinutes?: number;
   overtimeCharges?: number;
+  workforce?: {
+    wageType?: string;
+    wageRate?: number;
+    totalWorkerWage?: number;
+    workerCount?: number;
+  };
 }
+
+const getWorkerEarning = (earning: Earning): number => {
+  const { workforce, actualDurationMinutes } = earning;
+  if (workforce?.totalWorkerWage && workforce.totalWorkerWage > 0) {
+    return Math.round(workforce.totalWorkerWage / Math.max(workforce.workerCount || 1, 1));
+  }
+  if (workforce?.wageRate) {
+    if (workforce.wageType === 'per_session') return workforce.wageRate;
+    const hours = (actualDurationMinutes || 0) / 60;
+    return Math.round(workforce.wageRate * hours);
+  }
+  return 0;
+};
 
 interface Stats {
   today: number;
@@ -72,22 +88,6 @@ const calculateHoursWorked = (earning: Earning): string => {
   return 'N/A';
 };
 
-const calculateEarningsBreakdown = (earning: Earning) => {
-  const durationMinutes = earning.actualDurationMinutes || 0;
-  const hours = durationMinutes / 60;
-  const baseEarnings = Math.round(hours * HOURLY_RATE * 100) / 100;
-  const overtimeEarnings = earning.overtimeCharges || 0;
-  const totalGross = baseEarnings + overtimeEarnings;
-  
-  return {
-    hours: hours,
-    baseEarnings,
-    overtimeEarnings,
-    totalGross,
-    hourlyRate: HOURLY_RATE
-  };
-};
-
 // Weekly bar chart — last 7 days
 const WeeklyEarningsChart = ({ earnings }: { earnings: Earning[] }) => {
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -101,7 +101,7 @@ const WeeklyEarningsChart = ({ earnings }: { earnings: Earning[] }) => {
     const total = earnings.reduce((sum, e) => {
       if (!e.completedAt) return sum;
       const ed = new Date(e.completedAt);
-      if (ed.toDateString() === d.toDateString()) return sum + (e.totalAmount || 0);
+      if (ed.toDateString() === d.toDateString()) return sum + getWorkerEarning(e);
       return sum;
     }, 0);
     return { label, total };
@@ -141,7 +141,7 @@ const TopServicesCard = ({ earnings }: { earnings: Earning[] }) => {
     const name = e.service?.name || 'Other';
     if (!byService[name]) byService[name] = { count: 0, total: 0 };
     byService[name].count++;
-    byService[name].total += e.totalAmount || 0;
+    byService[name].total += getWorkerEarning(e);
   });
 
   const sorted = Object.entries(byService)
@@ -208,12 +208,12 @@ const WorkerEarnings = () => {
       let todayTotal = 0, weekTotal = 0, monthTotal = 0;
       
       (earningsData.earnings || []).forEach((earning: Earning) => {
-        if (!earning.completedAt || !earning.totalAmount) return;
+        if (!earning.completedAt) return;
         
         const earnDate = new Date(earning.completedAt);
         if (isNaN(earnDate.getTime())) return; // Skip invalid dates
         
-        const amount = earning.totalAmount;
+        const amount = getWorkerEarning(earning);
         
         if (earnDate.toDateString() === today) todayTotal += amount;
         if (earnDate >= weekAgo) weekTotal += amount;
@@ -273,7 +273,7 @@ const WorkerEarnings = () => {
       if (isNaN(earnDate.getTime())) return;
       
       const hours = (earning.actualDurationMinutes || 0) / 60;
-      const amount = calculateEarningsBreakdown(earning).totalGross;
+      const amount = getWorkerEarning(earning);
       
       if (earnDate.toDateString() === today) {
         todayHours += hours;
@@ -360,25 +360,6 @@ const WorkerEarnings = () => {
           ))}
         </div>
 
-        {/* Hourly Rate Card */}
-        <div className="card-elevated p-4 sm:p-5 md:p-6 bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center">
-                <IndianRupee className="w-6 h-6 text-primary-foreground" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">{t('worker.earnings.yourHourlyRate')}</p>
-                <p className="text-2xl font-bold text-foreground">₹{HOURLY_RATE}<span className="text-base text-muted-foreground">{t('worker.earnings.perHour')}</span></p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground">{t('worker.earnings.earningsCalculated')}</p>
-              <p className="text-sm font-semibold text-primary">{t('worker.earnings.startToEndTime')}</p>
-            </div>
-          </div>
-        </div>
-
         {/* Main earnings card */}
         <div className="rounded-2xl p-6 relative overflow-hidden" style={{ background: "var(--gradient-brand)" }}>
           <div className="absolute right-4 top-4 opacity-20 text-6xl">💰</div>
@@ -426,7 +407,7 @@ const WorkerEarnings = () => {
           ) : (
             <div className="space-y-3">
               {getRecentEarnings().filter(earning => earning.service && earning.customer).map((earning) => {
-                const breakdown = calculateEarningsBreakdown(earning);
+                const workerWage = getWorkerEarning(earning);
                 const hoursWorked = calculateHoursWorked(earning);
                 
                 return (
@@ -448,31 +429,19 @@ const WorkerEarnings = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-foreground">₹{Math.round(breakdown.totalGross)}</p>
+                        <p className="font-bold text-foreground">₹{workerWage > 0 ? workerWage : '—'}</p>
                         <span className="text-xs px-2 py-0.5 bg-success-light text-success rounded-full font-medium">
                           {t('worker.earnings.settled')}
                         </span>
                       </div>
                     </div>
                     
-                    {/* Earnings Breakdown */}
-                    {breakdown.hours > 0 && (
-                      <div className="pt-3 border-t border-border space-y-1.5">
+                    {/* Hours worked */}
+                    {hoursWorked !== 'N/A' && (
+                      <div className="pt-3 border-t border-border">
                         <div className="flex justify-between text-xs">
-                          <span className="text-muted-foreground">
-                            {t('worker.earnings.base')} ({breakdown.hours.toFixed(2)}h × ₹{breakdown.hourlyRate}/hr)
-                          </span>
-                          <span className="font-medium text-foreground">₹{Math.round(breakdown.baseEarnings)}</span>
-                        </div>
-                        {breakdown.overtimeEarnings > 0 && (
-                          <div className="flex justify-between text-xs">
-                            <span className="text-muted-foreground">{t('worker.earnings.overtimeCharges')}</span>
-                            <span className="font-medium text-warning">+₹{Math.round(breakdown.overtimeEarnings)}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between text-xs pt-1 border-t border-border/50">
-                          <span className="font-medium text-foreground">{t('worker.earnings.totalGross')}</span>
-                          <span className="font-bold text-foreground">₹{Math.round(breakdown.totalGross)}</span>
+                          <span className="text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> {t('worker.earnings.hoursWorked')}</span>
+                          <span className="font-medium text-foreground">{hoursWorked}</span>
                         </div>
                       </div>
                     )}

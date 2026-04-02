@@ -17,6 +17,7 @@ services:
       - ./backend/.env.production
     volumes:
       - ./backend/logs:/app/logs
+      - ./backend/uploads:/app/uploads
     networks:
       - app-network
     healthcheck:

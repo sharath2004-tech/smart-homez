@@ -842,14 +842,14 @@ router.get('/worker/earnings', authenticate, authorize('worker'), async (req, re
     const earnings = await Booking.find(query)
       .populate('customer', 'name')
       .populate('service', 'name')
-      .select('service customer completedAt totalAmount bookingDate startTime actualStartTime actualEndTime actualDurationMinutes overtimeMinutes overtimeCharges')
+      .select('service customer completedAt totalAmount bookingDate startTime actualStartTime actualEndTime actualDurationMinutes overtimeMinutes overtimeCharges workforce')
       .sort({ completedAt: -1 })
       .limit(parseInt(limit))
       .skip((parseInt(page) - 1) * parseInt(limit));
     
     const totalEarnings = await Booking.aggregate([
       { $match: query },
-      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+      { $group: { _id: null, total: { $sum: '$workforce.totalWorkerWage' } } }
     ]);
     
     const count = await Booking.countDocuments(query);

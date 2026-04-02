@@ -1315,6 +1315,11 @@ router.post('/google', async (req, res) => {
         await user.save();
         console.log(`✅ Linked Google OAuth to existing customer: ${email}`);
       } else {
+        // Always refresh profile picture from Google on re-login
+        if (picture && user.profileImage !== picture) {
+          user.profileImage = picture;
+          await user.save();
+        }
         console.log(`✅ Existing customer signed in via Google OAuth: ${email}`);
       }
     }
