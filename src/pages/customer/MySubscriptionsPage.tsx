@@ -246,8 +246,8 @@ const MySubscriptionsPage = () => {
   if (loading) {
     return (
       <AppLayout userType="customer" userName={profile?.name || "Customer"}>
-        <div className="w-full py-16 flex flex-col items-center gap-4">
-          <div className="sweep-loader"><span className="dot w-3 h-3" /><span className="dot w-3 h-3" /><span className="dot w-3 h-3" /></div>
+        <div className="max-w-6xl mx-auto py-12 text-center">
+          <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full mx-auto mb-3"></div>
           <p className="text-sm text-muted-foreground">{t('subscriptionPage.loading')}</p>
         </div>
       </AppLayout>

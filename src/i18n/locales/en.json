@@ -453,7 +453,6 @@
       "availability": "Availability Status",
       "online": "You are online and accepting orders",
       "offline": "You are offline",
-      "goOnline": "Toggle your availability from the admin panel to start accepting orders",
       "today": "Today",
       "thisWeek": "This Week",
       "thisMonth": "This Month",

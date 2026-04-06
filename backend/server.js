@@ -72,7 +72,9 @@ const defaultAllowedOrigins = [
   'http://localhost:8081',
   'http://localhost:8082',
   'https://smart-homez.vercel.app',
-  'https://*.vercel.app'
+  'https://*.vercel.app',
+  'https://healthyhomez.shop',
+  'https://www.healthyhomez.shop'
 ];
 
 const configuredOrigins = process.env.ALLOWED_ORIGINS
