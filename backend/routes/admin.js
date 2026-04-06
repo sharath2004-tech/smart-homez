@@ -1369,6 +1369,45 @@ router.patch('/workers/:workerId/unarchive', authenticate, authorize('admin', 's
   }
 });
 
+// @route   PATCH /api/admin/workers/:workerId/availability
+// @desc    Toggle worker availability (activate/deactivate)
+// @access  Private/Admin
+router.patch('/workers/:workerId/availability', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { availability } = req.body;
+
+    if (typeof availability !== 'boolean') {
+      return res.status(400).json({ error: { message: 'Availability must be a boolean value', status: 400 } });
+    }
+
+    const worker = await User.findById(req.params.workerId);
+    if (!worker || worker.role !== 'worker') {
+      return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
+    }
+
+    worker.workerProfile = worker.workerProfile || {};
+    worker.workerProfile.availability = availability;
+    worker.workerProfile.lastAvailabilityUpdate = new Date();
+    await worker.save({ validateBeforeSave: false });
+
+    console.log(`🔄 Worker ${worker.name} availability set to ${availability ? 'ACTIVE' : 'INACTIVE'} by ${req.user.role} ${req.user.name}`);
+
+    res.json({
+      success: true,
+      message: `Worker marked as ${availability ? 'active' : 'inactive'} successfully`,
+      worker: {
+        _id: worker._id,
+        availability: worker.workerProfile.availability,
+        isArchived: worker.isArchived,
+        isActive: worker.isActive
+      }
+    });
+  } catch (error) {
+    console.error('Admin worker availability update error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
 // @route   GET /api/admin/workers
 // @desc    Get all workers in admin's assigned locations
 // @access  Private/Admin

@@ -348,7 +348,7 @@ const WorkerDashboard = () => {
             <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
             <h3 className="text-lg font-bold text-foreground mb-1">{t('worker.dashboard.offline')}</h3>
             <p className="text-sm text-muted-foreground">
-              {t('worker.dashboard.online')}
+              {t('worker.dashboard.goOnline')}
             </p>
           </div>
         )}

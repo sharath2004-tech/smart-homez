@@ -505,6 +505,16 @@ const AdminWorkers = () => {
     }
   };
 
+  const handleToggleWorkerAvailability = async (workerId: string, currentAvailability: boolean) => {
+    try {
+      await workerCollectionApi.updateWorkerAvailability(workerId, !currentAvailability);
+      fetchData();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update worker availability';
+      alert(message);
+    }
+  };
+
   const handleEditWorker = async (workerId: string) => {
     try {
       const response = await adminAPI.getWorkerDetails(workerId);
@@ -558,7 +568,7 @@ const AdminWorkers = () => {
             availability: false,
             manualAvailability: false,
             effectiveAvailability: false,
-            availabilityReason: 'Worker must sign in and change the system-generated password before taking bookings'
+            availabilityReason: 'Worker will go online after logging in'
           }
         };
       });
@@ -1084,6 +1094,19 @@ const AdminWorkers = () => {
                   >
                     <Edit className="w-3.5 h-3.5" /> Edit Worker
                   </button>
+
+                  {!w.isArchived && (
+                    <button
+                      onClick={() => handleToggleWorkerAvailability(w._id, !!w.workerProfile?.availability)}
+                      className={`w-full py-2 mb-2 border rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
+                        w.workerProfile?.availability
+                          ? 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                          : 'border-green-300 text-green-700 hover:bg-green-50'
+                      }`}
+                    >
+                      <CheckCircle className="w-3.5 h-3.5" /> {w.workerProfile?.availability ? 'Set Inactive' : 'Set Active'}
+                    </button>
+                  )}
 
                   {w.isArchived ? (
                     <button

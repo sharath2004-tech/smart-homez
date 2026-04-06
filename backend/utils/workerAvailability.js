@@ -311,13 +311,6 @@ export const isWorkerEligibleForAssignment = (worker) => {
     };
   }
 
-  if (worker.isFirstLogin === true || worker.hasCustomPassword === false) {
-    return {
-      eligible: false,
-      reason: 'Worker must sign in and change the system-generated password before taking bookings'
-    };
-  }
-
   return {
     eligible: true,
     reason: null

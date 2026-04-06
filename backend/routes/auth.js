@@ -366,6 +366,25 @@ router.post('/login',
         });
       }
 
+      // For worker accounts: on first login (auto-generated password), clear the
+      // first-login flag and set availability to true so the worker goes online
+      // immediately according to their configured time slots.
+      let workerEffectiveAvailability = null;
+      if (user.role === 'worker' && user.isFirstLogin === true) {
+        try {
+          user.isFirstLogin = false;
+          if (user.workerProfile) {
+            user.workerProfile.availability = true;
+            user.workerProfile.lastAvailabilityUpdate = new Date();
+          }
+          await user.save({ validateBeforeSave: false });
+          console.log(`✅ Worker ${user.email} activated on first login — availability set to online.`);
+        } catch (activationError) {
+          console.error(`Failed to auto-activate worker ${user.email} on first login:`, activationError);
+        }
+        workerEffectiveAvailability = await evaluateWorkerEffectiveAvailability(user);
+      }
+
       // Create JWT token
       const token = jwt.sign(
         { userId: user._id, role: user.role },
@@ -373,19 +392,26 @@ router.post('/login',
         { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
       );
 
+      const responseUser = {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        profileImage: user.profileImage,
+        isFirstLogin: user.isFirstLogin,
+        ...getPasswordSetupState(user)
+      };
+
+      if (workerEffectiveAvailability) {
+        responseUser.availability = workerEffectiveAvailability.effectiveAvailability;
+        responseUser.availabilityReason = workerEffectiveAvailability.reason;
+      }
+
       res.json({
         message: usedTemporaryPasswordFallback ? 'Login successful (temporary password verified)' : 'Login successful',
         token,
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-          role: user.role,
-          profileImage: user.profileImage,
-          isFirstLogin: user.isFirstLogin,
-          ...getPasswordSetupState(user)
-        },
+        user: responseUser,
         requirePasswordChange: getPasswordSetupState(user).needsPasswordSetup
       });
     } catch (error) {

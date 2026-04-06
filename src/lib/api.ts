@@ -1372,6 +1372,13 @@ export const adminAPI = {
     });
   },
 
+  updateWorkerAvailability: async (workerId: string, availability: boolean) => {
+    return apiCall(`/admin/workers/${workerId}/availability`, {
+      method: 'PATCH',
+      body: JSON.stringify({ availability })
+    });
+  },
+
   // Workforce Management
   getWorkforceStatus: async () => {
     return apiCall('/admin/workforce-status');
