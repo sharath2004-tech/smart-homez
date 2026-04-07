@@ -188,8 +188,12 @@ async function verifyMsg91WidgetToken(token) {
   }
 
   const res = await fetch(
-    `https://control.msg91.com/api/v5/widget/verifyAccessToken?access-token=${encodeURIComponent(token)}&widgetId=${encodeURIComponent(widgetId)}`,
-    { headers: { authkey: authKey } },
+    'https://control.msg91.com/api/v5/widget/verifyAccessToken',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ authkey: authKey, 'access-token': token }),
+    },
   );
   const data = await res.json();
 
