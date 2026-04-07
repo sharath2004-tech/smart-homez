@@ -94,14 +94,14 @@ const LandingPage = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden min-h-screen flex flex-col" style={{ background: "var(--gradient-hero)" }}>
+      <section className="relative overflow-hidden" style={{ background: "var(--gradient-hero)" }}>
         <div className="absolute inset-0 opacity-5 pointer-events-none">
           <div className="absolute top-10 right-20 w-80 h-80 rounded-full bg-primary-foreground blur-3xl" />
           <div className="absolute bottom-10 left-20 w-60 h-60 rounded-full bg-primary-foreground blur-2xl" />
         </div>
 
         {/* Main hero — full width, split 50/50 */}
-        <div className="relative flex flex-col md:flex-row flex-1">
+        <div className="relative flex flex-col md:flex-row" style={{ minHeight: "calc(100vh - 72px)" }}>
           {/* Left: Text — full left half */}
           <div className="flex-1 flex flex-col justify-center px-10 md:px-16 lg:px-24 py-20 md:py-28">
             <div className="badge-primary inline-flex mb-6 animate-fade-in self-start" style={{ backgroundColor: "rgba(255,255,255,0.15)", color: "white" }}>
@@ -140,7 +140,7 @@ const LandingPage = () => {
           </div>
 
           {/* Right: Promo Video — full right half, edge-to-edge */}
-          <div className="flex-1 relative min-h-[300px] md:min-h-0">
+          <div className="w-full md:w-1/2 overflow-hidden" style={{ minHeight: "340px" }}>
             <video
               src="/media/booking-promo.mp4"
               poster="/media/booking-hero.png"
@@ -148,7 +148,7 @@ const LandingPage = () => {
               muted
               loop
               playsInline
-              className="absolute inset-0 w-full h-full object-cover"
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
             />
           </div>
         </div>
