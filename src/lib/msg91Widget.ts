@@ -39,7 +39,7 @@ declare global {
   }
 }
 
-let initialized = false;
+let initPromise: Promise<void> | null = null;
 
 type Msg91Response = { message?: string; token?: string; access_token?: string };
 type Msg91Error = { message?: string };
@@ -48,10 +48,26 @@ function extractError(err: unknown): Error {
   return new Error((err as Msg91Error)?.message || 'OTP operation failed. Please try again.');
 }
 
-function init(): void {
-  if (initialized) return;
+function waitForSendOtp(timeout = 6000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const check = () => {
+      if (typeof window.sendOtp === 'function') {
+        resolve();
+      } else if (Date.now() - start > timeout) {
+        reject(new Error('MSG91 widget timed out. Please refresh and try again.'));
+      } else {
+        setTimeout(check, 50);
+      }
+    };
+    check();
+  });
+}
+
+function init(): Promise<void> {
+  if (initPromise) return initPromise;
   if (typeof window.initSendOTP !== 'function') {
-    throw new Error('MSG91 OTP script not loaded. Check internet connection and index.html.');
+    return Promise.reject(new Error('MSG91 OTP script not loaded. Check internet connection and index.html.'));
   }
   window.initSendOTP({
     widgetId: import.meta.env.VITE_MSG91_WIDGET_ID as string,
@@ -60,7 +76,8 @@ function init(): void {
     success: () => {},
     failure: () => {},
   });
-  initialized = true;
+  initPromise = waitForSendOtp();
+  return initPromise;
 }
 
 /**
@@ -68,14 +85,16 @@ function init(): void {
  * @param phone - Must include country code without "+": e.g. "919876543210"
  */
 export function sendOtp(phone: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    init();
-    window.sendOtp(
-      phone,
-      () => resolve(),
-      (err: unknown) => reject(extractError(err)),
-    );
-  });
+  return init().then(
+    () =>
+      new Promise((resolve, reject) => {
+        window.sendOtp(
+          phone,
+          () => resolve(),
+          (err: unknown) => reject(extractError(err)),
+        );
+      }),
+  );
 }
 
 /**
@@ -117,5 +136,5 @@ export function verifyOtp(otp: string): Promise<string> {
 
 /** Force re-initialisation (e.g. after widgetId changes between environments). */
 export function resetWidget(): void {
-  initialized = false;
+  initPromise = null;
 }
