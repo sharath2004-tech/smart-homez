@@ -143,7 +143,19 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('✅ Connected to MongoDB Atlas'))
+  .then(async () => {
+    console.log('✅ Connected to MongoDB Atlas');
+    // One-time migration: unset email:null so sparse unique index works correctly.
+    // Documents with email:null bypass the sparse index and cause E11000 errors.
+    try {
+      const result = await User.updateMany({ email: null }, { $unset: { email: 1 } });
+      if (result.modifiedCount > 0) {
+        console.log(`🔧 Fixed ${result.modifiedCount} user(s) with email:null → email field removed`);
+      }
+    } catch (err) {
+      console.warn('⚠️  email:null migration warning:', err.message);
+    }
+  })
   .catch((err) => console.error('❌ MongoDB connection error:', err));
 
 // Health check route

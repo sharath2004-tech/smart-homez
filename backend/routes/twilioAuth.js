@@ -256,9 +256,18 @@ router.post('/verify-widget-token', async (req, res) => {
       return res.status(409).json({
         message: `A ${finalRole} account with this mobile number already exists. Please log in instead.`,
       });
-    } else if (!user.isPhoneVerified) {
-      user.isPhoneVerified = true;
-      await user.save();
+    } else {
+      // Existing user login — auto-heal stale isProfileIncomplete flag:
+      // if the user genuinely has a real name, clear the flag so they
+      // are never bounced to /complete-profile again.
+      const hasRealName = user.name
+        && user.name !== 'Customer'
+        && !user.name.startsWith('User');
+
+      let dirty = false;
+      if (!user.isPhoneVerified) { user.isPhoneVerified = true; dirty = true; }
+      if (user.isProfileIncomplete && hasRealName) { user.isProfileIncomplete = false; dirty = true; }
+      if (dirty) await user.save();
     }
 
     const jwtToken = jwt.sign(
