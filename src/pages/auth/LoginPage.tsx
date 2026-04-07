@@ -532,7 +532,7 @@ const LoginPage = () => {
                   >
                     {otpLoading
                       ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying&hellip;</>
-                      : "Verify &amp; Login"}
+                      : "Verify & Login"}
                   </button>
 
                   <div className="flex items-center justify-between text-sm">
