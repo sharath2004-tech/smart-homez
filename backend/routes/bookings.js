@@ -14,14 +14,14 @@ import SubscriptionWorkerChangeRequest from '../models/SubscriptionWorkerChangeR
 import User from '../models/User.js';
 import WorkerEarnings from '../models/WorkerEarnings.js';
 import {
-  activateBackupWorker,
-  assignWorkersWithBackup,
-  checkBackupActivationNeeded
+    activateBackupWorker,
+    assignWorkersWithBackup,
+    checkBackupActivationNeeded
 } from '../utils/advancedWorkerAssignment.js';
 import {
-  processQueuedBookings,
-  retryPendingBookingAssignment,
-  updateBookingStatuses
+    processQueuedBookings,
+    retryPendingBookingAssignment,
+    updateBookingStatuses
 } from '../utils/bookingStatusUpdater.js';
 import { calculateDistance } from '../utils/geolocation.js';
 import notificationService from '../utils/notificationService.js';
@@ -29,23 +29,24 @@ import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
 import { getNextRecurringScheduleDate } from '../utils/recurringSchedule.js';
 import { checkSlotAvailability } from '../utils/slotManagement.js';
 import {
-  buildRecurringOccurrences,
-  getNextBookableDate,
-  getSubscriptionConflictWindowEnd,
-  isRequestedDateTimeInPast,
-  timeRangesOverlap,
+    buildRecurringOccurrences,
+    getNextBookableDate,
+    getSubscriptionConflictWindowEnd,
+    isRequestedDateTimeInPast,
+    timeRangesOverlap,
 } from '../utils/subscriptionScheduling.js';
 import { checkIfOnTime, updateWorkerStats } from '../utils/updateWorkerStats.js';
+import { sendWhatsAppMessage } from '../utils/whatsappService.js';
 import { assignWorkerToBooking, reassignWorker } from '../utils/workerAssignment.js';
 import {
-  getWorkerBlockedTimeRanges,
-  isWorkerAvailableForTimeRange,
-  isWorkerEligibleForAssignment
+    getWorkerBlockedTimeRanges,
+    isWorkerAvailableForTimeRange,
+    isWorkerEligibleForAssignment
 } from '../utils/workerAvailability.js';
 import {
-  getWorkerAvailabilityForecast,
-  getWorkerCapacityStatus,
-  monitorWorkerPool
+    getWorkerAvailabilityForecast,
+    getWorkerCapacityStatus,
+    monitorWorkerPool
 } from '../utils/workerPoolManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1637,6 +1638,18 @@ router.post('/',
         return res.status(400).json({ errors: errors.array() });
       }
 
+      // Gate: customer must have a verified phone number
+      const requestingUser = await User.findById(req.user._id).select('isPhoneVerified phone role').lean();
+      if (requestingUser?.role === 'customer' && !requestingUser?.isPhoneVerified) {
+        return res.status(403).json({
+          error: {
+            message: 'Please verify your phone number before making a booking.',
+            code: 'PHONE_NOT_VERIFIED',
+            status: 403,
+          },
+        });
+      }
+
       let { 
         worker, 
         service, 
@@ -2155,6 +2168,31 @@ router.post('/',
       }
 
       await booking.save();
+
+      // Send WhatsApp booking confirmation to customer (non-blocking)
+      try {
+        const customerUser = await User.findById(req.user._id).select('phone name').lean();
+        if (customerUser?.phone) {
+          const bookingDate_ = booking.bookingDate
+            ? new Date(booking.bookingDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+            : '';
+          const bookingTime_ = booking.startTime || '';
+          const serviceName_ = booking.serviceDetails?.name || booking.bookingType || 'Service';
+          const bookingId_ = String(booking._id).slice(-6).toUpperCase();
+          sendWhatsAppMessage({
+            phone: customerUser.phone,
+            templateKey: 'BOOKING_CONFIRMED',
+            variables: {
+              serviceName: serviceName_,
+              date: bookingDate_,
+              time: bookingTime_,
+              bookingId: bookingId_,
+            },
+          }).catch((e) => console.warn('⚠️ WhatsApp booking confirmation failed:', e.message));
+        }
+      } catch (waErr) {
+        console.warn('⚠️ WhatsApp notification skipped:', waErr.message);
+      }
 
       // Always attempt auto-assignment unless explicitly disabled (autoAssign !== false)
       // This ensures workers are automatically assigned when available nearby
