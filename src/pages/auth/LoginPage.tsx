@@ -222,6 +222,12 @@ const LoginPage = () => {
       localStorage.setItem("user", JSON.stringify(response.user));
       const role = response.user.role;
 
+      // New OTP user with incomplete profile → complete it first
+      if (response.user.isProfileIncomplete) {
+        window.location.href = "/complete-profile";
+        return;
+      }
+
       // Enforce tab-role match
       const allowedRoles: Record<string, string[]> = {
         customer: ["customer"],

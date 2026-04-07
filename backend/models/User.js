@@ -9,11 +9,13 @@ const userSchema = new mongoose.Schema({
   },
   email: {
     type: String,
-    required: [true, 'Email is required'],
+    required: false,
     unique: true,
+    sparse: true,
     lowercase: true,
     trim: true,
-    match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email']
+    match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email'],
+    default: null
   },
   password: {
     type: String,
@@ -107,6 +109,10 @@ const userSchema = new mongoose.Schema({
   isFirstLogin: {
     type: Boolean,
     default: false // Only true for admin-created workers with temporary passwords
+  },
+  isProfileIncomplete: {
+    type: Boolean,
+    default: false // True for OTP-only users who haven't filled in name/email/location yet
   },
   hasCustomPassword: {
     type: Boolean,

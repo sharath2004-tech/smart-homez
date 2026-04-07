@@ -472,6 +472,14 @@ export const authAPI = {
     });
   },
 
+  // Complete profile for OTP-only users (name, email, gender, location)
+  completeProfile: async (data: { name: string; email?: string; gender?: string; locationId?: string; city?: string; area?: string; locationName?: string }) => {
+    return apiCall('/auth/complete-profile', {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    });
+  },
+
   // MSG91 Widget — verify widget access token and reset password (phone-based forgot-password)
   resetPasswordWidget: async (token: string, phone: string, newPassword: string) => {
     return apiCall('/auth/reset-password-widget', {

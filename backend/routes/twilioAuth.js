@@ -1,6 +1,7 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import { authenticate } from '../middleware/auth.js';
 import { sendOTP, toE164, verifyOTP } from '../utils/msg91Service.js';
 
 const router = express.Router();
@@ -227,22 +228,29 @@ router.post('/verify-widget-token', async (req, res) => {
     let user = await User.findOne({ phone: e164, role: finalRole });
 
     if (!user) {
-      if (!isSignupAttempt) {
-        return res.status(404).json({
-          message: `No ${finalRole} account found for this mobile number. Please sign up first.`,
+      if (isSignupAttempt) {
+        // Explicit signup with name provided
+        user = new User({
+          name: String(name).trim(),
+          phone: e164,
+          role: finalRole,
+          gender: gender || 'prefer_not_to_say',
+          isPhoneVerified: true,
+          isProfileIncomplete: false,
+          password: Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12),
+        });
+      } else {
+        // Login attempt — no account yet, auto-create a minimal profile
+        user = new User({
+          name: 'Customer',
+          phone: e164,
+          role: finalRole,
+          gender: 'prefer_not_to_say',
+          isPhoneVerified: true,
+          isProfileIncomplete: true,
+          password: Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12),
         });
       }
-
-      const digits = e164.replace(/\D/g, '').slice(-10);
-      user = new User({
-        name: String(name).trim(),
-        phone: e164,
-        role: finalRole,
-        gender: gender || 'prefer_not_to_say',
-        isPhoneVerified: true,
-        isFirstLogin: false,
-        password: Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12),
-      });
       await user.save();
     } else if (isSignupAttempt) {
       return res.status(409).json({
@@ -261,13 +269,14 @@ router.post('/verify-widget-token', async (req, res) => {
 
     res.json({
       token: jwtToken,
-      isNewUser: isSignupAttempt,
+      isNewUser: !!(isSignupAttempt || user.isProfileIncomplete),
       user: {
         id: user._id,
         name: user.name,
         phone: user.phone,
         role: user.role,
         isPhoneVerified: true,
+        isProfileIncomplete: !!user.isProfileIncomplete,
       },
     });
   } catch (error) {
@@ -294,6 +303,66 @@ router.post('/check-widget-token', async (req, res) => {
     console.error('check-widget-token error:', error.message);
     const status = error.message.includes('not configured') ? 500 : 401;
     res.status(status).json({ message: error.message || 'Verification failed. Please try again.' });
+  }
+});
+
+// PATCH /api/auth/complete-profile
+// Completes profile for OTP-only users (name, email, gender + optional location).
+// @access  Private (JWT required)
+router.patch('/complete-profile', authenticate, async (req, res) => {
+  try {
+    const { name, email, gender, locationId, locationName, city, area } = req.body;
+
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ message: 'Name is required' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check email uniqueness if provided
+    if (email && email.trim()) {
+      const existing = await User.findOne({ email: email.trim().toLowerCase(), _id: { $ne: user._id } });
+      if (existing) {
+        return res.status(409).json({ message: 'This email is already registered with another account.' });
+      }
+      user.email = email.trim().toLowerCase();
+    }
+
+    user.name = String(name).trim();
+    if (gender) user.gender = gender;
+
+    // Attach service location if provided
+    if (locationId) {
+      user.location = {
+        ...user.location,
+        serviceAreaId: locationId,
+        locationName: locationName || '',
+        city: city || '',
+        area: area || '',
+      };
+    }
+
+    user.isProfileIncomplete = false;
+    await user.save();
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        gender: user.gender,
+        isProfileIncomplete: false,
+      },
+    });
+  } catch (error) {
+    console.error('complete-profile error:', error.message);
+    res.status(500).json({ message: error.message || 'Failed to update profile.' });
   }
 });
 

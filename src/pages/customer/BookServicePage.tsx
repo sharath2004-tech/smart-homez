@@ -174,7 +174,14 @@ const BookServicePage = () => {
         authAPI.getProfile()
       ]);
       setService(serviceData.service);
-      setProfile(profileData.user || profileData);
+      const userProfile = profileData.user || profileData;
+      setProfile(userProfile);
+
+      // Gate: profile must be complete before booking
+      if (userProfile.isProfileIncomplete) {
+        navigate("/complete-profile", { replace: true });
+        return;
+      }
       
       // Fetch upcoming holidays to block those dates
       try {

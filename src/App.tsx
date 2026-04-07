@@ -13,6 +13,7 @@ import NotFound from "./pages/NotFound";
 
 // Auth pages
 import ChangePasswordPage from "./pages/auth/ChangePasswordPage";
+import CompleteProfilePage from "./pages/auth/CompleteProfilePage";
 import CustomerSignUp from "./pages/auth/CustomerSignUp";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import LoginPage from "./pages/auth/LoginPage";
@@ -116,6 +117,7 @@ const App = () => (
           <Route path="/register" element={<Navigate to="/register/customer" replace />} />
           <Route path="/register/customer" element={<CustomerSignUp />} />
           <Route path="/register/worker" element={<WorkerSignUp />} />
+          <Route path="/complete-profile" element={<CompleteProfilePage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/change-password" element={<ChangePasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
