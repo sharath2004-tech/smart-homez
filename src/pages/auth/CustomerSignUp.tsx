@@ -193,8 +193,13 @@ const CustomerSignUp = () => {
       setError("Name is required");
       return;
     }
-    if (!form.email.trim()) {
-      setError("Email is required");
+    const phoneDigits = form.phone.replace(/\D/g, "").slice(-10);
+    if (phoneDigits.length < 10) {
+      setError("Mobile number is required");
+      return;
+    }
+    if (form.email.trim() && !/^\S+@\S+\.\S+$/.test(form.email.trim())) {
+      setError("Enter a valid email address");
       return;
     }
     // Validate password field requirements
@@ -243,16 +248,16 @@ const CustomerSignUp = () => {
   const registerAccount = async (geo: GeoResult | null) => {
     setLoading(true);
     try {
+      const phoneDigits = form.phone.replace(/\D/g, "").slice(-10);
       const payload: Record<string, unknown> = {
         name: form.name.trim(),
-        email: form.email.trim().toLowerCase(),
         password: form.password,
         role: "customer",
         gender: form.gender || "prefer_not_to_say",
+        phone: "+91" + phoneDigits,
         isPhoneVerified: false,
       };
-      const phoneDigits = form.phone.replace(/\D/g, "").slice(-10);
-      if (phoneDigits.length === 10) payload.phone = "+91" + phoneDigits;
+      if (form.email.trim()) payload.email = form.email.trim().toLowerCase();
 
       if (geo) {
         payload.location = {
@@ -511,21 +516,8 @@ const CustomerSignUp = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Email Address</label>
-                  <input
-                    type="email"
-                    className="input-clean"
-                    placeholder="you@example.com"
-                    value={form.email}
-                    onChange={set("email")}
-                    required
-                    autoComplete="email"
-                  />
-                </div>
-
-                <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Mobile Number <span className="text-muted-foreground font-normal">(optional)</span>
+                    Mobile Number
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">+91</span>
@@ -537,8 +529,23 @@ const CustomerSignUp = () => {
                       placeholder="98765 43210"
                       value={form.phone}
                       onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value.replace(/\D/g, "") }))}
+                      required
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Email Address <span className="text-muted-foreground font-normal">(optional)</span>
+                  </label>
+                  <input
+                    type="email"
+                    className="input-clean"
+                    placeholder="you@example.com"
+                    value={form.email}
+                    onChange={set("email")}
+                    autoComplete="email"
+                  />
                 </div>
 
                 <div>

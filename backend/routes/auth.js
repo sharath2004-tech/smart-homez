@@ -110,7 +110,8 @@ router.post('/register',
   sensitiveAuthLimiter,
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
-    body('email').isEmail().withMessage('Valid email is required'),
+    body('email').optional({ checkFalsy: true }).isEmail().withMessage('Enter a valid email address'),
+    body('phone').if(body('role').not().equals('worker')).notEmpty().withMessage('Mobile number is required'),
     body('password')
       .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
       .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter')
@@ -130,13 +131,15 @@ router.post('/register',
       const normalizedRole = role || 'customer';
       const normalizedPhone = normalizeIndianPhone(phone);
 
-      // Check if user already exists
-      const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
-      if (existingUser) {
-        console.log(`⚠️ Registration attempt with existing email: ${email}`);
-        return res.status(400).json({ 
-          error: { message: 'User already exists with this email', status: 400 } 
-        });
+      // Check if user already exists (only when email is provided)
+      if (email && email.trim()) {
+        const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
+        if (existingUser) {
+          console.log(`⚠️ Registration attempt with existing email: ${email}`);
+          return res.status(400).json({ 
+            error: { message: 'User already exists with this email', status: 400 } 
+          });
+        }
       }
 
       if (phone && !normalizedPhone) {
@@ -162,7 +165,7 @@ router.post('/register',
         }
       }
 
-      console.log(`✅ No existing user found for email: ${email}, proceeding with registration`);
+      console.log(`✅ Proceeding with registration for: ${email || phone}`);
 
       // Load configurable settings
       const settings = await Settings.getSettings();
@@ -170,14 +173,14 @@ router.post('/register',
       // Prepare user data
       const userData = {
         name,
-        email: email.toLowerCase().trim(), // Normalize email
+        ...(email && email.trim() ? { email: email.toLowerCase().trim() } : {}),
         password,
         role: normalizedRole,
         phone: normalizedPhone || phone,
         gender: gender || 'prefer_not_to_say',
         religion: religion || undefined,
         isPhoneVerified: isPhoneVerified === true || isPhoneVerified === 'true',
-        isFirstLogin: false // Self-registered users don't need password change
+        isFirstLogin: false
       };
 
       // Add location data if provided
