@@ -279,14 +279,7 @@ export const NOTIFICATION_TEMPLATES = {
   BOOKING_CANCELLED: (data) => ({
     type: NOTIFICATION_TYPES.BOOKING_CANCELLED,
     title: '❌ Booking Cancelled',
-    message: `Your booking has been cancelled. ${data.refundAmount ? `Refund of ₹${data.refundAmount} will be processed.` : ''}`,
-    priority: 'medium'
-  }),
-  
-  REFUND_PROCESSED: (data) => ({
-    type: NOTIFICATION_TYPES.REFUND_PROCESSED,
-    title: '💰 Refund Processed',
-    message: `Refund of ₹${data.amount} has been processed for cancelled booking. It will reflect in 3-5 business days.`,
+    message: `Your booking has been cancelled.`,
     priority: 'medium'
   }),
   

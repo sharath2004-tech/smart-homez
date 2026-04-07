@@ -53,10 +53,9 @@ const WHATSAPP_TEMPLATES = {
   BOOKING_CANCELLED: {
     msg91Name: process.env.MSG91_WA_TPL_BOOKING_CANCELLED || 'booking_cancelled',
     language: 'en',
-    buildComponents: ({ serviceName, reason, refundAmount }) => ({
+    buildComponents: ({ serviceName, reason }) => ({
       body_1: { type: 'text', value: String(serviceName || 'Cleaning Service') },
       body_2: { type: 'text', value: String(reason || 'Cancelled by request') },
-      body_3: { type: 'text', value: refundAmount ? `₹${refundAmount}` : 'N/A' },
     }),
   },
 

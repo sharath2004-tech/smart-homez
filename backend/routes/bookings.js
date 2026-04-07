@@ -2683,23 +2683,9 @@ router.delete('/:id', authenticate, async (req, res) => {
       {
         bookingId: booking._id,
         serviceName: booking.service?.name ?? 'Move In / Move Out Cleaning',
-        refundAmount: refundAmount > 0 ? refundAmount : null,
         reason: booking.cancellationReason
       }
     );
-
-    // Send refund notification if applicable
-    if (refundAmount > 0) {
-      await notificationService.sendTemplatedNotification(
-        booking.customer._id,
-        'REFUND_PROCESSED',
-        {
-          bookingId: booking._id,
-          amount: refundAmount,
-          refundReason
-        }
-      );
-    }
 
     // Notify worker if assigned
     if (booking.worker) {
@@ -2707,7 +2693,7 @@ router.delete('/:id', authenticate, async (req, res) => {
         userId: booking.worker,
         type: 'cancellation',
         title: '❌ Booking Cancelled',
-        message: `Customer cancelled booking for ${booking.service?.name ?? 'Move In / Move Out Cleaning'}. ${refundReason}`,
+        message: `Customer cancelled booking for ${booking.service?.name ?? 'Move In / Move Out Cleaning'}.`,
         priority: 'medium',
         data: {
           bookingId: booking._id
