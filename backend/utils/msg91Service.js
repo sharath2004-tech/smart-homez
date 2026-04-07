@@ -1,13 +1,12 @@
 /**
- * MSG91 SMS OTP Service
+ * MSG91 OTP Service
  *
- * Provides SMS OTP functionality using MSG91 API
- * Supports fallback to Twilio if MSG91 fails
+ * Sends and verifies OTPs via MSG91 API (SMS / WhatsApp).
+ * No Twilio dependency.
  *
  * API Documentation: https://docs.msg91.com/
  */
 
-import twilio from 'twilio';
 import { isMsg91WhatsAppConfigured, sendMsg91WhatsAppOtp } from './msg91WhatsappService.js';
 import { isWhatsAppOtpConfigured, sendWhatsAppOtp, verifyWhatsAppOtp } from './whatsappService.js';
 
@@ -27,7 +26,6 @@ const MSG91_TEMPLATE_ID = process.env.MSG91_OTP_TEMPLATE_ID;
 const MSG91_OTP_EXPIRY = parseInt(process.env.MSG91_OTP_EXPIRY) || 600; // 10 minutes in seconds
 
 const USE_MSG91 = MSG91_AUTH_KEY && MSG91_TEMPLATE_ID;
-const TWILIO_FALLBACK_ENABLED = process.env.TWILIO_ENABLED === 'true';
 const OTP_DELIVERY_CHANNEL = process.env.OTP_DELIVERY_CHANNEL || 'sms';
 
 /**
@@ -338,81 +336,11 @@ export async function resendSMSOTP(phone, retryType = 'text') {
 }
 
 /**
- * Twilio fallback functions (if MSG91 fails)
- */
-function getTwilioClient() {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-
-  if (!accountSid || !authToken) {
-    throw new Error('Twilio credentials not configured');
-  }
-
-  return twilio(accountSid, authToken);
-}
-
-function getTwilioVerifySid() {
-  const sid = process.env.TWILIO_VERIFY_SID;
-  if (!sid) throw new Error('Twilio Verify SID not configured');
-  return sid;
-}
-
-/**
- * Send OTP via Twilio (fallback)
- * @param {string} phone - E.164 phone number
- * @returns {Promise<Object>}
- */
-async function sendViaTwilio(phone) {
-  console.log(`📱 Falling back to Twilio for ${phone}...`);
-
-  const client = getTwilioClient();
-  await client.verify.v2.services(getTwilioVerifySid()).verifications.create({
-    to: phone,
-    channel: 'sms'
-  });
-
-  console.log(`✅ OTP sent via Twilio to ${phone}`);
-
-  return {
-    success: true,
-    requestId: 'twilio',
-    message: 'OTP sent successfully (via backup service)'
-  };
-}
-
-/**
- * Verify OTP via Twilio (fallback)
- * @param {string} phone - E.164 phone number
- * @param {string} code - OTP code
- * @returns {Promise<Object>}
- */
-async function verifyViaTwilio(phone, code) {
-  console.log(`🔍 Verifying OTP via Twilio for ${phone}...`);
-
-  const client = getTwilioClient();
-  const check = await client.verify.v2.services(getTwilioVerifySid()).verificationChecks.create({
-    to: phone,
-    code
-  });
-
-  if (check.status !== 'approved') {
-    throw new Error('Invalid or expired OTP');
-  }
-
-  console.log(`✅ OTP verified via Twilio for ${phone}`);
-
-  return {
-    verified: true,
-    message: 'OTP verified successfully'
-  };
-}
-
-/**
- * Public API with automatic fallback
+ * Public API
  */
 
 /**
- * Send OTP (tries MSG91, falls back to Twilio if enabled)
+ * Send OTP (MSG91 SMS or WhatsApp)
  * @param {string} phone - Phone number
  * @param {Object} options - Optional parameters
  * @returns {Promise<Object>}
@@ -420,55 +348,38 @@ async function verifyViaTwilio(phone, code) {
 export async function sendOTP(phone, options = {}) {
   const e164 = toE164(phone);
 
-  try {
-    // MSG91 WhatsApp OTP (preferred channel)
-    if (OTP_DELIVERY_CHANNEL === 'msg91_whatsapp' && isMsg91WhatsAppConfigured()) {
-      const otp = String(Math.floor(100000 + Math.random() * 900000));
-      const result = await sendMsg91WhatsAppOtp({ phone: e164, otp, expiryMinutes: Math.floor(MSG91_OTP_EXPIRY / 60) });
-      if (result.success) {
-        // Store OTP for verification
-        otpStore.set(e164, {
-          requestId: 'msg91_whatsapp',
-          otp,
-          sentAt: Date.now(),
-          expiresAt: Date.now() + (MSG91_OTP_EXPIRY * 1000)
-        });
-        incrementRateLimit(e164);
-        console.log(`✅ OTP sent via MSG91 WhatsApp to ${phone}`);
-        return { success: true, requestId: 'msg91_whatsapp', message: 'OTP sent via WhatsApp' };
-      }
-      console.warn('⚠️ MSG91 WhatsApp OTP failed, falling through to other channels…');
+  // MSG91 WhatsApp OTP (preferred channel)
+  if (OTP_DELIVERY_CHANNEL === 'msg91_whatsapp' && isMsg91WhatsAppConfigured()) {
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    const result = await sendMsg91WhatsAppOtp({ phone: e164, otp, expiryMinutes: Math.floor(MSG91_OTP_EXPIRY / 60) });
+    if (result.success) {
+      otpStore.set(e164, {
+        requestId: 'msg91_whatsapp',
+        otp,
+        sentAt: Date.now(),
+        expiresAt: Date.now() + (MSG91_OTP_EXPIRY * 1000)
+      });
+      incrementRateLimit(e164);
+      console.log(`✅ OTP sent via MSG91 WhatsApp to ${phone}`);
+      return { success: true, requestId: 'msg91_whatsapp', message: 'OTP sent via WhatsApp' };
     }
-
-    // Twilio WhatsApp OTP
-    if (OTP_DELIVERY_CHANNEL === 'whatsapp' && isWhatsAppOtpConfigured()) {
-      return await sendWhatsAppOtp(e164);
-    }
-
-    if (USE_MSG91) {
-      return await sendSMSOTP(e164, options);
-    } else if (TWILIO_FALLBACK_ENABLED) {
-      return await sendViaTwilio(e164);
-    } else {
-      throw new Error('No SMS service configured. Set up MSG91 or enable Twilio fallback.');
-    }
-  } catch (error) {
-    // If MSG91 fails and Twilio fallback is enabled, try Twilio
-    if (USE_MSG91 && TWILIO_FALLBACK_ENABLED) {
-      console.warn('⚠️ MSG91 failed, attempting Twilio fallback...');
-      try {
-        return await sendViaTwilio(e164);
-      } catch (twilioError) {
-        console.error('❌ Twilio fallback also failed:', twilioError.message);
-        throw error; // Throw original MSG91 error
-      }
-    }
-    throw error;
+    console.warn('⚠️ MSG91 WhatsApp OTP failed, falling through to SMS…');
   }
+
+  // Twilio WhatsApp OTP
+  if (OTP_DELIVERY_CHANNEL === 'whatsapp' && isWhatsAppOtpConfigured()) {
+    return await sendWhatsAppOtp(e164);
+  }
+
+  if (USE_MSG91) {
+    return await sendSMSOTP(e164, options);
+  }
+
+  throw new Error('No SMS service configured. Set MSG91_AUTH_KEY and MSG91_OTP_TEMPLATE_ID in .env');
 }
 
 /**
- * Verify OTP (tries MSG91, falls back to Twilio if needed)
+ * Verify OTP
  * @param {string} phone - Phone number
  * @param {string} code - OTP code
  * @returns {Promise<Object>}
@@ -476,48 +387,32 @@ export async function sendOTP(phone, options = {}) {
 export async function verifyOTP(phone, code) {
   const e164 = toE164(phone);
 
-  try {
-    // MSG91 WhatsApp OTP verification (stored locally)
-    if (OTP_DELIVERY_CHANNEL === 'msg91_whatsapp') {
-      const stored = otpStore.get(e164);
-      if (stored && stored.requestId === 'msg91_whatsapp') {
-        if (Date.now() > stored.expiresAt) {
-          otpStore.delete(e164);
-          throw new Error('OTP has expired. Please request a new one.');
-        }
-        if (stored.otp === String(code)) {
-          otpStore.delete(e164);
-          console.log(`✅ OTP verified (MSG91 WhatsApp) for ${phone}`);
-          return { verified: true, message: 'OTP verified successfully' };
-        }
-        throw new Error('Invalid OTP. Please try again.');
+  // MSG91 WhatsApp OTP verification (stored locally)
+  if (OTP_DELIVERY_CHANNEL === 'msg91_whatsapp') {
+    const stored = otpStore.get(e164);
+    if (stored && stored.requestId === 'msg91_whatsapp') {
+      if (Date.now() > stored.expiresAt) {
+        otpStore.delete(e164);
+        throw new Error('OTP has expired. Please request a new one.');
       }
-      // Fall through to other methods if no stored OTP
-    }
-
-    if (OTP_DELIVERY_CHANNEL === 'whatsapp' && isWhatsAppOtpConfigured()) {
-      return await verifyWhatsAppOtp(e164, code);
-    }
-
-    if (USE_MSG91) {
-      return await verifySMSOTP(e164, code);
-    } else if (TWILIO_FALLBACK_ENABLED) {
-      return await verifyViaTwilio(e164, code);
-    } else {
-      throw new Error('No SMS service configured');
-    }
-  } catch (error) {
-    // If MSG91 fails and we used Twilio to send, verify with Twilio
-    if (USE_MSG91 && TWILIO_FALLBACK_ENABLED) {
-      try {
-        return await verifyViaTwilio(e164, code);
-      } catch (twilioError) {
-        // Throw original error
-        throw error;
+      if (stored.otp === String(code)) {
+        otpStore.delete(e164);
+        console.log(`✅ OTP verified (MSG91 WhatsApp) for ${phone}`);
+        return { verified: true, message: 'OTP verified successfully' };
       }
+      throw new Error('Invalid OTP. Please try again.');
     }
-    throw error;
   }
+
+  if (OTP_DELIVERY_CHANNEL === 'whatsapp' && isWhatsAppOtpConfigured()) {
+    return await verifyWhatsAppOtp(e164, code);
+  }
+
+  if (USE_MSG91) {
+    return await verifySMSOTP(e164, code);
+  }
+
+  throw new Error('No SMS service configured');
 }
 
 /**

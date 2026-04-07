@@ -2,6 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import WorkerProfilePreviewDialog from "@/components/WorkerProfilePreviewDialog";
 import { useServiceBookingAvailability } from "@/hooks/useServiceBookingAvailability";
 import { authAPI, bookingsAPI, servicesAPI, settingsAPI } from "@/lib/api";
+import * as msg91Widget from "@/lib/msg91Widget";
 import { getCustomerPlanFrequencyLabel } from "@/utils/subscriptionPlanDetails";
 import { getMinimumSubscriptionStartDate, isSubscriptionStartTimeExpired } from "@/utils/subscriptionStartRules";
 import { Calendar, CalendarClock, Clock, Info, MapPin, Sparkles, Star, User, Users, Zap } from "lucide-react";
@@ -80,6 +81,8 @@ const BookServicePage = () => {
   const [service, setService] = useState<Service | null>(null);
   const [profile, setProfile] = useState<{
     name: string;
+    phone?: string;
+    isPhoneVerified?: boolean;
     currentLocation?: { area: string; city: string };
     addresses?: Array<{
       isDefault?: boolean;
@@ -127,6 +130,25 @@ const BookServicePage = () => {
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [autoRenewal, setAutoRenewal] = useState(true);
   const [allowPause, setAllowPause] = useState(true);
+
+  // Phone verification modal state
+  const [showPhoneVerifyModal, setShowPhoneVerifyModal] = useState(false);
+  const [phoneVerifyNumber, setPhoneVerifyNumber] = useState('');
+  const [phoneVerifyOtp, setPhoneVerifyOtp] = useState('');
+  const [phoneVerifyOtpSent, setPhoneVerifyOtpSent] = useState(false);
+  const [phoneVerifyLoading, setPhoneVerifyLoading] = useState(false);
+  const [phoneVerifyError, setPhoneVerifyError] = useState('');
+  const [phoneVerifyResendCountdown, setPhoneVerifyResendCountdown] = useState(0);
+
+  const startPhoneVerifyResendCountdown = () => {
+    setPhoneVerifyResendCountdown(30);
+    const timer = setInterval(() => {
+      setPhoneVerifyResendCountdown(prev => {
+        if (prev <= 1) { clearInterval(timer); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  };
 
   const {
     availability,
@@ -357,6 +379,16 @@ const BookServicePage = () => {
       );
       return;
     }
+
+    // Gate: customer must have a verified phone number to receive booking notifications
+    if (!profile?.isPhoneVerified) {
+      setPhoneVerifyNumber(profile?.phone?.replace(/\D/g, '').slice(-10) || '');
+      setPhoneVerifyOtp('');
+      setPhoneVerifyOtpSent(false);
+      setPhoneVerifyError('');
+      setShowPhoneVerifyModal(true);
+      return;
+    }
     
     // Validation for subscription bookings
     if (bookingType !== 'oneTime') {
@@ -529,6 +561,48 @@ const BookServicePage = () => {
     const endMinutes = totalMinutes % 60;
     return `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
   };
+
+  // ── Phone verification handlers ──────────────────────────────────────────
+  const handleSendPhoneVerifyOtp = async () => {
+    const digits = phoneVerifyNumber.replace(/\D/g, '').slice(-10);
+    if (digits.length !== 10) {
+      setPhoneVerifyError('Enter a valid 10-digit mobile number');
+      return;
+    }
+    setPhoneVerifyLoading(true);
+    setPhoneVerifyError('');
+    try {
+      await msg91Widget.sendOtp('91' + digits);
+      setPhoneVerifyOtpSent(true);
+      startPhoneVerifyResendCountdown();
+    } catch (err) {
+      setPhoneVerifyError(err instanceof Error ? err.message : 'Failed to send OTP. Please try again.');
+    } finally {
+      setPhoneVerifyLoading(false);
+    }
+  };
+
+  const handleConfirmPhoneVerifyOtp = async () => {
+    if (phoneVerifyOtp.length !== 6) {
+      setPhoneVerifyError('Enter the 6-digit OTP');
+      return;
+    }
+    setPhoneVerifyLoading(true);
+    setPhoneVerifyError('');
+    try {
+      const widgetToken = await msg91Widget.verifyOtp(phoneVerifyOtp);
+      await authAPI.confirmPhoneWidgetToken(widgetToken);
+      // Mark locally so booking proceeds immediately
+      setProfile(prev => prev ? { ...prev, phone: phoneVerifyNumber, isPhoneVerified: true } : prev);
+      setShowPhoneVerifyModal(false);
+      toast.success('Phone verified! You can now complete your booking.');
+    } catch (err) {
+      setPhoneVerifyError(err instanceof Error ? err.message : 'Verification failed. Please try again.');
+    } finally {
+      setPhoneVerifyLoading(false);
+    }
+  };
+  // ────────────────────────────────────────────────────────────────────────
 
   const getTodayDate = () => {
     const d = new Date();
@@ -1616,6 +1690,112 @@ const BookServicePage = () => {
           }}
           worker={selectedWorkerProfile}
         />
+
+        {/* ── Phone Verification Modal ── */}
+        {showPhoneVerifyModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+            <div className="bg-background rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                  <User className="w-6 h-6 text-primary" />
+                </div>
+                <h2 className="text-lg font-bold text-foreground">Verify Your Phone</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  We need your verified phone number to send booking updates via WhatsApp.
+                </p>
+              </div>
+
+              {!phoneVerifyOtpSent ? (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Mobile Number</label>
+                    <div className="relative flex items-center">
+                      <span className="absolute left-4 text-muted-foreground font-medium text-sm">+91</span>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        maxLength={10}
+                        className="input-clean pl-12 w-full"
+                        placeholder="98765 43210"
+                        value={phoneVerifyNumber}
+                        onChange={(e) => setPhoneVerifyNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendPhoneVerifyOtp()}
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+
+                  {phoneVerifyError && (
+                    <p className="text-sm text-red-600">{phoneVerifyError}</p>
+                  )}
+
+                  <button
+                    onClick={handleSendPhoneVerifyOtp}
+                    disabled={phoneVerifyLoading || phoneVerifyNumber.replace(/\D/g, '').length < 10}
+                    className="btn-brand w-full flex items-center justify-center gap-2"
+                  >
+                    {phoneVerifyLoading ? 'Sending…' : 'Send OTP'}
+                  </button>
+                  <button
+                    onClick={() => setShowPhoneVerifyModal(false)}
+                    className="w-full text-sm text-muted-foreground hover:text-foreground text-center"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800">
+                    OTP sent to <strong>+91 {phoneVerifyNumber}</strong>. Check your WhatsApp / SMS.
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Enter OTP</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      className="input-clean tracking-[0.5em] text-center text-lg font-mono w-full"
+                      placeholder="· · · · · ·"
+                      value={phoneVerifyOtp}
+                      onChange={(e) => setPhoneVerifyOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      onKeyDown={(e) => e.key === 'Enter' && handleConfirmPhoneVerifyOtp()}
+                      autoFocus
+                    />
+                  </div>
+
+                  {phoneVerifyError && (
+                    <p className="text-sm text-red-600">{phoneVerifyError}</p>
+                  )}
+
+                  <button
+                    onClick={handleConfirmPhoneVerifyOtp}
+                    disabled={phoneVerifyLoading || phoneVerifyOtp.length < 6}
+                    className="btn-brand w-full flex items-center justify-center gap-2"
+                  >
+                    {phoneVerifyLoading ? 'Verifying…' : 'Verify & Continue'}
+                  </button>
+
+                  <button
+                    onClick={phoneVerifyResendCountdown > 0 ? undefined : handleSendPhoneVerifyOtp}
+                    disabled={phoneVerifyResendCountdown > 0 || phoneVerifyLoading}
+                    className="w-full text-sm text-muted-foreground hover:text-foreground text-center disabled:opacity-50"
+                  >
+                    {phoneVerifyResendCountdown > 0
+                      ? `Resend OTP in ${phoneVerifyResendCountdown}s`
+                      : 'Resend OTP'}
+                  </button>
+                  <button
+                    onClick={() => setShowPhoneVerifyModal(false)}
+                    className="w-full text-sm text-muted-foreground hover:text-foreground text-center"
+                  >
+                    Cancel
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </AppLayout>
   );

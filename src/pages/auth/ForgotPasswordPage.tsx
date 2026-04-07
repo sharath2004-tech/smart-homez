@@ -2,6 +2,7 @@ import { ArrowLeft, Check, Home, Loader2, Mail, Phone } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { authAPI } from "../../lib/api";
+import * as msg91Widget from "../../lib/msg91Widget";
 
 type Tab = "email" | "phone";
 type EmailStep = "sendOtp" | "resetPassword";
@@ -79,7 +80,7 @@ const ForgotPasswordPage = () => {
     }
     setPhoneLoading(true);
     try {
-      await authAPI.forgotPasswordPhone(phone);
+      await msg91Widget.sendOtp("91" + phone);
       setPhoneStep("resetPassword");
     } catch (err) {
       setPhoneError(err instanceof Error ? err.message : "Failed to send OTP. Please try again.");
@@ -101,7 +102,8 @@ const ForgotPasswordPage = () => {
     }
     setPhoneLoading(true);
     try {
-      await authAPI.resetPasswordPhone(phone, otp, newPassword);
+      const widgetToken = await msg91Widget.verifyOtp(otp);
+      await authAPI.resetPasswordWidget(widgetToken, phone, newPassword);
       setPhoneSuccess(true);
     } catch (err) {
       setPhoneError(err instanceof Error ? err.message : "Failed to reset password. Please check the OTP and try again.");

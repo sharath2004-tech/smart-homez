@@ -1,25 +1,9 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
-import twilio from 'twilio';
 import User from '../models/User.js';
 import { sendOTP, toE164, verifyOTP } from '../utils/msg91Service.js';
 
 const router = express.Router();
-
-function getTwilioClient() {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  if (!accountSid || !authToken) {
-    throw new Error('Twilio credentials not configured. Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in .env');
-  }
-  return twilio(accountSid, authToken);
-}
-
-function getVerifySid() {
-  const sid = process.env.TWILIO_VERIFY_SID;
-  if (!sid) throw new Error('Twilio Verify SID not configured. Set TWILIO_VERIFY_SID in .env');
-  return sid;
-}
 
 // POST /api/auth/send-otp
 // Sends a verification OTP via Twilio Verify
@@ -184,6 +168,128 @@ router.post('/check-otp', async (req, res) => {
     }
 
     res.status(500).json({ message: error.message || 'Verification failed. Please try again.' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// MSG91 Widget token verification helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Verify an MSG91 widget access token server-side.
+ * Returns { type: 'success', mobile: '91XXXXXXXXXX' } on success.
+ */
+async function verifyMsg91WidgetToken(token) {
+  const widgetId = process.env.MSG91_WIDGET_ID;
+  const authKey = process.env.MSG91_AUTH_KEY;
+
+  if (!widgetId || !authKey) {
+    throw new Error('OTP service not configured on server');
+  }
+
+  const res = await fetch(
+    `https://api.msg91.com/api/v5/widget/verifyAccessToken?access-token=${encodeURIComponent(token)}&widgetId=${encodeURIComponent(widgetId)}`,
+    { headers: { authkey: authKey } },
+  );
+  const data = await res.json();
+
+  if (!res.ok || data.type !== 'success') {
+    throw new Error('OTP verification failed. Please try again.');
+  }
+  return data; // { type, mobile, ... }
+}
+
+// POST /api/auth/verify-widget-token
+// Verifies MSG91 widget token, then finds/creates user and returns a platform JWT.
+// Body: { token, phone, role?, name?, gender? }
+router.post('/verify-widget-token', async (req, res) => {
+  try {
+    const { token, phone, role = 'customer', name, gender } = req.body;
+    if (!token || !phone) {
+      return res.status(400).json({ message: 'Token and phone are required' });
+    }
+
+    // Server-side verification with MSG91
+    const verifyData = await verifyMsg91WidgetToken(token);
+
+    // Use the mobile returned by MSG91 as the authoritative verified number
+    const rawMobile = verifyData.mobile || verifyData.identifier || phone;
+    const e164 = toE164(rawMobile);
+
+    const requestedRole = typeof role === 'string' ? role.toLowerCase().trim() : 'customer';
+    const finalRole = ['customer', 'worker'].includes(requestedRole) ? requestedRole : 'customer';
+    const isSignupAttempt = Boolean(name && String(name).trim());
+
+    let user = await User.findOne({ phone: e164, role: finalRole });
+
+    if (!user) {
+      if (!isSignupAttempt) {
+        return res.status(404).json({
+          message: `No ${finalRole} account found for this mobile number. Please sign up first.`,
+        });
+      }
+
+      const digits = e164.replace(/\D/g, '').slice(-10);
+      user = new User({
+        name: String(name).trim(),
+        phone: e164,
+        role: finalRole,
+        gender: gender || 'prefer_not_to_say',
+        isPhoneVerified: true,
+        isFirstLogin: false,
+        password: Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12),
+      });
+      await user.save();
+    } else if (isSignupAttempt) {
+      return res.status(409).json({
+        message: `A ${finalRole} account with this mobile number already exists. Please log in instead.`,
+      });
+    } else if (!user.isPhoneVerified) {
+      user.isPhoneVerified = true;
+      await user.save();
+    }
+
+    const jwtToken = jwt.sign(
+      { userId: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' },
+    );
+
+    res.json({
+      token: jwtToken,
+      isNewUser: isSignupAttempt,
+      user: {
+        id: user._id,
+        name: user.name,
+        phone: user.phone,
+        role: user.role,
+        isPhoneVerified: true,
+      },
+    });
+  } catch (error) {
+    console.error('verify-widget-token error:', error.message);
+    const status = error.message.includes('not configured') ? 500 : 401;
+    res.status(status).json({ message: error.message || 'Verification failed. Please try again.' });
+  }
+});
+
+// POST /api/auth/check-widget-token
+// Verifies MSG91 widget token only — no user creation (used during worker registration).
+// Body: { token, phone }
+router.post('/check-widget-token', async (req, res) => {
+  try {
+    const { token, phone } = req.body;
+    if (!token || !phone) {
+      return res.status(400).json({ message: 'Token and phone are required' });
+    }
+
+    await verifyMsg91WidgetToken(token);
+
+    res.json({ success: true, verified: true });
+  } catch (error) {
+    console.error('check-widget-token error:', error.message);
+    const status = error.message.includes('not configured') ? 500 : 401;
+    res.status(status).json({ message: error.message || 'Verification failed. Please try again.' });
   }
 });
 

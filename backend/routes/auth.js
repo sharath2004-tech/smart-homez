@@ -3,7 +3,6 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { body, validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
-import twilio from 'twilio';
 import { authenticate } from '../middleware/auth.js';
 import { uploadProfilePicture, uploadWorkerFiles } from '../middleware/upload.js';
 import Location from '../models/Location.js';
@@ -17,19 +16,6 @@ import { evaluateWorkerEffectiveAvailability } from '../utils/workerAvailability
 // Google OAuth
 import { OAuth2Client } from 'google-auth-library';
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
-function getTwilioClient() {
-  const sid = process.env.TWILIO_ACCOUNT_SID;
-  const token = process.env.TWILIO_AUTH_TOKEN;
-  if (!sid || !token) throw new Error('SMS service not configured');
-  return twilio(sid, token);
-}
-
-function getVerifySid() {
-  const sid = process.env.TWILIO_VERIFY_SID;
-  if (!sid) throw new Error('SMS verify service not configured');
-  return sid;
-}
 
 function toE164(phone) {
   const digits = phone.replace(/\D/g, '').slice(-10);
@@ -1398,5 +1384,170 @@ router.post('/google', async (req, res) => {
     });
   }
 });
+
+// @route   POST /api/auth/send-phone-otp-verify
+// @desc    Send OTP to a phone number for verification (logged-in customer)
+// @access  Private
+router.post('/send-phone-otp-verify', authenticate, sensitiveAuthLimiter, async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) {
+      return res.status(400).json({ error: { message: 'Phone number is required', status: 400 } });
+    }
+    const digits = phone.replace(/\D/g, '').slice(-10);
+    if (digits.length !== 10) {
+      return res.status(400).json({ error: { message: 'Enter a valid 10-digit mobile number', status: 400 } });
+    }
+    const e164 = `+91${digits}`;
+    await sendOTP(e164);
+    res.json({ success: true, message: 'OTP sent to your phone.' });
+  } catch (error) {
+    console.error('Send phone OTP verify error:', error.message);
+    if (error.message.includes('not configured')) {
+      return res.status(500).json({ error: { message: 'SMS service not available. Contact support.', status: 500 } });
+    }
+    res.status(400).json({ error: { message: error.message || 'Failed to send OTP', status: 400 } });
+  }
+});
+
+// @route   POST /api/auth/confirm-phone-otp-verify
+// @desc    Verify OTP and mark phone as verified on the logged-in user's account
+// @access  Private
+router.post('/confirm-phone-otp-verify', authenticate, async (req, res) => {
+  try {
+    const { phone, otp } = req.body;
+    if (!phone || !otp) {
+      return res.status(400).json({ error: { message: 'Phone and OTP are required', status: 400 } });
+    }
+    const digits = phone.replace(/\D/g, '').slice(-10);
+    if (digits.length !== 10) {
+      return res.status(400).json({ error: { message: 'Enter a valid 10-digit mobile number', status: 400 } });
+    }
+    const e164 = `+91${digits}`;
+
+    const result = await verifyOTP(e164, otp);
+    if (!result.verified) {
+      return res.status(400).json({ error: { message: 'Invalid or expired OTP', status: 400 } });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ error: { message: 'User not found', status: 404 } });
+    }
+
+    user.phone = digits;
+    user.isPhoneVerified = true;
+    await user.save();
+
+    res.json({ success: true, message: 'Phone verified successfully' });
+  } catch (error) {
+    console.error('Confirm phone OTP verify error:', error.message);
+    if (error.message.includes('Invalid OTP') || error.message.includes('expired')) {
+      return res.status(400).json({ error: { message: error.message, status: 400 } });
+    }
+    res.status(400).json({ error: { message: error.message || 'Verification failed', status: 400 } });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// MSG91 Widget token endpoints (no DLT / SMS, client-side OTP via widget)
+// ---------------------------------------------------------------------------
+
+async function verifyMsg91WidgetToken(token) {
+  const widgetId = process.env.MSG91_WIDGET_ID;
+  const authKey = process.env.MSG91_AUTH_KEY;
+  if (!widgetId || !authKey) throw new Error('OTP service not configured on server');
+
+  const res = await fetch(
+    `https://api.msg91.com/api/v5/widget/verifyAccessToken?access-token=${encodeURIComponent(token)}&widgetId=${encodeURIComponent(widgetId)}`,
+    { headers: { authkey: authKey } },
+  );
+  const data = await res.json();
+  if (!res.ok || data.type !== 'success') {
+    throw new Error('OTP verification failed. Please try again.');
+  }
+  return data; // { type, mobile, ... }
+}
+
+// @route   POST /api/auth/confirm-phone-widget-token
+// @desc    Verify MSG91 widget token and mark phone as verified on the logged-in user
+// @access  Private
+router.post('/confirm-phone-widget-token', authenticate, async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ error: { message: 'Token is required', status: 400 } });
+    }
+
+    const verifyData = await verifyMsg91WidgetToken(token);
+
+    // Use phone returned by MSG91 as the verified number
+    const rawMobile = verifyData.mobile || verifyData.identifier || '';
+    const digits = rawMobile.replace(/\D/g, '').slice(-10);
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ error: { message: 'User not found', status: 404 } });
+    }
+
+    if (digits.length === 10) user.phone = digits;
+    user.isPhoneVerified = true;
+    await user.save();
+
+    res.json({ success: true, message: 'Phone verified successfully' });
+  } catch (error) {
+    console.error('confirm-phone-widget-token error:', error.message);
+    const status = error.message.includes('not configured') ? 500 : 400;
+    res.status(status).json({ error: { message: error.message || 'Verification failed', status } });
+  }
+});
+
+// @route   POST /api/auth/reset-password-widget
+// @desc    Verify MSG91 widget token and reset password (phone-based forgot-password)
+// @access  Public
+router.post('/reset-password-widget',
+  sensitiveAuthLimiter,
+  [
+    body('token').notEmpty().withMessage('Token is required'),
+    body('phone').notEmpty().withMessage('Phone is required'),
+    body('newPassword')
+      .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+      .matches(/[A-Z]/).withMessage('Must contain uppercase letter')
+      .matches(/[a-z]/).withMessage('Must contain lowercase letter')
+      .matches(/[0-9]/).withMessage('Must contain a number')
+      .matches(/[!@#$%^&*(),.?":{}|<>]/).withMessage('Must contain a special character'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { token, phone, newPassword } = req.body;
+
+      await verifyMsg91WidgetToken(token);
+
+      const digits = phone.replace(/\D/g, '').slice(-10);
+      const user = await User.findOne({ phone: { $regex: `${digits}$` } }).select('+password');
+      if (!user) {
+        return res.status(404).json({ error: { message: 'No account found for this phone number', status: 404 } });
+      }
+
+      user.password = newPassword;
+      user.isFirstLogin = false;
+      user.hasCustomPassword = true;
+      await user.save();
+
+      try { await sendPasswordChangeConfirmation(user.email, user.name); } catch {}
+
+      res.json({ success: true, message: 'Password reset successfully. You can now log in.' });
+    } catch (error) {
+      console.error('reset-password-widget error:', error.message);
+      const status = error.message.includes('not configured') ? 500 : 400;
+      res.status(status).json({ error: { message: error.message || 'Server error', status } });
+    }
+  },
+);
 
 export default router;

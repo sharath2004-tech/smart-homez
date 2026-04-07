@@ -1,5 +1,6 @@
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { API_BASE_URL, authAPI } from "@/lib/api";
+import * as msg91Widget from "@/lib/msg91Widget";
 import {
     Camera,
     CheckCircle,
@@ -110,7 +111,7 @@ const WorkerSignUp = () => {
         await authAPI.sendEmailOTP(form.email.trim().toLowerCase());
       } else {
         const digits = form.phone.replace(/\D/g, "").slice(-10);
-        await authAPI.sendOTP("+91" + digits);
+        await msg91Widget.sendOtp("91" + digits);
       }
       setOtpSent(true);
       setError("");
@@ -133,7 +134,8 @@ const WorkerSignUp = () => {
         await authAPI.verifyEmailOTP(form.email.trim().toLowerCase(), otp);
       } else {
         const digits = form.phone.replace(/\D/g, "").slice(-10);
-        await authAPI.checkOTP("+91" + digits, otp);
+        const widgetToken = await msg91Widget.verifyOtp(otp);
+        await authAPI.checkWidgetToken(widgetToken, digits);
       }
       setOtpVerified(true);
       setError("");
@@ -149,7 +151,11 @@ const WorkerSignUp = () => {
   const handleResendOTP = async () => {
     setOtp("");
     setError("");
-    await handleSendOTP();
+    if (contactMethod === "phone") {
+      try { await msg91Widget.retryOtp(null); } catch { await handleSendOTP(); }
+    } else {
+      await handleSendOTP();
+    }
   };
 
   const handleFileChange = (

@@ -432,6 +432,54 @@ export const authAPI = {
     });
   },
 
+  // Phone verification for logged-in customers — send OTP to given phone number
+  sendPhoneOTPVerify: async (phone: string) => {
+    return apiCall('/auth/send-phone-otp-verify', {
+      method: 'POST',
+      body: JSON.stringify({ phone })
+    });
+  },
+
+  // Phone verification for logged-in customers — verify MSG91 widget token and mark phone as verified
+  confirmPhoneOTPVerify: async (phone: string, otp: string) => {
+    return apiCall('/auth/confirm-phone-otp-verify', {
+      method: 'POST',
+      body: JSON.stringify({ phone, otp })
+    });
+  },
+
+  // MSG91 Widget — verify widget access token and issue platform JWT (login/signup via phone OTP)
+  verifyWidgetToken: async (token: string, phone: string, role?: string, name?: string, gender?: string) => {
+    return apiCall('/auth/verify-widget-token', {
+      method: 'POST',
+      body: JSON.stringify({ token, phone, role, name, gender })
+    });
+  },
+
+  // MSG91 Widget — verify widget access token only, no user creation (worker registration phone check)
+  checkWidgetToken: async (token: string, phone: string) => {
+    return apiCall('/auth/check-widget-token', {
+      method: 'POST',
+      body: JSON.stringify({ token, phone })
+    });
+  },
+
+  // MSG91 Widget — verify widget access token and mark logged-in customer's phone as verified
+  confirmPhoneWidgetToken: async (token: string) => {
+    return apiCall('/auth/confirm-phone-widget-token', {
+      method: 'POST',
+      body: JSON.stringify({ token })
+    });
+  },
+
+  // MSG91 Widget — verify widget access token and reset password (phone-based forgot-password)
+  resetPasswordWidget: async (token: string, phone: string, newPassword: string) => {
+    return apiCall('/auth/reset-password-widget', {
+      method: 'POST',
+      body: JSON.stringify({ token, phone, newPassword })
+    });
+  },
+
   // Worker registration with file uploads (multipart/form-data)
   registerWorker: async (formData: FormData) => {
     const token = localStorage.getItem('token');

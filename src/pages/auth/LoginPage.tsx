@@ -1,5 +1,6 @@
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { authAPI, publicAPI } from "@/lib/api";
+import * as msg91Widget from "@/lib/msg91Widget";
 import { Eye, EyeOff, Home, Loader2, Phone, RefreshCw, Shield } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -183,7 +184,7 @@ const LoginPage = () => {
     setOtpLoading(true);
     setError("");
     try {
-      await authAPI.sendOTP(digits);
+      await msg91Widget.sendOtp("91" + digits);
       setOtpSent(true);
       startResendCountdown();
     } catch (err) {
@@ -199,8 +200,7 @@ const LoginPage = () => {
     setError("");
     setOtpLoading(true);
     try {
-      const digits = otpPhone.replace(/\D/g, "").slice(-10);
-      await authAPI.sendOTP(digits);
+      await msg91Widget.retryOtp(null);
       startResendCountdown();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to resend OTP.");
@@ -214,7 +214,9 @@ const LoginPage = () => {
     setOtpLoading(true);
     setError("");
     try {
-      const response = await authAPI.verifyOTP(otpPhone, otpCode, tab);
+      const widgetToken = await msg91Widget.verifyOtp(otpCode);
+      const digits = otpPhone.replace(/\D/g, "").slice(-10);
+      const response = await authAPI.verifyWidgetToken(widgetToken, digits, tab);
       localStorage.removeItem("userLocation");
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
