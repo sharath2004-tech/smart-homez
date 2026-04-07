@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import LocationSelector, { LocationData } from "@/components/LocationSelector";
 import { authAPI, serviceAreasAPI, servicesAPI, setStoredCustomerLocation, settingsAPI } from "@/lib/api";
 import { motion } from "framer-motion";
-import { CalendarClock, Clock, MapPin, Search, Sparkles, Users } from "lucide-react";
+import { CalendarClock, Clock, MapPin, Search, Sparkles, Star, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -67,6 +67,24 @@ const ServicesPage = () => {
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   const [requestingServiceId, setRequestingServiceId] = useState<string | null>(null);
   const [todayAvailableSlotCount, setTodayAvailableSlotCount] = useState<number | null>(null);
+  const [favouriteIds, setFavouriteIds] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('favouriteServiceIds');
+      return new Set(stored ? JSON.parse(stored) : []);
+    } catch {
+      return new Set();
+    }
+  });
+
+  const toggleFavourite = (serviceId: string) => {
+    setFavouriteIds(prev => {
+      const next = new Set(prev);
+      if (next.has(serviceId)) next.delete(serviceId);
+      else next.add(serviceId);
+      localStorage.setItem('favouriteServiceIds', JSON.stringify([...next]));
+      return next;
+    });
+  };
 
   // Count how many of today's slots are still in the future
   const countFutureSlots = (slots: string[]): number => {
@@ -225,8 +243,12 @@ const ServicesPage = () => {
     if (service.serviceType && HIDDEN_ROOT_SERVICE_TYPES.has(service.serviceType)) {
       return false;
     }
-
     return matchesCategory(service);
+  }).sort((a, b) => {
+    // Favourites float to top
+    const aFav = favouriteIds.has(a._id) ? 0 : 1;
+    const bFav = favouriteIds.has(b._id) ? 0 : 1;
+    return aFav - bFav;
   });
 
   const getCategoryEmoji = (category: string, name: string) => {
@@ -478,6 +500,13 @@ const ServicesPage = () => {
                       <div className="flex items-start justify-between gap-2">
                         <h3 className="font-bold font-heading text-foreground text-sm">{service.name}</h3>
                         <div className="flex flex-col items-end gap-1 shrink-0">
+                          <button
+                            onClick={() => toggleFavourite(service._id)}
+                            aria-label={favouriteIds.has(service._id) ? 'Remove from favourites' : 'Add to favourites'}
+                            className="p-1 rounded-lg hover:bg-accent transition-colors"
+                          >
+                            <Star className={`w-4 h-4 transition-colors ${favouriteIds.has(service._id) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
+                          </button>
                           {service.availability && (
                             <span className={`text-xs ${service.availability.available ? 'badge-success' : 'badge-warning'}`}>
                               {service.availability.available ? t('customer.services.available') : t('customer.services.limited')}

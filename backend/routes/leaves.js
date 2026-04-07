@@ -511,6 +511,56 @@ router.get(
 // ─── Admin Leave Routes ────────────────────────────────────────────────────────
 
 /**
+ * Get all workers with penalty leaves (Admin / Super Admin)
+ * GET /api/leaves/penalties
+ * Returns every worker who has at least one leave with penaltyApplied=true
+ */
+router.get(
+  '/penalties',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  async (req, res) => {
+    try {
+      const workers = await User.find({
+        role: 'worker',
+        'workerProfile.leaves.penaltyApplied': true
+      }).select('name email phone workerProfile.leaves workerProfile.hourlyRate workerProfile.wageType workerProfile.dailyWage workerProfile.monthlyWage').lean();
+
+      const result = workers.map(worker => {
+        const penaltyLeaves = (worker.workerProfile?.leaves || []).filter(
+          l => l.penaltyApplied && (l.penaltyAmount || 0) > 0
+        );
+        const totalPenalty = penaltyLeaves.reduce((sum, l) => sum + (l.penaltyAmount || 0), 0);
+
+        const formattedLeaves = penaltyLeaves.map(l => ({
+          _id: l._id,
+          date: l.dates && l.dates.length > 0 ? l.dates[0] : l.date,
+          dates: l.dates && l.dates.length > 0 ? l.dates : [l.date],
+          reason: l.reason || '',
+          status: l.status,
+          requestedAt: l.requestedAt,
+          penaltyAmount: l.penaltyAmount || 0
+        }));
+
+        return {
+          workerId: worker._id,
+          workerName: worker.name,
+          workerEmail: worker.email,
+          workerPhone: worker.phone,
+          penaltyLeaves: formattedLeaves,
+          totalPenaltyAmount: totalPenalty
+        };
+      }).filter(w => w.penaltyLeaves.length > 0);
+
+      res.json({ success: true, workers: result, totalWorkers: result.length });
+    } catch (error) {
+      console.error('Get penalty leaves error:', error);
+      res.status(500).json({ message: 'Server error', error: error.message });
+    }
+  }
+);
+
+/**
  * Admin applies for leave (date range)
  * POST /api/leaves/admin/apply
  */

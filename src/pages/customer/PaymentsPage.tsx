@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { authAPI, bookingsAPI } from "@/lib/api";
-import { AlertCircle, CheckCircle, Download, Wallet } from "lucide-react";
+import { AlertCircle, CheckCircle, Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -44,7 +44,8 @@ interface UserProfile {
 
 const PaymentsPage = () => {
   const { t } = useTranslation();
-  const [transactions, setTransactions] = useState<CompletedBooking[]>([]);
+  const [allTransactions, setAllTransactions] = useState<CompletedBooking[]>([]);
+  const [displayCount, setDisplayCount] = useState(10);
   const [stats, setStats] = useState<Stats>({ thisMonth: 0, totalServices: 0, savedAmount: 0 });
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,7 +65,8 @@ const PaymentsPage = () => {
       setProfile(profileData.user || profileData);
       
       const completedBookings = bookingsData.bookings || [];
-      setTransactions(completedBookings.slice(0, 10));
+      setAllTransactions(completedBookings);
+      setDisplayCount(10);
 
       // Calculate stats
       const now = new Date();
@@ -171,14 +173,9 @@ const PaymentsPage = () => {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold font-heading text-foreground">{t('customer.payments.transactionHistory')}</h2>
-            <button
-              onClick={() => alert(t('customer.payments.exportComingSoon'))}
-              className="flex items-center gap-1.5 text-sm text-primary font-medium"
-            >
-              <Download className="w-3.5 h-3.5" /> {t('customer.payments.export')}
-            </button>
+            <span className="text-xs text-muted-foreground">{allTransactions.length} total</span>
           </div>
-          {transactions.length === 0 ? (
+          {allTransactions.length === 0 ? (
             <div className="card-elevated p-12 text-center">
               <Wallet className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
               <h3 className="text-lg font-bold text-foreground mb-2">{t('customer.payments.noTransactions')}</h3>
@@ -186,7 +183,7 @@ const PaymentsPage = () => {
             </div>
           ) : (
             <div className="space-y-2">
-              {transactions.map((tx: CompletedBooking) => (
+              {allTransactions.slice(0, displayCount).map((tx: CompletedBooking) => (
                 <div key={tx._id} className="card-elevated p-4 flex items-center gap-3">
                   <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center text-xl shrink-0">
                     {getServiceEmoji(tx.service?.name || 'Service')}
@@ -212,8 +209,14 @@ const PaymentsPage = () => {
                     )}
                   </div>
                 </div>
-              ))}
-            </div>
+              ))}              {displayCount < allTransactions.length && (
+                <button
+                  onClick={() => setDisplayCount(c => c + 10)}
+                  className="w-full py-3 rounded-xl border border-border text-sm font-medium text-foreground hover:bg-accent transition-colors mt-2"
+                >
+                  Load more ({allTransactions.length - displayCount} remaining)
+                </button>
+              )}            </div>
           )}
         </div>
       </div>

@@ -267,6 +267,17 @@ const WorkerLeaves = () => {
           </AlertDescription>
         </Alert>
 
+        {/* Penalty policy notice — always visible */}
+        <div className="flex items-start gap-3 p-4 rounded-xl border border-amber-200 bg-amber-50">
+          <span className="text-xl shrink-0">⚠️</span>
+          <div>
+            <p className="text-sm font-bold text-amber-900">₹1,500 Late-Leave Penalty</p>
+            <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+              Leave requests submitted <strong>less than 24 hours</strong> before the leave date automatically incur a ₹1,500 deduction from your salary. Plan ahead and apply at least 24 hours in advance to avoid this penalty.
+            </p>
+          </div>
+        </div>
+
         <div className="grid md:grid-cols-2 gap-6">
           {/* Apply for Leave */}
           <Card>

@@ -18,12 +18,32 @@ import {
     RefreshCw,
     Search,
     Send,
+    ShieldAlert,
     User,
     XCircle
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+interface PenaltyLeave {
+  _id: string;
+  date: string;
+  dates: string[];
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requestedAt: string;
+  penaltyAmount: number;
+}
+
+interface WorkerPenalty {
+  workerId: string;
+  workerName: string;
+  workerEmail: string;
+  workerPhone?: string;
+  penaltyLeaves: PenaltyLeave[];
+  totalPenaltyAmount: number;
+}
 
 interface Worker {
   _id: string;
@@ -284,9 +304,14 @@ const AdminSalarySettlements = () => {
   const { name, role } = useAdminRole();
   const { toast } = useToast();
 
+  const [activeTab, setActiveTab] = useState<'penalties' | 'history'>('penalties');
   const [requests, setRequests] = useState<SalaryRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Penalties tab state
+  const [penaltyWorkers, setPenaltyWorkers] = useState<WorkerPenalty[]>([]);
+  const [penaltiesLoading, setPenaltiesLoading] = useState(true);
 
   // Send Salary panel state
   const [sendOpen, setSendOpen] = useState(false);
@@ -333,10 +358,23 @@ const AdminSalarySettlements = () => {
     }
   }, [toast]);
 
+  const fetchPenalties = useCallback(async () => {
+    setPenaltiesLoading(true);
+    try {
+      const data = await api.get('/leaves/penalties');
+      setPenaltyWorkers(data.workers || []);
+    } catch (err) {
+      console.error('Fetch penalties error:', err);
+    } finally {
+      setPenaltiesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchRequests();
     fetchWorkers();
-  }, [fetchRequests]);
+    fetchPenalties();
+  }, [fetchRequests, fetchPenalties]);
 
   const fetchWorkers = async () => {
     try {
@@ -447,8 +485,8 @@ const AdminSalarySettlements = () => {
             <h1 className="text-2xl font-bold text-foreground">Salary Management</h1>
             <p className="text-sm text-muted-foreground mt-1">Send monthly salary to workers based on their completed work</p>
           </div>
-          <Button variant="outline" size="sm" onClick={fetchRequests} disabled={loading}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          <Button variant="outline" size="sm" onClick={() => { fetchRequests(); fetchPenalties(); }} disabled={loading || penaltiesLoading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading || penaltiesLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
@@ -765,7 +803,134 @@ const AdminSalarySettlements = () => {
           )}
         </Card>
 
-        {/* ── Salary History ── */}
+        {/* ── Tabs ── */}
+        <div className="flex gap-2 border-b border-border">
+          <button
+            onClick={() => setActiveTab('penalties')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+              activeTab === 'penalties'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4" />
+            Penalties
+            {penaltyWorkers.length > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">
+                {penaltyWorkers.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+              activeTab === 'history'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <IndianRupee className="w-4 h-4" />
+            Salary History
+          </button>
+        </div>
+
+        {/* ── Penalties Tab ── */}
+        {activeTab === 'penalties' && (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-4 rounded-xl border border-amber-200 bg-amber-50">
+              <ShieldAlert className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold text-amber-900">Workers with Late-Leave Penalties</p>
+                <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+                  These workers applied for leave within 24 hours of the leave date. Each incurs a ₹1,500 penalty.
+                  When you use <strong>Send Salary</strong> for any of these workers, you can choose to include or waive the penalty at that time.
+                </p>
+              </div>
+            </div>
+
+            {penaltiesLoading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="w-7 h-7 animate-spin text-muted-foreground" />
+              </div>
+            ) : penaltyWorkers.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-14 text-muted-foreground">
+                  <CheckCircle className="w-10 h-10 mb-3 opacity-30" />
+                  <p className="text-sm font-medium">No pending penalties</p>
+                  <p className="text-xs mt-1">All workers are clear — no late-leave fines on record.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {penaltyWorkers.map(pw => (
+                  <Card key={pw.workerId} className="overflow-hidden">
+                    <div className="p-4 flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                          <User className="w-4 h-4 text-red-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-foreground">{pw.workerName}</p>
+                          <p className="text-xs text-muted-foreground">{pw.workerEmail}</p>
+                          {pw.workerPhone && <p className="text-xs text-muted-foreground">{pw.workerPhone}</p>}
+                          <div className="mt-2 space-y-1.5">
+                            {pw.penaltyLeaves.map((pl, idx) => (
+                              <div key={pl._id || idx} className="flex items-start gap-2">
+                                <span className="text-xs text-red-700 font-semibold bg-red-50 border border-red-200 rounded px-2 py-0.5 whitespace-nowrap">
+                                  ₹{pl.penaltyAmount.toLocaleString('en-IN')}
+                                </span>
+                                <div>
+                                  <p className="text-xs text-foreground font-medium">
+                                    {pl.dates && pl.dates.length > 1
+                                      ? `${fmtDate(pl.dates[0])} – ${fmtDate(pl.dates[pl.dates.length - 1])} (${pl.dates.length} days)`
+                                      : fmtDate(pl.date || (pl.dates && pl.dates[0]) || '')}
+                                  </p>
+                                  {pl.reason && <p className="text-xs text-muted-foreground">{pl.reason}</p>}
+                                  <p className="text-[10px] text-muted-foreground">
+                                    Status: <span className={`font-medium ${
+                                      pl.status === 'approved' ? 'text-green-700' :
+                                      pl.status === 'rejected' ? 'text-red-700' : 'text-amber-700'
+                                    }`}>{pl.status}</span>
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-2 shrink-0">
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">Total penalty</p>
+                          <p className="text-lg font-bold text-red-700">₹{pw.totalPenaltyAmount.toLocaleString('en-IN')}</p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setSendOpen(true);
+                            setWorkerSearch(pw.workerName);
+                            setSelectedWorker({ _id: pw.workerId, name: pw.workerName, email: pw.workerEmail });
+                            setSendPreview(null);
+                            const now = new Date();
+                            const firstOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+                            const monthEnd = getMonthEndDate(now.getFullYear(), now.getMonth() + 1);
+                            setSendFrom(firstOfMonth);
+                            setSendTo(monthEnd);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          className="text-xs font-semibold text-primary border border-primary/30 bg-primary/5 hover:bg-primary/10 rounded-lg px-3 py-1.5 transition-colors whitespace-nowrap"
+                        >
+                          Send Salary →
+                        </button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Salary History Tab ── */}
+        {activeTab === 'history' && (
         <div>
           <h2 className="text-lg font-semibold text-foreground mb-3">Salary History</h2>
 
@@ -999,6 +1164,7 @@ const AdminSalarySettlements = () => {
           </div>
         )}
         </div>
+        )}
       </div>
     </AppLayout>
   );

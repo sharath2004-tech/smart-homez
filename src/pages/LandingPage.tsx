@@ -1,6 +1,6 @@
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { publicAPI } from "@/lib/api";
-import { ArrowRight, CheckCircle, ChevronRight, Clock, Home, MapPin, Shield, Sparkles, Star, X } from "lucide-react";
+import { ArrowRight, CheckCircle, Clock, Home, MapPin, Shield, Sparkles, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -16,6 +16,7 @@ const LandingPage = () => {
   const [loading, setLoading] = useState(true);
   // Track whether we got real data from the API
   const [statsLoaded, setStatsLoaded] = useState(false);
+  const [liveReviews, setLiveReviews] = useState<{ _id: string; overallRating: number; comment: string; createdAt: string; customerName: string; avatar: string }[]>([]);
 
   // Removed hardcoded services array - services should be managed by admin and fetched from API
   // For marketing/landing page, either fetch actual services or use pure marketing content without specific services
@@ -42,7 +43,19 @@ const LandingPage = () => {
       }
     };
 
+    const fetchReviews = async () => {
+      try {
+        const response = await publicAPI.getReviews();
+        if (response.success && response.reviews?.length > 0) {
+          setLiveReviews(response.reviews.slice(0, 6));
+        }
+      } catch {
+        // fall back to hardcoded testimonials
+      }
+    };
+
     fetchStats();
+    fetchReviews();
   }, []);
 
   const formatNumber = (num: number) => {
@@ -193,23 +206,41 @@ const LandingPage = () => {
           <p className="text-muted-foreground">{t('landing.testimonials.subtitle')}</p>
         </div>
         <div className="grid md:grid-cols-3 gap-6">
-          {testimonials.map((testimonial) => (
-            <div key={testimonial.nameKey} className="card-elevated p-4 sm:p-5 md:p-6">
-              <div className="flex gap-1 mb-3">
-                {Array.from({ length: testimonial.rating }).map((_, i) => (
-                  <Star key={i} className="w-4 h-4 fill-warning text-warning" />
-                ))}
-              </div>
-              <p className="text-foreground text-sm leading-relaxed mb-4">"{t(testimonial.textKey)}"</p>
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-primary-light rounded-full flex items-center justify-center text-primary text-xs font-bold">{testimonial.avatar}</div>
-                <div>
-                  <div className="text-sm font-semibold text-foreground">{t(testimonial.nameKey)}</div>
-                  <div className="text-xs text-muted-foreground">{t(testimonial.cityKey)}</div>
+          {liveReviews.length > 0
+            ? liveReviews.map((review) => (
+                <div key={review._id} className="card-elevated p-4 sm:p-5 md:p-6">
+                  <div className="flex gap-1 mb-3">
+                    {Array.from({ length: review.overallRating }).map((_, i) => (
+                      <Star key={i} className="w-4 h-4 fill-warning text-warning" />
+                    ))}
+                  </div>
+                  <p className="text-foreground text-sm leading-relaxed mb-4">"{review.comment}"</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-primary-light rounded-full flex items-center justify-center text-primary text-xs font-bold">{review.avatar}</div>
+                    <div>
+                      <div className="text-sm font-semibold text-foreground">{review.customerName}</div>
+                      <div className="text-xs text-muted-foreground">Verified Customer</div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))}
+              ))
+            : testimonials.map((testimonial) => (
+                <div key={testimonial.nameKey} className="card-elevated p-4 sm:p-5 md:p-6">
+                  <div className="flex gap-1 mb-3">
+                    {Array.from({ length: testimonial.rating }).map((_, i) => (
+                      <Star key={i} className="w-4 h-4 fill-warning text-warning" />
+                    ))}
+                  </div>
+                  <p className="text-foreground text-sm leading-relaxed mb-4">"{t(testimonial.textKey)}"</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-primary-light rounded-full flex items-center justify-center text-primary text-xs font-bold">{testimonial.avatar}</div>
+                    <div>
+                      <div className="text-sm font-semibold text-foreground">{t(testimonial.nameKey)}</div>
+                      <div className="text-xs text-muted-foreground">{t(testimonial.cityKey)}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
         </div>
       </section>
 

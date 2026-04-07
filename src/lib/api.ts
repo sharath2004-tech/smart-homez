@@ -530,6 +530,10 @@ export const publicAPI = {
     return apiCall('/public/stats', {}, 10000);
   },
 
+  getReviews: async () => {
+    return apiCall('/reviews/public', {}, 10000);
+  },
+
   // Returns all active service cities and their locations — used in signup city picker
   getServiceLocations: async () => {
     return apiCall('/locations/public', {}, 10000);

@@ -195,6 +195,38 @@ router.get('/worker/:workerId/trends', authenticate, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/reviews/public
+ * Returns recent high-rating reviews with comments for the landing page.
+ * No authentication required.
+ */
+router.get('/public', async (req, res) => {
+  try {
+    const reviews = await Review.find({
+      overallRating: { $gte: 4 },
+      comment: { $exists: true, $ne: '' }
+    })
+      .sort({ createdAt: -1 })
+      .limit(12)
+      .populate('customer', 'name isAnonymous')
+      .lean();
+
+    const publicReviews = reviews.map(r => ({
+      _id: r._id,
+      overallRating: r.overallRating,
+      comment: r.comment,
+      createdAt: r.createdAt,
+      customerName: r.isAnonymous ? 'Anonymous' : (r.customer?.name || 'Customer'),
+      avatar: r.isAnonymous ? 'AN' : ((r.customer?.name || 'CU').slice(0, 2).toUpperCase())
+    }));
+
+    res.json({ success: true, reviews: publicReviews });
+  } catch (error) {
+    console.error('Public reviews error:', error);
+    res.status(500).json({ success: false, reviews: [] });
+  }
+});
+
 router.get('/analytics/dashboard', authenticate, async (req, res) => {
   try {
     // Only allow admin/super_admin access
