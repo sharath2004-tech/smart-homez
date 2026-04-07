@@ -4593,4 +4593,56 @@ router.get('/customers/:id',
   }
 );
 
+// ── WhatsApp Debug / Test ──────────────────────────────────────────────────
+// GET  /api/admin/debug-whatsapp          → config status (no message sent)
+// POST /api/admin/debug-whatsapp { phone } → send a test message to that number
+import { isMsg91WhatsAppConfigured } from '../utils/msg91WhatsappService.js';
+
+router.get('/debug-whatsapp', authenticate, authorize('admin', 'super_admin'), (req, res) => {
+  const authKey   = process.env.MSG91_AUTH_KEY;
+  const intNumber = process.env.MSG91_WHATSAPP_INTEGRATED_NUMBER;
+  const channel   = process.env.OTP_DELIVERY_CHANNEL || 'not set';
+
+  res.json({
+    configured: isMsg91WhatsAppConfigured(),
+    channel,
+    MSG91_AUTH_KEY: authKey ? `${authKey.slice(0, 6)}…` : '❌ MISSING',
+    MSG91_WHATSAPP_INTEGRATED_NUMBER: intNumber
+      ? `${intNumber.slice(0, 4)}…${intNumber.slice(-4)}`
+      : '❌ MISSING',
+    tip: !intNumber
+      ? 'Set MSG91_WHATSAPP_INTEGRATED_NUMBER=91XXXXXXXXXX (no +) in Render env vars'
+      : intNumber.startsWith('+')
+        ? '⚠️  Remove the + prefix — must be 91XXXXXXXXXX not +91XXXXXXXXXX'
+        : '✅ Format looks correct',
+  });
+});
+
+router.post('/debug-whatsapp', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  const { phone } = req.body;
+  if (!phone) return res.status(400).json({ error: 'phone required in body' });
+
+  if (!isMsg91WhatsAppConfigured()) {
+    return res.status(503).json({
+      error: 'MSG91 WhatsApp not configured',
+      missing: [
+        !process.env.MSG91_AUTH_KEY && 'MSG91_AUTH_KEY',
+        !process.env.MSG91_WHATSAPP_INTEGRATED_NUMBER && 'MSG91_WHATSAPP_INTEGRATED_NUMBER',
+      ].filter(Boolean),
+    });
+  }
+
+  try {
+    const { sendMsg91WhatsApp } = await import('../utils/msg91WhatsappService.js');
+    const result = await sendMsg91WhatsApp({
+      phone,
+      templateKey: 'WELCOME',
+      variables: { name: 'Test User' },
+    });
+    res.json({ result, phone });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

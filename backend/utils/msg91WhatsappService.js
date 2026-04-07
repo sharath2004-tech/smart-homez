@@ -242,10 +242,10 @@ export async function sendMsg91WhatsApp({ phone, templateKey, variables = {} }) 
     return { success: false, reason: 'MSG91 WhatsApp not configured' };
   }
 
-  const template = WHATSAPP_TEMPLATES[templateKey];
+  let template = WHATSAPP_TEMPLATES[templateKey];
   if (!template) {
-    console.error(`❌ Unknown WhatsApp template key: ${templateKey}`);
-    return { success: false, reason: `Unknown template: ${templateKey}` };
+    console.warn(`⚠️ Unknown WhatsApp template key: ${templateKey} — falling back to WELCOME`);
+    template = WHATSAPP_TEMPLATES['WELCOME'];
   }
 
   const recipient = normalizePhone(phone);
@@ -289,11 +289,17 @@ export async function sendMsg91WhatsApp({ phone, templateKey, variables = {} }) 
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      console.error(`❌ MSG91 WhatsApp API error (${response.status}):`, data);
-      return { success: false, reason: data.message || `HTTP ${response.status}`, data };
+      console.error(`❌ MSG91 WhatsApp API error (${response.status}) for [${templateKey}] → ${recipient}:`, JSON.stringify(data));
+      return { success: false, reason: data.message || data.error || `HTTP ${response.status}`, data };
     }
 
-    console.log(`✅ WhatsApp [${templateKey}] sent to ${recipient}`);
+    // MSG91 returns 200 but may still report failure in the body
+    if (data.type === 'error' || (data.message && data.message.toLowerCase().includes('error'))) {
+      console.error(`❌ MSG91 WhatsApp API returned error body for [${templateKey}]:`, JSON.stringify(data));
+      return { success: false, reason: data.message || 'MSG91 reported error', data };
+    }
+
+    console.log(`✅ WhatsApp [${templateKey}] sent to ${recipient} — MSG91 response:`, JSON.stringify(data));
     return { success: true, data };
   } catch (error) {
     console.error('❌ MSG91 WhatsApp send error:', error.message);
@@ -360,7 +366,7 @@ export function getTemplateKeyForType(notificationType) {
 // ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
-export { WHATSAPP_TEMPLATES, normalizePhone };
+export { normalizePhone, WHATSAPP_TEMPLATES };
 
 export default {
   isMsg91WhatsAppConfigured,
