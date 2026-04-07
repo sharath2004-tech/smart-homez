@@ -2,8 +2,9 @@ import AppLayout from "@/components/AppLayout";
 import LocationSelector, { type LocationData } from "@/components/LocationSelector";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { authAPI, bookingsAPI, dashboardPreferencesAPI, locationsAPI, serviceAreasAPI, servicesAPI, setStoredCustomerLocation } from "@/lib/api";
+import * as msg91Widget from "@/lib/msg91Widget";
 import { motion } from "framer-motion";
-import { AlertCircle, ArrowRight, Bell, ChevronRight, Clock, Loader2, MapPin, RefreshCw, Search, Settings, Star, X } from "lucide-react";
+import { AlertCircle, ArrowRight, Bell, ChevronRight, Clock, Loader2, MapPin, Phone, RefreshCw, Search, Settings, Shield, Star, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
@@ -21,6 +22,8 @@ interface Booking {
 
 interface UserProfile {
   name: string;
+  isPhoneVerified?: boolean;
+  phone?: string;
   addresses: Array<{
     _id: string;
     label: string;
@@ -133,6 +136,49 @@ const CustomerDashboard = () => {
   const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
   const [ongoingBooking, setOngoingBooking] = useState<Booking | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  // Phone verification modal state
+  const [showPhoneBanner, setShowPhoneBanner] = useState(false);
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
+  const [phoneInput, setPhoneInput] = useState('');
+  const [phoneOtp, setPhoneOtp] = useState('');
+  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+  const [phoneLoading, setPhoneLoading] = useState(false);
+  const [phoneError, setPhoneError] = useState('');
+  const [phoneResend, setPhoneResend] = useState(0);
+
+  const startResend = () => {
+    setPhoneResend(30);
+    const t = setInterval(() => setPhoneResend(p => { if (p <= 1) { clearInterval(t); return 0; } return p - 1; }), 1000);
+  };
+
+  const handleSendOtp = async () => {
+    const digits = phoneInput.replace(/\D/g, '').slice(-10);
+    if (digits.length !== 10) { setPhoneError('Enter a valid 10-digit mobile number'); return; }
+    setPhoneLoading(true); setPhoneError('');
+    try {
+      await msg91Widget.sendOtp('91' + digits);
+      setPhoneOtpSent(true);
+      startResend();
+    } catch (err) {
+      setPhoneError(err instanceof Error ? err.message : 'Failed to send OTP. Try again.');
+    } finally { setPhoneLoading(false); }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (phoneOtp.length !== 6) { setPhoneError('Enter the 6-digit OTP'); return; }
+    setPhoneLoading(true); setPhoneError('');
+    try {
+      const token = await msg91Widget.verifyOtp(phoneOtp);
+      await authAPI.confirmPhoneWidgetToken(token);
+      setProfile(prev => prev ? { ...prev, phone: phoneInput, isPhoneVerified: true } : prev);
+      setShowPhoneModal(false);
+      setShowPhoneBanner(false);
+      toast.success('Phone verified! You can now book services.');
+    } catch (err) {
+      setPhoneError(err instanceof Error ? err.message : 'Verification failed. Try again.');
+    } finally { setPhoneLoading(false); }
+  };
   const [nearbyWorkersCount, setNearbyWorkersCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [serviceableStatus, setServiceableStatus] = useState<'available' | 'unavailable' | 'unknown'>('unknown');
@@ -304,7 +350,10 @@ const CustomerDashboard = () => {
           bookingsAPI.getUpcoming(),
           bookingsAPI.getOngoing(),
         ]);
-        setProfile(profileData.user || profileData);
+        const fetchedProfile = profileData.user || profileData;
+        setProfile(fetchedProfile);
+        setShowPhoneBanner(!fetchedProfile.isPhoneVerified);
+        setPhoneInput(fetchedProfile.phone?.replace(/\D/g, '').slice(-10) || '');
         setUpcomingBookings((bookingsData.bookings || []).slice(0, 2));
         const ongoing = ongoingData.bookings || [];
         setOngoingBooking(ongoing.length > 0 ? ongoing[0] : null);
@@ -509,6 +558,30 @@ const CustomerDashboard = () => {
         initial="hidden"
         animate="visible"
       >
+        {/* Phone verification banner */}
+        {showPhoneBanner && (
+          <motion.div variants={itemVariants} className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-200">
+            <div className="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
+              <Shield className="w-5 h-5 text-amber-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-900">Verify your phone number</p>
+              <p className="text-xs text-amber-700 mt-0.5">Required to book services and receive WhatsApp updates on your bookings.</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => { setPhoneOtp(''); setPhoneOtpSent(false); setPhoneError(''); setShowPhoneModal(true); }}
+                className="text-xs font-semibold text-amber-800 bg-amber-200 hover:bg-amber-300 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                Verify now
+              </button>
+              <button onClick={() => setShowPhoneBanner(false)} className="text-amber-500 hover:text-amber-700 p-1">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+
         {/* Header */}
         <motion.div variants={itemVariants} className="flex items-start justify-between">
           <div>
@@ -913,6 +986,94 @@ const CustomerDashboard = () => {
           showCloseButton
           defaultLocation={selectedLocation ? { lat: selectedLocation.lat, lng: selectedLocation.lng } : undefined}
         />
+      )}
+
+      {/* Phone verification modal */}
+      {showPhoneModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-background rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div className="text-center">
+              <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
+                <Phone className="w-6 h-6 text-green-600" />
+              </div>
+              <h2 className="text-lg font-bold text-foreground">Verify your phone</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Enter your mobile number to receive an OTP and activate WhatsApp booking updates.
+              </p>
+            </div>
+
+            {!phoneOtpSent ? (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Mobile Number</label>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-4 text-muted-foreground font-medium text-sm select-none">+91</span>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      className="w-full pl-12 pr-4 py-3 rounded-xl border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                      placeholder="98765 43210"
+                      value={phoneInput}
+                      onChange={(e) => setPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSendOtp()}
+                      autoFocus
+                    />
+                  </div>
+                </div>
+                {phoneError && <p className="text-sm text-destructive">{phoneError}</p>}
+                <button
+                  onClick={handleSendOtp}
+                  disabled={phoneLoading || phoneInput.replace(/\D/g, '').length < 10}
+                  className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {phoneLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</> : 'Send OTP'}
+                </button>
+                <button onClick={() => setShowPhoneModal(false)} className="w-full text-sm text-muted-foreground hover:text-foreground text-center">
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800">
+                  OTP sent to <strong>+91 {phoneInput}</strong>. Check your SMS.
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Enter OTP</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    className="w-full px-4 py-3 rounded-xl border border-input bg-background text-foreground text-center text-xl font-mono tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                    placeholder="· · · · · ·"
+                    value={phoneOtp}
+                    onChange={(e) => setPhoneOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    onKeyDown={(e) => e.key === 'Enter' && handleVerifyOtp()}
+                    autoFocus
+                  />
+                </div>
+                {phoneError && <p className="text-sm text-destructive">{phoneError}</p>}
+                <button
+                  onClick={handleVerifyOtp}
+                  disabled={phoneLoading || phoneOtp.length < 6}
+                  className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {phoneLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</> : 'Verify & Activate'}
+                </button>
+                <button
+                  onClick={phoneResend > 0 ? undefined : handleSendOtp}
+                  disabled={phoneResend > 0 || phoneLoading}
+                  className="w-full text-sm text-muted-foreground hover:text-foreground text-center disabled:opacity-50"
+                >
+                  {phoneResend > 0 ? `Resend OTP in ${phoneResend}s` : 'Resend OTP'}
+                </button>
+                <button onClick={() => setShowPhoneModal(false)} className="w-full text-sm text-muted-foreground hover:text-foreground text-center">
+                  Cancel
+                </button>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </AppLayout>
   );
