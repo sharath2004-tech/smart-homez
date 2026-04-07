@@ -94,26 +94,25 @@ const LandingPage = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden" style={{ background: "var(--gradient-hero)" }}>
-        <div className="absolute inset-0 opacity-5 pointer-events-none">
+      <section className="relative overflow-hidden py-20 md:py-28" style={{ background: "var(--gradient-hero)" }}>
+        <div className="absolute inset-0 opacity-5">
           <div className="absolute top-10 right-20 w-80 h-80 rounded-full bg-primary-foreground blur-3xl" />
           <div className="absolute bottom-10 left-20 w-60 h-60 rounded-full bg-primary-foreground blur-2xl" />
         </div>
-
-        {/* Main hero — full width, split 50/50 */}
-        <div className="relative flex flex-col md:flex-row" style={{ minHeight: "calc(100vh - 72px)" }}>
-          {/* Left: Text — full left half */}
-          <div className="flex-1 flex flex-col justify-center px-10 md:px-16 lg:px-24 py-20 md:py-28">
-            <div className="badge-primary inline-flex mb-6 animate-fade-in self-start" style={{ backgroundColor: "rgba(255,255,255,0.15)", color: "white" }}>
+        <div className="relative max-w-6xl mx-auto px-10">
+          <div className="flex flex-col md:flex-row items-center gap-10 md:gap-10">
+            {/* Left: Text */}
+            <div className="flex-1 max-w-2xl">
+            <div className="badge-primary inline-flex mb-6 animate-fade-in" style={{ backgroundColor: "rgba(255,255,255,0.15)", color: "white" }}>
               <Sparkles className="w-3.5 h-3.5" />
               <span>{t('landing.hero.badge')}</span>
             </div>
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold font-heading text-primary-foreground leading-tight mb-6 animate-fade-in">
+            <h1 className="text-5xl md:text-6xl font-bold font-heading text-primary-foreground leading-tight mb-6 animate-fade-in">
               {t('landing.hero.title').split('\n').map((line, i) => (
                 <span key={i}>{line}{i === 0 && <br />}</span>
               ))}
             </h1>
-            <p className="text-xl text-primary-foreground/70 leading-relaxed mb-8 animate-fade-in max-w-lg">
+            <p className="text-xl text-primary-foreground/70 leading-relaxed mb-8 animate-fade-in">
               {t('landing.hero.subtitle')}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 mb-12 animate-fade-in">
@@ -137,31 +136,32 @@ const LandingPage = () => {
                 </div>
               ))}
             </div>
-          </div>
+            </div>
 
-          {/* Right: Promo Video — full right half, edge-to-edge */}
-          <div className="w-full md:w-1/2 overflow-hidden" style={{ minHeight: "340px" }}>
-            <video
-              src="/media/booking-promo.mp4"
-              poster="/media/booking-hero.png"
-              autoPlay
-              muted
-              loop
-              playsInline
-              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-            />
+            {/* Right: Promo Video */}
+            <div className="w-full md:w-[600px] shrink-0">
+              <video
+                src="/media/booking-promo.mp4"
+                poster="/media/booking-hero.png"
+                autoPlay
+                muted
+                loop
+                playsInline
+                className="w-full rounded-2xl shadow-2xl object-cover"
+                style={{ maxHeight: "520px" }}
+              />
+            </div>
           </div>
         </div>
-
-        {/* Stats bar — full width at bottom */}
-        <div className="relative w-full px-10 md:px-16 lg:px-24 py-6" style={{ backgroundColor: "rgba(0,0,0,0.25)", backdropFilter: "blur(8px)" }}>
-          <div className="grid grid-cols-3 gap-4 md:gap-8 max-w-3xl">
+        {/* Stats bar */}
+        <div className="relative max-w-6xl mx-auto px-6 mt-16">
+          <div className="grid grid-cols-3 gap-4 md:gap-8">
             {[
               { value: loading ? "..." : statsLoaded ? formatNumber(stats.totalCustomers) : "500+", labelKey: "landing.stats.happyCustomers" },
               { value: loading ? "..." : statsLoaded ? formatNumber(stats.totalWorkers) : "50+", labelKey: "landing.stats.activeWorkers" },
               { value: loading ? "..." : `${stats.fulfillmentRate}%+`, labelKey: "landing.stats.fulfillmentRate" },
             ].map((stat) => (
-              <div key={stat.labelKey} className="text-left">
+              <div key={stat.labelKey} className="text-center p-4 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.08)", backdropFilter: "blur(8px)" }}>
                 <div className="text-2xl md:text-3xl font-bold font-heading text-primary-foreground">{stat.value}</div>
                 <div className="text-xs text-primary-foreground/60 mt-1">{t(stat.labelKey)}</div>
               </div>
