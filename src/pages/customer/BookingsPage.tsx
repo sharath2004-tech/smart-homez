@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import BookingDetailModal from "./BookingDetailModal";
+import ReviewModal from "./ReviewModal";
 
 interface Worker {
   _id: string;
@@ -88,6 +89,7 @@ const BookingsPage = () => {
   const [bookingToReschedule, setBookingToReschedule] = useState<Booking | null>(null);
   const [trackingBooking, setTrackingBooking] = useState<Booking | null>(null);
   const [selectedWorkerProfile, setSelectedWorkerProfile] = useState<Worker | null>(null);
+  const [reviewBooking, setReviewBooking] = useState<Booking | null>(null);
 
   // Auto-open a booking detail when navigated here with state.openBookingId
   useEffect(() => {
@@ -470,18 +472,16 @@ const BookingsPage = () => {
                     
                     {isPast && booking.status === 'completed' && (
                       <button
-                        onClick={() => alert('Review feature coming soon!')}
+                        onClick={(e) => { e.stopPropagation(); setReviewBooking(booking); }}
                         className="flex-1 btn-brand py-2.5 text-sm"
                       >
                         Write Review
                       </button>
                     )}
 
-                    {isPast && booking.status === 'completed' && booking.worker && (
+                    {isPast && booking.status === 'completed' && booking.service?._id && (
                       <button
-                        onClick={() => navigate(
-                          `/customer/book?preferredWorker=${booking.worker!._id}&preferredWorkerName=${encodeURIComponent(booking.worker!.name)}`
-                        )}
+                        onClick={(e) => { e.stopPropagation(); navigate(`/customer/book/${booking.service!._id}`); }}
                         className="flex-1 btn-outline py-2.5 text-sm flex items-center justify-center gap-1"
                       >
                         <CalendarPlus className="w-4 h-4" />
@@ -519,6 +519,16 @@ const BookingsPage = () => {
           bookingId={bookingToReschedule._id}
         />
       )}
+      {/* Review Modal */}
+      {reviewBooking && (
+        <ReviewModal
+          bookingId={reviewBooking._id}
+          workers={reviewBooking.worker ? [{ id: reviewBooking.worker._id, name: reviewBooking.worker.name }] : []}
+          onClose={() => setReviewBooking(null)}
+          onReviewSubmitted={() => { setReviewBooking(null); fetchBookings(); }}
+        />
+      )}
+
       {/* Worker Tracking Modal */}
       {trackingBooking && (
         <WorkerTrackingMap
