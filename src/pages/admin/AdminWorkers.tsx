@@ -270,7 +270,7 @@ const AdminWorkers = () => {
   const [noRegionAssigned, setNoRegionAssigned] = useState(false);
   const [showWorkerForm, setShowWorkerForm] = useState(false);
   const [creatingWorker, setCreatingWorker] = useState(false);
-  const [credentialDelivery, setCredentialDelivery] = useState<"email" | "phone" | "both">("email");
+  // credentialDelivery is always 'phone' — no email-based delivery
   const [customCreateSpecialization, setCustomCreateSpecialization] = useState("");
   const [customEditSpecialization, setCustomEditSpecialization] = useState("");
 
@@ -305,7 +305,6 @@ const AdminWorkers = () => {
 
   const [workerForm, setWorkerForm] = useState({
     name: "",
-    email: "",
     phone: "",
     gender: "" as string,
     dateOfBirth: "",
@@ -693,13 +692,13 @@ const AdminWorkers = () => {
       }
     }
 
-    // Credential delivery validation
-    if (!workerForm.email) {
-      alert('Email is required to create a worker account');
+    if (!workerForm.phone) {
+      alert('Phone number is required to create a worker account');
       return;
     }
-    if (credentialDelivery === 'phone' && !workerForm.phone) {
-      alert('Phone is required for phone credential delivery');
+
+    if (!createPhoneVerified) {
+      alert('Please verify the worker\'s phone number via OTP before creating the account');
       return;
     }
 
@@ -727,7 +726,6 @@ const AdminWorkers = () => {
     try {
       const formData = new FormData();
       formData.append('name', workerForm.name);
-      if (workerForm.email) formData.append('email', workerForm.email);
       if (workerForm.phone) formData.append('phone', workerForm.phone);
       if (workerForm.gender) formData.append('gender', workerForm.gender);
       if (workerForm.religion) formData.append('religion', workerForm.religion);
@@ -737,7 +735,7 @@ const AdminWorkers = () => {
       formData.append('assignedApartmentIds', JSON.stringify(workerForm.selectedLocations));
       if (workerForm.aadhaarNumber) formData.append('aadhaarNumber', workerForm.aadhaarNumber.replace(/\s/g, ''));
       formData.append('hourlyRate', workerForm.hourlyRate);
-      formData.append('credentialDelivery', credentialDelivery);
+      formData.append('credentialDelivery', 'phone');
       if (createPhoneVerified) formData.append('isPhoneVerified', 'true');
       if (docFiles.profilePicture) formData.append('profilePicture', docFiles.profilePicture);
       if (docFiles.aadhaarFront) formData.append('aadhaarFront', docFiles.aadhaarFront);
@@ -746,20 +744,14 @@ const AdminWorkers = () => {
       const response = await workerCollectionApi.createWorker(formData);
       
       // Show temporary password to admin
-      const deliveryLabel =
-        credentialDelivery === "both" ? `📧 Email: ${workerForm.email}\n📱 Phone: ${workerForm.phone}` :
-        credentialDelivery === "phone" ? `📱 Phone: ${workerForm.phone}` :
-        `📧 Email: ${workerForm.email}`;
       const deliveryStatus = response.deliveryResults
         ? Object.entries(response.deliveryResults).map(([k, v]) => `${k}: ${v}`).join(', ')
         : 'pending';
-      alert(`Worker created successfully! ✅\n\nTemporary Password: ${response.temporaryPassword || '(see delivery channel)'}\n\nCredentials sent via:\n${deliveryLabel}\nStatus: ${deliveryStatus}\n\nPlease save this password as backup.`);
+      alert(`Worker created successfully! ✅\n\nTemporary Password: ${response.temporaryPassword || '(see delivery channel)'}\n\nCredentials sent via SMS to: ${workerForm.phone}\nStatus: ${deliveryStatus}\n\nPlease save this password as backup.`);
       
       setShowWorkerForm(false);
-      setCredentialDelivery("email");
       setWorkerForm({
         name: "",
-        email: "",
         phone: "",
         gender: "",
         dateOfBirth: "",
@@ -1207,49 +1199,16 @@ const AdminWorkers = () => {
                   />
                 </div>
 
-                {/* Credential delivery method — affects which fields are required */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">Send temporary password via</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {(["email", "phone", "both"] as const).map((opt) => (
-                      <button
-                        key={opt}
-                        type="button"
-                        onClick={() => setCredentialDelivery(opt)}
-                        className={`py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
-                          credentialDelivery === opt
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background border-border hover:bg-muted text-foreground"
-                        }`}
-                      >
-                        {opt === "email" ? "📧 Email" : opt === "phone" ? "📱 Phone" : "📧+📱 Both"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {/* Phone field — required, with OTP verification */}
 
+                {/* Phone field — required, with OTP verification */}
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    Email <span className="text-destructive">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    className="input-clean"
-                    placeholder="worker@example.com"
-                    value={workerForm.email}
-                    onChange={(e) => setWorkerForm({...workerForm, email: e.target.value})}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Worker login and password backup are always tied to email.</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Phone {credentialDelivery === 'email' ? <span className="text-muted-foreground font-normal">(Optional)</span> : <span className="text-destructive">*</span>}
+                    Phone <span className="text-destructive">*</span>
                   </label>
                   <input
                     type="tel"
-                    required={credentialDelivery !== 'email'}
+                    required
                     className="input-clean"
                     placeholder="+91 9876543210"
                     value={workerForm.phone}
@@ -1310,15 +1269,7 @@ const AdminWorkers = () => {
                       {createPhoneOtpError && <p className="text-xs text-destructive mt-1">{createPhoneOtpError}</p>}
                     </div>
                   )}
-                </div>
-
-                {/* Credential delivery method */}
-                <div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {credentialDelivery === "email" && "Temporary password will be sent to the email address."}
-                    {credentialDelivery === "phone" && "Temporary password will be sent as an SMS to the phone number."}
-                    {credentialDelivery === "both" && "Temporary password will be sent to both email and phone."}
-                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">Temporary password will be sent as an SMS to this number.</p>
                 </div>
 
                 <div>

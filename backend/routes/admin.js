@@ -1065,8 +1065,8 @@ router.post('/workers',
   handleWorkerUploadFields,
   [
     body('name').notEmpty().withMessage('Name is required'),
-    body('email').isEmail().withMessage('Valid email is required'),
-    body('phone').optional().notEmpty().withMessage('Phone cannot be empty'),
+    body('phone').notEmpty().withMessage('Phone number is required'),
+    body('email').optional().isEmail().withMessage('Invalid email format'),
     body('gender').optional().isIn(['male', 'female', 'other', 'prefer_not_to_say']).withMessage('Invalid gender'),
     body('religion').optional().isString(),
     body('experience').optional().isNumeric().withMessage('Experience must be a number'),
@@ -1095,6 +1095,10 @@ router.post('/workers',
 
       const { name, email, phone, gender, religion, experience, hourlyRate, aadhaarNumber, dateOfBirth } = req.body;
 
+      if (!phone) {
+        return res.status(400).json({ error: { message: 'Phone number is required', status: 400 } });
+      }
+
       // Parse array fields that may come as JSON strings from multipart forms
       let specialization = req.body.specialization;
       if (typeof specialization === 'string') {
@@ -1114,21 +1118,11 @@ router.post('/workers',
       const aadhaarBackPath = files.aadhaarBack?.[0]
         ? `/uploads/worker-docs/${files.aadhaarBack[0].filename}` : null;
 
-      if (!email) {
-        return res.status(400).json({ error: { message: 'Email is required', status: 400 } });
-      }
-
-      // Normalize email
-      const normalizedEmail = email.toLowerCase().trim();
-      
-      // Check if email exists
-      const existingUser = await User.findOne({ email: normalizedEmail });
+      // Check for duplicate phone number
+      const existingUser = await User.findOne({ phone });
       if (existingUser) {
-        console.log(`⚠️ Worker creation attempt with existing email: ${normalizedEmail}`);
-        return res.status(400).json({ error: { message: 'Email already exists', status: 400 } });
+        return res.status(400).json({ error: { message: 'A worker with this phone number already exists', status: 400 } });
       }
-
-      console.log(`✅ No existing user found for email: ${normalizedEmail}, proceeding with worker creation`);
 
       // Check if admin has permission (only if role is admin, not super_admin)
       if (req.user.role === 'admin' && !req.user.adminProfile?.permissions?.canCreateWorkers) {
@@ -1137,7 +1131,7 @@ router.post('/workers',
 
       // Generate temporary password
       const temporaryPassword = generateTemporaryPassword();
-      console.log(`🔑 Generated temporary password for ${normalizedEmail}:`, temporaryPassword);
+      console.log(`🔑 Generated temporary password for ${phone}:`, temporaryPassword);
 
       // REQUIRE location assignment for workers
       if (!assignedApartmentIds || assignedApartmentIds.length === 0) {
@@ -1176,7 +1170,7 @@ router.post('/workers',
       // Create worker
       const worker = new User({
         name,
-        email: normalizedEmail,
+        ...(email && email.trim() ? { email: email.toLowerCase().trim() } : {}),
         password: temporaryPassword, // Will be hashed by pre-save hook
         temporaryPassword: temporaryPassword, // Store plain text for reference (not hashed)
         isFirstLogin: true, // Force password change on first login
@@ -1220,26 +1214,17 @@ router.post('/workers',
         { $push: { assignedWorkers: { worker: worker._id, assignedAt: new Date() } } }
       );
 
-      // Return immediately so worker creation isn't blocked by email/SMS provider latency.
-      const credentialDelivery = req.body.credentialDelivery || 'email'; // 'email' | 'phone' | 'both'
-      const deliveryResults = buildCredentialDeliveryResults(credentialDelivery, phone);
-
-      const deliveryMessage =
-        credentialDelivery === 'both'
-          ? 'Credential delivery has been queued for email and SMS.'
-          : credentialDelivery === 'phone'
-          ? 'Credential delivery has been queued for SMS.'
-          : 'Credential delivery has been queued for email.';
+      // Return immediately so worker creation isn't blocked by SMS provider latency.
+      const deliveryResults = buildCredentialDeliveryResults('phone', phone);
 
       res.status(201).json({
         success: true,
-        message: `Worker created successfully. ${deliveryMessage}`,
+        message: 'Worker created successfully. Credential delivery has been queued for SMS.',
         deliveryResults,
-        credentialDelivery,
+        credentialDelivery: 'phone',
         worker: {
           _id: worker._id,
           name: worker.name,
-          email: worker.email,
           phone: worker.phone,
           role: worker.role,
           gender: worker.gender,
@@ -1252,8 +1237,7 @@ router.post('/workers',
       });
 
       queueWorkerCredentialDelivery({
-        credentialDelivery,
-        email: normalizedEmail,
+        credentialDelivery: 'phone',
         phone,
         name,
         temporaryPassword

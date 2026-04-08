@@ -276,11 +276,20 @@ router.post('/register',
       // Handle MongoDB duplicate key error (unique index violation)
       if (error.code === 11000) {
         const field = Object.keys(error.keyPattern || {})[0];
-        return res.status(400).json({ 
-          error: { 
-            message: `A user with this ${field || 'email'} already exists. If you recently deleted this account, please wait a moment and try again.`, 
-            status: 400 
-          } 
+        if (field === 'phone') {
+          return res.status(409).json({
+            error: { message: 'An account with this mobile number already exists. Please log in instead.', status: 409 }
+          });
+        }
+        if (field === 'email') {
+          return res.status(400).json({
+            error: { message: 'An account with this email already exists.', status: 400 }
+          });
+        }
+        // Fallback — likely the stale non-sparse email_1 index (email: null collision).
+        // Treat it as a phone duplicate so the user gets the correct next-step message.
+        return res.status(409).json({
+          error: { message: 'An account with this mobile number already exists. Please log in instead.', status: 409 }
         });
       }
       
