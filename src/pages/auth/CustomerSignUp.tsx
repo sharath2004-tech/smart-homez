@@ -374,6 +374,7 @@ const CustomerSignUp = () => {
                       required
                     />
                   </div>
+                </div>
 
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">
