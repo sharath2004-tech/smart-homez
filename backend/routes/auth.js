@@ -1437,7 +1437,16 @@ router.post('/confirm-phone-otp-verify', authenticate, async (req, res) => {
       return res.status(404).json({ error: { message: 'User not found', status: 404 } });
     }
 
-    user.phone = digits;
+    // Reject if this phone is already verified on a different account
+    const phoneConflict = await User.findOne({
+      phone: { $regex: `${digits}$` },
+      _id: { $ne: user._id }
+    });
+    if (phoneConflict) {
+      return res.status(409).json({ error: { message: 'This phone number is already linked to another account.', status: 409 } });
+    }
+
+    user.phone = e164;  // store as e164 (+91XXXXXXXXXX) for consistency
     user.isPhoneVerified = true;
     await user.save();
 
@@ -1496,7 +1505,20 @@ router.post('/confirm-phone-widget-token', authenticate, async (req, res) => {
       return res.status(404).json({ error: { message: 'User not found', status: 404 } });
     }
 
-    if (digits.length === 10) user.phone = digits;
+    if (digits.length === 10) {
+      const e164Phone = `+91${digits}`;
+
+      // Reject if this phone is already linked to a different account
+      const phoneConflict = await User.findOne({
+        phone: { $regex: `${digits}$` },
+        _id: { $ne: user._id }
+      });
+      if (phoneConflict) {
+        return res.status(409).json({ error: { message: 'This phone number is already linked to another account.', status: 409 } });
+      }
+
+      user.phone = e164Phone;  // store as e164 (+91XXXXXXXXXX) for consistency
+    }
     user.isPhoneVerified = true;
     await user.save();
 
