@@ -5948,4 +5948,92 @@ router.patch('/:id/workforce', authenticate, authorize('admin', 'super_admin'), 
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// WORKER SUBSCRIPTION TRACKER
+// @route   GET /api/bookings/worker/my-subscriptions
+// @desc    All subscriptions assigned to the authenticated worker with session detail
+// @access  Worker
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/worker/my-subscriptions', authenticate, authorize('worker'), async (req, res) => {
+  try {
+    const workerId = req.user._id;
+
+    // Find all parent subscription bookings where this worker is assigned
+    const parentBookings = await Booking.find({
+      worker: workerId,
+      'subscription.isSubscription': true,
+      parentBooking: null,
+    })
+      .populate('customer', 'name phone')
+      .populate('service', 'name category')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const result = await Promise.all(parentBookings.map(async (b) => {
+      const sessions = await Booking.find({
+        parentBooking: b._id,
+        'subscription.isSubscription': true,
+      })
+        .select('status bookingDate startTime endTime actualStartTime actualEndTime actualDurationMinutes scheduledDurationMinutes overtimeMinutes overtimeCharges')
+        .sort({ bookingDate: 1 })
+        .lean();
+
+      const sessionRows = sessions.map((s, idx) => {
+        const scheduledMins = s.scheduledDurationMinutes ||
+          (() => {
+            if (!s.startTime || !s.endTime) return null;
+            const [sh, sm] = s.startTime.split(':').map(Number);
+            const [eh, em] = s.endTime.split(':').map(Number);
+            return (eh * 60 + em) - (sh * 60 + sm);
+          })();
+        return {
+          sessionNumber: idx + 1,
+          _id: s._id,
+          bookingDate: s.bookingDate,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          status: s.status,
+          actualStartTime: s.actualStartTime,
+          actualEndTime: s.actualEndTime,
+          actualDurationMinutes: s.actualDurationMinutes,
+          scheduledDurationMinutes: scheduledMins,
+          overtimeMinutes: s.overtimeMinutes || 0,
+          overtimeCharges: s.overtimeCharges || 0,
+        };
+      });
+
+      const done = sessionRows.filter(r => r.status === 'completed').length;
+      const totalOvertimeMinutes = sessionRows.reduce((s, r) => s + r.overtimeMinutes, 0);
+      const totalOvertimeCharges = sessionRows.reduce((s, r) => s + r.overtimeCharges, 0);
+
+      return {
+        _id: b._id,
+        customer: b.customer,
+        service: b.service,
+        bookingType: b.bookingType,
+        location: b.location,
+        subscriptionStartDate: b.subscription?.subscriptionStartDate,
+        subscriptionEndDate: b.subscription?.subscriptionEndDate,
+        activationStatus: b.subscription?.activationStatus,
+        isPaused: b.subscription?.isPaused,
+        isPrepaid: b.subscription?.isPrepaid,
+        preferredTime: b.subscription?.preferredTime || b.startTime,
+        durationPerSession: b.subscription?.durationPerSession,
+        frequency: b.recurringSchedule?.frequency,
+        sessionsTotal: sessionRows.length,
+        sessionsDone: done,
+        sessionsUpcoming: sessionRows.length - done,
+        totalOvertimeMinutes,
+        totalOvertimeCharges: Math.round(totalOvertimeCharges * 100) / 100,
+        sessions: sessionRows,
+      };
+    }));
+
+    res.json({ subscriptions: result });
+  } catch (error) {
+    console.error('Worker subscriptions error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
 export default router;

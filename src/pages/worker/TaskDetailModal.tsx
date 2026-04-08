@@ -822,7 +822,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
           )}
 
           {/* Payment Information */}
-          {!isPrepaidSubscription && (
+          {!isPrepaidSubscription ? (
           <div className="card-elevated p-5">
             <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
               <IndianRupee className="w-5 h-5 text-primary" />
@@ -848,17 +848,42 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
               </div>
             </div>
           </div>
-          )}
-
-          {isPrepaidSubscription && (
-            <div className="card-elevated p-5 bg-emerald-50 border-2 border-emerald-200">
-              <h3 className="font-bold text-foreground mb-3 flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-emerald-600" />
-                Subscription already prepaid
-              </h3>
-              <p className="text-sm text-emerald-800">
-                Payment for this subscription was completed before worker assignment. No collection or payment-proof upload is needed for this visit.
-              </p>
+          ) : (
+            <div className="space-y-3">
+              {/* Prepaid confirmation */}
+              <div className="card-elevated p-5 bg-emerald-50 border-2 border-emerald-200">
+                <h3 className="font-bold text-foreground mb-3 flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-emerald-600" />
+                  Subscription already prepaid
+                </h3>
+                <p className="text-sm text-emerald-800">
+                  The base service fee was paid upfront — no collection needed for this visit.
+                </p>
+              </div>
+              {/* Overtime still needs collection even for prepaid subs */}
+              {overtimeMinutes > 0 && (
+                <div className="card-elevated p-5 border-2 border-orange-300 bg-orange-50">
+                  <h3 className="font-bold text-orange-800 mb-3 flex items-center gap-2">
+                    <IndianRupee className="w-5 h-5 text-orange-600" />
+                    Overtime — Collect from Customer
+                  </h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-orange-700">
+                        {t('worker.taskDetail.overtime')} ({overtimeMinutes} min × ₹{OVERTIME_RATE})
+                      </span>
+                      <span className="font-semibold text-orange-700">₹{(overtimeMinutes * OVERTIME_RATE).toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-orange-100 rounded-xl mt-2">
+                      <span className="font-semibold text-orange-900">Collect from Customer</span>
+                      <span className="text-2xl font-bold text-orange-700">₹{(overtimeMinutes * OVERTIME_RATE).toFixed(2)}</span>
+                    </div>
+                    <p className="text-xs text-orange-600">
+                      ⚠ Service ran {overtimeMinutes} min over the scheduled time. Collect the overtime charge in addition to the prepaid subscription.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

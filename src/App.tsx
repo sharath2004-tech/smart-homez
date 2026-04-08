@@ -51,6 +51,7 @@ import WorkerEarnings from "./pages/worker/WorkerEarnings";
 import WorkerLeaves from "./pages/worker/WorkerLeaves";
 import WorkerProfile from "./pages/worker/WorkerProfile";
 import WorkerSalaryRequest from "./pages/worker/WorkerSalaryRequest";
+import WorkerSubscriptions from "./pages/worker/WorkerSubscriptions";
 import WorkerTasks from "./pages/worker/WorkerTasks";
 
 // Admin pages
@@ -73,6 +74,7 @@ import AdminServices from "./pages/admin/AdminServices";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminSOS from "./pages/admin/AdminSOS";
 import AdminSubscriptionSections from "./pages/admin/AdminSubscriptionSections";
+import AdminSubscriptionTracker from "./pages/admin/AdminSubscriptionTracker";
 import AdminWorkerRequests from "./pages/admin/AdminWorkerRequests";
 import AdminWorkers from "./pages/admin/AdminWorkers";
 import AdminWorkerSchedule from "./pages/admin/AdminWorkerSchedule";
@@ -160,6 +162,7 @@ const App = () => (
           <Route path="/worker/profile" element={<ProtectedRoute allowedRoles={['worker']}><WorkerProfile /></ProtectedRoute>} />
           <Route path="/worker/notifications" element={<ProtectedRoute allowedRoles={['worker']}><NotificationsPage userType="worker" /></ProtectedRoute>} />
           <Route path="/worker/help" element={<ProtectedRoute allowedRoles={['worker']}><HelpPage userType="worker" /></ProtectedRoute>} />
+          <Route path="/worker/subscriptions" element={<ProtectedRoute allowedRoles={['worker']}><WorkerSubscriptions /></ProtectedRoute>} />
 
           {/* Admin */}
           <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminDashboard /></ProtectedRoute>} />
@@ -170,6 +173,7 @@ const App = () => (
           <Route path="/admin/dashboard-preferences" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminDashboardPreferences /></ProtectedRoute>} />
           <Route path="/admin/home-config" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminHomeConfig /></ProtectedRoute>} />
           <Route path="/admin/subscription-sections" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminSubscriptionSections /></ProtectedRoute>} />
+          <Route path="/admin/subscription-tracker" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminSubscriptionTracker /></ProtectedRoute>} />
           <Route path="/admin/workforce" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminWorkforce /></ProtectedRoute>} />
           <Route path="/admin/worker-schedule" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminWorkerSchedule /></ProtectedRoute>} />
           <Route path="/admin/worker-requests" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminWorkerRequests /></ProtectedRoute>} />

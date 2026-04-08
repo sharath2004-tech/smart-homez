@@ -5063,4 +5063,189 @@ router.post('/debug-whatsapp', authenticate, authorize('admin', 'super_admin'), 
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SUBSCRIPTION TRACKER
+// ─────────────────────────────────────────────────────────────────────────────
+
+// @route   GET /api/admin/subscription-tracker
+// @desc    List all active subscriptions with session counts, overtime totals
+// @access  Admin / Super Admin
+router.get('/subscription-tracker', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { status, search, page = 1, limit = 30 } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    // Build filter for parent subscription bookings
+    const matchStage = {
+      'subscription.isSubscription': true,
+      parentBooking: null,   // top-level parent only
+    };
+
+    // Admin: restrict to locations they manage
+    if (req.user.role === 'admin') {
+      const locationIds = (req.user.adminProfile?.assignedLocations || []).map(l => l.locationId);
+      if (locationIds.length > 0) {
+        matchStage['location.locationId'] = { $in: locationIds.map(id => new mongoose.Types.ObjectId(id)) };
+      }
+    }
+
+    if (status && status !== 'all') {
+      matchStage['subscription.activationStatus'] = status;
+    }
+
+    // Get parent bookings
+    const parentBookings = await Booking.find(matchStage)
+      .populate('customer', 'name phone')
+      .populate('worker', 'name phone')
+      .populate('service', 'name category')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit))
+      .lean();
+
+    const total = await Booking.countDocuments(matchStage);
+
+    // For each parent booking, get child session counts + overtime totals
+    const result = await Promise.all(parentBookings.map(async (b) => {
+      // Filter by search
+      if (search) {
+        const q = search.toLowerCase();
+        const nameMatch = b.customer?.name?.toLowerCase().includes(q);
+        const serviceMatch = b.service?.name?.toLowerCase().includes(q);
+        if (!nameMatch && !serviceMatch) return null;
+      }
+
+      const childBookings = await Booking.find({
+        parentBooking: b._id,
+        'subscription.isSubscription': true,
+      }).select('status actualStartTime actualEndTime actualDurationMinutes scheduledDurationMinutes overtimeMinutes overtimeCharges bookingDate startTime endTime worker').populate('worker', 'name').lean();
+
+      const done = childBookings.filter(c => c.status === 'completed').length;
+      const upcoming = childBookings.filter(c => ['confirmed', 'assigned', 'pending', 'in-progress'].includes(c.status)).length;
+      const totalOvertimeMinutes = childBookings.reduce((s, c) => s + (c.overtimeMinutes || 0), 0);
+      const totalOvertimeCharges = childBookings.reduce((s, c) => s + (c.overtimeCharges || 0), 0);
+
+      return {
+        _id: b._id,
+        customer: b.customer,
+        worker: b.worker,
+        service: b.service,
+        bookingType: b.bookingType,
+        location: b.location,
+        subscriptionStartDate: b.subscription?.subscriptionStartDate,
+        subscriptionEndDate: b.subscription?.subscriptionEndDate,
+        activationStatus: b.subscription?.activationStatus,
+        isPaused: b.subscription?.isPaused,
+        isPrepaid: b.subscription?.isPrepaid,
+        totalAmount: b.totalAmount,
+        paymentStatus: b.paymentStatus,
+        preferredTime: b.subscription?.preferredTime || b.startTime,
+        durationPerSession: b.subscription?.durationPerSession,
+        frequency: b.recurringSchedule?.frequency,
+        sessionsTotal: childBookings.length,
+        sessionsDone: done,
+        sessionsUpcoming: upcoming,
+        totalOvertimeMinutes,
+        totalOvertimeCharges: Math.round(totalOvertimeCharges * 100) / 100,
+        createdAt: b.createdAt,
+      };
+    }));
+
+    const filtered = result.filter(Boolean);
+
+    res.json({ subscriptions: filtered, total, page: Number(page), limit: Number(limit) });
+  } catch (error) {
+    console.error('Subscription tracker error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   GET /api/admin/subscription-tracker/:bookingId/sessions
+// @desc    Full session statement for one subscription (parent + all child bookings)
+// @access  Admin / Super Admin
+router.get('/subscription-tracker/:bookingId/sessions', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+
+    const parent = await Booking.findById(bookingId)
+      .populate('customer', 'name phone')
+      .populate('worker', 'name phone')
+      .populate('service', 'name category')
+      .lean();
+
+    if (!parent) {
+      return res.status(404).json({ error: { message: 'Subscription not found', status: 404 } });
+    }
+
+    const sessions = await Booking.find({
+      parentBooking: bookingId,
+      'subscription.isSubscription': true,
+    })
+      .populate('worker', 'name phone')
+      .sort({ bookingDate: 1 })
+      .lean();
+
+    const sessionRows = sessions.map((s, idx) => {
+      const scheduledMins = s.scheduledDurationMinutes ||
+        (() => {
+          if (!s.startTime || !s.endTime) return null;
+          const [sh, sm] = s.startTime.split(':').map(Number);
+          const [eh, em] = s.endTime.split(':').map(Number);
+          return (eh * 60 + em) - (sh * 60 + sm);
+        })();
+
+      return {
+        sessionNumber: idx + 1,
+        _id: s._id,
+        bookingDate: s.bookingDate,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        worker: s.worker,
+        status: s.status,
+        actualStartTime: s.actualStartTime,
+        actualEndTime: s.actualEndTime,
+        actualDurationMinutes: s.actualDurationMinutes,
+        scheduledDurationMinutes: scheduledMins,
+        overtimeMinutes: s.overtimeMinutes || 0,
+        overtimeCharges: s.overtimeCharges || 0,
+      };
+    });
+
+    const totalOvertimeMinutes = sessionRows.reduce((s, r) => s + r.overtimeMinutes, 0);
+    const totalOvertimeCharges = sessionRows.reduce((s, r) => s + r.overtimeCharges, 0);
+    const sessionsDone = sessionRows.filter(r => r.status === 'completed').length;
+
+    res.json({
+      subscription: {
+        _id: parent._id,
+        customer: parent.customer,
+        worker: parent.worker,
+        service: parent.service,
+        bookingType: parent.bookingType,
+        location: parent.location,
+        totalAmount: parent.totalAmount,
+        paymentStatus: parent.paymentStatus,
+        isPrepaid: parent.subscription?.isPrepaid,
+        activationStatus: parent.subscription?.activationStatus,
+        subscriptionStartDate: parent.subscription?.subscriptionStartDate,
+        subscriptionEndDate: parent.subscription?.subscriptionEndDate,
+        preferredTime: parent.subscription?.preferredTime || parent.startTime,
+        durationPerSession: parent.subscription?.durationPerSession,
+        frequency: parent.recurringSchedule?.frequency,
+      },
+      sessions: sessionRows,
+      summary: {
+        total: sessionRows.length,
+        done: sessionsDone,
+        upcoming: sessionRows.length - sessionsDone,
+        totalOvertimeMinutes,
+        totalOvertimeCharges: Math.round(totalOvertimeCharges * 100) / 100,
+      },
+    });
+  } catch (error) {
+    console.error('Subscription sessions error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
 export default router;

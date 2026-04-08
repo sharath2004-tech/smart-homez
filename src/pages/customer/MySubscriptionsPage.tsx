@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import SubscriptionCalendar from "@/components/SubscriptionCalendar";
 import SubscriptionPaymentStep from "@/components/SubscriptionPaymentStep";
 import { authAPI, bookingsAPI } from "@/lib/api";
-import { AlertTriangle, Calendar, CalendarDays, CheckCircle, Clock, Edit2, MapPin, RefreshCw, User, UserCheck, XCircle } from "lucide-react";
+import { AlertTriangle, Calendar, CalendarDays, CheckCircle, ChevronDown, ChevronUp, Clock, Edit2, MapPin, RefreshCw, User, UserCheck, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -10,6 +10,12 @@ import { toast } from "sonner";
 interface Booking {
   _id: string;
   parentBooking?: string | null;
+  actualStartTime?: string;
+  actualEndTime?: string;
+  actualDurationMinutes?: number;
+  scheduledDurationMinutes?: number;
+  overtimeMinutes?: number;
+  overtimeCharges?: number;
   bookingDate: string;
   startTime: string;
   endTime: string;
@@ -101,6 +107,15 @@ const MySubscriptionsPage = () => {
     reason: '',
   });
   const [submittingPauseRequest, setSubmittingPauseRequest] = useState(false);
+  const [sessionMap, setSessionMap] = useState<Record<string, Booking[]>>({});
+  const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
+
+  const toggleSessions = (id: string) =>
+    setExpandedSessions(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
+      return next;
+    });
 
   const toggleCalendar = (id: string) =>
     setExpandedCalendars(prev => {
@@ -140,6 +155,20 @@ const MySubscriptionsPage = () => {
         });
       
       setSubscriptions(subscriptionBookings);
+
+      // Build session map from child bookings
+      const parentIds = new Set(subscriptionBookings.map((s: Booking) => s._id));
+      const childSessions: Record<string, Booking[]> = {};
+      (bookingsData.bookings || []).forEach((b: Booking) => {
+        if (b.parentBooking && parentIds.has(b.parentBooking)) {
+          if (!childSessions[b.parentBooking]) childSessions[b.parentBooking] = [];
+          childSessions[b.parentBooking].push(b);
+        }
+      });
+      Object.keys(childSessions).forEach(k => {
+        childSessions[k].sort((a, b) => new Date(a.bookingDate).getTime() - new Date(b.bookingDate).getTime());
+      });
+      setSessionMap(childSessions);
     } catch (error) {
       console.error('Fetch error:', error);
       toast.error(t('subscriptionPage.toasts.loadFailed'));
@@ -514,6 +543,109 @@ const MySubscriptionsPage = () => {
                     {t('subscriptionPage.features.durationPerSession', { count: subscription.subscription?.durationPerSession || 1 })}
                   </span>
                 </div>
+
+                {/* Session Progress + Bill Summary */}
+                {(() => {
+                  const sessions = sessionMap[subscription._id] || [];
+                  const done = sessions.filter(s => s.status === 'completed').length;
+                  const total = sessions.length;
+                  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+                  const totalOvertimeCharges = sessions.reduce((sum, s) => sum + (s.overtimeCharges || 0), 0);
+                  const totalOvertimeMinutes = sessions.reduce((sum, s) => sum + (s.overtimeMinutes || 0), 0);
+                  if (total === 0) return null;
+                  return (
+                    <div className="mb-4 p-3 bg-muted/40 rounded-xl">
+                      {/* Progress bar */}
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="font-medium text-muted-foreground">Sessions Progress</span>
+                        <span className="font-semibold text-foreground">{done} / {total} done</span>
+                      </div>
+                      <div className="w-full h-2 bg-muted rounded-full overflow-hidden mb-3">
+                        <div
+                          className="h-full bg-primary rounded-full transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+
+                      {/* Bill chips */}
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                          <CheckCircle className="w-3 h-3" />
+                          Prepaid ₹{subscription.totalAmount.toLocaleString('en-IN')} ✓
+                        </span>
+                        {totalOvertimeCharges > 0 && (
+                          <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
+                            <Clock className="w-3 h-3" />
+                            Overtime Due: ₹{totalOvertimeCharges.toLocaleString('en-IN')} ({totalOvertimeMinutes} min)
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Session history toggle */}
+                      <button
+                        onClick={() => toggleSessions(subscription._id)}
+                        className="flex items-center gap-1 text-xs text-primary hover:underline"
+                      >
+                        {expandedSessions.has(subscription._id) ? (
+                          <><ChevronUp className="w-3 h-3" /> Hide Session History</>
+                        ) : (
+                          <><ChevronDown className="w-3 h-3" /> View Session History ({sessions.length} sessions)</>
+                        )}
+                      </button>
+
+                      {expandedSessions.has(subscription._id) && (
+                        <div className="mt-3 rounded-lg border border-border overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead className="bg-muted/60">
+                              <tr>
+                                <th className="text-left px-3 py-2 font-medium text-muted-foreground">#</th>
+                                <th className="text-left px-3 py-2 font-medium text-muted-foreground">Date</th>
+                                <th className="text-left px-3 py-2 font-medium text-muted-foreground">Time</th>
+                                <th className="text-left px-3 py-2 font-medium text-muted-foreground">Duration</th>
+                                <th className="text-left px-3 py-2 font-medium text-muted-foreground">Overtime</th>
+                                <th className="text-left px-3 py-2 font-medium text-muted-foreground">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {sessions.map((session, idx) => (
+                                <tr key={session._id} className={idx % 2 === 0 ? '' : 'bg-muted/30'}>
+                                  <td className="px-3 py-2 text-muted-foreground">{idx + 1}</td>
+                                  <td className="px-3 py-2 whitespace-nowrap">{new Date(session.bookingDate).toLocaleDateString()}</td>
+                                  <td className="px-3 py-2 whitespace-nowrap">
+                                    {session.actualStartTime
+                                      ? `${session.actualStartTime}–${session.actualEndTime || '?'}`
+                                      : session.startTime}
+                                  </td>
+                                  <td className="px-3 py-2 whitespace-nowrap">
+                                    {session.actualDurationMinutes
+                                      ? `${session.actualDurationMinutes} min`
+                                      : `${(subscription.subscription?.durationPerSession || 1) * 60} min`}
+                                  </td>
+                                  <td className="px-3 py-2 whitespace-nowrap">
+                                    {(session.overtimeMinutes || 0) > 0 ? (
+                                      <span className="text-orange-600 font-semibold">
+                                        +{session.overtimeMinutes}m / ₹{(session.overtimeCharges || 0).toFixed(0)}
+                                      </span>
+                                    ) : <span className="text-muted-foreground">—</span>}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <span className={`capitalize font-medium ${
+                                      session.status === 'completed' ? 'text-green-600' :
+                                      session.status === 'cancelled' ? 'text-red-500' :
+                                      'text-muted-foreground'
+                                    }`}>
+                                      {session.status}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Actions */}
                 <div className="flex gap-2">

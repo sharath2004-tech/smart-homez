@@ -65,10 +65,10 @@ Your OTP for verification is *{{1}}*. It is valid for {{2}} minutes. Do not shar
 
 ## 2. `booking_confirmed`
 
-### English (`en`)
+### English (`en`)  ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd 
 ```
 Great news! Your booking for *{{1}}* on {{2}} at {{3}} has been confirmed. Booking ID: {{4}}. We look forward to serving you!
-```
+```                      
 
 ### Telugu (`te`)
 ```
