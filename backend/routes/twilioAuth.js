@@ -62,9 +62,18 @@ router.post('/verify-otp', async (req, res) => {
     const isSignupAttempt = Boolean(name && String(name).trim());
 
     const digits = e164.replace(/\D/g, '').slice(-10);
-    let user = await User.findOne({ phone: { $regex: `${digits}$` } });
+    // For login: match by phone AND role so the correct account is returned
+    // For signup: check any role to prevent duplicate phones across roles
+    let user = await User.findOne({ phone: { $regex: `${digits}$` }, role: finalRole });
 
     if (!user) {
+      // Check if phone exists under a different role
+      const otherRoleUser = await User.findOne({ phone: { $regex: `${digits}$` } });
+      if (otherRoleUser && !isSignupAttempt) {
+        return res.status(409).json({
+          message: `This number is registered as a ${otherRoleUser.role}. Please select the correct role tab.`
+        });
+      }
       // For login flow (no name), do not auto-create users
       if (!isSignupAttempt) {
         return res.status(404).json({
@@ -218,9 +227,18 @@ router.post('/verify-widget-token', async (req, res) => {
     const isSignupAttempt = Boolean(name && String(name).trim());
 
     const digits = e164.replace(/\D/g, '').slice(-10);
-    let user = await User.findOne({ phone: { $regex: `${digits}$` } });
+    // For login: match by phone AND role so the correct account is returned
+    // For signup: check any role to prevent duplicate phones across roles
+    let user = await User.findOne({ phone: { $regex: `${digits}$` }, role: finalRole });
 
     if (!user) {
+      // Check if phone exists under a different role
+      const otherRoleUser = await User.findOne({ phone: { $regex: `${digits}$` } });
+      if (otherRoleUser && !isSignupAttempt) {
+        return res.status(409).json({
+          message: `This number is registered as a ${otherRoleUser.role}. Please select the correct role tab.`,
+        });
+      }
       if (isSignupAttempt) {
         // Explicit signup with name provided
         user = new User({
