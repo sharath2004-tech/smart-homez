@@ -86,8 +86,7 @@ const CompleteProfilePage = () => {
       const stored = JSON.parse(localStorage.getItem("user") || "{}");
       localStorage.setItem("user", JSON.stringify({ ...stored, ...response.user }));
 
-      setStep("done");
-      setTimeout(() => navigate("/customer/dashboard"), 2000);
+      navigate("/customer/dashboard", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save profile. Please try again.");
     } finally {
