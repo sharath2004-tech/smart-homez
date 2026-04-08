@@ -81,7 +81,9 @@ const userSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    trim: true
+    trim: true,
+    unique: true,
+    sparse: true  // allows multiple null/undefined values; enforces uniqueness only when set
   },
   isPhoneVerified: {
     type: Boolean,

@@ -61,20 +61,13 @@ router.post('/verify-otp', async (req, res) => {
     const finalRole = allowedRoles.includes(requestedRole) ? requestedRole : 'customer';
     const isSignupAttempt = Boolean(name && String(name).trim());
 
-    let user = await User.findOne({ phone: e164, role: finalRole });
+    let user = await User.findOne({ phone: e164 });
 
     if (!user) {
       // For login flow (no name), do not auto-create users
       if (!isSignupAttempt) {
         return res.status(404).json({
-          message: `No ${finalRole} account found for this mobile number. Please sign up first.`
-        });
-      }
-
-      const existingSameRoleUser = await User.findOne({ phone: e164, role: finalRole });
-      if (existingSameRoleUser) {
-        return res.status(409).json({
-          message: `A ${finalRole} account with this mobile number already exists. Please log in instead.`
+          message: `No account found for this mobile number. Please sign up first.`
         });
       }
 
@@ -92,7 +85,7 @@ router.post('/verify-otp', async (req, res) => {
       await user.save();
     } else if (isSignupAttempt) {
       return res.status(409).json({
-        message: `A ${user.role} account with this mobile number already exists. Please log in instead.`
+        message: `An account with this mobile number already exists. Please log in instead.`
       });
     } else if (!user.isPhoneVerified) {
       user.isPhoneVerified = true;
@@ -225,7 +218,7 @@ router.post('/verify-widget-token', async (req, res) => {
     const finalRole = ['customer', 'worker'].includes(requestedRole) ? requestedRole : 'customer';
     const isSignupAttempt = Boolean(name && String(name).trim());
 
-    let user = await User.findOne({ phone: e164, role: finalRole });
+    let user = await User.findOne({ phone: e164 });
 
     if (!user) {
       if (isSignupAttempt) {
@@ -254,7 +247,7 @@ router.post('/verify-widget-token', async (req, res) => {
       await user.save();
     } else if (isSignupAttempt) {
       return res.status(409).json({
-        message: `A ${finalRole} account with this mobile number already exists. Please log in instead.`,
+        message: `An account with this mobile number already exists. Please log in instead.`,
       });
     } else {
       // Existing user login — auto-heal stale isProfileIncomplete flag:

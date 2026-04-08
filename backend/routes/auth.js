@@ -150,15 +150,14 @@ router.post('/register',
 
       if (normalizedPhone) {
         const phoneDigits = normalizedPhone.slice(-10);
-        const existingPhoneRoleUser = await User.findOne({
-          role: normalizedRole,
+        const existingPhoneUser = await User.findOne({
           phone: { $regex: `${phoneDigits}$` }
         });
 
-        if (existingPhoneRoleUser) {
+        if (existingPhoneUser) {
           return res.status(409).json({
             error: {
-              message: `A ${normalizedRole} account with this mobile number already exists. Please log in instead.`,
+              message: 'An account with this mobile number already exists. Please log in instead.',
               status: 409
             }
           });
