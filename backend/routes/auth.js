@@ -1059,8 +1059,8 @@ router.post('/register-worker',
       }
 
       // Validate required text fields
-      if (!name || !email || !password || !phone) {
-        return res.status(400).json({ error: { message: 'Name, email, password and phone are required', status: 400 } });
+      if (!name || !password || !phone) {
+        return res.status(400).json({ error: { message: 'Name, password and phone are required', status: 400 } });
       }
 
       // Validate password strength
@@ -1077,10 +1077,12 @@ router.post('/register-worker',
         return res.status(400).json({ error: { message: 'Aadhaar front image is required', status: 400 } });
       }
 
-      // Check if user already exists
-      const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
-      if (existingUser) {
-        return res.status(400).json({ error: { message: 'User already exists with this email', status: 400 } });
+      // Check if user already exists (check email only if provided)
+      if (email && email.trim()) {
+        const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
+        if (existingUser) {
+          return res.status(400).json({ error: { message: 'An account with this email already exists.', status: 400 } });
+        }
       }
 
       const normalizedPhone = normalizeIndianPhone(phone);
@@ -1128,15 +1130,15 @@ router.post('/register-worker',
 
       const userData = {
         name: name.trim(),
-        email: email.toLowerCase().trim(),
+        ...(email && email.trim() ? { email: email.toLowerCase().trim() } : {}),
         password,
         role: 'worker',
         phone: normalizedPhone,
         gender: gender || 'prefer_not_to_say',
         profileImage: `/uploads/profile-pics/${profilePicFile.filename}`,
         isFirstLogin: false,
-        isPhoneVerified: contactMethod === 'phone' && (phoneVerified === 'true' || phoneVerified === true),
-        isEmailVerified: contactMethod === 'email' && (emailVerified === 'true' || emailVerified === true),
+        isPhoneVerified: phoneVerified === 'true' || phoneVerified === true,
+        isEmailVerified: false,
         workerProfile: {
           experience: parseInt(experience) || 0,
           specialization: parsedSkills,
@@ -1232,7 +1234,9 @@ router.post('/register-worker',
     } catch (error) {
       console.error('Worker registration error:', error);
       if (error.code === 11000) {
-        return res.status(400).json({ error: { message: 'A user with this email already exists', status: 400 } });
+        const field = Object.keys(error.keyPattern || {})[0];
+        const fieldLabel = field === 'phone' ? 'mobile number' : field === 'email' ? 'email' : 'details';
+        return res.status(400).json({ error: { message: `A worker account with this ${fieldLabel} already exists. Please log in instead.`, status: 400 } });
       }
       res.status(500).json({ error: { message: 'Server error during registration', status: 500 } });
     }
@@ -1527,6 +1531,140 @@ router.post('/confirm-phone-widget-token', authenticate, async (req, res) => {
     console.error('confirm-phone-widget-token error:', error.message);
     const status = error.message.includes('not configured') ? 500 : 400;
     res.status(status).json({ error: { message: error.message || 'Verification failed', status } });
+  }
+});
+
+// @route   POST /api/auth/verify-widget-token
+// @desc    Verify MSG91 widget token and login (or auto-register) by phone OTP
+// @access  Public
+router.post('/verify-widget-token', sensitiveAuthLimiter, async (req, res) => {
+  try {
+    const { token, phone, role } = req.body;
+    if (!token || !phone) {
+      return res.status(400).json({ error: { message: 'Token and phone are required', status: 400 } });
+    }
+
+    // Verify widget token with MSG91
+    await verifyMsg91WidgetToken(token);
+
+    const digits = phone.replace(/\D/g, '').slice(-10);
+    if (digits.length !== 10) {
+      return res.status(400).json({ error: { message: 'Invalid phone number', status: 400 } });
+    }
+    const e164 = `+91${digits}`;
+
+    // Build role filter based on tab
+    const roleQuery = role === 'admin'
+      ? { role: { $in: ['admin', 'super_admin'] } }
+      : role === 'worker'
+        ? { role: 'worker' }
+        : {}; // customer: match any role so we can show a role-mismatch message below
+
+    let user = await User.findOne({ phone: { $regex: `${digits}$` }, ...roleQuery });
+
+    // If customer tab and no match yet, also check if the phone belongs to another role
+    if (!user && role === 'customer') {
+      const anyRoleUser = await User.findOne({ phone: { $regex: `${digits}$` } });
+      if (anyRoleUser) {
+        user = anyRoleUser; // will fail role check below and surface a helpful message
+      }
+    }
+
+    let isNewUser = false;
+
+    if (!user) {
+      if (role !== 'customer') {
+        const roleLabel = role === 'admin' ? 'an Admin' : 'a Worker';
+        return res.status(404).json({
+          error: {
+            message: `No ${roleLabel} account found for this number. Please contact admin.`,
+            status: 404
+          }
+        });
+      }
+
+      // Auto-create a minimal customer account — no email field
+      isNewUser = true;
+      user = new User({
+        name: 'Customer',
+        role: 'customer',
+        phone: e164,
+        isPhoneVerified: true,
+        isProfileIncomplete: true,
+        isFirstLogin: true,
+        hasCustomPassword: false,
+        password: crypto.randomBytes(32).toString('hex'),
+      });
+      await user.save();
+      console.log(`✅ Auto-registered new customer via phone OTP: ${e164} (ID: ${user._id})`);
+    }
+
+    if (!user.isActive) {
+      return res.status(401).json({ error: { message: 'Account is deactivated. Please contact support.', status: 401 } });
+    }
+
+    // Ensure phone is stored and marked verified
+    if (!user.isPhoneVerified || user.phone !== e164) {
+      user.phone = e164;
+      user.isPhoneVerified = true;
+      await user.save();
+    }
+
+    const jwtToken = jwt.sign(
+      { userId: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+
+    res.json({
+      success: true,
+      token: jwtToken,
+      isNewUser,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        profileImage: user.profileImage,
+        isFirstLogin: user.isFirstLogin,
+        isProfileIncomplete: user.isProfileIncomplete,
+        ...getPasswordSetupState(user),
+      }
+    });
+  } catch (error) {
+    console.error('verify-widget-token error:', error.message);
+    if (error.code === 11000) {
+      return res.status(409).json({
+        error: { message: 'This phone number is already registered. Try logging in instead.', status: 409 }
+      });
+    }
+    const status = error.message?.includes('not configured') ? 500 : 400;
+    res.status(status).json({ error: { message: error.message || 'Verification failed. Please try again.', status } });
+  }
+});
+
+// @route   POST /api/auth/check-widget-token
+// @desc    Verify MSG91 widget token (phone pre-check for worker registration)
+// @access  Public
+router.post('/check-widget-token', sensitiveAuthLimiter, async (req, res) => {
+  try {
+    const { token, phone } = req.body;
+    if (!token || !phone) {
+      return res.status(400).json({ error: { message: 'Token and phone are required', status: 400 } });
+    }
+
+    await verifyMsg91WidgetToken(token);
+
+    const digits = phone.replace(/\D/g, '').slice(-10);
+    if (digits.length !== 10) {
+      return res.status(400).json({ error: { message: 'Invalid phone number', status: 400 } });
+    }
+
+    res.json({ success: true, message: 'Phone verified successfully' });
+  } catch (error) {
+    console.error('check-widget-token error:', error.message);
+    const status = error.message?.includes('not configured') ? 500 : 400;
+    res.status(status).json({ error: { message: error.message || 'Verification failed. Please try again.', status } });
   }
 });
 
