@@ -61,7 +61,8 @@ router.post('/verify-otp', async (req, res) => {
     const finalRole = allowedRoles.includes(requestedRole) ? requestedRole : 'customer';
     const isSignupAttempt = Boolean(name && String(name).trim());
 
-    let user = await User.findOne({ phone: e164 });
+    const digits = e164.replace(/\D/g, '').slice(-10);
+    let user = await User.findOne({ phone: { $regex: `${digits}$` } });
 
     if (!user) {
       // For login flow (no name), do not auto-create users
@@ -70,8 +71,6 @@ router.post('/verify-otp', async (req, res) => {
           message: `No account found for this mobile number. Please sign up first.`
         });
       }
-
-      const digits = e164.replace(/\D/g, '').slice(-10);
 
       user = new User({
         name: name || `User${digits.slice(-4)}`,
@@ -218,7 +217,8 @@ router.post('/verify-widget-token', async (req, res) => {
     const finalRole = ['customer', 'worker'].includes(requestedRole) ? requestedRole : 'customer';
     const isSignupAttempt = Boolean(name && String(name).trim());
 
-    let user = await User.findOne({ phone: e164 });
+    const digits = e164.replace(/\D/g, '').slice(-10);
+    let user = await User.findOne({ phone: { $regex: `${digits}$` } });
 
     if (!user) {
       if (isSignupAttempt) {
@@ -232,19 +232,13 @@ router.post('/verify-widget-token', async (req, res) => {
           isProfileIncomplete: false,
           password: Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12),
         });
+        await user.save();
       } else {
-        // Login attempt — no account yet, auto-create a minimal profile
-        user = new User({
-          name: 'Customer',
-          phone: e164,
-          role: finalRole,
-          gender: 'prefer_not_to_say',
-          isPhoneVerified: true,
-          isProfileIncomplete: true,
-          password: Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12),
+        // Login attempt — no account found for this number
+        return res.status(404).json({
+          message: `No account found for this mobile number. Please sign up first.`,
         });
       }
-      await user.save();
     } else if (isSignupAttempt) {
       return res.status(409).json({
         message: `An account with this mobile number already exists. Please log in instead.`,
