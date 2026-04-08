@@ -260,10 +260,17 @@ router.post('/verify-widget-token', async (req, res) => {
         });
         await user.save();
       } else {
-        // Login attempt — no account found for this number
-        return res.status(404).json({
-          message: `No account found for this mobile number. Please sign up first.`,
+        // Login attempt — phone verified but no account exists yet.
+        // Create a provisional account and let the user complete their profile.
+        user = new User({
+          name: `User${digits.slice(-4)}`,
+          phone: e164,
+          role: finalRole,
+          isPhoneVerified: true,
+          isProfileIncomplete: true,
+          password: Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12),
         });
+        await user.save();
       }
     } else if (isSignupAttempt) {
       return res.status(409).json({
