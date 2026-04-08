@@ -1177,6 +1177,7 @@ router.post('/workers',
         isFirstLogin: true, // Force password change on first login
         hasCustomPassword: false,
         phone,
+        isPhoneVerified: req.body.isPhoneVerified === 'true',
         gender: gender || 'prefer_not_to_say',
         religion: religion || undefined,
         dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
@@ -1824,7 +1825,7 @@ router.put('/workers/:workerId',
 
       // Basic fields
       if (req.body.name) updateData.name = req.body.name;
-      if (req.body.email) updateData.email = req.body.email;
+      if (req.body.email && /^\S+@\S+\.\S+$/.test(req.body.email)) updateData.email = req.body.email.toLowerCase().trim();
       if (req.body.phone) updateData.phone = req.body.phone;
       if (req.body.gender) updateData.gender = req.body.gender;
       if (req.body.dateOfBirth) updateData.dateOfBirth = new Date(req.body.dateOfBirth);

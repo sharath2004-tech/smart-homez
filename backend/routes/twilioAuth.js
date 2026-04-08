@@ -67,8 +67,12 @@ router.post('/verify-otp', async (req, res) => {
     let user = await User.findOne({ phone: { $regex: `${digits}$` }, role: finalRole });
 
     if (!user) {
-      // Check if phone exists under a different role
-      const otherRoleUser = await User.findOne({ phone: { $regex: `${digits}$` } });
+      // Check if phone exists under a different OTP-capable role (customer/worker only).
+      // admin/super_admin use email+password, so their phone must not block OTP login.
+      const otherRoleUser = await User.findOne({
+        phone: { $regex: `${digits}$` },
+        role: { $in: ['customer', 'worker'] }
+      });
       if (otherRoleUser && !isSignupAttempt) {
         return res.status(409).json({
           message: `This number is registered as a ${otherRoleUser.role}. Please select the correct role tab.`
@@ -232,8 +236,12 @@ router.post('/verify-widget-token', async (req, res) => {
     let user = await User.findOne({ phone: { $regex: `${digits}$` }, role: finalRole });
 
     if (!user) {
-      // Check if phone exists under a different role
-      const otherRoleUser = await User.findOne({ phone: { $regex: `${digits}$` } });
+      // Check if phone exists under a different OTP-capable role (customer/worker only).
+      // admin/super_admin use email+password, so their phone must not block OTP login.
+      const otherRoleUser = await User.findOne({
+        phone: { $regex: `${digits}$` },
+        role: { $in: ['customer', 'worker'] }
+      });
       if (otherRoleUser && !isSignupAttempt) {
         return res.status(409).json({
           message: `This number is registered as a ${otherRoleUser.role}. Please select the correct role tab.`,

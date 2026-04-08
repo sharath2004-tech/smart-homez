@@ -521,6 +521,7 @@ router.post(
         isFirstLogin: true,
         hasCustomPassword: false,
         phone,
+        isPhoneVerified: req.body.isPhoneVerified === 'true',
         gender: gender || 'prefer_not_to_say',
         religion: religion || undefined,
         role: 'worker',

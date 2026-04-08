@@ -5,6 +5,7 @@ import { WorkerRatingAnalytics } from "@/components/WorkerRatingAnalytics";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { useConfirm } from "@/hooks/useConfirm";
 import { adminAPI, API_BASE_URL, reliabilityAPI, reviewAnalyticsAPI, superAdminAPI } from "@/lib/api";
+import * as msg91Widget from "@/lib/msg91Widget";
 import { AlertTriangle, Archive, ArchiveRestore, BarChart3, CheckCircle, Clock, Edit, Eye, EyeOff, FileText, Info, Loader2, MapPin, Plus, Search, Star, TrendingUp, Upload, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -326,6 +327,13 @@ const AdminWorkers = () => {
     aadhaarBack: null
   });
 
+  // Phone OTP verification state (worker creation form)
+  const [createPhoneOtpSent, setCreatePhoneOtpSent] = useState(false);
+  const [createPhoneOtpCode, setCreatePhoneOtpCode] = useState('');
+  const [createPhoneOtpLoading, setCreatePhoneOtpLoading] = useState(false);
+  const [createPhoneOtpError, setCreatePhoneOtpError] = useState('');
+  const [createPhoneVerified, setCreatePhoneVerified] = useState(false);
+
   const profilePicRef = useRef<HTMLInputElement>(null);
   const aadhaarFrontRef = useRef<HTMLInputElement>(null);
   const aadhaarBackRef = useRef<HTMLInputElement>(null);
@@ -597,7 +605,7 @@ const AdminWorkers = () => {
 
       // Basic fields
       formData.append('name', editWorker.name);
-      formData.append('email', editWorker.email);
+      if (editWorker.email && editWorker.email.includes('@')) formData.append('email', editWorker.email);
       if (editWorker.phone) formData.append('phone', editWorker.phone);
       if (editWorker.gender) formData.append('gender', editWorker.gender);
       if (editWorker.dateOfBirth) formData.append('dateOfBirth', editWorker.dateOfBirth);
@@ -730,6 +738,7 @@ const AdminWorkers = () => {
       if (workerForm.aadhaarNumber) formData.append('aadhaarNumber', workerForm.aadhaarNumber.replace(/\s/g, ''));
       formData.append('hourlyRate', workerForm.hourlyRate);
       formData.append('credentialDelivery', credentialDelivery);
+      if (createPhoneVerified) formData.append('isPhoneVerified', 'true');
       if (docFiles.profilePicture) formData.append('profilePicture', docFiles.profilePicture);
       if (docFiles.aadhaarFront) formData.append('aadhaarFront', docFiles.aadhaarFront);
       if (docFiles.aadhaarBack) formData.append('aadhaarBack', docFiles.aadhaarBack);
@@ -763,12 +772,47 @@ const AdminWorkers = () => {
       });
       setCustomCreateSpecialization("");
       setDocFiles({ profilePicture: null, aadhaarFront: null, aadhaarBack: null });
+      setCreatePhoneOtpSent(false);
+      setCreatePhoneOtpCode('');
+      setCreatePhoneOtpError('');
+      setCreatePhoneVerified(false);
       fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create worker';
       alert('❌ Error: ' + message);
     } finally {
       setCreatingWorker(false);
+    }
+  };
+
+  const handleSendCreatePhoneOtp = async () => {
+    const digits = workerForm.phone.replace(/\D/g, '').slice(-10);
+    if (digits.length !== 10) { setCreatePhoneOtpError('Enter a valid 10-digit mobile number'); return; }
+    setCreatePhoneOtpLoading(true);
+    setCreatePhoneOtpError('');
+    try {
+      await msg91Widget.sendOtp('91' + digits);
+      setCreatePhoneOtpSent(true);
+    } catch (err) {
+      setCreatePhoneOtpError(err instanceof Error ? err.message : 'Failed to send OTP');
+    } finally {
+      setCreatePhoneOtpLoading(false);
+    }
+  };
+
+  const handleVerifyCreatePhoneOtp = async () => {
+    if (createPhoneOtpCode.length !== 6) { setCreatePhoneOtpError('Enter the 6-digit OTP'); return; }
+    setCreatePhoneOtpLoading(true);
+    setCreatePhoneOtpError('');
+    try {
+      await msg91Widget.verifyOtp(createPhoneOtpCode);
+      setCreatePhoneVerified(true);
+      setCreatePhoneOtpSent(false);
+      setCreatePhoneOtpCode('');
+    } catch (err) {
+      setCreatePhoneOtpError(err instanceof Error ? err.message : 'Invalid OTP. Please try again.');
+    } finally {
+      setCreatePhoneOtpLoading(false);
     }
   };
 
@@ -1209,8 +1253,63 @@ const AdminWorkers = () => {
                     className="input-clean"
                     placeholder="+91 9876543210"
                     value={workerForm.phone}
-                    onChange={(e) => setWorkerForm({...workerForm, phone: e.target.value})}
+                    onChange={(e) => {
+                      setWorkerForm({...workerForm, phone: e.target.value});
+                      setCreatePhoneVerified(false);
+                      setCreatePhoneOtpSent(false);
+                      setCreatePhoneOtpCode('');
+                      setCreatePhoneOtpError('');
+                    }}
                   />
+                  {/* Phone OTP Verification */}
+                  {workerForm.phone.replace(/\D/g, '').slice(-10).length === 10 && (
+                    <div className="mt-2">
+                      {createPhoneVerified ? (
+                        <p className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
+                          <CheckCircle className="w-3.5 h-3.5" /> Phone verified
+                        </p>
+                      ) : !createPhoneOtpSent ? (
+                        <button
+                          type="button"
+                          onClick={handleSendCreatePhoneOtp}
+                          disabled={createPhoneOtpLoading}
+                          className="flex items-center gap-1.5 text-xs text-primary font-medium hover:underline disabled:opacity-50"
+                        >
+                          {createPhoneOtpLoading && <Loader2 className="w-3 h-3 animate-spin" />}
+                          Verify phone via OTP
+                        </button>
+                      ) : (
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={6}
+                            className="input-clean"
+                            placeholder="Enter 6-digit OTP"
+                            value={createPhoneOtpCode}
+                            onChange={(e) => setCreatePhoneOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          />
+                          <button
+                            type="button"
+                            onClick={handleVerifyCreatePhoneOtp}
+                            disabled={createPhoneOtpLoading || createPhoneOtpCode.length < 6}
+                            className="w-full py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                          >
+                            {createPhoneOtpLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                            Verify OTP
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setCreatePhoneOtpSent(false); setCreatePhoneOtpCode(''); setCreatePhoneOtpError(''); }}
+                            className="text-xs text-muted-foreground hover:underline"
+                          >
+                            Change number
+                          </button>
+                        </div>
+                      )}
+                      {createPhoneOtpError && <p className="text-xs text-destructive mt-1">{createPhoneOtpError}</p>}
+                    </div>
+                  )}
                 </div>
 
                 {/* Credential delivery method */}
