@@ -66,6 +66,7 @@ import AdminHomeConfig from "./pages/admin/AdminHomeConfig";
 import AdminLeaves from "./pages/admin/AdminLeaves";
 import AdminLocations from "./pages/admin/AdminLocations";
 import AdminQuotes from "./pages/admin/AdminQuotes";
+import AdminReports from "./pages/admin/AdminReports";
 import AdminSalarySettlements from "./pages/admin/AdminSalarySettlements";
 import AdminServiceAreas from "./pages/admin/AdminServiceAreas";
 import AdminServices from "./pages/admin/AdminServices";
@@ -87,6 +88,7 @@ import SuperAdminHelpMessages from "./pages/superadmin/SuperAdminHelpMessages";
 import SuperAdminLeaves from "./pages/superadmin/SuperAdminLeaves";
 import SuperAdminLocations from "./pages/superadmin/SuperAdminLocations";
 import SuperAdminQuotes from "./pages/superadmin/SuperAdminQuotes";
+import SuperAdminReports from "./pages/superadmin/SuperAdminReports";
 import SuperAdminSalarySettlements from "./pages/superadmin/SuperAdminSalarySettlements";
 import SuperAdminServiceAreas from "./pages/superadmin/SuperAdminServiceAreas";
 import SuperAdminServices from "./pages/superadmin/SuperAdminServices";
@@ -184,6 +186,7 @@ const App = () => (
           <Route path="/admin/sos" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminSOS /></ProtectedRoute>} />
           <Route path="/admin/quotes" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminQuotes /></ProtectedRoute>} />
           <Route path="/admin/business-expenses" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><BusinessExpenses /></ProtectedRoute>} />
+          <Route path="/admin/reports" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminReports /></ProtectedRoute>} />
 
           {/* Super Admin */}
           <Route path="/super-admin/dashboard" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminDashboard /></ProtectedRoute>} />
@@ -206,6 +209,7 @@ const App = () => (
           <Route path="/super-admin/deep-cleaning-config" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminDeepCleaningConfig /></ProtectedRoute>} />
           <Route path="/super-admin/heatmap" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminHeatmap /></ProtectedRoute>} />
           <Route path="/super-admin/business-expenses" element={<ProtectedRoute allowedRoles={['super_admin']}><BusinessExpenses /></ProtectedRoute>} />
+          <Route path="/super-admin/reports" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminReports /></ProtectedRoute>} />
 
           {/* Catch-all */}
           <Route path="*" element={<NotFound />} />

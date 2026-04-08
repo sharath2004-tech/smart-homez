@@ -141,6 +141,7 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
     { to: "/admin/worker-schedule",    icon: Calendar,        label: t('nav.workerSchedule') },
     { to: "/admin/workforce",          icon: Users,           label: t('nav.workforce') },
     { to: "/admin/salary-settlements", icon: IndianRupee,     label: "Salary Settlements" },
+    { to: "/admin/reports",            icon: BarChart3,       label: "Reports" },
     { to: "/admin/quotes",             icon: FileText,        label: "Quote Requests" },
     { to: "/admin/help-messages",      icon: MessageSquare,   label: "Help Messages" },
     { to: "/admin/locations",          icon: MapPin,          label: t('nav.locations') },
@@ -185,6 +186,7 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
         { to: "/admin/worker-schedule", icon: Calendar, label: t('nav.workerSchedule') },
         { to: "/admin/workforce", icon: Users, label: t('nav.workforce') },
         { to: "/admin/salary-settlements", icon: IndianRupee, label: "Salary Settlements" },
+        { to: "/admin/reports", icon: BarChart3, label: "Reports" },
       ]
     },
     {
@@ -229,6 +231,7 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
     { to: "/super-admin/worker-schedule",    icon: Calendar,        label: t('nav.workerSchedule') },
     { to: "/super-admin/workforce",          icon: Users,           label: t('nav.workforce') },
     { to: "/super-admin/salary-settlements", icon: IndianRupee,     label: "Salary Settlements" },
+    { to: "/super-admin/reports",            icon: BarChart3,       label: "Reports" },
     { to: "/super-admin/quotes",             icon: FileText,        label: "Quote Requests" },
     { to: "/super-admin/help-messages",      icon: MessageSquare,   label: "Help Messages" },
     { to: "/super-admin/locations",          icon: MapPin,          label: "Locations & Admins" },
@@ -275,6 +278,7 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
         { to: "/super-admin/worker-schedule", icon: Calendar, label: t('nav.workerSchedule') },
         { to: "/super-admin/workforce", icon: Users, label: t('nav.workforce') },
         { to: "/super-admin/salary-settlements", icon: IndianRupee, label: "Salary Settlements" },
+        { to: "/super-admin/reports", icon: BarChart3, label: "Reports" },
       ]
     },
     {

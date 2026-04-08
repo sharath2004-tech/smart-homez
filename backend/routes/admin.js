@@ -3980,6 +3980,434 @@ router.get('/worker-schedule-comprehensive',
   }
 );
 
+// ============== REPORTS ==============
+
+// @route   GET /api/admin/reports/worker-wages
+// @desc    Worker hourly wage report (month-to-date or custom range). Per-worker: tasks, minutes, wage earned.
+// @access  Private/Admin|SuperAdmin
+router.get('/reports/worker-wages', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const fromDate = req.query.from ? new Date(req.query.from) : monthStart;
+    const toDate = req.query.to ? new Date(req.query.to) : today;
+    fromDate.setHours(0, 0, 0, 0);
+    toDate.setHours(23, 59, 59, 999);
+
+    // Location filter
+    let locationFilter = {};
+    if (req.query.locationId && mongoose.Types.ObjectId.isValid(req.query.locationId)) {
+      locationFilter = { 'location.locationId': new mongoose.Types.ObjectId(req.query.locationId) };
+    } else if (req.user.role === 'admin' && req.user.adminProfile?.assignedLocationIds?.length) {
+      locationFilter = {
+        'location.locationId': {
+          $in: req.user.adminProfile.assignedLocationIds.map(id => new mongoose.Types.ObjectId(id))
+        }
+      };
+    }
+
+    // Aggregate completed bookings per worker in period
+    const wageRows = await Booking.aggregate([
+      {
+        $match: {
+          ...REVENUE_BOOKING_MATCH,
+          ...locationFilter,
+          worker: { $ne: null },
+        }
+      },
+      {
+        $addFields: { effectiveCompletedAt: COMPLETED_BOOKING_DATE_EXPR }
+      },
+      {
+        $match: { effectiveCompletedAt: { $gte: fromDate, $lte: toDate } }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'worker',
+          foreignField: '_id',
+          as: 'workerDoc'
+        }
+      },
+      { $unwind: '$workerDoc' },
+      {
+        $addFields: {
+          effectiveMinutes: {
+            $cond: [
+              { $gt: ['$actualDurationMinutes', 0] },
+              '$actualDurationMinutes',
+              { $ifNull: ['$scheduledDurationMinutes', 0] }
+            ]
+          }
+        }
+      },
+      {
+        $group: {
+          _id: '$workerDoc._id',
+          name: { $first: '$workerDoc.name' },
+          phone: { $first: '$workerDoc.phone' },
+          hourlyRate: { $first: '$workerDoc.workerProfile.hourlyRate' },
+          totalMinutesWorked: { $sum: '$effectiveMinutes' },
+          completedTasks: { $sum: 1 }
+        }
+      },
+      {
+        $addFields: {
+          totalHoursWorked: { $round: [{ $divide: ['$totalMinutesWorked', 60] }, 2] },
+          wageEarned: {
+            $round: [
+              { $multiply: [{ $divide: ['$totalMinutesWorked', 60] }, { $ifNull: ['$hourlyRate', 0] }] },
+              2
+            ]
+          }
+        }
+      },
+      { $sort: { name: 1 } }
+    ]);
+
+    const totalWage = wageRows.reduce((s, r) => s + (r.wageEarned || 0), 0);
+    const totalMinutes = wageRows.reduce((s, r) => s + (r.totalMinutesWorked || 0), 0);
+
+    res.json({
+      success: true,
+      period: { from: fromDate, to: toDate },
+      summary: {
+        totalWorkers: wageRows.length,
+        totalMinutesWorked: totalMinutes,
+        totalHoursWorked: Math.round((totalMinutes / 60) * 100) / 100,
+        totalWageEarned: Math.round(totalWage * 100) / 100
+      },
+      workers: wageRows
+    });
+  } catch (error) {
+    console.error('Worker wage report error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   GET /api/admin/reports/worker-wages/export
+// @desc    CSV export of worker wage report
+// @access  Private/Admin|SuperAdmin
+router.get('/reports/worker-wages/export', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const fromDate = req.query.from ? new Date(req.query.from) : monthStart;
+    const toDate = req.query.to ? new Date(req.query.to) : today;
+    fromDate.setHours(0, 0, 0, 0);
+    toDate.setHours(23, 59, 59, 999);
+
+    let locationFilter = {};
+    if (req.query.locationId && mongoose.Types.ObjectId.isValid(req.query.locationId)) {
+      locationFilter = { 'location.locationId': new mongoose.Types.ObjectId(req.query.locationId) };
+    } else if (req.user.role === 'admin' && req.user.adminProfile?.assignedLocationIds?.length) {
+      locationFilter = {
+        'location.locationId': {
+          $in: req.user.adminProfile.assignedLocationIds.map(id => new mongoose.Types.ObjectId(id))
+        }
+      };
+    }
+
+    const wageRows = await Booking.aggregate([
+      { $match: { ...REVENUE_BOOKING_MATCH, ...locationFilter, worker: { $ne: null } } },
+      { $addFields: { effectiveCompletedAt: COMPLETED_BOOKING_DATE_EXPR } },
+      { $match: { effectiveCompletedAt: { $gte: fromDate, $lte: toDate } } },
+      { $lookup: { from: 'users', localField: 'worker', foreignField: '_id', as: 'workerDoc' } },
+      { $unwind: '$workerDoc' },
+      {
+        $addFields: {
+          effectiveMinutes: {
+            $cond: [
+              { $gt: ['$actualDurationMinutes', 0] },
+              '$actualDurationMinutes',
+              { $ifNull: ['$scheduledDurationMinutes', 0] }
+            ]
+          }
+        }
+      },
+      {
+        $group: {
+          _id: '$workerDoc._id',
+          name: { $first: '$workerDoc.name' },
+          phone: { $first: '$workerDoc.phone' },
+          hourlyRate: { $first: '$workerDoc.workerProfile.hourlyRate' },
+          totalMinutesWorked: { $sum: '$effectiveMinutes' },
+          completedTasks: { $sum: 1 }
+        }
+      },
+      {
+        $addFields: {
+          totalHoursWorked: { $round: [{ $divide: ['$totalMinutesWorked', 60] }, 2] },
+          wageEarned: {
+            $round: [
+              { $multiply: [{ $divide: ['$totalMinutesWorked', 60] }, { $ifNull: ['$hourlyRate', 0] }] },
+              2
+            ]
+          }
+        }
+      },
+      { $sort: { name: 1 } }
+    ]);
+
+    const fromStr = fromDate.toISOString().split('T')[0];
+    const toStr = toDate.toISOString().split('T')[0];
+    const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+
+    const header = ['Worker Name', 'Phone', 'Hourly Rate (₹)', 'Tasks Completed', 'Total Minutes', 'Total Hours', 'Wage Earned (₹)'].map(q).join(',');
+    const rows = wageRows.map(r =>
+      [r.name, r.phone, r.hourlyRate ?? 0, r.completedTasks, r.totalMinutesWorked, r.totalHoursWorked, r.wageEarned].map(q).join(',')
+    );
+    // Append summary footer
+    const totalWage = wageRows.reduce((s, r) => s + (r.wageEarned || 0), 0);
+    rows.push(['TOTAL', '', '', wageRows.reduce((s, r) => s + r.completedTasks, 0), wageRows.reduce((s, r) => s + r.totalMinutesWorked, 0), Math.round((wageRows.reduce((s, r) => s + r.totalMinutesWorked, 0) / 60) * 100) / 100, Math.round(totalWage * 100) / 100].map(q).join(','));
+
+    const csv = [header, ...rows].join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="worker-wages-${fromStr}-to-${toStr}.csv"`);
+    res.send(csv);
+  } catch (error) {
+    console.error('Worker wage export error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   GET /api/admin/reports/customer-bills
+// @desc    Customer bill report: subscription hours billed + extra/overtime charges in a date range
+// @access  Private/Admin|SuperAdmin
+router.get('/reports/customer-bills', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const fromDate = req.query.from ? new Date(req.query.from) : monthStart;
+    const toDate = req.query.to ? new Date(req.query.to) : today;
+    fromDate.setHours(0, 0, 0, 0);
+    toDate.setHours(23, 59, 59, 999);
+
+    let locationFilter = {};
+    if (req.query.locationId && mongoose.Types.ObjectId.isValid(req.query.locationId)) {
+      locationFilter = { 'location.locationId': new mongoose.Types.ObjectId(req.query.locationId) };
+    } else if (req.user.role === 'admin' && req.user.adminProfile?.assignedLocationIds?.length) {
+      locationFilter = {
+        'location.locationId': {
+          $in: req.user.adminProfile.assignedLocationIds.map(id => new mongoose.Types.ObjectId(id))
+        }
+      };
+    }
+
+    const billRows = await Booking.aggregate([
+      {
+        $match: {
+          ...REVENUE_BOOKING_MATCH,
+          ...locationFilter,
+          customer: { $ne: null }
+        }
+      },
+      {
+        $addFields: { effectiveCompletedAt: COMPLETED_BOOKING_DATE_EXPR }
+      },
+      {
+        $match: { effectiveCompletedAt: { $gte: fromDate, $lte: toDate } }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'customer',
+          foreignField: '_id',
+          as: 'customerDoc'
+        }
+      },
+      { $unwind: '$customerDoc' },
+      {
+        $addFields: {
+          isSubscriptionBooking: {
+            $cond: [
+              {
+                $or: [
+                  { $eq: ['$bookingType', 'monthly-subscription'] },
+                  { $eq: ['$bookingType', 'daily'] },
+                  { $eq: ['$bookingType', 'weekly'] },
+                  { $eq: ['$bookingType', 'biweekly'] },
+                  { $eq: ['$bookingType', 'monthly'] },
+                  { $eq: ['$subscription.isSubscription', true] }
+                ]
+              },
+              true,
+              false
+            ]
+          },
+          overtimeAmt: { $ifNull: ['$overtimeCharges', 0] }
+        }
+      },
+      {
+        $group: {
+          _id: '$customerDoc._id',
+          name: { $first: '$customerDoc.name' },
+          phone: { $first: '$customerDoc.phone' },
+          totalBookings: { $sum: 1 },
+          subscriptionBookings: { $sum: { $cond: ['$isSubscriptionBooking', 1, 0] } },
+          oneTimeBookings: { $sum: { $cond: ['$isSubscriptionBooking', 0, 1] } },
+          subscriptionBill: {
+            $sum: {
+              $cond: ['$isSubscriptionBooking', '$totalAmount', 0]
+            }
+          },
+          oneTimeBill: {
+            $sum: {
+              $cond: ['$isSubscriptionBooking', 0, '$totalAmount']
+            }
+          },
+          extraUtilisationBill: { $sum: '$overtimeAmt' },
+          grossBill: { $sum: '$totalAmount' }
+        }
+      },
+      {
+        $addFields: {
+          totalBill: { $round: [{ $add: ['$grossBill', '$extraUtilisationBill'] }, 2] },
+          subscriptionBill: { $round: ['$subscriptionBill', 2] },
+          oneTimeBill: { $round: ['$oneTimeBill', 2] },
+          extraUtilisationBill: { $round: ['$extraUtilisationBill', 2] }
+        }
+      },
+      { $sort: { name: 1 } }
+    ]);
+
+    const totals = billRows.reduce(
+      (acc, r) => ({
+        subscriptionBill: acc.subscriptionBill + r.subscriptionBill,
+        oneTimeBill: acc.oneTimeBill + r.oneTimeBill,
+        extraUtilisationBill: acc.extraUtilisationBill + r.extraUtilisationBill,
+        totalBill: acc.totalBill + r.totalBill
+      }),
+      { subscriptionBill: 0, oneTimeBill: 0, extraUtilisationBill: 0, totalBill: 0 }
+    );
+
+    res.json({
+      success: true,
+      period: { from: fromDate, to: toDate },
+      summary: {
+        totalCustomers: billRows.length,
+        totalSubscriptionBill: Math.round(totals.subscriptionBill * 100) / 100,
+        totalOneTimeBill: Math.round(totals.oneTimeBill * 100) / 100,
+        totalExtraUtilisationBill: Math.round(totals.extraUtilisationBill * 100) / 100,
+        grandTotal: Math.round(totals.totalBill * 100) / 100
+      },
+      customers: billRows
+    });
+  } catch (error) {
+    console.error('Customer bill report error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   GET /api/admin/reports/customer-bills/export
+// @desc    CSV export of customer bill report
+// @access  Private/Admin|SuperAdmin
+router.get('/reports/customer-bills/export', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const fromDate = req.query.from ? new Date(req.query.from) : monthStart;
+    const toDate = req.query.to ? new Date(req.query.to) : today;
+    fromDate.setHours(0, 0, 0, 0);
+    toDate.setHours(23, 59, 59, 999);
+
+    let locationFilter = {};
+    if (req.query.locationId && mongoose.Types.ObjectId.isValid(req.query.locationId)) {
+      locationFilter = { 'location.locationId': new mongoose.Types.ObjectId(req.query.locationId) };
+    } else if (req.user.role === 'admin' && req.user.adminProfile?.assignedLocationIds?.length) {
+      locationFilter = {
+        'location.locationId': {
+          $in: req.user.adminProfile.assignedLocationIds.map(id => new mongoose.Types.ObjectId(id))
+        }
+      };
+    }
+
+    const billRows = await Booking.aggregate([
+      { $match: { ...REVENUE_BOOKING_MATCH, ...locationFilter, customer: { $ne: null } } },
+      { $addFields: { effectiveCompletedAt: COMPLETED_BOOKING_DATE_EXPR } },
+      { $match: { effectiveCompletedAt: { $gte: fromDate, $lte: toDate } } },
+      { $lookup: { from: 'users', localField: 'customer', foreignField: '_id', as: 'customerDoc' } },
+      { $unwind: '$customerDoc' },
+      {
+        $addFields: {
+          isSubscriptionBooking: {
+            $cond: [
+              {
+                $or: [
+                  { $eq: ['$bookingType', 'monthly-subscription'] },
+                  { $eq: ['$bookingType', 'daily'] },
+                  { $eq: ['$bookingType', 'weekly'] },
+                  { $eq: ['$bookingType', 'biweekly'] },
+                  { $eq: ['$bookingType', 'monthly'] },
+                  { $eq: ['$subscription.isSubscription', true] }
+                ]
+              },
+              true,
+              false
+            ]
+          },
+          overtimeAmt: { $ifNull: ['$overtimeCharges', 0] }
+        }
+      },
+      {
+        $group: {
+          _id: '$customerDoc._id',
+          name: { $first: '$customerDoc.name' },
+          phone: { $first: '$customerDoc.phone' },
+          totalBookings: { $sum: 1 },
+          subscriptionBookings: { $sum: { $cond: ['$isSubscriptionBooking', 1, 0] } },
+          oneTimeBookings: { $sum: { $cond: ['$isSubscriptionBooking', 0, 1] } },
+          subscriptionBill: { $sum: { $cond: ['$isSubscriptionBooking', '$totalAmount', 0] } },
+          oneTimeBill: { $sum: { $cond: ['$isSubscriptionBooking', 0, '$totalAmount'] } },
+          extraUtilisationBill: { $sum: '$overtimeAmt' },
+          grossBill: { $sum: '$totalAmount' }
+        }
+      },
+      {
+        $addFields: {
+          totalBill: { $round: [{ $add: ['$grossBill', '$extraUtilisationBill'] }, 2] },
+          subscriptionBill: { $round: ['$subscriptionBill', 2] },
+          oneTimeBill: { $round: ['$oneTimeBill', 2] },
+          extraUtilisationBill: { $round: ['$extraUtilisationBill', 2] }
+        }
+      },
+      { $sort: { name: 1 } }
+    ]);
+
+    const fromStr = fromDate.toISOString().split('T')[0];
+    const toStr = toDate.toISOString().split('T')[0];
+    const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+
+    const header = ['Customer Name', 'Phone', 'Total Bookings', 'Subscription Bookings', 'One-Time Bookings', 'Subscription Bill (₹)', 'One-Time Bill (₹)', 'Extra Utilisation (₹)', 'Total Bill (₹)'].map(q).join(',');
+    const rows = billRows.map(r =>
+      [r.name, r.phone, r.totalBookings, r.subscriptionBookings, r.oneTimeBookings, r.subscriptionBill, r.oneTimeBill, r.extraUtilisationBill, r.totalBill].map(q).join(',')
+    );
+    const totals = billRows.reduce((acc, r) => ({ sb: acc.sb + r.subscriptionBill, ob: acc.ob + r.oneTimeBill, eb: acc.eb + r.extraUtilisationBill, tb: acc.tb + r.totalBill }), { sb: 0, ob: 0, eb: 0, tb: 0 });
+    rows.push(['TOTAL', '', billRows.reduce((s, r) => s + r.totalBookings, 0), billRows.reduce((s, r) => s + r.subscriptionBookings, 0), billRows.reduce((s, r) => s + r.oneTimeBookings, 0), Math.round(totals.sb * 100) / 100, Math.round(totals.ob * 100) / 100, Math.round(totals.eb * 100) / 100, Math.round(totals.tb * 100) / 100].map(q).join(','));
+
+    const csv = [header, ...rows].join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="customer-bills-${fromStr}-to-${toStr}.csv"`);
+    res.send(csv);
+  } catch (error) {
+    console.error('Customer bill export error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
 // @route   GET /api/admin/worker-schedule-export
 // @desc    Export worker schedules to Excel/CSV
 // @access  Private/Admin

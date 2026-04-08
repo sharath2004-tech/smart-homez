@@ -1476,6 +1476,49 @@ export const adminAPI = {
 
   getCustomerDetails: async (customerId: string) => {
     return apiCall(`/admin/customers/${customerId}`);
+  },
+
+  // Reports
+  getWorkerWageReport: async (params?: { from?: string; to?: string; locationId?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.from) q.append('from', params.from);
+    if (params?.to) q.append('to', params.to);
+    if (params?.locationId) q.append('locationId', params.locationId);
+    return apiCall(`/admin/reports/worker-wages${q.toString() ? `?${q.toString()}` : ''}`);
+  },
+
+  getWorkerWageReportExportUrl: async (params?: { from?: string; to?: string; locationId?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.from) q.append('from', params.from);
+    if (params?.to) q.append('to', params.to);
+    if (params?.locationId) q.append('locationId', params.locationId);
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/admin/reports/worker-wages/export${q.toString() ? `?${q.toString()}` : ''}`, {
+      headers: { ...(token && { Authorization: `Bearer ${token}` }) }
+    });
+    if (!response.ok) throw new Error('Export failed');
+    return response.blob();
+  },
+
+  getCustomerBillReport: async (params?: { from?: string; to?: string; locationId?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.from) q.append('from', params.from);
+    if (params?.to) q.append('to', params.to);
+    if (params?.locationId) q.append('locationId', params.locationId);
+    return apiCall(`/admin/reports/customer-bills${q.toString() ? `?${q.toString()}` : ''}`);
+  },
+
+  getCustomerBillReportExportUrl: async (params?: { from?: string; to?: string; locationId?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.from) q.append('from', params.from);
+    if (params?.to) q.append('to', params.to);
+    if (params?.locationId) q.append('locationId', params.locationId);
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/admin/reports/customer-bills/export${q.toString() ? `?${q.toString()}` : ''}`, {
+      headers: { ...(token && { Authorization: `Bearer ${token}` }) }
+    });
+    if (!response.ok) throw new Error('Export failed');
+    return response.blob();
   }
 };
 
