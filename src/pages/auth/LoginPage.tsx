@@ -2,34 +2,10 @@ import { LanguageSelector } from "@/components/LanguageSelector";
 import { authAPI, publicAPI } from "@/lib/api";
 import * as msg91Widget from "@/lib/msg91Widget";
 import { Eye, EyeOff, Home, Loader2, Phone, RefreshCw, Shield } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (config: {
-            client_id: string;
-            callback: (response: { credential: string }) => void;
-            auto_select?: boolean;
-            cancel_on_tap_outside?: boolean;
-            itp_support?: boolean;
-          }) => void;
-          prompt: (notification?: (n: {
-            isNotDisplayed: () => boolean;
-            isSkippedMoment: () => boolean;
-            isDismissedMoment: () => boolean;
-            getNotDisplayedReason: () => string;
-            getSkippedReason: () => string;
-          }) => void) => void;
-        };
-      };
-    };
-  }
-}
 
 const LoginPage = () => {
   const { t } = useTranslation();
@@ -41,7 +17,6 @@ const LoginPage = () => {
   const [stats, setStats] = useState({ totalCustomers: 0, totalWorkers: 0, servicesDone: 0 });
 
   // OTP login state
-  const [useOTP, setUseOTP] = useState(false);
   const [otpPhone, setOtpPhone] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [otpSent, setOtpSent] = useState(false);
@@ -49,65 +24,13 @@ const LoginPage = () => {
   const [resendCountdown, setResendCountdown] = useState(0);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Google Sign-In initialization state
-  const [googleInitialized, setGoogleInitialized] = useState(false);
-
   useEffect(() => {
     publicAPI.getStats().then((r) => { if (r.success) setStats(r.stats); }).catch(() => {});
   }, []);
 
-  const handleGoogleLogin = useCallback(async (credential: string) => {
-    setLoading(true);
-    setError("");
-    try {
-      const response = await authAPI.googleLogin(credential);
-      localStorage.removeItem("userLocation");
-      localStorage.setItem("token", response.token);
-      localStorage.setItem("user", JSON.stringify(response.user));
-
-      if (response.isNewUser === true || response.hasLocation !== true) {
-        window.location.href = "/register/customer?oauth=location";
-        return;
-      }
-
-      window.location.href = "/customer/dashboard";
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Google sign-in failed. Please try again.");
-      setLoading(false);
-    }
-  }, []);
-
-  // Initialize Google Sign-In — polls until GSI script is ready (async defer)
-  useEffect(() => {
-    if (googleInitialized) return;
-
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (!clientId || clientId === 'your_google_client_id.apps.googleusercontent.com') return;
-
-    const initGoogle = () => {
-      if (!window.google?.accounts?.id) return false;
-      window.google.accounts.id.initialize({
-        client_id: clientId,
-        callback: (response) => handleGoogleLogin(response.credential),
-        auto_select: false,
-        cancel_on_tap_outside: true,
-        itp_support: true,
-      });
-      setGoogleInitialized(true);
-      return true;
-    };
-
-    if (!initGoogle()) {
-      const interval = setInterval(() => { if (initGoogle()) clearInterval(interval); }, 100);
-      const timeout = setTimeout(() => clearInterval(interval), 10000);
-      return () => { clearInterval(interval); clearTimeout(timeout); };
-    }
-  }, [googleInitialized, handleGoogleLogin]);
-
   useEffect(() => {
     setForm({ email: "", password: "" });
     setError("");
-    setUseOTP(false);
     setOtpPhone("");
     setOtpCode("");
     setOtpSent(false);
@@ -253,28 +176,6 @@ const LoginPage = () => {
     }
   };
 
-  const triggerGoogleSignIn = () => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (!clientId || clientId === 'your_google_client_id.apps.googleusercontent.com') {
-      setError("Google Sign-In is not configured. Please contact support.");
-      return;
-    }
-    if (!window.google?.accounts?.id || !googleInitialized) {
-      setError("Google Sign-In is still loading. Please try again in a moment.");
-      return;
-    }
-    setError("");
-    window.google.accounts.id.prompt((notification) => {
-      if (notification.isNotDisplayed()) {
-        setError(
-          `Google Sign-In popup was blocked (${notification.getNotDisplayedReason() || 'unknown'}). ` +
-          "Allow pop-ups for this site or try a different browser."
-        );
-      }
-      // isSkippedMoment = user dismissed; no error needed
-    });
-  };
-
   const tabs = [
     { key: "customer", label: "Customer", icon: "👤" },
     { key: "worker", label: "Worker", icon: "🔧" },
@@ -282,7 +183,6 @@ const LoginPage = () => {
   ] as const;
 
   const signupLink = tab === "customer" ? "/register/customer" : tab === "worker" ? "/register/worker" : null;
-  const showOTPToggle = tab === "customer" || tab === "worker";
 
   return (
     <div className="min-h-screen flex">
@@ -362,62 +262,15 @@ const LoginPage = () => {
             </div>
           )}
 
-          {/* OTP / Password toggle (Customer & Worker only) */}
-          {showOTPToggle && (
-            <div className="flex gap-2 p-1 bg-muted rounded-xl mb-5">
-              <button
-                onClick={() => { setUseOTP(false); setError(""); setOtpSent(false); setOtpCode(""); }}
-                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${!useOTP ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground"}`}
-              >
-                Email &amp; Password
-              </button>
-              <button
-                onClick={() => { setUseOTP(true); setError(""); }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-medium rounded-lg transition-all ${useOTP ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground"}`}
-              >
-                <Phone className="w-3.5 h-3.5" /> Mobile OTP
-              </button>
-            </div>
-          )}
-
           {error && (
             <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">
               {error}
             </div>
           )}
 
-          {/* -- Email / Password login form -- */}
-          {!useOTP && (
+          {/* -- Admin Email / Password login form -- */}
+          {tab === "admin" && (
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Google Sign-In (customer only) */}
-              {tab === "customer" && (
-                <>
-                  <button
-                    type="button"
-                    onClick={triggerGoogleSignIn}
-                    disabled={loading}
-                    className="w-full flex items-center justify-center gap-3 py-3 px-4 border-2 border-border rounded-xl font-semibold hover:bg-accent transition-colors disabled:opacity-50"
-                  >
-                    <svg className="w-5 h-5" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg>
-                    {loading ? "Signing in..." : "Continue with Google"}
-                  </button>
-
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-border"></div>
-                    </div>
-                    <div className="relative flex justify-center text-sm">
-                      <span className="px-4 bg-background text-muted-foreground">Or sign in with email</span>
-                    </div>
-                  </div>
-                </>
-              )}
-
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">
                   {t("auth.login.email")}
@@ -476,8 +329,8 @@ const LoginPage = () => {
             </form>
           )}
 
-          {/* -- Mobile OTP login form -- */}
-          {useOTP && (
+          {/* -- Mobile OTP login form (Customer & Worker) -- */}
+          {tab !== "admin" && (
             <div className="space-y-4">
               {!otpSent ? (
                 <>

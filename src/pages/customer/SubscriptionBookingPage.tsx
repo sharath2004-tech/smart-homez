@@ -49,6 +49,7 @@ export default function SubscriptionBookingPage() {
   const [service, setService] = useState<Service | null>(null);
   const [profile, setProfile] = useState<{
     name?: string;
+    isPhoneVerified?: boolean;
     addresses?: Array<{
       isDefault?: boolean;
       apartmentName?: string;
@@ -166,6 +167,11 @@ export default function SubscriptionBookingPage() {
           ? 'Checking whether this service is available in your region. Please wait a moment.'
           : 'Please set a service location in your profile or services page before booking.'
       );
+      return;
+    }
+
+    if (!profile?.isPhoneVerified) {
+      toast.error('Please verify your mobile number before confirming the booking.');
       return;
     }
 

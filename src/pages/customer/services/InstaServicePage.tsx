@@ -18,6 +18,7 @@ import { toast } from "sonner";
 
 interface UserProfile {
   name: string;
+  isPhoneVerified?: boolean;
   addresses?: {
     isDefault: boolean;
     apartmentName?: string;
@@ -315,6 +316,11 @@ const InstaServicePage = () => {
           ? 'Checking whether this service is available in your region. Please wait a moment.'
           : 'Please set a service location in your profile or services page before booking.'
       );
+      return;
+    }
+
+    if (!profile?.isPhoneVerified) {
+      toast.error('Please verify your mobile number before confirming the booking.');
       return;
     }
 

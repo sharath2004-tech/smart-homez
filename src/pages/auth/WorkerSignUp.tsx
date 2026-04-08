@@ -39,7 +39,6 @@ const WorkerSignUp = () => {
   const [step, setStep] = useState<Step>("form");
   const [form, setForm] = useState({
     name: "",
-    email: "",
     phone: "",
     password: "",
     confirmPassword: "",
@@ -57,7 +56,6 @@ const WorkerSignUp = () => {
   const [termsAccepted, setTermsAccepted] = useState(false);
 
   // OTP verification states
-  const [contactMethod, setContactMethod] = useState<"email" | "phone">("email");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
@@ -107,12 +105,8 @@ const WorkerSignUp = () => {
     setOtpLoading(true);
     setError("");
     try {
-      if (contactMethod === "email") {
-        await authAPI.sendEmailOTP(form.email.trim().toLowerCase());
-      } else {
-        const digits = form.phone.replace(/\D/g, "").slice(-10);
-        await msg91Widget.sendOtp("91" + digits);
-      }
+      const digits = form.phone.replace(/\D/g, "").slice(-10);
+      await msg91Widget.sendOtp("91" + digits);
       setOtpSent(true);
       setError("");
     } catch (err) {
@@ -130,13 +124,9 @@ const WorkerSignUp = () => {
     setOtpLoading(true);
     setError("");
     try {
-      if (contactMethod === "email") {
-        await authAPI.verifyEmailOTP(form.email.trim().toLowerCase(), otp);
-      } else {
-        const digits = form.phone.replace(/\D/g, "").slice(-10);
-        const widgetToken = await msg91Widget.verifyOtp(otp);
-        await authAPI.checkWidgetToken(widgetToken, digits);
-      }
+      const digits = form.phone.replace(/\D/g, "").slice(-10);
+      const widgetToken = await msg91Widget.verifyOtp(otp);
+      await authAPI.checkWidgetToken(widgetToken, digits);
       setOtpVerified(true);
       setError("");
       // Move to skills step after successful verification
@@ -151,11 +141,7 @@ const WorkerSignUp = () => {
   const handleResendOTP = async () => {
     setOtp("");
     setError("");
-    if (contactMethod === "phone") {
-      try { await msg91Widget.retryOtp(null); } catch { await handleSendOTP(); }
-    } else {
-      await handleSendOTP();
-    }
+    try { await msg91Widget.retryOtp(null); } catch { await handleSendOTP(); }
   };
 
   const handleFileChange = (
@@ -178,10 +164,6 @@ const WorkerSignUp = () => {
     e.preventDefault();
     if (!form.name.trim()) {
       setError("Name is required");
-      return;
-    }
-    if (!form.email.trim()) {
-      setError("Email is required");
       return;
     }
     const digits = form.phone.replace(/\D/g, "").slice(-10);
@@ -282,7 +264,7 @@ const WorkerSignUp = () => {
       return;
     }
     if (!otpVerified) {
-      setError("Please verify your email or phone first");
+      setError("Please verify your phone first");
       return;
     }
     setLoading(true);
@@ -291,15 +273,14 @@ const WorkerSignUp = () => {
       const digits = form.phone.replace(/\D/g, "").slice(-10);
       const formData = new FormData();
       formData.append("name", form.name.trim());
-      formData.append("email", form.email.trim().toLowerCase());
       formData.append("password", form.password);
       formData.append("phone", "+91" + digits);
       formData.append("gender", form.gender || "prefer_not_to_say");
       formData.append("experience", form.experience || "0");
       formData.append("skills", JSON.stringify(selectedSkills));
-      formData.append("phoneVerified", contactMethod === "phone" ? "true" : "false");
-      formData.append("emailVerified", contactMethod === "email" ? "true" : "false");
-      formData.append("contactMethod", contactMethod);
+      formData.append("phoneVerified", "true");
+      formData.append("emailVerified", "false");
+      formData.append("contactMethod", "phone");
       formData.append("otpVerified", "true");
       formData.append("locationId", selectedLocationId);
       if (form.dateOfBirth) formData.append("dateOfBirth", form.dateOfBirth);
@@ -414,19 +395,6 @@ const WorkerSignUp = () => {
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">Full Name</label>
                   <input className="input-clean" placeholder="e.g. Ravi Kumar" value={form.name} onChange={set("name")} required />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Email Address</label>
-                  <input
-                    type="email"
-                    className="input-clean"
-                    placeholder="you@example.com"
-                    value={form.email}
-                    onChange={set("email")}
-                    required
-                    autoComplete="email"
-                  />
                 </div>
 
                 <div>
@@ -571,51 +539,16 @@ const WorkerSignUp = () => {
               <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Verify your contact</h2>
               <p className="text-muted-foreground mb-6">
                 {otpSent
-                  ? `Enter the 6-digit code sent to your ${contactMethod}`
-                  : "Choose how you want to verify your account"}
+                  ? "Enter the 6-digit code sent to your phone"
+                  : "We will verify your mobile number via OTP"}
               </p>
 
               {!otpSent ? (
                 <>
                   <div className="space-y-3 mb-6">
-                    <button
-                      type="button"
-                      onClick={() => setContactMethod("email")}
-                      className={`w-full flex items-center justify-between p-4 border-2 rounded-xl transition-all ${
-                        contactMethod === "email"
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:bg-accent"
-                      }`}
-                    >
+                    <div className="w-full flex items-center justify-between p-4 border-2 border-primary bg-primary/5 rounded-xl">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          contactMethod === "email" ? "bg-primary text-primary-foreground" : "bg-muted"
-                        }`}>
-                          📧
-                        </div>
-                        <div className="text-left">
-                          <div className="font-semibold text-sm">Verify via Email</div>
-                          <div className="text-xs text-muted-foreground">{form.email}</div>
-                        </div>
-                      </div>
-                      {contactMethod === "email" && (
-                        <CheckCircle className="w-5 h-5 text-primary" />
-                      )}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setContactMethod("phone")}
-                      className={`w-full flex items-center justify-between p-4 border-2 rounded-xl transition-all ${
-                        contactMethod === "phone"
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:bg-accent"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          contactMethod === "phone" ? "bg-primary text-primary-foreground" : "bg-muted"
-                        }`}>
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-primary text-primary-foreground">
                           📱
                         </div>
                         <div className="text-left">
@@ -623,14 +556,12 @@ const WorkerSignUp = () => {
                           <div className="text-xs text-muted-foreground">+91 {form.phone}</div>
                         </div>
                       </div>
-                      {contactMethod === "phone" && (
-                        <CheckCircle className="w-5 h-5 text-primary" />
-                      )}
-                    </button>
+                      <CheckCircle className="w-5 h-5 text-primary" />
+                    </div>
                   </div>
 
                   <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800 mb-6">
-                    We'll send a 6-digit verification code to your selected {contactMethod}
+                    We'll send a 6-digit verification code to your mobile number
                   </div>
 
                   <div className="flex gap-3">
@@ -678,7 +609,7 @@ const WorkerSignUp = () => {
                       autoFocus
                     />
                     <p className="text-xs text-muted-foreground mt-2 text-center">
-                      Code sent to {contactMethod === "email" ? form.email : `+91 ${form.phone}`}
+                      Code sent to +91 {form.phone}
                     </p>
                   </div>
 
@@ -708,18 +639,6 @@ const WorkerSignUp = () => {
                       Didn't receive code? Resend OTP
                     </button>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOtpSent(false);
-                      setOtp("");
-                      setError("");
-                    }}
-                    className="w-full mt-4 py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm"
-                  >
-                    Change verification method
-                  </button>
                 </>
               )}
             </>

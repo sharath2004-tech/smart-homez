@@ -61,6 +61,7 @@ interface Worker {
 interface BookingProfile {
   role: string;
   name?: string;
+  isPhoneVerified?: boolean;
   addresses?: Array<{
     isDefault?: boolean;
     apartmentName?: string;
@@ -286,6 +287,11 @@ const CleaningServicePage = () => {
           ? 'Checking whether this service is available in your region. Please wait a moment.'
           : 'Please set a service location in your profile or services page before booking.'
       );
+      return;
+    }
+
+    if (!profile?.isPhoneVerified) {
+      toast.error('Please verify your mobile number before confirming the booking.');
       return;
     }
 

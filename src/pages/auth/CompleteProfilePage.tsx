@@ -25,7 +25,7 @@ type Step = "details" | "location" | "done";
 const CompleteProfilePage = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>("details");
-  const [form, setForm] = useState({ name: "", email: "", gender: "" });
+  const [form, setForm] = useState({ name: "", gender: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -62,10 +62,6 @@ const CompleteProfilePage = () => {
   const handleDetailsNext = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) { setError("Please enter your full name"); return; }
-    if (form.email && !/^\S+@\S+\.\S+$/.test(form.email.trim())) {
-      setError("Please enter a valid email address");
-      return;
-    }
     setError("");
     setStep("location");
   };
@@ -76,7 +72,6 @@ const CompleteProfilePage = () => {
     try {
       const response = await authAPI.completeProfile({
         name: form.name.trim(),
-        email: form.email.trim() || undefined,
         gender: form.gender || undefined,
         locationId,
         ...locationMeta,
@@ -240,20 +235,6 @@ const CompleteProfilePage = () => {
                     className="w-full px-4 py-3 rounded-xl border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                     autoFocus
                   />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Email address <span className="text-muted-foreground font-normal">(optional)</span>
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="you@example.com"
-                    value={form.email}
-                    onChange={set("email")}
-                    className="w-full px-4 py-3 rounded-xl border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Used for booking confirmations and receipts.</p>
                 </div>
 
                 <div>
