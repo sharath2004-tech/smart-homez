@@ -1158,6 +1158,7 @@ router.patch('/admins/:adminId', async (req, res) => {
         area: loc.area,
         city: loc.city
       }));
+      admin.markModified('adminProfile.assignedLocations');
 
       await Location.updateMany({ assignedAdmin: adminId }, { $unset: { assignedAdmin: '' } });
       await Location.updateMany({ _id: { $in: assignedLocationIds } }, { $set: { assignedAdmin: adminId } });

@@ -956,7 +956,11 @@ router.patch('/admins/:adminId', authenticate, authorize('super_admin'), async (
 
     // Update permissions if provided
     if (permissions && typeof permissions === 'object') {
-      admin.adminProfile.permissions = { ...admin.adminProfile.permissions.toObject?.() || admin.adminProfile.permissions, ...permissions };
+      admin.adminProfile.permissions.canCreateWorkers = permissions.canCreateWorkers ?? admin.adminProfile.permissions.canCreateWorkers;
+      admin.adminProfile.permissions.canDeleteWorkers = permissions.canDeleteWorkers ?? admin.adminProfile.permissions.canDeleteWorkers;
+      admin.adminProfile.permissions.canManageApartments = permissions.canManageApartments ?? admin.adminProfile.permissions.canManageApartments;
+      admin.adminProfile.permissions.canViewReports = permissions.canViewReports ?? admin.adminProfile.permissions.canViewReports;
+      admin.markModified('adminProfile.permissions');
     }
 
     // Update assigned locations if provided
@@ -968,6 +972,7 @@ router.patch('/admins/:adminId', authenticate, authorize('super_admin'), async (
         area: loc.area,
         city: loc.city
       }));
+      admin.markModified('adminProfile.assignedLocations');
 
       // Update locations with new admin assignment
       await Location.updateMany(
