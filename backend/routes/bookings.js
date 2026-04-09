@@ -2594,10 +2594,21 @@ router.delete('/:id', authenticate, async (req, res) => {
     if (booking.scheduledDate) {
       scheduledTime = new Date(booking.scheduledDate);
     } else {
+      // Build scheduled UTC time from bookingDate (stored as UTC midnight) and
+      // startTime (local IST "HH:MM"). IST = UTC+5:30, so IST midnight of that
+      // calendar date = UTC midnight − 330 minutes.
+      const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000; // 19 800 000 ms
       const bookingDateObj = new Date(booking.bookingDate);
       const [startH, startM] = (booking.startTime || '00:00').split(':').map(Number);
-      scheduledTime = new Date(bookingDateObj);
-      scheduledTime.setHours(startH, startM, 0, 0);
+      const calendarDateUTCMs = Date.UTC(
+        bookingDateObj.getUTCFullYear(),
+        bookingDateObj.getUTCMonth(),
+        bookingDateObj.getUTCDate()
+      );
+      // IST midnight of that calendar date + startTime minutes = UTC scheduled time
+      scheduledTime = new Date(
+        calendarDateUTCMs - IST_OFFSET_MS + (startH * 60 + startM) * 60 * 1000
+      );
     }
     const minutesUntilBooking = (scheduledTime - now) / 60000;
 
@@ -2620,21 +2631,14 @@ router.delete('/:id', authenticate, async (req, res) => {
       // Within free-cancel window
       cancellationCharge = policy.cancellationCharge || 100;
 
-      // Admin/super_admin can cancel without penalty — only customers must pay and upload proof
-      if (!isAdminCancellation && !booking.cancellationPenaltyPaid) {
-        // Mark booking as awaiting penalty payment
-        booking.pendingCancellation = true;
-        booking.cancellationReason = req.body.reason || 'Cancellation requested by customer';
-        await booking.save();
-
-        const paymentSettings = settings?.payment || {};
-        return res.status(402).json({
-          requiresPenaltyPayment: true,
-          penaltyAmount: cancellationCharge,
-          upiId: paymentSettings.upiId || 'healthyhomez@upi',
-          upiName: paymentSettings.upiName || 'Healthy Homez',
-          qrCodeImage: paymentSettings.qrCodeImage || null,
-          message: `A cancellation fee of ₹${cancellationCharge} applies. Please pay and upload the payment proof to confirm cancellation.`
+      // Customers cannot cancel within the free-cancel window — hard block
+      if (!isAdminCancellation) {
+        return res.status(403).json({
+          cannotCancel: true,
+          cancellationCharge,
+          error: {
+            message: `Cancellations are not allowed within ${freeWindowMinutes} minutes of the service start time. Please contact support if you need assistance. A ₹${cancellationCharge} cancellation charge may apply.`
+          }
         });
       }
 
