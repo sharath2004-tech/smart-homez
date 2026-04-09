@@ -645,7 +645,7 @@ export const bookingsAPI = {
     });
     const data = await response.json();
     if (response.status === 402) {
-      // Penalty payment required — return the data so the caller can show the payment panel
+      // Penalty payment required — return data so the caller can show the payment modal
       return { ...data, requiresPenaltyPayment: true };
     }
     if (!response.ok) {

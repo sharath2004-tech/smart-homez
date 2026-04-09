@@ -5,7 +5,7 @@ import WorkerTrackingMap from "@/components/WorkerTrackingMap";
 import { Badge } from "@/components/ui/badge";
 import { useConfirm } from "@/hooks/useConfirm";
 import { authAPI, bookingsAPI } from "@/lib/api";
-import { Calendar, CalendarPlus, Clock, MapPin, Phone, QrCode, RefreshCw, Star } from "lucide-react";
+import { AlertTriangle, Calendar, CalendarPlus, Clock, MapPin, Phone, QrCode, RefreshCw, Star, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -91,6 +91,18 @@ const BookingsPage = () => {
   const [selectedWorkerProfile, setSelectedWorkerProfile] = useState<Worker | null>(null);
   const [reviewBooking, setReviewBooking] = useState<Booking | null>(null);
 
+  // Penalty payment state
+  interface PenaltyInfo {
+    bookingId: string;
+    penaltyAmount: number;
+    upiId: string;
+    upiName: string;
+    qrCodeImage: string | null;
+  }
+  const [penaltyInfo, setPenaltyInfo] = useState<PenaltyInfo | null>(null);
+  const [penaltyProofFile, setPenaltyProofFile] = useState<File | null>(null);
+  const [penaltySubmitting, setPenaltySubmitting] = useState(false);
+
   // Auto-open a booking detail when navigated here with state.openBookingId
   useEffect(() => {
     const state = routeLocation.state as { openBookingId?: string } | null;
@@ -153,11 +165,37 @@ const BookingsPage = () => {
     if (!await confirm(t('customer.bookings.cancelConfirm'))) return;
 
     try {
-      await bookingsAPI.cancel(bookingId);
+      const result = await bookingsAPI.cancel(bookingId);
+      if (result?.requiresPenaltyPayment) {
+        setPenaltyInfo({
+          bookingId,
+          penaltyAmount: result.penaltyAmount ?? 100,
+          upiId: result.upiId ?? 'healthyhomez@upi',
+          upiName: result.upiName ?? 'Healthy Homez',
+          qrCodeImage: result.qrCodeImage ?? null
+        });
+        return;
+      }
       await fetchBookings();
     } catch (error) {
       console.error('Error cancelling booking:', error);
       alert(error instanceof Error ? error.message : t('customer.bookings.failedCancel'));
+    }
+  };
+
+  const handleSubmitPenaltyProof = async () => {
+    if (!penaltyInfo || !penaltyProofFile) return;
+    setPenaltySubmitting(true);
+    try {
+      await bookingsAPI.submitCancelPenaltyProof(penaltyInfo.bookingId, penaltyProofFile);
+      setPenaltyInfo(null);
+      setPenaltyProofFile(null);
+      await fetchBookings();
+    } catch (error) {
+      console.error('Error submitting penalty proof:', error);
+      alert(error instanceof Error ? error.message : 'Failed to submit payment proof');
+    } finally {
+      setPenaltySubmitting(false);
     }
   };
 
@@ -548,6 +586,89 @@ const BookingsPage = () => {
         worker={selectedWorkerProfile}
       />
 
+      {/* Penalty Payment Modal */}
+      {penaltyInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-background rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5">
+            {/* Header */}
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-destructive" />
+                <h2 className="text-lg font-bold text-foreground">Cancellation Fee Required</h2>
+              </div>
+              <button
+                onClick={() => { setPenaltyInfo(null); setPenaltyProofFile(null); }}
+                className="p-1 hover:bg-muted rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </div>
+
+            {/* Notice */}
+            <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4">
+              <p className="text-sm text-foreground">
+                This booking is within the cancellation window. A fee of{' '}
+                <span className="font-bold text-destructive">₹{penaltyInfo.penaltyAmount}</span>{' '}
+                must be paid before the cancellation is confirmed.
+              </p>
+            </div>
+
+            {/* Payment Details */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-muted rounded-xl text-sm">
+                <span className="text-muted-foreground">UPI ID</span>
+                <span className="font-semibold text-foreground select-all">{penaltyInfo.upiId}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted rounded-xl text-sm">
+                <span className="text-muted-foreground">Pay To</span>
+                <span className="font-semibold text-foreground">{penaltyInfo.upiName}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-primary/10 border border-primary/30 rounded-xl text-sm">
+                <span className="text-muted-foreground">Amount</span>
+                <span className="font-bold text-primary text-base">₹{penaltyInfo.penaltyAmount}</span>
+              </div>
+            </div>
+
+            {/* QR Code */}
+            {penaltyInfo.qrCodeImage && (
+              <div className="flex flex-col items-center gap-2">
+                <p className="text-xs text-muted-foreground">Scan to pay</p>
+                <img
+                  src={penaltyInfo.qrCodeImage}
+                  alt="Payment QR Code"
+                  className="w-40 h-40 rounded-xl border border-border object-contain"
+                />
+              </div>
+            )}
+
+            {/* Upload Proof */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-foreground">Upload Payment Screenshot</p>
+              <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-border rounded-xl p-4 cursor-pointer hover:border-primary transition-colors">
+                <Upload className="w-6 h-6 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">
+                  {penaltyProofFile ? penaltyProofFile.name : 'Tap to select screenshot'}
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => setPenaltyProofFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+            </div>
+
+            {/* Submit */}
+            <button
+              onClick={handleSubmitPenaltyProof}
+              disabled={!penaltyProofFile || penaltySubmitting}
+              className="w-full py-3 bg-destructive text-destructive-foreground rounded-xl font-semibold text-sm hover:bg-destructive/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {penaltySubmitting ? 'Processing…' : 'Submit Proof & Confirm Cancellation'}
+            </button>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 };

@@ -2631,14 +2631,20 @@ router.delete('/:id', authenticate, async (req, res) => {
       // Within free-cancel window
       cancellationCharge = policy.cancellationCharge || 100;
 
-      // Customers cannot cancel within the free-cancel window — hard block
-      if (!isAdminCancellation) {
-        return res.status(403).json({
-          cannotCancel: true,
-          cancellationCharge,
-          error: {
-            message: `Cancellations are not allowed within ${freeWindowMinutes} minutes of the service start time. Please contact support if you need assistance. A ₹${cancellationCharge} cancellation charge may apply.`
-          }
+      // Customers must pay the cancellation charge before cancelling within the window
+      if (!isAdminCancellation && !booking.cancellationPenaltyPaid) {
+        booking.pendingCancellation = true;
+        booking.cancellationReason = req.body.reason || 'Cancellation requested by customer';
+        await booking.save();
+
+        const paymentSettings = settings?.payment || {};
+        return res.status(402).json({
+          requiresPenaltyPayment: true,
+          penaltyAmount: cancellationCharge,
+          upiId: paymentSettings.upiId || 'healthyhomez@upi',
+          upiName: paymentSettings.upiName || 'Healthy Homez',
+          qrCodeImage: paymentSettings.qrCodeImage || null,
+          message: `A cancellation fee of ₹${cancellationCharge} applies. Please pay and upload the payment proof to confirm cancellation.`
         });
       }
 
