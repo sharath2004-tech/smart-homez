@@ -148,9 +148,12 @@ mongoose.connect(process.env.MONGODB_URI)
     // One-time migration: unset email:null so sparse unique index works correctly.
     // Documents with email:null bypass the sparse index and cause E11000 errors.
     try {
-      const result = await User.updateMany({ email: null }, { $unset: { email: 1 } });
+      const result = await User.updateMany(
+        { $or: [{ email: null }, { email: '' }] },
+        { $unset: { email: 1 } }
+      );
       if (result.modifiedCount > 0) {
-        console.log(`🔧 Fixed ${result.modifiedCount} user(s) with email:null → email field removed`);
+        console.log(`🔧 Fixed ${result.modifiedCount} user(s) with email:null/empty → email field removed`);
       }
     } catch (err) {
       console.warn('⚠️  email:null migration warning:', err.message);
