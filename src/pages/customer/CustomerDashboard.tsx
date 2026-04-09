@@ -812,7 +812,7 @@ const CustomerDashboard = () => {
               ✨
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-green-900 text-sm leading-tight">Move In / Move Out — Commercial &amp; Residential</p>
+              <p className="font-bold text-green-900 text-sm leading-tight">Post Construction — Commercial &amp; Residential</p>
               <p className="text-xs text-green-700 mt-0.5">Get a custom quote for villas, offices, restaurants, bungalows and handover cleaning.</p>
             </div>
             <span className="shrink-0 text-xs font-semibold bg-green-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">Get Quote</span>
