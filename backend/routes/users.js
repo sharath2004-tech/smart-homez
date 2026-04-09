@@ -3,6 +3,7 @@ import { authenticate, authorize } from '../middleware/auth.js';
 import Booking from '../models/Booking.js';
 import Location from '../models/Location.js';
 import User from '../models/User.js';
+import WorkerEarnings from '../models/WorkerEarnings.js';
 import { calculateDistance } from '../utils/geolocation.js';
 import { getWorkerPerformance } from '../utils/updateWorkerStats.js';
 import { evaluateWorkerEffectiveAvailability, isWorkerEligibleForAssignment } from '../utils/workerAvailability.js';
@@ -89,8 +90,37 @@ router.get('/', authenticate, authorize('admin'), async (req, res) => {
 
     const count = await User.countDocuments(query);
 
+    // Enrich worker records with live stats from Bookings + WorkerEarnings
+    let enrichedUsers = users;
+    if (role === 'worker' && users.length > 0) {
+      const workerIds = users.map(u => u._id);
+
+      const [jobsAgg, earningsAgg] = await Promise.all([
+        Booking.aggregate([
+          { $match: { worker: { $in: workerIds }, status: 'completed' } },
+          { $group: { _id: '$worker', count: { $sum: 1 } } }
+        ]),
+        WorkerEarnings.aggregate([
+          { $match: { worker: { $in: workerIds } } },
+          { $group: { _id: '$worker', total: { $sum: '$netEarning' } } }
+        ])
+      ]);
+
+      const jobsMap = new Map(jobsAgg.map(r => [r._id.toString(), r.count]));
+      const earningsMap = new Map(earningsAgg.map(r => [r._id.toString(), r.total]));
+
+      enrichedUsers = users.map(u => {
+        const obj = u.toObject();
+        if (obj.workerProfile) {
+          obj.workerProfile.completedJobs = jobsMap.get(u._id.toString()) || 0;
+          obj.workerProfile.totalEarnings = Math.round((earningsMap.get(u._id.toString()) || 0) * 100) / 100;
+        }
+        return obj;
+      });
+    }
+
     res.json({
-      users,
+      users: enrichedUsers,
       totalPages: Math.ceil(count / limitNum),
       currentPage: pageNum,
       totalUsers: count

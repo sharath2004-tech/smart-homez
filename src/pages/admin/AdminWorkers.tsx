@@ -31,6 +31,7 @@ interface Worker {
     languages?: string[];
     rating: number;
     completedJobs: number;
+    totalBookingsCompleted?: number;
     totalEarnings: number;
     availability: boolean;
     manualAvailability?: boolean;
@@ -1008,14 +1009,14 @@ const AdminWorkers = () => {
                       )}
                     </div>
                     <div className="text-center">
-                      <p className="text-sm font-bold text-foreground">{w.workerProfile?.completedJobs || 0}</p>
+                      <p className="text-sm font-bold text-foreground">{w.workerProfile?.completedJobs ?? w.workerProfile?.totalBookingsCompleted ?? 0}</p>
                       <p className="text-xs text-muted-foreground">Jobs</p>
                       <p className="text-xs text-green-600">
                         {w.workerProfile?.rating && w.workerProfile.rating >= 4 ? '🔥 Top Performer' : ''}
                       </p>
                     </div>
                     <div className="text-center">
-                      <p className="text-sm font-bold text-foreground">₹{w.workerProfile?.totalEarnings || 0}</p>
+                      <p className="text-sm font-bold text-foreground">₹{w.workerProfile?.totalEarnings ?? 0}</p>
                       <p className="text-xs text-muted-foreground">Earned</p>
                       <p className="text-xs text-purple-600">
                         {isWorkerEffectivelyOnline(w) ? '🟢 Online' : '🔴 Offline'}

@@ -143,12 +143,17 @@ const settingsSchema = new mongoose.Schema({
     }
   },
 
-  // Cancellation Policy (REQ-C-010: Free cancellation up to 1 hour before)
+  // Cancellation Policy (REQ-C-010: Free cancellation up to 20 min before)
   cancellationPolicy: {
-    // Hours before booking to get full refund (FREE cancellation)
+    // Minutes before booking start to get full refund (FREE cancellation)
+    freeCancellationMinutes: {
+      type: Number,
+      default: 20 // 20 minutes before = FREE cancellation
+    },
+    // Legacy field kept for backward compatibility
     fullRefundHours: {
       type: Number,
-      default: 1 // 1 hour before = FREE cancellation
+      default: 1
     },
     // Refund percentage if cancelled < fullRefundHours
     partialRefundPercentage: {

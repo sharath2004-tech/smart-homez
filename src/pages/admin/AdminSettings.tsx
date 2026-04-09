@@ -45,6 +45,7 @@ interface Settings {
     };
   };
   cancellationPolicy: {
+    freeCancellationMinutes: number;
     fullRefundHours: number;
     partialRefundPercentage: number;
     partialRefundHours: number;
@@ -92,6 +93,7 @@ const createDefaultSettings = (): Settings => ({
     }
   },
   cancellationPolicy: {
+    freeCancellationMinutes: 20,
     fullRefundHours: 1,
     partialRefundPercentage: 0,
     partialRefundHours: 0.5,
@@ -763,13 +765,13 @@ const AdminSettings = () => {
               </div>
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Full Refund Window (hours before booking)</label>
-                  <input type="number" min="0" step="0.5"
-                    value={settings.cancellationPolicy.fullRefundHours}
-                    onChange={(e) => setSettings(prev => ({ ...prev, cancellationPolicy: { ...prev.cancellationPolicy, fullRefundHours: parseFloat(e.target.value) || 0 } }))}
+                  <label className="block text-sm font-medium text-foreground mb-2">Free Cancellation Window (minutes before booking)</label>
+                  <input type="number" min="0" step="1"
+                    value={settings.cancellationPolicy.freeCancellationMinutes}
+                    onChange={(e) => setSettings(prev => ({ ...prev, cancellationPolicy: { ...prev.cancellationPolicy, freeCancellationMinutes: parseInt(e.target.value) || 0 } }))}
                     className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Customer gets 100% refund if cancelled before this window</p>
+                  <p className="text-xs text-muted-foreground mt-1">Customer gets 100% refund if cancelled before this window (e.g. 20 = free if 20+ min before start)</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">Cancellation Charge (₹)</label>

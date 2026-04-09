@@ -634,10 +634,24 @@ export const bookingsAPI = {
   },
 
   cancel: async (id: string, reason?: string) => {
-    return apiCall(`/bookings/${id}`, {
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/bookings/${id}`, {
       method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` })
+      },
       body: JSON.stringify({ reason })
     });
+    const data = await response.json();
+    if (response.status === 402) {
+      // Penalty payment required — return the data so the caller can show the payment panel
+      return { ...data, requiresPenaltyPayment: true };
+    }
+    if (!response.ok) {
+      throw new Error(data.error?.message || data.message || 'Failed to cancel booking');
+    }
+    return data;
   },
 
   reschedule: async (id: string, newDate: string, newTime: string) => {
@@ -651,6 +665,27 @@ export const bookingsAPI = {
     return apiCall(`/bookings/${id}/retry-assignment`, {
       method: 'POST'
     });
+  },
+
+  workerCancel: async (id: string, reason?: string) => {
+    return apiCall(`/bookings/${id}/worker-cancel`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reason })
+    });
+  },
+
+  submitCancelPenaltyProof: async (id: string, file: File) => {
+    const token = getAuthToken();
+    const formData = new FormData();
+    formData.append('penaltyProof', file);
+    const response = await fetch(`${API_BASE_URL}/bookings/${id}/cancel-penalty-proof`, {
+      method: 'PATCH',
+      headers: { ...(token && { Authorization: `Bearer ${token}` }) },
+      body: formData
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error?.message || 'Failed to submit penalty proof');
+    return data;
   },
 
   getUpcoming: async () => {

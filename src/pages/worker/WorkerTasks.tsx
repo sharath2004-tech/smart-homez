@@ -1,9 +1,10 @@
 import AppLayout from "@/components/AppLayout";
 import { useConfirm } from "@/hooks/useConfirm";
 import { authAPI, bookingsAPI, workersAPI } from "@/lib/api";
-import { Calendar, CheckCircle, Clock, MapPin, Package, User } from "lucide-react";
+import { Calendar, CheckCircle, Clock, MapPin, Package, User, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import TaskDetailModal from "./TaskDetailModal";
 
 interface Task {
@@ -71,6 +72,7 @@ const WorkerTasks = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"current" | "upcoming" | "completed">("current");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTasks();
@@ -123,6 +125,21 @@ const WorkerTasks = () => {
         console.error('Error completing task:', error);
         alert('Failed to complete task');
       }
+    }
+  };
+
+  const handleCancelAssignment = async (taskId: string) => {
+    if (!(await confirm('Cancel your assignment for this booking? Admin will be notified and the booking will be reassigned.'))) return;
+    setCancellingId(taskId);
+    try {
+      const result = await bookingsAPI.workerCancel(taskId);
+      toast.warning(result.message || 'Assignment cancelled.');
+      await fetchTasks();
+    } catch (error) {
+      console.error('Error cancelling assignment:', error);
+      toast.error('Failed to cancel assignment. Please try again.');
+    } finally {
+      setCancellingId(null);
     }
   };
 
@@ -214,10 +231,20 @@ const WorkerTasks = () => {
             </div>
           </div>
 
-          <div className="pt-2 border-t border-border">
+          <div className="pt-2 border-t border-border flex items-center justify-between gap-2">
             <p className="text-xs text-primary font-medium">
               👆 {t('worker.tasks.tapToViewDetails')}
             </p>
+            {(task.status === 'confirmed' || task.status === 'pending') && activeTab === 'upcoming' && (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleCancelAssignment(task._id); }}
+                disabled={cancellingId === task._id}
+                className="flex items-center gap-1 text-xs text-destructive font-medium hover:text-destructive/80 disabled:opacity-50 transition-colors"
+              >
+                <XCircle className="w-3.5 h-3.5" />
+                {cancellingId === task._id ? 'Cancelling…' : 'Cancel Assignment'}
+              </button>
+            )}
           </div>
         </div>
       </div>

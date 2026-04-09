@@ -2584,10 +2584,13 @@ router.delete('/:id', authenticate, async (req, res) => {
     // Get cancellation policy from settings
     const settings = await Settings.findOne();
     const policy = settings?.cancellationPolicy || {
-      fullRefundHours: 1,
+      freeCancellationMinutes: 20,
       cancellationCharge: 100,
       partialRefundPercentage: 0
     };
+
+    // Free-cancel window in minutes (use freeCancellationMinutes, fall back to legacy fullRefundHours * 60)
+    const freeWindowMinutes = policy.freeCancellationMinutes ?? ((policy.fullRefundHours ?? 1) * 60);
 
     // Calculate time difference
     // booking.scheduledDate does not exist on the schema; derive from bookingDate + startTime
@@ -2601,7 +2604,7 @@ router.delete('/:id', authenticate, async (req, res) => {
       scheduledTime = new Date(bookingDateObj);
       scheduledTime.setHours(startH, startM, 0, 0);
     }
-    const hoursUntilBooking = (scheduledTime - now) / (1000 * 60 * 60);
+    const minutesUntilBooking = (scheduledTime - now) / 60000;
 
     // Calculate refund based on policy
     let refundAmount = 0;
@@ -2611,17 +2614,36 @@ router.delete('/:id', authenticate, async (req, res) => {
 
     const bookingAmount = booking.totalAmount || 0;
 
-    if (hoursUntilBooking >= policy.fullRefundHours) {
+    if (minutesUntilBooking >= freeWindowMinutes) {
       // FREE cancellation - Full refund
       refundAmount = bookingAmount;
       refundPercentage = 100;
-      refundReason = `Free cancellation (${hoursUntilBooking.toFixed(1)} hours before booking)`;
-    } else if (hoursUntilBooking > 0) {
-      // Within 1-hour window - Apply cancellation charge
+      refundReason = `Free cancellation (${Math.round(minutesUntilBooking)} minutes before booking)`;
+    } else if (minutesUntilBooking > 0) {
+      // Within free-cancel window — gate on penalty payment proof
       cancellationCharge = policy.cancellationCharge || 100;
+
+      // If penalty proof has not been submitted yet, pause cancellation and ask for it
+      if (!booking.cancellationPenaltyPaid) {
+        // Mark booking as awaiting penalty payment
+        booking.pendingCancellation = true;
+        booking.cancellationReason = req.body.reason || 'Cancellation requested by customer';
+        await booking.save();
+
+        const paymentSettings = settings?.payment || {};
+        return res.status(402).json({
+          requiresPenaltyPayment: true,
+          penaltyAmount: cancellationCharge,
+          upiId: paymentSettings.upiId || 'healthyhomez@upi',
+          upiName: paymentSettings.upiName || 'Healthy Homez',
+          qrCodeImage: paymentSettings.qrCodeImage || null,
+          message: `A cancellation fee of ₹${cancellationCharge} applies. Please pay and upload the payment proof to confirm cancellation.`
+        });
+      }
+
       refundAmount = Math.max(0, bookingAmount - cancellationCharge);
-      refundPercentage = (refundAmount / bookingAmount) * 100;
-      refundReason = `Cancellation within 1-hour window. ₹${cancellationCharge} charge applied.`;
+      refundPercentage = bookingAmount > 0 ? (refundAmount / bookingAmount) * 100 : 0;
+      refundReason = `Cancellation within ${freeWindowMinutes}-minute window. ₹${cancellationCharge} charge applied.`;
     } else {
       // Booking has already started - No refund
       refundAmount = 0;
@@ -6037,3 +6059,164 @@ router.get('/worker/my-subscriptions', authenticate, authorize('worker'), async 
 });
 
 export default router;
+
+// @route   PATCH /api/bookings/:id/worker-cancel
+// @desc    Worker cancels their assignment on a booking (no penalty; admin is notified).
+// @access  Private/Worker
+router.patch('/:id/worker-cancel', authenticate, authorize('worker'), async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id)
+      .populate('customer', 'name email phone')
+      .populate('service', 'name');
+
+    if (!booking) {
+      return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
+    }
+
+    // Only the assigned worker may cancel
+    if (!booking.worker || booking.worker.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: { message: 'You are not assigned to this booking', status: 403 } });
+    }
+
+    if (['completed', 'cancelled', 'in-progress'].includes(booking.status)) {
+      return res.status(400).json({ error: { message: `Cannot cancel a ${booking.status} booking`, status: 400 } });
+    }
+
+    // Unassign worker and set booking back to pending for reassignment
+    booking.worker = null;
+    booking.status = 'pending';
+    booking.cancellationReason = req.body.reason || 'Worker cancelled assignment';
+    await booking.save();
+
+    // Notify admin
+    try {
+      await notificationService.createNotification({
+        recipient: null,
+        recipientRole: 'admin',
+        type: 'booking_update',
+        title: 'Worker Cancelled Booking',
+        message: `Worker ${req.user.name} cancelled booking #${booking._id.toString().slice(-6).toUpperCase()}. Customer: ${booking.customer?.name || 'N/A'}`,
+        data: { bookingId: booking._id }
+      });
+    } catch {
+      // non-fatal
+    }
+
+    res.json({
+      success: true,
+      message: 'Booking assignment cancelled successfully.'
+    });
+  } catch (error) {
+    console.error('Worker cancel booking error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   PATCH /api/bookings/:id/cancel-penalty-proof
+// @desc    Customer submits penalty payment proof to confirm early cancellation
+// @access  Private/Customer
+router.patch('/:id/cancel-penalty-proof',
+  authenticate,
+  (req, res, next) => {
+    upload.single('penaltyProof')(req, res, (err) => {
+      if (err) return handleMulterError(err, req, res, next);
+      next();
+    });
+  },
+  async (req, res) => {
+    try {
+      const booking = await Booking.findById(req.params.id)
+        .populate('customer', 'name email phone')
+        .populate('service', 'name');
+
+      if (!booking) {
+        return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
+      }
+
+      // Only the booking customer may submit
+      if (booking.customer._id.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ error: { message: 'Forbidden', status: 403 } });
+      }
+
+      if (!booking.pendingCancellation) {
+        return res.status(400).json({ error: { message: 'This booking does not have a pending cancellation', status: 400 } });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: { message: 'Payment proof image is required', status: 400 } });
+      }
+
+      // Build file URL (same pattern as other proof uploads)
+      const proofUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+
+      // Load cancellation policy to finalize refund calculation
+      const settings = await Settings.findOne();
+      const policy = settings?.cancellationPolicy || { freeCancellationMinutes: 20, cancellationCharge: 100 };
+      const cancellationCharge = policy.cancellationCharge || 100;
+      const bookingAmount = booking.totalAmount || 0;
+      const refundAmount = Math.max(0, bookingAmount - cancellationCharge);
+      const refundPercentage = bookingAmount > 0 ? (refundAmount / bookingAmount) * 100 : 0;
+      const freeWindowMinutes = policy.freeCancellationMinutes ?? ((policy.fullRefundHours ?? 1) * 60);
+
+      const now = new Date();
+
+      // Complete the cancellation now that proof is supplied
+      booking.cancellationPenaltyProof = proofUrl;
+      booking.cancellationPenaltyPaid = true;
+      booking.pendingCancellation = false;
+      booking.status = 'cancelled';
+      booking.cancellationDate = now;
+      booking.refund = {
+        amount: refundAmount,
+        percentage: refundPercentage,
+        reason: `Cancellation within ${freeWindowMinutes}-minute window. ₹${cancellationCharge} charge applied. Penalty proof uploaded.`,
+        processedAt: refundAmount > 0 ? now : null,
+        status: refundAmount > 0 ? 'processed' : 'not-applicable'
+      };
+
+      await booking.save();
+
+      // Trigger queue for freed slot
+      processQueuedBookings(booking.location?.locationId).catch(err =>
+        console.error('Queue processing error after penalised cancellation:', err.message)
+      );
+
+      // Notify customer
+      await notificationService.sendTemplatedNotification(
+        booking.customer._id,
+        'BOOKING_CANCELLED',
+        {
+          bookingId: booking._id,
+          serviceName: booking.service?.name ?? 'Service',
+          reason: booking.cancellationReason
+        }
+      );
+
+      // Notify worker if assigned
+      if (booking.worker) {
+        await notificationService.sendNotification({
+          userId: booking.worker,
+          type: 'cancellation',
+          title: '❌ Booking Cancelled',
+          message: `Customer cancelled booking for ${booking.service?.name ?? 'Service'} after paying ₹${cancellationCharge} penalty.`,
+          priority: 'medium',
+          data: { bookingId: booking._id }
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Cancellation confirmed after penalty payment.',
+        booking,
+        refund: {
+          amount: refundAmount,
+          percentage: refundPercentage,
+          cancellationCharge
+        }
+      });
+    } catch (error) {
+      console.error('Cancel penalty proof error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);

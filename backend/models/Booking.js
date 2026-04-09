@@ -470,6 +470,19 @@ const bookingSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  // Penalty payment gate for early cancellation
+  pendingCancellation: {
+    type: Boolean,
+    default: false
+  },
+  cancellationPenaltyProof: {
+    type: String,
+    default: null  // URL of uploaded penalty payment screenshot
+  },
+  cancellationPenaltyPaid: {
+    type: Boolean,
+    default: false
+  },
   // Refund information (REQ-C-010)
   refund: {
     amount: {
