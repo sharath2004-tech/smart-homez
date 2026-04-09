@@ -36,7 +36,6 @@ import {
     timeRangesOverlap,
 } from '../utils/subscriptionScheduling.js';
 import { checkIfOnTime, updateWorkerStats } from '../utils/updateWorkerStats.js';
-import { sendWhatsAppMessage } from '../utils/whatsappService.js';
 import { assignWorkerToBooking, reassignWorker } from '../utils/workerAssignment.js';
 import {
     getWorkerBlockedTimeRanges,
@@ -2169,31 +2168,6 @@ router.post('/',
 
       await booking.save();
 
-      // Send WhatsApp booking confirmation to customer (non-blocking)
-      try {
-        const customerUser = await User.findById(req.user._id).select('phone name').lean();
-        if (customerUser?.phone) {
-          const bookingDate_ = booking.bookingDate
-            ? new Date(booking.bookingDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-            : '';
-          const bookingTime_ = booking.startTime || '';
-          const serviceName_ = booking.serviceDetails?.name || booking.bookingType || 'Service';
-          const bookingId_ = String(booking._id).slice(-6).toUpperCase();
-          sendWhatsAppMessage({
-            phone: customerUser.phone,
-            templateKey: 'BOOKING_CONFIRMED',
-            variables: {
-              serviceName: serviceName_,
-              date: bookingDate_,
-              time: bookingTime_,
-              bookingId: bookingId_,
-            },
-          }).catch((e) => console.warn('⚠️ WhatsApp booking confirmation failed:', e.message));
-        }
-      } catch (waErr) {
-        console.warn('⚠️ WhatsApp notification skipped:', waErr.message);
-      }
-
       // Always attempt auto-assignment unless explicitly disabled (autoAssign !== false)
       // This ensures workers are automatically assigned when available nearby
       // Uses advanced assignment system with primary + 2 backup workers
@@ -2375,7 +2349,7 @@ router.post('/',
           .populate('service', 'name description price duration allowBreakRequests');
       }
 
-      // Send in-app notification now that booking status is final
+      // Send in-app + WhatsApp notification now that booking status is final
       if (booking.status === 'confirmed') {
         const svcName = booking.serviceDetails?.name || booking.bookingType || 'Service';
         const bookingDateStr = booking.bookingDate
@@ -2387,7 +2361,12 @@ router.post('/',
           title: '✅ Booking Confirmed',
           message: `Your booking for ${svcName} on ${bookingDateStr} at ${booking.startTime} is confirmed.`,
           priority: 'high',
-          data: { bookingId: booking._id }
+          data: {
+            bookingId: String(booking._id).slice(-6).toUpperCase(),
+            serviceName: svcName,
+            date: bookingDateStr,
+            time: booking.startTime || '',
+          }
         }).catch(err => console.error('Booking confirmed notification error:', err.message));
       }
 
