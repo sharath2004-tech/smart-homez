@@ -6202,8 +6202,8 @@ router.patch('/:id/cancel-penalty-proof',
         return res.status(400).json({ error: { message: 'Payment proof image is required', status: 400 } });
       }
 
-      // Build file URL (same pattern as other proof uploads)
-      const proofUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+      // Build file path (relative, consistent with other proof uploads)
+      const proofUrl = `/uploads/${req.file.filename}`;
 
       // Save proof — do NOT cancel yet. Admin must review and approve first.
       booking.cancellationPenaltyProof = proofUrl;

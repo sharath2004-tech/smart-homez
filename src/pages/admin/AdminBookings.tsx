@@ -227,7 +227,8 @@ const AdminBookings = () => {
       (b.customer?.name || '').toLowerCase().includes(search.toLowerCase()) ||
       b._id.toLowerCase().includes(search.toLowerCase()) ||
       serviceName.toLowerCase().includes(search.toLowerCase());
-    const matchFilter = filter === "all" || b.status === filter;
+    const matchFilter = filter === "all"
+      || (filter === "pending-cancellation" ? (b.pendingCancellation === true && b.cancellationPenaltyReviewStatus === 'pending_review') : b.status === filter);
 
     // Worker filter
     const matchWorker = !selectedWorker || b.worker?._id === selectedWorker;
@@ -332,7 +333,7 @@ const AdminBookings = () => {
     )
   );
 
-  const hasProofs = (b: Booking) => !!(b.completionPhoto?.url || getPaymentProofs(b).length > 0 || (b.completionPhotos && b.completionPhotos.length > 0));
+  const hasProofs = (b: Booking) => !!(b.completionPhoto?.url || getPaymentProofs(b).length > 0 || (b.completionPhotos && b.completionPhotos.length > 0) || !!b.cancellationPenaltyProof);
 
   const handleApproveBooking = async (bookingId: string) => {
     try {
@@ -922,6 +923,10 @@ const AdminBookings = () => {
       return true;
     }
 
+    if (booking.pendingCancellation && !!booking.cancellationPenaltyProof) {
+      return true;
+    }
+
     if (canReviewPaymentProof(booking)) {
       return true;
     }
@@ -1008,6 +1013,7 @@ const AdminBookings = () => {
               <option value="pending-review">Pending Review</option>
               <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
+              <option value="pending-cancellation">⚠️ Pending Cancellation</option>
             </select>
           </div>
 
@@ -1138,13 +1144,15 @@ const AdminBookings = () => {
                               setSelectedProofBooking(b);
                             }}
                             className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors ${
-                              hasProofs(b)
-                                ? getPaymentReviewStatus(b) === 'pending' ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                                : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                              b.pendingCancellation && b.cancellationPenaltyProof && b.cancellationPenaltyReviewStatus === 'pending_review'
+                                ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                                : hasProofs(b)
+                                  ? getPaymentReviewStatus(b) === 'pending' ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                  : 'bg-muted text-muted-foreground hover:bg-muted/70'
                             }`}
                           >
                             <Eye className="w-3.5 h-3.5" />
-                            {canReviewPaymentProof(b) && getPaymentReviewStatus(b) === 'pending' ? '💳 Review Payment' : (
+                            {b.pendingCancellation && b.cancellationPenaltyProof && b.cancellationPenaltyReviewStatus === 'pending_review' ? '⚠️ Review Cancel' : canReviewPaymentProof(b) && getPaymentReviewStatus(b) === 'pending' ? '💳 Review Payment' : (
                               hasProofs(b) ? (
                                 <span>
                                   {[
