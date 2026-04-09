@@ -317,7 +317,7 @@ const AdminSettings = () => {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">Application Settings</h1>
-          <p className="text-muted-foreground">Configure payment, company, booking{isSuperAdmin ? ', earnings, subscriptions, and cancellation policy' : ', and booking settings'}</p>
+          <p className="text-muted-foreground">Configure payment, company, booking{isSuperAdmin ? ', earnings, subscriptions, and' : ' and'} cancellation policy settings</p>
         </div>
 
         <div className="grid gap-6">
@@ -748,68 +748,65 @@ const AdminSettings = () => {
             </div>
           )}
 
-          {/* Super Admin Only: Cancellation Policy */}
-          {isSuperAdmin && (
-            <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-amber-200">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-amber-600" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-xl font-bold text-foreground">Cancellation Policy</h2>
-                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Super Admin Only</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">Refund windows and cancellation charges</p>
-                </div>
+          {/* Cancellation Policy — editable by admin and super_admin */}
+          <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-amber-200">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                <FileText className="w-5 h-5 text-amber-600" />
               </div>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Free Cancellation Window (minutes before booking)</label>
-                  <input type="number" min="0" step="1"
-                    value={settings.cancellationPolicy.freeCancellationMinutes}
-                    onChange={(e) => setSettings(prev => ({ ...prev, cancellationPolicy: { ...prev.cancellationPolicy, freeCancellationMinutes: parseInt(e.target.value) || 0 } }))}
-                    className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Customer gets 100% refund if cancelled before this window (e.g. 20 = free if 20+ min before start)</p>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-bold text-foreground">Cancellation Policy</h2>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Cancellation Charge (₹)</label>
-                  <input type="number" min="0"
-                    value={settings.cancellationPolicy.cancellationCharge}
-                    onChange={(e) => setSettings(prev => ({ ...prev, cancellationPolicy: { ...prev.cancellationPolicy, cancellationCharge: parseFloat(e.target.value) || 0 } }))}
-                    className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Flat fee charged if cancelled within full refund window</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Partial Refund Window (hours)</label>
-                  <input type="number" min="0" step="0.5"
-                    value={settings.cancellationPolicy.partialRefundHours}
-                    onChange={(e) => setSettings(prev => ({ ...prev, cancellationPolicy: { ...prev.cancellationPolicy, partialRefundHours: parseFloat(e.target.value) || 0 } }))}
-                    className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Partial Refund Percentage (%)</label>
-                  <input type="number" min="0" max="100"
-                    value={settings.cancellationPolicy.partialRefundPercentage}
-                    onChange={(e) => setSettings(prev => ({ ...prev, cancellationPolicy: { ...prev.cancellationPolicy, partialRefundPercentage: parseFloat(e.target.value) || 0 } }))}
-                    className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">No Refund Window (hours)</label>
-                  <input type="number" min="0" step="0.5"
-                    value={settings.cancellationPolicy.noRefundHours}
-                    onChange={(e) => setSettings(prev => ({ ...prev, cancellationPolicy: { ...prev.cancellationPolicy, noRefundHours: parseFloat(e.target.value) || 0 } }))}
-                    className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">No refund if cancelled within this many hours of booking</p>
-                </div>
+                <p className="text-sm text-muted-foreground">Refund windows and cancellation charges</p>
               </div>
             </div>
-          )}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Free Cancellation Window (minutes before booking)</label>
+                <input type="number" min="0" step="1"
+                  value={settings.cancellationPolicy.freeCancellationMinutes}
+                  onChange={(e) => setSettings(prev => ({ ...prev, cancellationPolicy: { ...prev.cancellationPolicy, freeCancellationMinutes: parseInt(e.target.value) || 0 } }))}
+                  className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Customer gets 100% refund if cancelled before this window (e.g. 20 = free if 20+ min before start)</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Cancellation Charge (₹)</label>
+                <input type="number" min="0"
+                  value={settings.cancellationPolicy.cancellationCharge}
+                  onChange={(e) => setSettings(prev => ({ ...prev, cancellationPolicy: { ...prev.cancellationPolicy, cancellationCharge: parseFloat(e.target.value) || 0 } }))}
+                  className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Flat fee charged if customer cancels within the free window</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Partial Refund Window (hours)</label>
+                <input type="number" min="0" step="0.5"
+                  value={settings.cancellationPolicy.partialRefundHours}
+                  onChange={(e) => setSettings(prev => ({ ...prev, cancellationPolicy: { ...prev.cancellationPolicy, partialRefundHours: parseFloat(e.target.value) || 0 } }))}
+                  className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Partial Refund Percentage (%)</label>
+                <input type="number" min="0" max="100"
+                  value={settings.cancellationPolicy.partialRefundPercentage}
+                  onChange={(e) => setSettings(prev => ({ ...prev, cancellationPolicy: { ...prev.cancellationPolicy, partialRefundPercentage: parseFloat(e.target.value) || 0 } }))}
+                  className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">No Refund Window (hours)</label>
+                <input type="number" min="0" step="0.5"
+                  value={settings.cancellationPolicy.noRefundHours}
+                  onChange={(e) => setSettings(prev => ({ ...prev, cancellationPolicy: { ...prev.cancellationPolicy, noRefundHours: parseFloat(e.target.value) || 0 } }))}
+                  className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <p className="text-xs text-muted-foreground mt-1">No refund if cancelled within this many hours of booking</p>
+              </div>
+            </div>
+          </div>
 
           {/* Save Button */}
           <div className="flex justify-end gap-3">

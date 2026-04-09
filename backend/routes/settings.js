@@ -282,7 +282,8 @@ router.put('/',
     body('subscriptions.workerPlans.premium.price').optional().isFloat({ min: 0 }),
     body('subscriptions.customerPlans.basic.price').optional().isFloat({ min: 0 }),
     body('subscriptions.customerPlans.premium.price').optional().isFloat({ min: 0 }),
-    // Cancellation Policy (super_admin only)
+    // Cancellation Policy (admin + super_admin)
+    body('cancellationPolicy.freeCancellationMinutes').optional().isFloat({ min: 0 }).withMessage('Free cancellation window must be non-negative'),
     body('cancellationPolicy.fullRefundHours').optional().isFloat({ min: 0 }).withMessage('Full refund hours must be non-negative'),
     body('cancellationPolicy.partialRefundPercentage').optional().isFloat({ min: 0, max: 100 }),
     body('cancellationPolicy.partialRefundHours').optional().isFloat({ min: 0 }),
@@ -303,13 +304,19 @@ router.put('/',
         booking: req.body.booking
       };
 
-      // Only super_admin can update earnings, subscriptions, and cancellation policy
+      // Only super_admin can update earnings and subscription pricing
+      // Both admin and super_admin can update cancellation policy
       if (req.user.role === 'super_admin') {
         if (req.body.earnings) updates.earnings = req.body.earnings;
         if (req.body.subscriptions) updates.subscriptions = req.body.subscriptions;
         if (req.body.cancellationPolicy) updates.cancellationPolicy = req.body.cancellationPolicy;
+      } else if (req.user.role === 'admin') {
+        if (req.body.cancellationPolicy) updates.cancellationPolicy = req.body.cancellationPolicy;
+        if (req.body.earnings || req.body.subscriptions) {
+          return res.status(403).json({ error: { message: 'Only super admins can update earnings and subscription pricing', status: 403 } });
+        }
       } else if (req.body.earnings || req.body.subscriptions || req.body.cancellationPolicy) {
-        return res.status(403).json({ error: { message: 'Only super admins can update earnings, subscription pricing, and cancellation policy', status: 403 } });
+        return res.status(403).json({ error: { message: 'Only admins can update cancellation policy, and only super admins can update earnings and subscription pricing', status: 403 } });
       }
 
       // Only super_admin can update overtime rate

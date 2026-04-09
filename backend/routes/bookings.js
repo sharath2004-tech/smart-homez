@@ -2630,17 +2630,19 @@ router.delete('/:id', authenticate, async (req, res) => {
 
     const bookingAmount = booking.totalAmount || 0;
 
+    const isAdminCancellation = req.user.role === 'admin' || req.user.role === 'super_admin';
+
     if (minutesUntilBooking >= freeWindowMinutes) {
       // FREE cancellation - Full refund
       refundAmount = bookingAmount;
       refundPercentage = 100;
       refundReason = `Free cancellation (${Math.round(minutesUntilBooking)} minutes before booking)`;
     } else if (minutesUntilBooking > 0) {
-      // Within free-cancel window — gate on penalty payment proof
+      // Within free-cancel window
       cancellationCharge = policy.cancellationCharge || 100;
 
-      // If penalty proof has not been submitted yet, pause cancellation and ask for it
-      if (!booking.cancellationPenaltyPaid) {
+      // Admin/super_admin can cancel without penalty — only customers must pay and upload proof
+      if (!isAdminCancellation && !booking.cancellationPenaltyPaid) {
         // Mark booking as awaiting penalty payment
         booking.pendingCancellation = true;
         booking.cancellationReason = req.body.reason || 'Cancellation requested by customer';
@@ -2657,9 +2659,16 @@ router.delete('/:id', authenticate, async (req, res) => {
         });
       }
 
-      refundAmount = Math.max(0, bookingAmount - cancellationCharge);
-      refundPercentage = bookingAmount > 0 ? (refundAmount / bookingAmount) * 100 : 0;
-      refundReason = `Cancellation within ${freeWindowMinutes}-minute window. ₹${cancellationCharge} charge applied.`;
+      if (isAdminCancellation) {
+        // Admin overrides — full refund issued to customer, no penalty deducted
+        refundAmount = bookingAmount;
+        refundPercentage = 100;
+        refundReason = `Cancelled by admin within ${freeWindowMinutes}-minute window. Full refund issued.`;
+      } else {
+        refundAmount = Math.max(0, bookingAmount - cancellationCharge);
+        refundPercentage = bookingAmount > 0 ? (refundAmount / bookingAmount) * 100 : 0;
+        refundReason = `Cancellation within ${freeWindowMinutes}-minute window. ₹${cancellationCharge} charge applied.`;
+      }
     } else {
       // Booking has already started - No refund
       refundAmount = 0;
