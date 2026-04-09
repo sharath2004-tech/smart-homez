@@ -368,6 +368,8 @@ const AdminBookings = () => {
     } catch (error) {
       console.error('Payment proof review error:', error);
       alert((error as Error).message || `Failed to ${action} payment proof`);
+    } finally {
+      setReviewingPaymentBookingId(null);
     }
   };
 
@@ -386,8 +388,6 @@ const AdminBookings = () => {
       alert((error as Error).message || `Failed to ${action} cancellation proof`);
     } finally {
       setReviewingCancelPenaltyId(null);
-    } finally {
-      setReviewingPaymentBookingId(null);
     }
   };
 
