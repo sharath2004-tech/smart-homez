@@ -55,7 +55,9 @@ export default function NotificationCenter({ userType }: NotificationCenterProps
     queryFn: async () => {
       const res = await api.get('/notifications');
       return res.notifications ?? [];
-    }
+    },
+    refetchInterval: 30000, // poll every 30 s for new notifications
+    refetchOnWindowFocus: true,
   });
 
   const markReadMutation = useMutation({

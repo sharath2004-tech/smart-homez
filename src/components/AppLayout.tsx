@@ -55,11 +55,16 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
   }, [storedUser]);
 
   useEffect(() => {
-    api.get('/notifications')
-      .then((res: { notifications: { isRead: boolean }[] }) => {
-        setUnreadCount(res.notifications?.filter((n) => !n.isRead).length ?? 0);
-      })
-      .catch(() => {});
+    const fetchUnread = () => {
+      api.get('/notifications')
+        .then((res: { notifications: { isRead: boolean }[] }) => {
+          setUnreadCount(res.notifications?.filter((n) => !n.isRead).length ?? 0);
+        })
+        .catch(() => {});
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 30000); // refresh badge every 30 s
+    return () => clearInterval(interval);
   }, [location.pathname]);
 
   // Business hours badge

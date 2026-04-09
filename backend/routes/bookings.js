@@ -2375,6 +2375,22 @@ router.post('/',
           .populate('service', 'name description price duration allowBreakRequests');
       }
 
+      // Send in-app notification now that booking status is final
+      if (booking.status === 'confirmed') {
+        const svcName = booking.serviceDetails?.name || booking.bookingType || 'Service';
+        const bookingDateStr = booking.bookingDate
+          ? new Date(booking.bookingDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+          : '';
+        notificationService.sendNotification({
+          userId: req.user._id,
+          type: 'booking-confirmed',
+          title: '✅ Booking Confirmed',
+          message: `Your booking for ${svcName} on ${bookingDateStr} at ${booking.startTime} is confirmed.`,
+          priority: 'high',
+          data: { bookingId: booking._id }
+        }).catch(err => console.error('Booking confirmed notification error:', err.message));
+      }
+
       res.status(201).json({ 
         message: 'Booking created successfully', 
         booking: populatedBooking 
@@ -4380,6 +4396,9 @@ router.post('/:id/payment-proof-review',
 
       await booking.save();
 
+      const serviceName = booking.service?.name || 'Service';
+      const bookingAmount = booking.totalAmount || 0;
+
       if (booking.subscription?.isSubscription) {
         await notificationService.sendNotification({
           userId: booking.customer._id,
@@ -4387,13 +4406,42 @@ router.post('/:id/payment-proof-review',
           title: action === 'approve' ? 'Subscription payment approved' : 'Subscription payment rejected',
           message: action === 'approve'
             ? (booking.subscription.activationStatus === 'active'
-                ? `Payment proof for ${booking.service?.name || 'your subscription'} was approved and the subscription is now active.`
-                : `Payment proof for ${booking.service?.name || 'your subscription'} was approved. Admin will complete worker and future schedule checks before activation.`)
-            : `Payment proof for ${booking.service?.name || 'your subscription'} was rejected.${trimmedReason ? ` Reason: ${trimmedReason}` : ''}`,
+                ? `We have received your payment of ₹${bookingAmount} for ${serviceName}. Thank you! Your subscription is now active.`
+                : `Payment of ₹${bookingAmount} for ${serviceName} was approved. Admin will finalise worker assignment before activation.`)
+            : `Payment proof for ${serviceName} was rejected.${trimmedReason ? ` Reason: ${trimmedReason}` : ''}`,
           priority: 'high',
           data: {
             bookingId: booking._id,
+            amount: bookingAmount,
+            serviceName,
             subscriptionStatus: booking.subscription.activationStatus || null,
+          }
+        });
+      } else if (action === 'approve') {
+        // Non-subscription: notify customer that payment has been verified
+        await notificationService.sendNotification({
+          userId: booking.customer._id,
+          type: 'payment',
+          title: '✅ Payment Verified',
+          message: `We have received your payment of ₹${bookingAmount} for ${serviceName}. Thank you! Your booking is now active.`,
+          priority: 'high',
+          data: {
+            bookingId: booking._id,
+            amount: bookingAmount,
+            serviceName,
+          }
+        });
+      } else {
+        // Non-subscription rejection
+        await notificationService.sendNotification({
+          userId: booking.customer._id,
+          type: 'payment',
+          title: '❌ Payment Proof Rejected',
+          message: `Your payment proof for ${serviceName} was rejected.${trimmedReason ? ` Reason: ${trimmedReason}` : ' Please re-upload a valid proof.'}`,
+          priority: 'high',
+          data: {
+            bookingId: booking._id,
+            serviceName,
           }
         });
       }
@@ -6088,14 +6136,29 @@ router.patch('/:id/worker-cancel', authenticate, authorize('worker'), async (req
     booking.cancellationReason = req.body.reason || 'Worker cancelled assignment';
     await booking.save();
 
-    // Notify admin
+    // Notify all admins/super-admins
     try {
-      await notificationService.createNotification({
-        recipient: null,
-        recipientRole: 'admin',
-        type: 'booking_update',
+      const admins = await User.find({ role: { $in: ['admin', 'super_admin'] }, isActive: true }).select('_id').lean();
+      await Promise.all(admins.map(admin => notificationService.sendNotification({
+        userId: admin._id,
+        type: 'booking',
         title: 'Worker Cancelled Booking',
         message: `Worker ${req.user.name} cancelled booking #${booking._id.toString().slice(-6).toUpperCase()}. Customer: ${booking.customer?.name || 'N/A'}`,
+        priority: 'high',
+        data: { bookingId: booking._id }
+      })));
+    } catch {
+      // non-fatal
+    }
+
+    // Notify customer their booking is now pending a new worker
+    try {
+      await notificationService.sendNotification({
+        userId: booking.customer._id,
+        type: 'booking',
+        title: '⏳ Booking Pending Re-assignment',
+        message: `Your assigned worker is no longer available. We are finding a replacement worker for your booking.`,
+        priority: 'high',
         data: { bookingId: booking._id }
       });
     } catch {
