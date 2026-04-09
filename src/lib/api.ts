@@ -1593,6 +1593,24 @@ export const settingsAPI = {
       method: 'PUT',
       body: JSON.stringify(settings)
     });
+  },
+
+  requestOvertimeRateChange: async (requestedRate: number, reason?: string) => {
+    return apiCall('/settings/overtime-rate-request', {
+      method: 'POST',
+      body: JSON.stringify({ requestedRate, reason })
+    });
+  },
+
+  getOvertimeRateRequests: async () => {
+    return apiCall('/settings/overtime-rate-requests');
+  },
+
+  reviewOvertimeRateRequest: async (requestId: string, approved: boolean, reviewNote?: string) => {
+    return apiCall(`/settings/overtime-rate-requests/${requestId}/review`, {
+      method: 'PUT',
+      body: JSON.stringify({ approved, reviewNote })
+    });
   }
 };
 

@@ -174,6 +174,19 @@ const settingsSchema = new mongoose.Schema({
     }
   },
 
+  // Overtime rate change requests (admin → super_admin approval flow)
+  overtimeRateRequests: [{
+    requestedRate: { type: Number, required: true, min: 0 },
+    requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    requestedByName: { type: String, default: '' },
+    reason: { type: String, default: '' },
+    status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    reviewNote: { type: String, default: '' },
+    requestedAt: { type: Date, default: Date.now },
+    reviewedAt: { type: Date, default: null }
+  }],
+
   // Last updated info
   updatedBy: {
     type: mongoose.Schema.Types.ObjectId,

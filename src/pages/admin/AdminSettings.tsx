@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { settingsAPI } from "@/lib/api";
 import { cropQRFromImage } from "@/utils/cropQRFromImage";
-import { Building, CreditCard, FileText, IndianRupee, Lock, Save, Upload } from "lucide-react";
+import { Building, CheckCircle, Clock, CreditCard, FileText, IndianRupee, Lock, Save, Upload, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -141,6 +141,17 @@ const mergeSettingsWithDefaults = (incoming?: Partial<Settings> | null): Setting
   };
 };
 
+interface OvertimeRateRequest {
+  _id: string;
+  requestedRate: number;
+  requestedByName: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewNote: string;
+  requestedAt: string;
+  reviewedAt: string | null;
+}
+
 const AdminSettings = () => {
   const navigate = useNavigate();
   const { role, name, isSuperAdmin } = useAdminRole();
@@ -148,10 +159,18 @@ const AdminSettings = () => {
   const [saving, setSaving] = useState(false);
   const [uploadingQR, setUploadingQR] = useState(false);
   const [settings, setSettings] = useState<Settings>(createDefaultSettings());
+  // Overtime rate request state
+  const [overtimeRequests, setOvertimeRequests] = useState<OvertimeRateRequest[]>([]);
+  const [requestedRate, setRequestedRate] = useState('');
+  const [requestReason, setRequestReason] = useState('');
+  const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSettings();
-  }, []);
+    fetchOvertimeRequests();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperAdmin]);
 
   const fetchSettings = async () => {
     try {
@@ -163,6 +182,52 @@ const AdminSettings = () => {
       alert('Failed to load settings');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchOvertimeRequests = async () => {
+    if (!isSuperAdmin) return;
+    try {
+      const res = await settingsAPI.getOvertimeRateRequests();
+      setOvertimeRequests(res.requests || []);
+    } catch (error) {
+      console.error('Failed to load overtime rate requests:', error);
+    }
+  };
+
+  const handleSubmitOvertimeRequest = async () => {
+    const rate = parseFloat(requestedRate);
+    if (!requestedRate || isNaN(rate) || rate < 0) {
+      alert('Please enter a valid rate (0 or more)');
+      return;
+    }
+    try {
+      setSubmittingRequest(true);
+      await settingsAPI.requestOvertimeRateChange(rate, requestReason.trim() || undefined);
+      alert('Request submitted. Super admin will review it.');
+      setRequestedRate('');
+      setRequestReason('');
+    } catch (error) {
+      console.error('Failed to submit overtime rate request:', error);
+      alert('Failed to submit request. Please try again.');
+    } finally {
+      setSubmittingRequest(false);
+    }
+  };
+
+  const handleReviewRequest = async (requestId: string, approved: boolean, reviewNote?: string) => {
+    try {
+      setReviewingId(requestId);
+      const res = await settingsAPI.reviewOvertimeRateRequest(requestId, approved, reviewNote);
+      alert(approved ? `Approved. New overtime rate: ₹${res.currentRate}/min` : 'Request rejected.');
+      // Refresh rate in settings
+      setSettings(prev => ({ ...prev, booking: { ...prev.booking, overtimeRate: res.currentRate } }));
+      fetchOvertimeRequests();
+    } catch (error) {
+      console.error('Failed to review request:', error);
+      alert('Failed to process review. Please try again.');
+    } finally {
+      setReviewingId(null);
     }
   };
 
@@ -481,29 +546,78 @@ const AdminSettings = () => {
             </div>
 
             <div className="grid md:grid-cols-2 gap-4">
-              {isSuperAdmin && (
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Overtime Rate (₹ per minute)
-                </label>
-                <div className="relative">
-                  <IndianRupee className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    value={settings.booking.overtimeRate}
-                    onChange={(e) => setSettings(prev => ({
-                      ...prev,
-                      booking: { ...prev.booking, overtimeRate: parseFloat(e.target.value) || 0 }
-                    }))}
-                    className="w-full pl-10 pr-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
+              {/* Overtime Rate — super admin edits directly; admin submits a change request */}
+              {isSuperAdmin ? (
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Overtime Rate (₹ per minute)
+                  </label>
+                  <div className="relative">
+                    <IndianRupee className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      value={settings.booking.overtimeRate}
+                      onChange={(e) => setSettings(prev => ({
+                        ...prev,
+                        booking: { ...prev.booking, overtimeRate: parseFloat(e.target.value) || 0 }
+                      }))}
+                      className="w-full pl-10 pr-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Charge rate when service exceeds scheduled time
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Charge rate when service exceeds scheduled time
-                </p>
-              </div>
+              ) : (
+                <div className="md:col-span-2">
+                  <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">Overtime Rate</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Current: <span className="font-medium text-foreground">₹{settings.booking.overtimeRate}/min</span> — only Super Admin can approve changes</p>
+                      </div>
+                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">Requires Super Admin</span>
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-foreground mb-1">Request new rate (₹/min)</label>
+                        <div className="relative">
+                          <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            value={requestedRate}
+                            onChange={(e) => setRequestedRate(e.target.value)}
+                            placeholder={String(settings.booking.overtimeRate)}
+                            className="w-full pl-9 pr-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-foreground mb-1">Reason (optional)</label>
+                        <input
+                          type="text"
+                          value={requestReason}
+                          onChange={(e) => setRequestReason(e.target.value)}
+                          placeholder="Briefly explain why"
+                          className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={submittingRequest || !requestedRate}
+                      onClick={handleSubmitOvertimeRequest}
+                      className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
+                    >
+                      {submittingRequest ? <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> : <IndianRupee className="w-4 h-4" />}
+                      Request Rate Change
+                    </button>
+                  </div>
+                </div>
               )}
 
               <div>
@@ -546,6 +660,91 @@ const AdminSettings = () => {
               )}
             </div>
           </div>
+
+          {/* Super Admin Only: Overtime Rate Change Requests */}
+          {isSuperAdmin && (
+            <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-orange-200">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <IndianRupee className="w-5 h-5 text-orange-600" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-bold text-foreground">Overtime Rate Change Requests</h2>
+                    <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">Super Admin Only</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Review admin requests to change the overtime rate</p>
+                </div>
+              </div>
+
+              {overtimeRequests.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No overtime rate change requests yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {overtimeRequests.map((req) => (
+                    <div key={req._id} className={`rounded-xl border p-4 space-y-2 ${
+                      req.status === 'pending' ? 'border-orange-200 bg-orange-50' :
+                      req.status === 'approved' ? 'border-green-200 bg-green-50' :
+                      'border-red-100 bg-red-50'
+                    }`}>
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <div className="space-y-0.5">
+                          <p className="text-sm font-semibold text-foreground">
+                            {req.requestedByName || 'Admin'} → ₹{req.requestedRate}/min
+                          </p>
+                          {req.reason && (
+                            <p className="text-xs text-muted-foreground">Reason: {req.reason}</p>
+                          )}
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {new Date(req.requestedAt).toLocaleString('en-IN')}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {req.status === 'pending' ? (
+                            <>
+                              <button
+                                type="button"
+                                disabled={reviewingId === req._id}
+                                onClick={() => {
+                                  const note = window.prompt(`Approve rate change to ₹${req.requestedRate}/min?\n\nOptional note for admin:`);
+                                  if (note !== null) handleReviewRequest(req._id, true, note || undefined);
+                                }}
+                                className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-60"
+                              >
+                                <CheckCircle className="w-3.5 h-3.5" /> Approve
+                              </button>
+                              <button
+                                type="button"
+                                disabled={reviewingId === req._id}
+                                onClick={() => {
+                                  const note = window.prompt(`Reject this request?\n\nReason (optional):`);
+                                  if (note !== null) handleReviewRequest(req._id, false, note || undefined);
+                                }}
+                                className="inline-flex items-center gap-1 rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600 disabled:opacity-60"
+                              >
+                                <XCircle className="w-3.5 h-3.5" /> Reject
+                              </button>
+                            </>
+                          ) : (
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                              req.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                            }`}>
+                              {req.status === 'approved' ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                              {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {req.reviewNote && (
+                        <p className="text-xs text-muted-foreground border-t border-border pt-2">Note: {req.reviewNote}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Super Admin Only: Cancellation Policy */}
           {isSuperAdmin && (

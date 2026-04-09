@@ -346,4 +346,154 @@ router.put('/',
   }
 );
 
+// @route   POST /api/settings/overtime-rate-request
+// @desc    Admin requests a change to the overtime rate (super_admin must approve)
+// @access  Private/Admin
+router.post('/overtime-rate-request',
+  authenticate,
+  authorize('admin'),
+  [
+    body('requestedRate').isFloat({ min: 0 }).withMessage('Requested rate must be a non-negative number'),
+    body('reason').optional().isString().trim()
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { requestedRate, reason } = req.body;
+      const settings = await Settings.getSettings();
+
+      // Cancel any existing pending request from this admin
+      settings.overtimeRateRequests = (settings.overtimeRateRequests || []).map(r => {
+        if (r.status === 'pending' && r.requestedBy.toString() === req.user._id.toString()) {
+          r.status = 'rejected';
+          r.reviewNote = 'Superseded by a new request';
+          r.reviewedAt = new Date();
+        }
+        return r;
+      });
+
+      settings.overtimeRateRequests.push({
+        requestedRate: parseFloat(requestedRate),
+        requestedBy: req.user._id,
+        requestedByName: req.user.name || '',
+        reason: reason || '',
+        status: 'pending',
+        requestedAt: new Date()
+      });
+
+      await settings.save();
+
+      // Notify all super admins
+      const superAdmins = await User.find({ role: 'super_admin' }).select('_id').lean();
+      for (const sa of superAdmins) {
+        await Notification.create({
+          recipient: sa._id,
+          type: 'system',
+          title: 'Overtime Rate Change Request',
+          message: `${req.user.name || 'An admin'} is requesting the overtime rate to be changed to ₹${requestedRate}/min. Reason: ${reason || 'Not provided'}`,
+          data: { requestedRate, requestedBy: req.user._id },
+          priority: 'medium'
+        });
+      }
+
+      res.status(201).json({ message: 'Overtime rate change request submitted successfully' });
+    } catch (error) {
+      console.error('Overtime rate request error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   GET /api/settings/overtime-rate-requests
+// @desc    Super admin gets all overtime rate change requests
+// @access  Private/SuperAdmin
+router.get('/overtime-rate-requests',
+  authenticate,
+  authorize('super_admin'),
+  async (req, res) => {
+    try {
+      const settings = await Settings.getSettings();
+      const requests = (settings.overtimeRateRequests || [])
+        .slice()
+        .sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
+
+      res.json({
+        requests,
+        currentRate: settings.booking.overtimeRate
+      });
+    } catch (error) {
+      console.error('Get overtime rate requests error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   PUT /api/settings/overtime-rate-requests/:requestId/review
+// @desc    Super admin approves or rejects an overtime rate change request
+// @access  Private/SuperAdmin
+router.put('/overtime-rate-requests/:requestId/review',
+  authenticate,
+  authorize('super_admin'),
+  [
+    body('approved').isBoolean().withMessage('approved must be a boolean'),
+    body('reviewNote').optional().isString().trim()
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { approved, reviewNote } = req.body;
+      const settings = await Settings.getSettings();
+
+      const request = (settings.overtimeRateRequests || []).id(req.params.requestId);
+      if (!request) {
+        return res.status(404).json({ error: { message: 'Request not found', status: 404 } });
+      }
+      if (request.status !== 'pending') {
+        return res.status(400).json({ error: { message: 'This request has already been reviewed', status: 400 } });
+      }
+
+      request.status = approved ? 'approved' : 'rejected';
+      request.reviewedBy = req.user._id;
+      request.reviewNote = reviewNote || '';
+      request.reviewedAt = new Date();
+
+      if (approved) {
+        settings.booking.overtimeRate = request.requestedRate;
+        settings.updatedBy = req.user._id;
+        settings.updatedAt = new Date();
+      }
+
+      await settings.save();
+
+      // Notify the requesting admin
+      await Notification.create({
+        recipient: request.requestedBy,
+        type: 'system',
+        title: approved ? 'Overtime Rate Request Approved' : 'Overtime Rate Request Rejected',
+        message: approved
+          ? `Your request to change the overtime rate to ₹${request.requestedRate}/min has been approved.`
+          : `Your request to change the overtime rate to ₹${request.requestedRate}/min was rejected.${reviewNote ? ` Reason: ${reviewNote}` : ''}`,
+        data: { requestedRate: request.requestedRate, approved },
+        priority: 'medium'
+      });
+
+      res.json({
+        message: approved ? 'Request approved. Overtime rate updated.' : 'Request rejected.',
+        currentRate: settings.booking.overtimeRate
+      });
+    } catch (error) {
+      console.error('Review overtime rate request error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
 export default router;

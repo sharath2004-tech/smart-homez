@@ -99,6 +99,7 @@ interface Booking {
   actualEndTime?: string;
   serviceStartQRCode?: string;
   serviceEndQRCode?: string;
+  overtimeMinutes?: number;
   overtimeCharges?: number;
   rating?: number;
   review?: string;
@@ -520,8 +521,15 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
     && !isBookingPaymentSettled
     && !isSubscriptionChildVisit
     && booking.status !== 'cancelled'
-    && booking.status !== 'completed'
     && paymentSummary?.pendingAmount !== null
+    && (
+      // Subscription root booking: payment required BEFORE work starts
+      booking.subscription?.isSubscription
+      ||
+      // Non-subscription: payment QR shown to customer AFTER worker has finished
+      booking.status === 'pending-review'
+      || booking.status === 'completed'
+    )
   );
 
   const handlePrintToPDF = () => {
@@ -1040,16 +1048,18 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
               {shouldShowPaymentProofStep && (
                 <SubscriptionPaymentStep
                   bookingId={booking._id}
-                  amount={booking.totalAmount}
-                  amountLabel={booking.subscription?.isSubscription ? 'Subscription amount' : 'Booking amount'}
+                  amount={booking.subscription?.isSubscription ? booking.totalAmount : calculateTotalAmount()}
+                  amountLabel={booking.subscription?.isSubscription ? 'Subscription amount' : 'Amount due'}
                   title={booking.paymentProof?.reviewStatus === 'rejected'
                     ? 'Re-upload payment proof'
-                    : 'Upload payment proof'}
+                    : booking.subscription?.isSubscription
+                      ? 'Complete subscription payment'
+                      : 'Pay for completed service'}
                   description={booking.paymentProof?.reviewStatus === 'rejected'
                     ? 'Your previous payment proof was rejected. Please upload a clear payment screenshot so admin can verify it.'
                     : booking.subscription?.isSubscription
                       ? 'This subscription is waiting for payment proof. Complete the payment and upload the screenshot here so your region admin or super admin can review it and continue the activation process.'
-                      : 'Payment is pending for this booking. Complete the payment and upload the screenshot here so admin can verify it.'}
+                      : 'The worker has completed the service. Scan the QR code or use the UPI ID below to make the payment, then upload your payment screenshot for admin verification.'}
                   successLabel={booking.paymentProof?.reviewStatus === 'rejected'
                     ? 'Updated payment proof uploaded. Waiting for admin review'
                     : 'Payment proof uploaded. Waiting for admin review'}
@@ -1061,23 +1071,48 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
               )}
 
               <div className="bg-muted p-4 rounded-xl space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{t('customer.bookings.baseAmount')}</span>
-                  <span className="font-medium text-foreground">₹{booking.totalAmount}</span>
-                </div>
-                {overtimeMinutes > 0 && (
-                  <>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-orange-600">Overtime ({overtimeMinutes} min × ₹{OVERTIME_RATE})</span>
-                      <span className="font-medium text-orange-600">₹{(overtimeMinutes * OVERTIME_RATE).toFixed(2)}</span>
-                    </div>
-                    <div className="border-t border-border pt-2"></div>
-                  </>
-                )}
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-foreground">{t('customer.bookings.totalAmount')}</span>
-                  <span className="text-2xl font-bold text-primary">₹{calculateTotalAmount().toFixed(2)}</span>
-                </div>
+                {(() => {
+                  // In-progress: use live frontend timer values; backend hasn't added overtime yet
+                  // pending-review / completed: use backend-persisted values; booking.totalAmount already includes overtime
+                  const liveOvertimeActive = booking.status === 'in-progress' && overtimeMinutes > 0;
+                  const backendOvertimeCharges = (booking.overtimeCharges ?? 0);
+                  const backendOvertimeMinutes = (booking.overtimeMinutes ?? 0);
+                  const hasBackendOvertime = backendOvertimeMinutes > 0 && backendOvertimeCharges > 0;
+
+                  const baseAmount = liveOvertimeActive
+                    ? booking.totalAmount
+                    : hasBackendOvertime
+                      ? booking.totalAmount - backendOvertimeCharges
+                      : booking.totalAmount;
+
+                  const displayOvertimeMinutes = liveOvertimeActive ? overtimeMinutes : backendOvertimeMinutes;
+                  const displayOvertimeCharges = liveOvertimeActive
+                    ? overtimeMinutes * OVERTIME_RATE
+                    : backendOvertimeCharges;
+                  const showOvertimeLine = liveOvertimeActive || hasBackendOvertime;
+
+                  return (
+                    <>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">{t('customer.bookings.baseAmount')}</span>
+                        <span className="font-medium text-foreground">₹{baseAmount.toFixed(2)}</span>
+                      </div>
+                      {showOvertimeLine && (
+                        <>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-orange-600">Overtime ({displayOvertimeMinutes} min × ₹{OVERTIME_RATE}/min)</span>
+                            <span className="font-medium text-orange-600">₹{displayOvertimeCharges.toFixed(2)}</span>
+                          </div>
+                          <div className="border-t border-border pt-2"></div>
+                        </>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-foreground">{t('customer.bookings.totalAmount')}</span>
+                        <span className="text-2xl font-bold text-primary">₹{calculateTotalAmount().toFixed(2)}</span>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
 
