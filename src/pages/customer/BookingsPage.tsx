@@ -190,6 +190,7 @@ const BookingsPage = () => {
       await bookingsAPI.submitCancelPenaltyProof(penaltyInfo.bookingId, penaltyProofFile);
       setPenaltyInfo(null);
       setPenaltyProofFile(null);
+      alert('Payment proof submitted successfully. Admin will review and confirm your cancellation shortly.');
       await fetchBookings();
     } catch (error) {
       console.error('Error submitting penalty proof:', error);

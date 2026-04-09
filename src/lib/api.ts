@@ -688,6 +688,13 @@ export const bookingsAPI = {
     return data;
   },
 
+  reviewCancelPenaltyProof: async (id: string, action: 'approve' | 'reject', reason?: string) => {
+    return apiCall(`/bookings/${id}/cancel-penalty-review`, {
+      method: 'POST',
+      body: JSON.stringify({ action, reason })
+    });
+  },
+
   getUpcoming: async () => {
     return apiCall('/bookings?status=confirmed,pending');
   },

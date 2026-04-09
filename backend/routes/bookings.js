@@ -6205,73 +6205,152 @@ router.patch('/:id/cancel-penalty-proof',
       // Build file URL (same pattern as other proof uploads)
       const proofUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
 
-      // Load cancellation policy to finalize refund calculation
+      // Save proof — do NOT cancel yet. Admin must review and approve first.
+      booking.cancellationPenaltyProof = proofUrl;
+      booking.cancellationPenaltyPaid = false;
+      booking.cancellationPenaltyReviewStatus = 'pending_review';
+      // pendingCancellation stays true — admin sees it as awaiting review
+      await booking.save();
+
+      // Notify all admins to review the cancellation fee proof
+      const adminUsers = await User.find({ role: { $in: ['admin', 'super_admin'] }, isActive: true }).select('_id').lean();
+      await Promise.all(adminUsers.map(admin =>
+        notificationService.sendNotification({
+          userId: admin._id,
+          type: 'alert',
+          title: '🔍 Cancellation Fee Proof Received',
+          message: `Customer has uploaded cancellation fee payment proof for booking #${booking._id}. Please review and approve or reject.`,
+          priority: 'high',
+          data: { bookingId: booking._id }
+        }).catch(() => {})
+      ));
+
+      res.json({
+        success: true,
+        message: 'Payment proof submitted successfully. Admin will review and confirm your cancellation shortly.',
+        booking
+      });
+    } catch (error) {
+      console.error('Cancel penalty proof error:', error);
+      res.status(500).json({ error: { message: 'Server error', status: 500 } });
+    }
+  }
+);
+
+// @route   POST /api/bookings/:id/cancel-penalty-review
+// @desc    Admin reviews (approve/reject) customer cancellation fee payment proof
+// @access  Private/Admin
+router.post('/:id/cancel-penalty-review',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  [
+    body('action').isIn(['approve', 'reject']).withMessage('action must be approve or reject'),
+    body('reason').optional().isString().trim().isLength({ max: 500 })
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: { message: errors.array()[0].msg, status: 400 } });
+      }
+
+      const booking = await Booking.findById(req.params.id)
+        .populate('customer', 'name email phone')
+        .populate('service', 'name');
+
+      if (!booking) {
+        return res.status(404).json({ error: { message: 'Booking not found', status: 404 } });
+      }
+
+      if (!booking.pendingCancellation || !booking.cancellationPenaltyProof) {
+        return res.status(400).json({ error: { message: 'No cancellation fee proof pending review for this booking', status: 400 } });
+      }
+
+      const { action, reason } = req.body;
+      const now = new Date();
       const settings = await Settings.findOne();
       const policy = settings?.cancellationPolicy || { freeCancellationMinutes: 20, cancellationCharge: 100 };
       const cancellationCharge = policy.cancellationCharge || 100;
       const bookingAmount = booking.totalAmount || 0;
-      const refundAmount = Math.max(0, bookingAmount - cancellationCharge);
-      const refundPercentage = bookingAmount > 0 ? (refundAmount / bookingAmount) * 100 : 0;
       const freeWindowMinutes = policy.freeCancellationMinutes ?? ((policy.fullRefundHours ?? 1) * 60);
 
-      const now = new Date();
+      if (action === 'approve') {
+        // Confirm the cancellation
+        const refundAmount = Math.max(0, bookingAmount - cancellationCharge);
+        const refundPercentage = bookingAmount > 0 ? (refundAmount / bookingAmount) * 100 : 0;
 
-      // Complete the cancellation now that proof is supplied
-      booking.cancellationPenaltyProof = proofUrl;
-      booking.cancellationPenaltyPaid = true;
-      booking.pendingCancellation = false;
-      booking.status = 'cancelled';
-      booking.cancellationDate = now;
-      booking.refund = {
-        amount: refundAmount,
-        percentage: refundPercentage,
-        reason: `Cancellation within ${freeWindowMinutes}-minute window. ₹${cancellationCharge} charge applied. Penalty proof uploaded.`,
-        processedAt: refundAmount > 0 ? now : null,
-        status: refundAmount > 0 ? 'processed' : 'not-applicable'
-      };
-
-      await booking.save();
-
-      // Trigger queue for freed slot
-      processQueuedBookings(booking.location?.locationId).catch(err =>
-        console.error('Queue processing error after penalised cancellation:', err.message)
-      );
-
-      // Notify customer
-      await notificationService.sendTemplatedNotification(
-        booking.customer._id,
-        'BOOKING_CANCELLED',
-        {
-          bookingId: booking._id,
-          serviceName: booking.service?.name ?? 'Service',
-          reason: booking.cancellationReason
-        }
-      );
-
-      // Notify worker if assigned
-      if (booking.worker) {
-        await notificationService.sendNotification({
-          userId: booking.worker,
-          type: 'cancellation',
-          title: '❌ Booking Cancelled',
-          message: `Customer cancelled booking for ${booking.service?.name ?? 'Service'} after paying ₹${cancellationCharge} penalty.`,
-          priority: 'medium',
-          data: { bookingId: booking._id }
-        });
-      }
-
-      res.json({
-        success: true,
-        message: 'Cancellation confirmed after penalty payment.',
-        booking,
-        refund: {
+        booking.cancellationPenaltyPaid = true;
+        booking.cancellationPenaltyReviewStatus = 'approved';
+        booking.pendingCancellation = false;
+        booking.status = 'cancelled';
+        booking.cancellationDate = now;
+        booking.refund = {
           amount: refundAmount,
           percentage: refundPercentage,
-          cancellationCharge
+          reason: `Cancellation within ${freeWindowMinutes}-minute window. ₹${cancellationCharge} fee paid. Approved by admin.`,
+          processedAt: refundAmount > 0 ? now : null,
+          status: refundAmount > 0 ? 'processed' : 'not-applicable'
+        };
+        await booking.save();
+
+        // Free the slot for queued bookings
+        processQueuedBookings(booking.location?.locationId).catch(err =>
+          console.error('Queue processing error after penalty cancellation approval:', err.message)
+        );
+
+        // Notify customer — cancellation confirmed
+        await notificationService.sendNotification({
+          userId: booking.customer._id,
+          type: 'cancellation',
+          title: '✅ Cancellation Confirmed',
+          message: `Your cancellation request for ${booking.service?.name ?? 'Service'} has been approved.${refundAmount > 0 ? ` Refund of ₹${refundAmount} will be processed.` : ''}`,
+          priority: 'high',
+          data: { bookingId: booking._id }
+        });
+
+        // Notify worker if assigned
+        if (booking.worker) {
+          await notificationService.sendNotification({
+            userId: booking.worker,
+            type: 'cancellation',
+            title: '❌ Booking Cancelled',
+            message: `Booking for ${booking.service?.name ?? 'Service'} has been cancelled by the customer.`,
+            priority: 'medium',
+            data: { bookingId: booking._id }
+          });
         }
-      });
+
+        return res.json({
+          success: true,
+          message: 'Cancellation fee proof approved. Booking has been cancelled.',
+          booking,
+          refund: { amount: refundAmount, percentage: refundPercentage, cancellationCharge }
+        });
+      } else {
+        // Reject proof — allow customer to reupload
+        booking.cancellationPenaltyProof = null;
+        booking.cancellationPenaltyReviewStatus = 'rejected';
+        booking.pendingCancellation = true; // keep gate open so customer must reupload
+        await booking.save();
+
+        // Notify customer — proof rejected
+        await notificationService.sendNotification({
+          userId: booking.customer._id,
+          type: 'alert',
+          title: '❌ Cancellation Proof Rejected',
+          message: `Your cancellation fee payment proof was rejected.${reason ? ` Reason: ${reason}` : ''} Please upload a valid payment screenshot to confirm your cancellation.`,
+          priority: 'high',
+          data: { bookingId: booking._id }
+        });
+
+        return res.json({
+          success: true,
+          message: 'Cancellation fee proof rejected. Customer will be asked to reupload.',
+          booking
+        });
+      }
     } catch (error) {
-      console.error('Cancel penalty proof error:', error);
+      console.error('Cancel penalty review error:', error);
       res.status(500).json({ error: { message: 'Server error', status: 500 } });
     }
   }

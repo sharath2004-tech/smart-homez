@@ -483,6 +483,11 @@ const bookingSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  cancellationPenaltyReviewStatus: {
+    type: String,
+    enum: ['pending_review', 'approved', 'rejected', null],
+    default: null  // Set to 'pending_review' when customer uploads proof; admin changes to approved/rejected
+  },
   // Refund information (REQ-C-010)
   refund: {
     amount: {

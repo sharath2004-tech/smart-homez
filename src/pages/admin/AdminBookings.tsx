@@ -76,6 +76,11 @@ interface Booking {
     updatedAt?: string;
   };
   scheduledDurationMinutes?: number;
+  pendingCancellation?: boolean;
+  cancellationPenaltyProof?: string | null;
+  cancellationPenaltyPaid?: boolean;
+  cancellationPenaltyReviewStatus?: 'pending_review' | 'approved' | 'rejected' | null;
+  cancellationReason?: string;
 }
 
 const statusConfig: Record<string, string> = {
@@ -131,6 +136,7 @@ const AdminBookings = () => {
   const [selectedProofBooking, setSelectedProofBooking] = useState<Booking | null>(null);
   const [approvingBookingId, setApprovingBookingId] = useState<string | null>(null);
   const [reviewingPaymentBookingId, setReviewingPaymentBookingId] = useState<string | null>(null);
+  const [reviewingCancelPenaltyId, setReviewingCancelPenaltyId] = useState<string | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocation, setSelectedLocation] = useState("");
   const [noRegionAssigned, setNoRegionAssigned] = useState(false);
@@ -361,6 +367,24 @@ const AdminBookings = () => {
     } catch (error) {
       console.error('Payment proof review error:', error);
       alert((error as Error).message || `Failed to ${action} payment proof`);
+    }
+  };
+
+  const handleReviewCancelPenalty = async (booking: Booking, action: 'approve' | 'reject') => {
+    const reason = action === 'reject'
+      ? (prompt('Reason for rejection (optional):') ?? '')
+      : undefined;
+    setReviewingCancelPenaltyId(booking._id);
+    try {
+      const response = await bookingsAPI.reviewCancelPenaltyProof(booking._id, action, reason || undefined);
+      setSelectedProofBooking((prev) => prev && prev._id === booking._id ? { ...prev, ...response.booking } : prev);
+      setBookings((prev) => prev.map((b) => b._id === booking._id ? { ...b, ...response.booking } : b));
+      alert(action === 'approve' ? 'Cancellation approved. Booking has been cancelled.' : 'Proof rejected. Customer will be notified to reupload.');
+    } catch (error) {
+      console.error('Cancel penalty review error:', error);
+      alert((error as Error).message || `Failed to ${action} cancellation proof`);
+    } finally {
+      setReviewingCancelPenaltyId(null);
     } finally {
       setReviewingPaymentBookingId(null);
     }
@@ -1503,6 +1527,70 @@ const AdminBookings = () => {
                   </div>
                 )}
               </div>
+
+              {/* Cancellation Fee Proof */}
+              {selectedProofBooking.pendingCancellation && selectedProofBooking.cancellationPenaltyProof && (
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-foreground flex items-center gap-2">
+                    ⚠️ Cancellation Fee Proof
+                  </h3>
+                  <div className="rounded-xl border border-orange-200 bg-orange-50/50 p-3 space-y-3">
+                    <div className="rounded-xl overflow-hidden border-2 border-orange-200 bg-black">
+                      <img
+                        src={bookingsAPI.getCompletionPhotoUrl(selectedProofBooking.cancellationPenaltyProof)}
+                        alt="Cancellation fee payment proof"
+                        className="w-full max-h-72 object-contain mx-auto"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-orange-700 font-medium">Review status:</span>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        selectedProofBooking.cancellationPenaltyReviewStatus === 'approved'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : selectedProofBooking.cancellationPenaltyReviewStatus === 'rejected'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-orange-100 text-orange-700'
+                      }`}>
+                        {selectedProofBooking.cancellationPenaltyReviewStatus === 'pending_review'
+                          ? 'Pending Review'
+                          : selectedProofBooking.cancellationPenaltyReviewStatus || 'Pending Review'}
+                      </span>
+                    </div>
+                    {selectedProofBooking.cancellationReason && (
+                      <div className="text-sm">
+                        <span className="text-orange-700 font-medium">Reason: </span>
+                        <span className="text-foreground">{selectedProofBooking.cancellationReason}</span>
+                      </div>
+                    )}
+                  </div>
+                  {selectedProofBooking.cancellationPenaltyReviewStatus !== 'approved' && (
+                    <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-3">
+                      <div>
+                        <p className="text-sm font-semibold text-orange-900">Cancellation fee review</p>
+                        <p className="text-xs text-orange-800 mt-1">
+                          Verify the payment screenshot. Approve to confirm cancellation, or reject to ask the customer to reupload.
+                        </p>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <button
+                          onClick={() => handleReviewCancelPenalty(selectedProofBooking, 'approve')}
+                          disabled={reviewingCancelPenaltyId === selectedProofBooking._id}
+                          className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-semibold text-sm hover:bg-emerald-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {reviewingCancelPenaltyId === selectedProofBooking._id ? 'Processing…' : '✅ Approve & Cancel Booking'}
+                        </button>
+                        <button
+                          onClick={() => handleReviewCancelPenalty(selectedProofBooking, 'reject')}
+                          disabled={reviewingCancelPenaltyId === selectedProofBooking._id}
+                          className="flex-1 py-2.5 border border-red-200 text-red-700 rounded-xl font-semibold text-sm hover:bg-red-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          ❌ Reject Proof
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {canReviewPaymentProof(selectedProofBooking) && (
                 <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 space-y-3">
