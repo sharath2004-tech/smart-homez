@@ -436,7 +436,7 @@ router.post(
   handleWorkerUploadFields,
   [
     body('name').notEmpty().withMessage('Name is required'),
-    body('email').isEmail().withMessage('Valid email is required'),
+    body('email').optional().isEmail().withMessage('Invalid email format'),
     body('phone').optional().notEmpty().withMessage('Phone cannot be empty'),
     body('specialization').custom((value) => {
       if (Array.isArray(value)) return true;
@@ -482,13 +482,9 @@ router.post(
       const aadhaarBackPath = files.aadhaarBack?.[0]
         ? `/uploads/worker-docs/${files.aadhaarBack[0].filename}` : null;
 
-      if (!email) {
-        return res.status(400).json({ error: { message: 'Email is required', status: 400 } });
-      }
+      const normalizedEmail = email ? email.toLowerCase().trim() : null;
 
-      const normalizedEmail = email.toLowerCase().trim();
-
-      if (await User.findOne({ email: normalizedEmail })) {
+      if (normalizedEmail && await User.findOne({ email: normalizedEmail })) {
         return res.status(400).json({ error: { message: 'Email already exists', status: 400 } });
       }
 
@@ -515,7 +511,7 @@ router.post(
 
       const worker = new User({
         name,
-        email: normalizedEmail,
+        ...(normalizedEmail ? { email: normalizedEmail } : {}),
         password: temporaryPassword,
         temporaryPassword,
         isFirstLogin: true,
@@ -582,7 +578,7 @@ router.post(
 
       queueWorkerCredentialDelivery({
         credentialDelivery,
-        email: normalizedEmail,
+        ...(normalizedEmail ? { email: normalizedEmail } : {}),
         phone,
         name,
         temporaryPassword
