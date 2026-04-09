@@ -2627,11 +2627,11 @@ router.delete('/:id', authenticate, async (req, res) => {
       refundAmount = bookingAmount;
       refundPercentage = 100;
       refundReason = `Free cancellation (${Math.round(minutesUntilBooking)} minutes before booking)`;
-    } else if (minutesUntilBooking > 0) {
-      // Within free-cancel window
+    } else {
+      // Within free-cancel window OR start time already passed — penalty applies
       cancellationCharge = policy.cancellationCharge || 100;
 
-      // Customers must pay the cancellation charge before cancelling within the window
+      // Customers must pay the cancellation charge
       if (!isAdminCancellation && !booking.cancellationPenaltyPaid) {
         booking.pendingCancellation = true;
         booking.cancellationReason = req.body.reason || 'Cancellation requested by customer';
@@ -2652,17 +2652,12 @@ router.delete('/:id', authenticate, async (req, res) => {
         // Admin overrides — full refund issued to customer, no penalty deducted
         refundAmount = bookingAmount;
         refundPercentage = 100;
-        refundReason = `Cancelled by admin within ${freeWindowMinutes}-minute window. Full refund issued.`;
+        refundReason = `Cancelled by admin. Full refund issued.`;
       } else {
         refundAmount = Math.max(0, bookingAmount - cancellationCharge);
         refundPercentage = bookingAmount > 0 ? (refundAmount / bookingAmount) * 100 : 0;
         refundReason = `Cancellation within ${freeWindowMinutes}-minute window. ₹${cancellationCharge} charge applied.`;
       }
-    } else {
-      // Booking has already started - No refund
-      refundAmount = 0;
-      refundPercentage = 0;
-      refundReason = 'Booking has already started. No refund applicable.';
     }
 
     const isRootSubscriptionCancellation = Boolean(
