@@ -586,7 +586,8 @@ router.post(
     } catch (error) {
       console.error('Super admin create worker error:', error);
       if (error.code === 11000) {
-        return res.status(400).json({ error: { message: 'A user with this email already exists', status: 400 } });
+        const field = Object.keys(error.keyPattern || {})[0] || 'field';
+        return res.status(400).json({ error: { message: `A user with this ${field} already exists`, status: 400 } });
       }
       res.status(500).json({ error: { message: 'Server error', status: 500 } });
     }
@@ -1125,7 +1126,8 @@ router.post(
     } catch (error) {
       console.error('Super admin create admin error:', error);
       if (error.code === 11000) {
-        return res.status(400).json({ error: { message: 'A user with this email already exists', status: 400 } });
+        const field = Object.keys(error.keyPattern || {})[0] || 'field';
+        return res.status(400).json({ error: { message: `A user with this ${field} already exists`, status: 400 } });
       }
       res.status(500).json({ error: { message: 'Server error', status: 500 } });
     }
