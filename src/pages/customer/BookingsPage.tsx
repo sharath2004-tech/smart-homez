@@ -5,7 +5,7 @@ import WorkerTrackingMap from "@/components/WorkerTrackingMap";
 import { Badge } from "@/components/ui/badge";
 import { useConfirm } from "@/hooks/useConfirm";
 import { authAPI, bookingsAPI } from "@/lib/api";
-import { AlertTriangle, Calendar, CalendarPlus, Clock, MapPin, Phone, QrCode, RefreshCw, Star, Upload, X } from "lucide-react";
+import { AlertTriangle, Calendar, CalendarPlus, Clock, Loader2, MapPin, Phone, QrCode, RefreshCw, Star, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -63,6 +63,8 @@ interface Booking {
   createdAt: string;
   serviceStartQRCode?: string;
   actualStartTime?: string;
+  pendingCancellation?: boolean;
+  cancellationPenaltyReviewStatus?: 'pending_review' | 'approved' | 'rejected' | null;
 }
 
 const statusConfig: Record<string, { label: string; bg: string; text: string }> = {
@@ -102,6 +104,7 @@ const BookingsPage = () => {
   const [penaltyInfo, setPenaltyInfo] = useState<PenaltyInfo | null>(null);
   const [penaltyProofFile, setPenaltyProofFile] = useState<File | null>(null);
   const [penaltySubmitting, setPenaltySubmitting] = useState(false);
+  const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
 
   // Auto-open a booking detail when navigated here with state.openBookingId
   useEffect(() => {
@@ -164,6 +167,7 @@ const BookingsPage = () => {
   const handleCancelBooking = async (bookingId: string) => {
     if (!await confirm(t('customer.bookings.cancelConfirm'))) return;
 
+    setCancellingBookingId(bookingId);
     try {
       const result = await bookingsAPI.cancel(bookingId);
       if (result?.requiresPenaltyPayment) {
@@ -180,6 +184,8 @@ const BookingsPage = () => {
     } catch (error) {
       console.error('Error cancelling booking:', error);
       alert(error instanceof Error ? error.message : t('customer.bookings.failedCancel'));
+    } finally {
+      setCancellingBookingId(null);
     }
   };
 
@@ -336,7 +342,9 @@ const BookingsPage = () => {
             </div>
           ) : (
             bookings.map((booking) => {
-              const statusInfo = getStatusInfo(booking.status);
+              const statusInfo = booking.pendingCancellation
+                ? { label: 'Pending Cancellation', bg: 'bg-orange-100', text: 'text-orange-800' }
+                : getStatusInfo(booking.status);
               const isUpcoming = activeTab === "upcoming";
               const isOngoing = activeTab === "ongoing";
               const isPast = activeTab === "past";
@@ -491,11 +499,14 @@ const BookingsPage = () => {
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleCancelBooking(booking._id); }}
-                          disabled={booking.status === 'in-progress'}
-                          className="w-full sm:flex-1 py-2.5 bg-destructive text-destructive-foreground rounded-lg text-sm font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={booking.status === 'in-progress' || cancellingBookingId === booking._id}
+                          className="w-full sm:flex-1 py-2.5 bg-destructive text-destructive-foreground rounded-lg text-sm font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
                           title={booking.status === 'in-progress' ? 'Cannot cancel a service already in progress' : ''}
                         >
-                          Cancel
+                          {cancellingBookingId === booking._id
+                            ? <><Loader2 className="w-4 h-4 animate-spin" /> Cancelling…</>
+                            : 'Cancel'
+                          }
                         </button>
                       </>
                     )}
@@ -590,7 +601,14 @@ const BookingsPage = () => {
       {/* Penalty Payment Modal */}
       {penaltyInfo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-background rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5">
+          <div className="relative bg-background rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5">
+            {penaltySubmitting && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl bg-background/90">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <p className="text-sm font-medium text-foreground">Submitting proof…</p>
+                <p className="text-xs text-muted-foreground">Please wait, do not close this window</p>
+              </div>
+            )}
             {/* Header */}
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2">
@@ -598,8 +616,9 @@ const BookingsPage = () => {
                 <h2 className="text-lg font-bold text-foreground">Cancellation Fee Required</h2>
               </div>
               <button
-                onClick={() => { setPenaltyInfo(null); setPenaltyProofFile(null); }}
-                className="p-1 hover:bg-muted rounded-lg transition-colors"
+                onClick={() => { if (!penaltySubmitting) { setPenaltyInfo(null); setPenaltyProofFile(null); } }}
+                disabled={penaltySubmitting}
+                className="p-1 hover:bg-muted rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <X className="w-4 h-4 text-muted-foreground" />
               </button>

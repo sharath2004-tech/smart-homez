@@ -124,6 +124,11 @@ interface Booking {
     url: string;
     timestamp: string;
   };
+  pendingCancellation?: boolean;
+  cancellationPenaltyProof?: string | null;
+  cancellationPenaltyPaid?: boolean;
+  cancellationPenaltyReviewStatus?: 'pending_review' | 'approved' | 'rejected' | null;
+  cancellationRejectionReason?: string | null;
 }
 
 interface BookingDetailModalProps {
@@ -193,7 +198,19 @@ const STATUS_ORDER: Record<string, number> = {
 
 const DEFAULT_PAYMENT_METHOD = 'qr-upi';
 
-const BookingStatusStepper = ({ status }: { status: string }) => {
+const BookingStatusStepper = ({ status, pendingCancellation }: { status: string; pendingCancellation?: boolean }) => {
+  if (pendingCancellation) {
+    return (
+      <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl p-4">
+        <XCircle className="w-6 h-6 text-orange-500 shrink-0" />
+        <div>
+          <p className="font-semibold text-orange-800">Cancellation Under Review</p>
+          <p className="text-xs text-orange-600">Your cancellation fee proof has been submitted. Admin will review and confirm cancellation shortly.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (status === 'cancelled') {
     return (
       <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
@@ -636,18 +653,20 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
             </div>
 
             {/* Booking Status Stepper */}
-            <BookingStatusStepper status={booking.status} />
+            <BookingStatusStepper status={booking.status} pendingCancellation={booking.pendingCancellation} />
 
             {/* Status Badge */}
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">{t('customer.bookings.status')}</span>
               <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                booking.pendingCancellation ? 'bg-orange-100 text-orange-800' :
                 booking.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
                 booking.status === 'in-progress' ? 'bg-purple-100 text-purple-800' :
                 booking.status === 'completed' ? 'bg-green-100 text-green-800' :
                 'bg-yellow-100 text-yellow-800'
               }`}>
-                {booking.status === 'in-progress' ? 'In Progress' : booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                {booking.pendingCancellation ? 'Pending Cancellation' :
+                 booking.status === 'in-progress' ? 'In Progress' : booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
               </span>
             </div>
 
@@ -966,6 +985,43 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                       </span>
                     )}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Cancellation Review Section */}
+            {booking.pendingCancellation && booking.cancellationPenaltyProof && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <XCircle className="w-5 h-5 text-orange-500" />
+                  Cancellation Fee Payment
+                </h3>
+                <div className={`rounded-2xl border p-4 space-y-3 ${
+                  booking.cancellationPenaltyReviewStatus === 'approved' ? 'border-green-200 bg-green-50' :
+                  booking.cancellationPenaltyReviewStatus === 'rejected' ? 'border-red-200 bg-red-50' :
+                  'border-orange-200 bg-orange-50'
+                }`}>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <p className="text-sm font-semibold text-foreground">Proof submitted</p>
+                    {booking.cancellationPenaltyReviewStatus === 'pending_review' && (
+                      <span className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">Pending admin review</span>
+                    )}
+                    {booking.cancellationPenaltyReviewStatus === 'approved' && (
+                      <span className="inline-flex rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">Approved — cancellation confirmed</span>
+                    )}
+                    {booking.cancellationPenaltyReviewStatus === 'rejected' && (
+                      <span className="inline-flex rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">Proof rejected — re-upload required</span>
+                    )}
+                  </div>
+                  <img
+                    src={bookingsAPI.getCompletionPhotoUrl(booking.cancellationPenaltyProof)}
+                    alt="Cancellation fee proof"
+                    className="w-full max-w-xs rounded-xl border border-border object-contain"
+                  />
+                  {booking.cancellationRejectionReason && (
+                    <p className="text-xs text-red-600 bg-red-50 rounded-xl px-3 py-2">Reason: {booking.cancellationRejectionReason}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">Once approved by admin, your booking will be cancelled and the fee payment confirmed.</p>
                 </div>
               </div>
             )}
