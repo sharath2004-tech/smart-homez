@@ -521,7 +521,7 @@ const CustomerDashboard = () => {
       return `${dateText}, ${formattedTime}`;
     }
     
-    return dateText;https://smart-homez.onrender.com
+    return dateText;
   };
 
   // Animation variants
@@ -538,14 +538,14 @@ const CustomerDashboard = () => {
     visible: {
       opacity: 1,
       y: 0,
-      transition: { duration: 0.35, ease: "easeOut" }
+      transition: { duration: 0.35, ease: "easeOut" as const }
     }
   };
 
   const cardHoverVariants = {
     hover: {
       scale: 1.015,
-      transition: { duration: 0.2, ease: "easeOut" }
+      transition: { duration: 0.2, ease: "easeOut" as const }
     },
     tap: { scale: 0.97 }
   };
