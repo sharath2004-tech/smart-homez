@@ -174,7 +174,7 @@ const MySubscriptionsPage = () => {
 
   const handleChangeWorkerClick = async (subscription: CustomerSubscription) => {
     setChangingWorker(subscription._id);
-    await fetchAvailableWorkers(subscription.service.category);
+    await fetchAvailableWorkers(subscription.service?.category ?? '');
   };
 
   const handleWorkerChange = async (bookingId: string, newWorkerId: string) => {
@@ -271,6 +271,7 @@ const MySubscriptionsPage = () => {
         {/* Renewal reminder banners */}
         {subscriptions
           .filter(s => {
+            if (!s.service) return false;
             const end = s.subscriptionEndDate;
             if (!end) return false;
             const daysLeft = Math.ceil((new Date(end).getTime() - Date.now()) / 86400000);
@@ -284,7 +285,7 @@ const MySubscriptionsPage = () => {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-orange-800">
                     {t('subscriptionPage.renewal.expires', {
-                      service: s.service.name,
+                      service: s.service?.name ?? 'Service',
                       when: daysLeft <= 0 ? t('subscriptionPage.renewal.today') : daysLeft === 1 ? t('subscriptionPage.renewal.tomorrow') : t('subscriptionPage.renewal.inDays', { count: daysLeft })
                     })}
                   </p>
@@ -331,7 +332,7 @@ const MySubscriptionsPage = () => {
                 <div className="flex items-start justify-between mb-4 pb-4 border-b border-border">
                   <div>
                     <h3 className="text-xl font-bold text-foreground mb-1">
-                      {subscription.service.name}
+                      {subscription.service?.name ?? 'Service Unavailable'}
                     </h3>
                     <p className="text-sm text-muted-foreground capitalize">
                       {t('subscriptionPage.frequencyLabel', { frequency: subscription.frequency || '-' })}

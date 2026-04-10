@@ -193,8 +193,8 @@ const AdminWorkerSchedule = () => {
             'Period': period,
             'Booking Type': booking.isSubscription ? 'Subscription' : 'One-Time',
             'Frequency': booking.subscriptionFrequency || 'N/A',
-            'Service': booking.service.name,
-            'Category': booking.service.category,
+            'Service': booking.service?.name ?? '',
+            'Category': booking.service?.category ?? '',
             'Customer Name': booking.customer.name,
             'Customer Phone': booking.customer.phone,
             'Location': booking.location.apartmentName,
@@ -824,8 +824,8 @@ const AdminWorkerSchedule = () => {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-col">
-                            <span className="text-sm font-medium text-foreground">{booking.service.name}</span>
-                            <span className="text-xs text-muted-foreground capitalize">{booking.service.category}</span>
+                            <span className="text-sm font-medium text-foreground">{booking.service?.name ?? '—'}</span>
+                            <span className="text-xs text-muted-foreground capitalize">{booking.service?.category ?? ''}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3">
@@ -948,7 +948,7 @@ const AdminWorkerSchedule = () => {
                       <div className="flex items-start justify-between gap-4 flex-wrap">
                         <div className="flex-1 min-w-0 sm:min-w-[250px]">
                           <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            <span className="font-semibold text-foreground">{booking.service.name}</span>
+                            <span className="font-semibold text-foreground">{booking.service?.name ?? '—'}</span>
                             {booking.isSubscription && (
                               <span className="badge-primary text-xs">
                                 📋 {booking.subscriptionFrequency}

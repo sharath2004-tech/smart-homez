@@ -6031,7 +6031,10 @@ router.get('/customer/my-subscriptions', authenticate, authorize('customer'), as
       .sort({ createdAt: -1 })
       .lean();
 
-    const result = await Promise.all(parentBookings.map(async (b) => {
+    // Skip bookings whose service document was deleted
+    const validParentBookings = parentBookings.filter(b => b.service != null);
+
+    const result = await Promise.all(validParentBookings.map(async (b) => {
       const childSessions = await Booking.find({
         parentBooking: b._id,
         'subscription.isSubscription': true,
