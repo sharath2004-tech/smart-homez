@@ -1,84 +1,76 @@
 import AppLayout from "@/components/AppLayout";
 import SubscriptionCalendar from "@/components/SubscriptionCalendar";
 import SubscriptionPaymentStep from "@/components/SubscriptionPaymentStep";
-import { authAPI, bookingsAPI } from "@/lib/api";
-import { AlertTriangle, Calendar, CalendarDays, CheckCircle, ChevronDown, ChevronUp, Clock, Edit2, MapPin, RefreshCw, User, UserCheck, XCircle } from "lucide-react";
+import { api, authAPI, bookingsAPI } from "@/lib/api";
+import { AlertTriangle, Calendar, CalendarDays, CheckCircle, ChevronDown, ChevronUp, Clock, Edit2, IndianRupee, MapPin, RefreshCw, Timer, User, UserCheck, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
-interface Booking {
+// ── Session row returned by the new API ──────────────────────────────────────
+interface SessionRow {
+  sessionNumber: number;
   _id: string;
-  parentBooking?: string | null;
-  actualStartTime?: string;
-  actualEndTime?: string;
-  actualDurationMinutes?: number;
-  scheduledDurationMinutes?: number;
-  overtimeMinutes?: number;
-  overtimeCharges?: number;
   bookingDate: string;
   startTime: string;
   endTime: string;
   status: string;
+  worker?: { name: string } | null;
+  actualStartTime?: string;
+  actualEndTime?: string;
+  actualDurationMinutes?: number;
+  scheduledDurationMinutes?: number;
+  overtimeMinutes: number;
+  overtimeCharges: number;
+}
+
+// ── Subscription object returned by /bookings/customer/my-subscriptions ───────
+interface CustomerSubscription {
+  _id: string;
+  service: { _id: string; name: string; description: string; category: string };
   bookingType: string;
-  subscription?: {
-    isSubscription: boolean;
-    isPrepaid?: boolean;
-    activationStatus?: 'payment_pending' | 'approval_pending' | 'active';
-    fixedWorker?: string;
-    autoRenewal?: boolean;
-    allowPause?: boolean;
-    isPaused?: boolean;
-    pauseRequestStatus?: 'none' | 'pending' | 'approved' | 'rejected';
-    pauseRequestedAt?: string | null;
-    pauseRequestStartDate?: string | null;
-    pauseRequestEndDate?: string | null;
-    pauseRequestReason?: string;
-    pauseReviewNote?: string;
-    subscriptionStartDate?: string;
-    subscriptionEndDate?: string;
-    preferredTime?: string;
-    durationPerSession?: number;
-  };
-  recurringSchedule?: {
-    frequency: string;
-    selectedDays?: string[];
-    startDate?: string;
-    endDate?: string;
-  };
   worker?: {
     _id: string;
     name: string;
     phone: string;
-    email: string;
-    workerProfile: {
-      specialization: string;
-      rating: number;
-      completedBookings: number;
-    };
+    workerProfile: { specialization: string; rating: number; completedBookings: number };
   } | null;
-  service: {
-    _id: string;
-    name: string;
-    description: string;
-    category: string;
-  };
-  location: {
-    address: string;
-    area: string;
-    city: string;
-    apartmentName?: string;
-  };
+  location: { address?: string; area: string; city: string; apartmentName?: string };
+  subscriptionStartDate?: string;
+  subscriptionEndDate?: string;
+  activationStatus?: 'payment_pending' | 'approval_pending' | 'active' | string;
+  isPaused?: boolean;
+  isPrepaid?: boolean;
+  autoRenewal?: boolean;
+  allowPause?: boolean;
+  pauseRequestStatus?: 'none' | 'pending' | 'approved' | 'rejected' | string;
+  pauseRequestedAt?: string | null;
+  pauseRequestStartDate?: string | null;
+  pauseRequestEndDate?: string | null;
+  pauseReviewNote?: string | null;
+  preferredTime?: string;
+  durationPerSession?: number;
+  frequency?: string;
+  selectedDays?: string[];
+  startDate?: string;
+  endDate?: string;
   totalAmount: number;
+  paymentStatus?: string;
   paymentProof?: {
     url?: string | null;
     reviewStatus?: 'pending' | 'approved' | 'rejected';
     reviewNotes?: string | null;
   };
-  paymentStatus?: string;
+  sessionsTotal: number;
+  sessionsDone: number;
+  sessionsUpcoming: number;
+  totalOvertimeMinutes: number;
+  totalOvertimeCharges: number;
+  sessions: SessionRow[];
 }
 
-interface Worker {
+// ── Available-worker type for change-worker modal ─────────────────────────────
+interface AvailableWorker {
   _id: string;
   name: string;
   email: string;
@@ -91,13 +83,30 @@ interface Worker {
   };
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const fmtDate = (d?: string) => {
+  if (!d) return '—';
+  try { return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' }); }
+  catch { return d; }
+};
+const fmtTime = (t?: string) => {
+  if (!t) return '—';
+  try { return new Date(t).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }); }
+  catch { return t; }
+};
+const fmtMins = (m?: number | null) => {
+  if (!m) return '—';
+  const h = Math.floor(m / 60); const r = m % 60;
+  return h > 0 ? `${h}h ${r}m` : `${r}m`;
+};
+
 const MySubscriptionsPage = () => {
   const { t } = useTranslation();
   const [profile, setProfile] = useState<{ role: string; name?: string } | null>(null);
-  const [subscriptions, setSubscriptions] = useState<Booking[]>([]);
+  const [subscriptions, setSubscriptions] = useState<CustomerSubscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [changingWorker, setChangingWorker] = useState<string | null>(null);
-  const [availableWorkers, setAvailableWorkers] = useState<Worker[]>([]);
+  const [availableWorkers, setAvailableWorkers] = useState<AvailableWorker[]>([]);
   const [loadingWorkers, setLoadingWorkers] = useState(false);
   const [expandedCalendars, setExpandedCalendars] = useState<Set<string>>(new Set());
   const [pauseRequestFor, setPauseRequestFor] = useState<string | null>(null);
@@ -107,7 +116,6 @@ const MySubscriptionsPage = () => {
     reason: '',
   });
   const [submittingPauseRequest, setSubmittingPauseRequest] = useState(false);
-  const [sessionMap, setSessionMap] = useState<Record<string, Booking[]>>({});
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
 
   const toggleSessions = (id: string) =>
@@ -128,47 +136,15 @@ const MySubscriptionsPage = () => {
       return next;
     });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [profileData, bookingsData] = await Promise.all([
+      const [profileData, subsData] = await Promise.all([
         authAPI.getProfile(),
-        bookingsAPI.getAll()
+        api.get('/bookings/customer/my-subscriptions'),
       ]);
-      
       setProfile(profileData.user || profileData);
-      
-      // Filter for subscription bookings
-      const subscriptionBookings = (bookingsData.bookings || [])
-        .filter((booking: Booking) => 
-          booking.subscription?.isSubscription && 
-          !booking.parentBooking &&
-          booking.status !== 'cancelled' &&
-          booking.status !== 'completed'
-        )
-        .sort((a: Booking, b: Booking) => {
-          return new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime();
-        });
-      
-      setSubscriptions(subscriptionBookings);
-
-      // Build session map from child bookings
-      const parentIds = new Set(subscriptionBookings.map((s: Booking) => s._id));
-      const childSessions: Record<string, Booking[]> = {};
-      (bookingsData.bookings || []).forEach((b: Booking) => {
-        if (b.parentBooking && parentIds.has(b.parentBooking)) {
-          if (!childSessions[b.parentBooking]) childSessions[b.parentBooking] = [];
-          childSessions[b.parentBooking].push(b);
-        }
-      });
-      Object.keys(childSessions).forEach(k => {
-        childSessions[k].sort((a, b) => new Date(a.bookingDate).getTime() - new Date(b.bookingDate).getTime());
-      });
-      setSessionMap(childSessions);
+      setSubscriptions(subsData.subscriptions ?? []);
     } catch (error) {
       console.error('Fetch error:', error);
       toast.error(t('subscriptionPage.toasts.loadFailed'));
@@ -177,22 +153,15 @@ const MySubscriptionsPage = () => {
     }
   };
 
+  useEffect(() => {
+    fetchData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const fetchAvailableWorkers = async (serviceCategory: string) => {
     try {
       setLoadingWorkers(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/users/workers/available?specialization=${serviceCategory}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
-      
-      if (!response.ok) throw new Error(t('subscriptionPage.toasts.workersLoadFailed'));
-      
-      const data = await response.json();
+      const data = await api.get(`/users/workers/available?specialization=${encodeURIComponent(serviceCategory)}`);
       setAvailableWorkers(data.workers || []);
     } catch (error) {
       console.error('Error fetching workers:', error);
@@ -202,7 +171,7 @@ const MySubscriptionsPage = () => {
     }
   };
 
-  const handleChangeWorkerClick = async (subscription: Booking) => {
+  const handleChangeWorkerClick = async (subscription: CustomerSubscription) => {
     setChangingWorker(subscription._id);
     await fetchAvailableWorkers(subscription.service.category);
   };
@@ -283,10 +252,10 @@ const MySubscriptionsPage = () => {
     );
   }
 
-  const isSubscriptionPaymentSettled = (subscription: Booking) => Boolean(
+  const isSubscriptionPaymentSettled = (subscription: CustomerSubscription) => Boolean(
     subscription.paymentStatus === 'paid'
     || subscription.paymentProof?.reviewStatus === 'approved'
-    || subscription.subscription?.activationStatus === 'active'
+    || subscription.activationStatus === 'active'
   );
 
   return (
@@ -301,13 +270,13 @@ const MySubscriptionsPage = () => {
         {/* Renewal reminder banners */}
         {subscriptions
           .filter(s => {
-            const end = s.subscription?.subscriptionEndDate;
+            const end = s.subscriptionEndDate;
             if (!end) return false;
             const daysLeft = Math.ceil((new Date(end).getTime() - Date.now()) / 86400000);
             return daysLeft >= 0 && daysLeft <= 3;
           })
           .map(s => {
-            const daysLeft = Math.ceil((new Date(s.subscription!.subscriptionEndDate!).getTime() - Date.now()) / 86400000);
+            const daysLeft = Math.ceil((new Date(s.subscriptionEndDate!).getTime() - Date.now()) / 86400000);
             return (
               <div key={`renewal-${s._id}`} className="mb-3 flex items-start gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3">
                 <AlertTriangle className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
@@ -320,7 +289,7 @@ const MySubscriptionsPage = () => {
                   </p>
                   <p className="text-xs text-orange-600 mt-0.5">
                     {t('subscriptionPage.renewal.description', {
-                      date: new Date(s.subscription!.subscriptionEndDate!).toLocaleDateString()
+                      date: new Date(s.subscriptionEndDate!).toLocaleDateString()
                     })}
                   </p>
                 </div>
@@ -350,7 +319,7 @@ const MySubscriptionsPage = () => {
               (() => {
                 const paymentSettled = isSubscriptionPaymentSettled(subscription);
                 const proofSubmittedPending = Boolean(
-                  subscription.subscription?.activationStatus === 'payment_pending'
+                  subscription.activationStatus === 'payment_pending'
                   && subscription.paymentProof?.reviewStatus === 'pending'
                   && subscription.paymentProof?.url
                 );
@@ -364,7 +333,7 @@ const MySubscriptionsPage = () => {
                       {subscription.service.name}
                     </h3>
                     <p className="text-sm text-muted-foreground capitalize">
-                      {t('subscriptionPage.frequencyLabel', { frequency: subscription.recurringSchedule?.frequency || '-' })}
+                      {t('subscriptionPage.frequencyLabel', { frequency: subscription.frequency || '-' })}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -372,11 +341,11 @@ const MySubscriptionsPage = () => {
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
                           {t('subscriptionPage.badges.proofSubmitted')}
                       </span>
-                    ) : subscription.subscription?.activationStatus === 'payment_pending' && !paymentSettled ? (
+                    ) : subscription.activationStatus === 'payment_pending' && !paymentSettled ? (
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
                           {t('subscriptionPage.badges.paymentRequired')}
                       </span>
-                    ) : subscription.subscription?.activationStatus === 'approval_pending' ? (
+                    ) : subscription.activationStatus === 'approval_pending' ? (
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
                           {t('subscriptionPage.badges.review')}
                       </span>
@@ -384,11 +353,11 @@ const MySubscriptionsPage = () => {
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
                           {t('subscriptionPage.badges.paid')}
                       </span>
-                    ) : subscription.subscription?.isPaused ? (
+                    ) : subscription.isPaused ? (
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300">
                           {t('subscriptionPage.badges.paused')}
                       </span>
-                    ) : subscription.subscription?.pauseRequestStatus === 'pending' ? (
+                    ) : subscription.pauseRequestStatus === 'pending' ? (
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
                           {t('subscriptionPage.badges.pausePending')}
                       </span>
@@ -407,24 +376,24 @@ const MySubscriptionsPage = () => {
                       <Clock className="w-4 h-4 text-muted-foreground" />
                       <span className="text-muted-foreground">{t('subscriptionPage.labels.time')}:</span>
                       <span className="font-medium text-foreground">
-                        {subscription.subscription?.preferredTime || subscription.startTime}
+                        {subscription.preferredTime || '—'}
                       </span>
                     </div>
-                    
+
                     <div className="flex items-center gap-2 text-sm">
                       <Calendar className="w-4 h-4 text-muted-foreground" />
                       <span className="text-muted-foreground">{t('subscriptionPage.labels.started')}:</span>
                       <span className="font-medium text-foreground">
-                        {new Date(subscription.subscription?.subscriptionStartDate || subscription.bookingDate).toLocaleDateString()}
+                        {fmtDate(subscription.subscriptionStartDate)}
                       </span>
                     </div>
 
-                    {subscription.subscription?.subscriptionEndDate && (
+                    {subscription.subscriptionEndDate && (
                       <div className="flex items-center gap-2 text-sm">
                         <Calendar className="w-4 h-4 text-muted-foreground" />
                         <span className="text-muted-foreground">{t('subscriptionPage.labels.ends')}:</span>
                         <span className="font-medium text-foreground">
-                          {new Date(subscription.subscription.subscriptionEndDate).toLocaleDateString()}
+                          {fmtDate(subscription.subscriptionEndDate)}
                         </span>
                       </div>
                     )}
@@ -467,7 +436,7 @@ const MySubscriptionsPage = () => {
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-foreground">{subscription.worker.name}</p>
                           <p className="text-xs text-muted-foreground line-clamp-2 break-words">
-                            {subscription.worker.workerProfile.specialization} • ⭐ {subscription.worker.workerProfile.rating.toFixed(1)}
+                            {subscription.worker.workerProfile?.specialization} • ⭐ {subscription.worker.workerProfile?.rating?.toFixed(1)}
                           </p>
                         </div>
                       </div>
@@ -475,9 +444,9 @@ const MySubscriptionsPage = () => {
                       <div className="rounded-lg bg-muted/60 px-3 py-3 text-sm text-muted-foreground">
                         {proofSubmittedPending
                           ? t('subscriptionPage.worker.unassigned.proofSubmitted')
-                          : subscription.subscription?.activationStatus === 'payment_pending' && !paymentSettled
+                          : subscription.activationStatus === 'payment_pending' && !paymentSettled
                           ? t('subscriptionPage.worker.unassigned.paymentPending')
-                          : subscription.subscription?.activationStatus === 'approval_pending'
+                          : subscription.activationStatus === 'approval_pending'
                           ? t('subscriptionPage.worker.unassigned.review')
                           : paymentSettled
                             ? t('subscriptionPage.worker.unassigned.paid')
@@ -487,8 +456,8 @@ const MySubscriptionsPage = () => {
                   </div>
                 </div>
 
-                {/* Subscription Features */}
-                {subscription.recurringSchedule?.selectedDays && subscription.recurringSchedule.selectedDays.length > 0 && (
+                {/* Service days calendar */}
+                {subscription.selectedDays && subscription.selectedDays.length > 0 && (
                   <div className="mb-4 p-3 bg-muted/50 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-xs font-semibold text-foreground">📅 {t('subscriptionPage.calendar.serviceDays')}</p>
@@ -501,7 +470,7 @@ const MySubscriptionsPage = () => {
                       </button>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {subscription.recurringSchedule.selectedDays.map((day) => (
+                      {subscription.selectedDays.map((day) => (
                         <span
                           key={day}
                           className="px-2 py-1 bg-primary/10 text-primary rounded text-xs font-medium capitalize"
@@ -513,11 +482,11 @@ const MySubscriptionsPage = () => {
                     {expandedCalendars.has(subscription._id) && (
                       <div className="mt-3">
                         <SubscriptionCalendar
-                          selectedDays={subscription.recurringSchedule.selectedDays}
-                          startDate={subscription.recurringSchedule.startDate || subscription.subscription?.subscriptionStartDate}
-                          endDate={subscription.recurringSchedule.endDate || subscription.subscription?.subscriptionEndDate}
-                          isPaused={subscription.subscription?.isPaused}
-                          preferredTime={subscription.subscription?.preferredTime || subscription.startTime}
+                          selectedDays={subscription.selectedDays}
+                          startDate={subscription.startDate}
+                          endDate={subscription.endDate}
+                          isPaused={subscription.isPaused}
+                          preferredTime={subscription.preferredTime}
                         />
                       </div>
                     )}
@@ -526,13 +495,13 @@ const MySubscriptionsPage = () => {
 
                 {/* Features */}
                 <div className="flex flex-wrap gap-3 mb-4 text-xs text-muted-foreground">
-                  {subscription.subscription?.autoRenewal && (
+                  {subscription.autoRenewal && (
                     <span className="flex items-center gap-1">
                       <CheckCircle className="w-3 h-3 text-green-600" />
                       {t('subscriptionPage.features.autoRenewal')}
                     </span>
                   )}
-                  {subscription.subscription?.allowPause && (
+                  {subscription.allowPause && (
                     <span className="flex items-center gap-1">
                       <CheckCircle className="w-3 h-3 text-blue-600" />
                       {t('subscriptionPage.features.pauseAvailable')}
@@ -540,67 +509,84 @@ const MySubscriptionsPage = () => {
                   )}
                   <span className="flex items-center gap-1">
                     <CheckCircle className="w-3 h-3 text-purple-600" />
-                    {t('subscriptionPage.features.durationPerSession', { count: subscription.subscription?.durationPerSession || 1 })}
+                    {t('subscriptionPage.features.durationPerSession', { count: subscription.durationPerSession || 1 })}
                   </span>
                 </div>
 
                 {/* Session Progress + Bill Summary */}
                 {(() => {
-                  const sessions = sessionMap[subscription._id] || [];
-                  const done = sessions.filter(s => s.status === 'completed').length;
-                  const total = sessions.length;
+                  const sessions = subscription.sessions ?? [];
+                  const done = subscription.sessionsDone;
+                  const total = subscription.sessionsTotal;
+                  const upcoming = subscription.sessionsUpcoming;
                   const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
-                  const totalOvertimeCharges = sessions.reduce((sum, s) => sum + (s.overtimeCharges || 0), 0);
-                  const totalOvertimeMinutes = sessions.reduce((sum, s) => sum + (s.overtimeMinutes || 0), 0);
-                  if (total === 0) return null;
+                  const totalOvertimeCharges = subscription.totalOvertimeCharges;
+                  const totalOvertimeMinutes = subscription.totalOvertimeMinutes;
+                  const nextSession = sessions.find(s => ['confirmed', 'assigned', 'pending'].includes(s.status));
                   return (
-                    <div className="mb-4 p-3 bg-muted/40 rounded-xl">
-                      {/* Progress bar */}
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="font-medium text-muted-foreground">Sessions Progress</span>
-                        <span className="font-semibold text-foreground">{done} / {total} done</span>
-                      </div>
-                      <div className="w-full h-2 bg-muted rounded-full overflow-hidden mb-3">
-                        <div
-                          className="h-full bg-primary rounded-full transition-all"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-
-                      {/* Bill chips */}
-                      <div className="flex flex-wrap gap-2 mb-3">
+                    <div className="mb-4 p-4 bg-muted/40 rounded-xl space-y-3">
+                      {/* Summary pills */}
+                      <div className="flex flex-wrap gap-2">
                         <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
-                          <CheckCircle className="w-3 h-3" />
+                          <IndianRupee className="w-3 h-3" />
                           Prepaid ₹{subscription.totalAmount.toLocaleString('en-IN')} ✓
                         </span>
                         {totalOvertimeCharges > 0 && (
                           <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
-                            <Clock className="w-3 h-3" />
-                            Overtime Due: ₹{totalOvertimeCharges.toLocaleString('en-IN')} ({totalOvertimeMinutes} min)
+                            <Timer className="w-3 h-3" />
+                            Overtime Due: ₹{totalOvertimeCharges.toLocaleString('en-IN')} ({fmtMins(totalOvertimeMinutes)})
                           </span>
                         )}
                       </div>
 
+                      {/* Progress bar */}
+                      <div>
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="font-medium text-muted-foreground">Sessions Progress</span>
+                          <span className="font-semibold text-foreground">{done}/{total} done · {upcoming} upcoming</span>
+                        </div>
+                        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-primary rounded-full transition-all"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Next session */}
+                      {nextSession && (
+                        <div className="flex items-center gap-2 text-xs rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-blue-800">
+                          <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                          <span>
+                            Next session: <strong>{fmtDate(nextSession.bookingDate)}</strong> at <strong>{nextSession.startTime}</strong>
+                            {nextSession.worker && <> · {nextSession.worker.name}</>}
+                          </span>
+                        </div>
+                      )}
+
                       {/* Session history toggle */}
-                      <button
-                        onClick={() => toggleSessions(subscription._id)}
-                        className="flex items-center gap-1 text-xs text-primary hover:underline"
-                      >
-                        {expandedSessions.has(subscription._id) ? (
-                          <><ChevronUp className="w-3 h-3" /> Hide Session History</>
-                        ) : (
-                          <><ChevronDown className="w-3 h-3" /> View Session History ({sessions.length} sessions)</>
-                        )}
-                      </button>
+                      {total > 0 && (
+                        <button
+                          onClick={() => toggleSessions(subscription._id)}
+                          className="flex items-center gap-1 text-xs text-primary hover:underline"
+                        >
+                          {expandedSessions.has(subscription._id) ? (
+                            <><ChevronUp className="w-3 h-3" /> Hide Session Log</>
+                          ) : (
+                            <><ChevronDown className="w-3 h-3" /> View Session Log ({total} sessions)</>
+                          )}
+                        </button>
+                      )}
 
                       {expandedSessions.has(subscription._id) && (
-                        <div className="mt-3 rounded-lg border border-border overflow-x-auto">
+                        <div className="rounded-lg border border-border overflow-x-auto">
                           <table className="w-full text-xs">
                             <thead className="bg-muted/60">
                               <tr>
                                 <th className="text-left px-3 py-2 font-medium text-muted-foreground">#</th>
                                 <th className="text-left px-3 py-2 font-medium text-muted-foreground">Date</th>
-                                <th className="text-left px-3 py-2 font-medium text-muted-foreground">Time</th>
+                                <th className="text-left px-3 py-2 font-medium text-muted-foreground">Scheduled</th>
+                                <th className="text-left px-3 py-2 font-medium text-muted-foreground">Actual</th>
                                 <th className="text-left px-3 py-2 font-medium text-muted-foreground">Duration</th>
                                 <th className="text-left px-3 py-2 font-medium text-muted-foreground">Overtime</th>
                                 <th className="text-left px-3 py-2 font-medium text-muted-foreground">Status</th>
@@ -609,28 +595,32 @@ const MySubscriptionsPage = () => {
                             <tbody>
                               {sessions.map((session, idx) => (
                                 <tr key={session._id} className={idx % 2 === 0 ? '' : 'bg-muted/30'}>
-                                  <td className="px-3 py-2 text-muted-foreground">{idx + 1}</td>
-                                  <td className="px-3 py-2 whitespace-nowrap">{new Date(session.bookingDate).toLocaleDateString()}</td>
+                                  <td className="px-3 py-2 text-muted-foreground font-medium">{session.sessionNumber}</td>
+                                  <td className="px-3 py-2 whitespace-nowrap">{fmtDate(session.bookingDate)}</td>
+                                  <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
+                                    {session.startTime} – {session.endTime}
+                                  </td>
                                   <td className="px-3 py-2 whitespace-nowrap">
                                     {session.actualStartTime
-                                      ? `${session.actualStartTime}–${session.actualEndTime || '?'}`
-                                      : session.startTime}
+                                      ? `${fmtTime(session.actualStartTime)} – ${fmtTime(session.actualEndTime)}`
+                                      : <span className="text-muted-foreground">—</span>}
                                   </td>
                                   <td className="px-3 py-2 whitespace-nowrap">
                                     {session.actualDurationMinutes
                                       ? `${session.actualDurationMinutes} min`
-                                      : `${(subscription.subscription?.durationPerSession || 1) * 60} min`}
+                                      : fmtMins(session.scheduledDurationMinutes ?? (subscription.durationPerSession ?? 1) * 60)}
                                   </td>
                                   <td className="px-3 py-2 whitespace-nowrap">
-                                    {(session.overtimeMinutes || 0) > 0 ? (
+                                    {session.overtimeMinutes > 0 ? (
                                       <span className="text-orange-600 font-semibold">
-                                        +{session.overtimeMinutes}m / ₹{(session.overtimeCharges || 0).toFixed(0)}
+                                        +{session.overtimeMinutes}m / ₹{session.overtimeCharges.toFixed(0)}
                                       </span>
                                     ) : <span className="text-muted-foreground">—</span>}
                                   </td>
                                   <td className="px-3 py-2">
                                     <span className={`capitalize font-medium ${
                                       session.status === 'completed' ? 'text-green-600' :
+                                      session.status === 'in-progress' ? 'text-blue-600' :
                                       session.status === 'cancelled' ? 'text-red-500' :
                                       'text-muted-foreground'
                                     }`}>
@@ -649,8 +639,8 @@ const MySubscriptionsPage = () => {
 
                 {/* Actions */}
                 <div className="flex gap-2">
-                  {subscription.subscription?.allowPause && subscription.subscription?.activationStatus === 'active' && (
-                    subscription.subscription?.isPaused ? (
+                  {subscription.allowPause && subscription.activationStatus === 'active' && (
+                    subscription.isPaused ? (
                       <button
                         onClick={() => handleResumeSubscription(subscription._id)}
                         className="btn-outline flex items-center gap-2"
@@ -658,7 +648,7 @@ const MySubscriptionsPage = () => {
                         <RefreshCw className="w-4 h-4" />
                         {t('subscriptionPage.actions.resume')}
                       </button>
-                    ) : subscription.subscription?.pauseRequestStatus === 'pending' ? (
+                    ) : subscription.pauseRequestStatus === 'pending' ? (
                       <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
                         {t('subscriptionPage.actions.pausePending')}
                       </div>
@@ -674,7 +664,7 @@ const MySubscriptionsPage = () => {
                   )}
                 </div>
 
-                {subscription.subscription?.activationStatus === 'payment_pending' && !paymentSettled && (
+                {subscription.activationStatus === 'payment_pending' && !paymentSettled && (
                   <div className="mt-4 space-y-4">
                     {subscription.paymentProof?.reviewStatus === 'pending' && subscription.paymentProof?.url ? (
                       <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
@@ -703,7 +693,7 @@ const MySubscriptionsPage = () => {
                   </div>
                 )}
 
-                {subscription.subscription?.activationStatus === 'approval_pending' && (
+                {subscription.activationStatus === 'approval_pending' && (
                   <div className="mt-4 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-700">
                     {t('subscriptionPage.payment.approvalPending')}
                   </div>
@@ -715,22 +705,22 @@ const MySubscriptionsPage = () => {
                   </div>
                 )}
 
-                {subscription.subscription?.pauseRequestStatus === 'rejected' && subscription.subscription?.pauseReviewNote && (
+                {subscription.pauseRequestStatus === 'rejected' && subscription.pauseReviewNote && (
                   <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {t('subscriptionPage.pause.rejectedUpdate', { note: subscription.subscription.pauseReviewNote })}
+                    {t('subscriptionPage.pause.rejectedUpdate', { note: subscription.pauseReviewNote })}
                   </div>
                 )}
 
-                {subscription.subscription?.pauseRequestStatus === 'pending' && (
+                {subscription.pauseRequestStatus === 'pending' && (
                   <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
                     {t('subscriptionPage.pause.sentOn', {
-                      date: subscription.subscription.pauseRequestedAt ? new Date(subscription.subscription.pauseRequestedAt).toLocaleDateString() : t('subscriptionPage.renewal.today')
+                      date: subscription.pauseRequestedAt ? new Date(subscription.pauseRequestedAt).toLocaleDateString() : t('subscriptionPage.renewal.today')
                     })}
-                    {subscription.subscription.pauseRequestStartDate && (
-                      <span> {t('subscriptionPage.pause.breakWindowStart', { date: new Date(subscription.subscription.pauseRequestStartDate).toLocaleDateString() })}</span>
+                    {subscription.pauseRequestStartDate && (
+                      <span> {t('subscriptionPage.pause.breakWindowStart', { date: new Date(subscription.pauseRequestStartDate).toLocaleDateString() })}</span>
                     )}
-                    {subscription.subscription.pauseRequestEndDate && (
-                      <span> {t('subscriptionPage.pause.breakWindowEnd', { date: new Date(subscription.subscription.pauseRequestEndDate).toLocaleDateString() })}</span>
+                    {subscription.pauseRequestEndDate && (
+                      <span> {t('subscriptionPage.pause.breakWindowEnd', { date: new Date(subscription.pauseRequestEndDate).toLocaleDateString() })}</span>
                     )}
                   </div>
                 )}
@@ -745,7 +735,7 @@ const MySubscriptionsPage = () => {
                       <p className="text-sm text-muted-foreground mb-4">
                         {t('subscriptionPage.worker.modalDescription')}
                       </p>
-                      
+
                       {loadingWorkers ? (
                         <div className="py-12 text-center">
                           <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
