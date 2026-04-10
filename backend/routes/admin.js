@@ -16,7 +16,7 @@ import WorkerEarnings from '../models/WorkerEarnings.js';
 import WorkerSalaryRequest from '../models/WorkerSalaryRequest.js';
 import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/emailService.js';
 import notificationService from '../utils/notificationService.js';
-import { getNextRecurringScheduleDate } from '../utils/recurringSchedule.js';
+import { getNextRecurringScheduleDate, projectSubscriptionSessions } from '../utils/recurringSchedule.js';
 import { checkSlotAvailability } from '../utils/slotManagement.js';
 import { isWhatsAppConfigured, sendWhatsAppMessage } from '../utils/whatsappService.js';
 import {

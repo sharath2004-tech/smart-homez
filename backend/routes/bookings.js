@@ -24,7 +24,7 @@ import {
 import { calculateDistance } from '../utils/geolocation.js';
 import notificationService from '../utils/notificationService.js';
 import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
-import { getNextRecurringScheduleDate } from '../utils/recurringSchedule.js';
+import { getNextRecurringScheduleDate, projectSubscriptionSessions } from '../utils/recurringSchedule.js';
 import { checkSlotAvailability } from '../utils/slotManagement.js';
 import {
     buildRecurringOccurrences,
