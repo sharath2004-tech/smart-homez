@@ -1,11 +1,12 @@
 import ListPagination from "@/components/admin/ListPagination";
 import AppLayout from "@/components/AppLayout";
 import BookingOrderPrint from "@/components/BookingOrderPrint";
+import WorkerProfilePreviewDialog from "@/components/WorkerProfilePreviewDialog";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { adminAPI, bookingsAPI, superAdminAPI } from "@/lib/api";
 import ExcelJS from "exceljs";
 import html2pdf from "html2pdf.js";
-import { CheckCircle, Coffee, Crown, Download, Eye, MapPin, Printer, Search, Users, Wallet, X } from "lucide-react";
+import { CheckCircle, Coffee, Crown, Download, Eye, MapPin, Printer, Search, User, Users, Wallet, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 interface ProofPhoto {
@@ -35,7 +36,7 @@ interface Booking {
   _id: string;
   bookingId?: string;
   customer: { _id: string; name: string; email: string; phone?: string } | null;
-  worker?: { _id: string; name: string; email: string; phone?: string } | null;
+  worker?: { _id: string; name: string; email: string; phone?: string; profileImage?: string; gender?: string; religion?: string; workerProfile?: { experience?: number; languages?: string[]; rating?: number; specialization?: string[] | string; totalReviews?: number; totalJobsCompleted?: number; completedJobs?: number; completedBookings?: number; availability?: boolean } } | null;
   supportStaff?: { worker: { _id: string; name: string; email?: string; phone?: string }; name?: string }[];
   service: { _id: string; name: string; category: string; price?: number; duration?: number } | null;
   bookingType?: string;
@@ -157,6 +158,9 @@ const AdminBookings = () => {
   const [availableWorkers, setAvailableWorkers] = useState<AvailableWorker[]>([]);
   const [availableWorkersLoading, setAvailableWorkersLoading] = useState(false);
   const [reassignReason, setReassignReason] = useState('Admin reassignment');
+
+  // Worker profile preview state
+  const [showWorkerProfileDialog, setShowWorkerProfileDialog] = useState(false);
 
   // Print state
   const [showPrintModal, setShowPrintModal] = useState(false);
@@ -1342,7 +1346,18 @@ const AdminBookings = () => {
                 </div>
                 <div>
                   <p className="text-muted-foreground text-xs">Worker</p>
-                  <p className="font-medium">{selectedProofBooking.worker?.name || '—'}</p>
+                  {selectedProofBooking.worker ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowWorkerProfileDialog(true)}
+                      className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline mt-0.5"
+                    >
+                      <User className="w-3.5 h-3.5 shrink-0" />
+                      {selectedProofBooking.worker.name}
+                    </button>
+                  ) : (
+                    <p className="font-medium">—</p>
+                  )}
                 </div>
                 <div>
                   <p className="text-muted-foreground text-xs">Service</p>
@@ -1955,6 +1970,11 @@ const AdminBookings = () => {
           </div>
         </div>
       )}
+      <WorkerProfilePreviewDialog
+        open={showWorkerProfileDialog}
+        onOpenChange={setShowWorkerProfileDialog}
+        worker={selectedProofBooking?.worker || null}
+      />
     </AppLayout>
   );
 };

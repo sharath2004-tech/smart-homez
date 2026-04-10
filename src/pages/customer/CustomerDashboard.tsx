@@ -521,7 +521,7 @@ const CustomerDashboard = () => {
       return `${dateText}, ${formattedTime}`;
     }
     
-    return dateText;
+    return dateText;https://smart-homez.onrender.com
   };
 
   // Animation variants
