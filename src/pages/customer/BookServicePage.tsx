@@ -36,6 +36,14 @@ interface Service {
     allowDaySelection: boolean;
     sortOrder: number;
   }>;
+  timeBasedPricing?: {
+    enabled: boolean;
+    startTime: string;
+    endTime: string;
+    surchargeType: 'percentage' | 'fixed';
+    surchargeValue: number;
+    label: string;
+  };
 }
 
 interface Worker {
@@ -344,30 +352,78 @@ const BookServicePage = () => {
     const defaultHours = (service.duration || 60) / 60;
     const durationRatio = durationPerSession / defaultHours;
 
+    let base: number;
     if (bookingType !== 'oneTime') {
       // Use the selected subscription plan's price as the base for the default duration
       const plan = subscriptionPlans.find(p => p.name === bookingType);
-      if (plan) return Math.round(plan.price * durationRatio);
+      base = plan ? Math.round(plan.price * durationRatio) : Math.round(service.price * durationRatio);
+    } else {
+      // One-time: use pricingPlans.oneTime or service.price as base
+      base = Math.round(
+        ((service.pricingPlans as Record<string, number> | undefined)?.[bookingType]
+          ?? service.pricingPlans?.oneTime
+          ?? service.price) * durationRatio
+      );
     }
-
-    // One-time: use pricingPlans.oneTime or service.price as base
-    const base = (service.pricingPlans as Record<string, number> | undefined)?.[bookingType]
-      ?? service.pricingPlans?.oneTime
-      ?? service.price;
-    return Math.round(base * durationRatio);
+    return base + calculatePeakSurcharge(base);
   };
 
-  // MRP = market rate before platform discount
+  /** Returns the peak-hours surcharge for a given base price. */
+  const calculatePeakSurcharge = (basePrice: number): number => {
+    const tbp = service?.timeBasedPricing;
+    if (!tbp?.enabled || !tbp.surchargeValue) return 0;
+
+    const timeStr = bookingMode === 'schedule' ? selectedExactTime : (() => {
+      const now = new Date();
+      const minutes = Math.ceil((now.getHours() * 60 + now.getMinutes()) / 15) * 15 + 30;
+      return `${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+    })();
+    if (!timeStr) return 0;
+
+    const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+    const t = toMin(timeStr);
+    const start = toMin(tbp.startTime);
+    const end = toMin(tbp.endTime);
+    const inWindow = start <= end ? t >= start && t <= end : t >= start || t <= end;
+    if (!inWindow) return 0;
+
+    return tbp.surchargeType === 'fixed'
+      ? Math.round(tbp.surchargeValue)
+      : Math.round(basePrice * tbp.surchargeValue / 100);
+  };
+
+  /** True when the currently selected time falls in the peak window. */
+  const isPeakHours = (): boolean => {
+    const tbp = service?.timeBasedPricing;
+    if (!tbp?.enabled || !tbp.surchargeValue) return false;
+    const defaultHours = (service!.duration || 60) / 60;
+    const durationRatio = durationPerSession / defaultHours;
+    let base: number;
+    if (bookingType !== 'oneTime') {
+      const plan = subscriptionPlans.find(p => p.name === bookingType);
+      base = plan ? Math.round(plan.price * durationRatio) : Math.round(service!.price * durationRatio);
+    } else {
+      base = Math.round(((service!.pricingPlans as Record<string, number> | undefined)?.[bookingType] ?? service!.pricingPlans?.oneTime ?? service!.price) * durationRatio);
+    }
+    return calculatePeakSurcharge(base) > 0;
+  };
+
+  // MRP = market rate before platform discount (excludes peak-hours surcharge)
   const calculateMrp = () => {
     if (!service) return 0;
     const defaultHours = (service.duration || 60) / 60;
     const durationRatio = durationPerSession / defaultHours;
     // For subscription plans, MRP = service base price scaled by duration
-    // For one-time, MRP = 20% above our price
+    // For one-time, MRP = 20% above our base price (not including surcharge)
     if (bookingType !== 'oneTime') {
       return Math.round(service.price * durationRatio);
     }
-    return Math.round(calculatePrice() / 0.8);
+    const basePrice = Math.round(
+      ((service.pricingPlans as Record<string, number> | undefined)?.[bookingType]
+        ?? service.pricingPlans?.oneTime
+        ?? service.price) * durationRatio
+    );
+    return Math.round(basePrice / 0.8);
   };
 
   const handleBooking = async (e: React.FormEvent) => {
@@ -1096,6 +1152,22 @@ const BookServicePage = () => {
                       Selected: <span className="font-semibold text-foreground">{formatSlotTime(selectedExactTime)}</span>
                     </p>
                   )}
+
+                  {/* Peak-hours surcharge notice */}
+                  {isPeakHours() && service?.timeBasedPricing && (
+                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+                      <span className="text-amber-600 text-sm leading-none mt-0.5">⚡</span>
+                      <div className="text-xs text-amber-800">
+                        <span className="font-semibold">{service.timeBasedPricing.label} pricing applies</span>
+                        {' '}({service.timeBasedPricing.startTime}–{service.timeBasedPricing.endTime}){' '}
+                        — a surcharge of{' '}
+                        {service.timeBasedPricing.surchargeType === 'fixed'
+                          ? `₹${service.timeBasedPricing.surchargeValue}`
+                          : `${service.timeBasedPricing.surchargeValue}%`}{' '}
+                        has been added to the total.
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Warning when no workers available at location */}
                   {selectedDate && !loadingSlots && totalWorkersCount === 0 && (
@@ -1643,6 +1715,16 @@ const BookServicePage = () => {
                 </span>
               </div>
               <div className="h-px bg-border my-3"></div>
+              {isPeakHours() && service.timeBasedPricing && (
+                <div className="flex justify-between text-xs text-amber-700">
+                  <span>⚡ {service.timeBasedPricing.label} surcharge</span>
+                  <span>
+                    +{service.timeBasedPricing.surchargeType === 'fixed'
+                      ? `₹${service.timeBasedPricing.surchargeValue}`
+                      : `${service.timeBasedPricing.surchargeValue}%`}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between items-end text-lg">
                 <span className="font-bold text-foreground">Total</span>
                 <div className="text-right">

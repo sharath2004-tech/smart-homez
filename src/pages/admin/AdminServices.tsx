@@ -107,6 +107,14 @@ interface Service {
   serviceCategory?: string;
   displayOrder?: number;
   allowBreakRequests?: boolean;
+  timeBasedPricing?: {
+    enabled: boolean;
+    startTime: string;
+    endTime: string;
+    surchargeType: 'percentage' | 'fixed';
+    surchargeValue: number;
+    label: string;
+  };
 }
 
 interface UserProfile {
@@ -593,6 +601,7 @@ const AdminServices = () => {
       serviceCategory: service.serviceCategory ?? 'other',
       displayOrder: service.displayOrder ?? 0,
       allowBreakRequests: service.allowBreakRequests === true,
+      timeBasedPricing: service.timeBasedPricing ?? { enabled: false, startTime: '19:00', endTime: '23:59', surchargeType: 'percentage', surchargeValue: 0, label: 'Peak Hours' },
     });
     setEditingId(service._id!);
     setShowForm(true);
@@ -643,6 +652,7 @@ const AdminServices = () => {
       serviceCategory: 'other',
       displayOrder: 0,
       allowBreakRequests: false,
+      timeBasedPricing: { enabled: false, startTime: '19:00', endTime: '23:59', surchargeType: 'percentage', surchargeValue: 0, label: 'Peak Hours' },
     });
   };
 
@@ -1882,6 +1892,98 @@ const AdminServices = () => {
                     </label>
                     <p className="text-xs text-muted-foreground">Workers can request breaks during in-progress bookings for this service.</p>
                   </div>
+                </div>
+
+                {/* Time-Based Pricing */}
+                <div className="space-y-3 p-4 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="timeBasedPricingEnabled"
+                      checked={formData.timeBasedPricing?.enabled === true}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        timeBasedPricing: { ...(formData.timeBasedPricing ?? { startTime: '19:00', endTime: '23:59', surchargeType: 'percentage', surchargeValue: 0, label: 'Peak Hours' }), enabled: e.target.checked }
+                      })}
+                      className="w-4 h-4 accent-primary"
+                    />
+                    <div>
+                      <label htmlFor="timeBasedPricingEnabled" className="text-sm font-medium text-foreground cursor-pointer">
+                        ⚡ Time-Based Pricing (Peak Hours)
+                      </label>
+                      <p className="text-xs text-muted-foreground">Charge more during specific hours (e.g. after 7 PM). Shown to customers before booking.</p>
+                    </div>
+                  </div>
+
+                  {formData.timeBasedPricing?.enabled && (
+                    <div className="space-y-3 pl-7">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-foreground mb-1">Start Time</label>
+                          <input
+                            type="time"
+                            value={formData.timeBasedPricing?.startTime ?? '19:00'}
+                            onChange={(e) => setFormData({ ...formData, timeBasedPricing: { ...formData.timeBasedPricing!, startTime: e.target.value } })}
+                            className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-foreground mb-1">End Time</label>
+                          <input
+                            type="time"
+                            value={formData.timeBasedPricing?.endTime ?? '23:59'}
+                            onChange={(e) => setFormData({ ...formData, timeBasedPricing: { ...formData.timeBasedPricing!, endTime: e.target.value } })}
+                            className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-foreground mb-1">Surcharge Type</label>
+                          <select
+                            value={formData.timeBasedPricing?.surchargeType ?? 'percentage'}
+                            onChange={(e) => setFormData({ ...formData, timeBasedPricing: { ...formData.timeBasedPricing!, surchargeType: e.target.value as 'percentage' | 'fixed' } })}
+                            className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background"
+                          >
+                            <option value="percentage">Percentage (%)</option>
+                            <option value="fixed">Fixed Amount (₹)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-foreground mb-1">
+                            {formData.timeBasedPricing?.surchargeType === 'fixed' ? 'Amount (₹)' : 'Percentage (%)'}
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step={formData.timeBasedPricing?.surchargeType === 'fixed' ? '1' : '0.1'}
+                            value={formData.timeBasedPricing?.surchargeValue ?? 0}
+                            onChange={(e) => setFormData({ ...formData, timeBasedPricing: { ...formData.timeBasedPricing!, surchargeValue: Number(e.target.value) } })}
+                            className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-foreground mb-1">Label (shown to customer)</label>
+                        <input
+                          type="text"
+                          value={formData.timeBasedPricing?.label ?? 'Peak Hours'}
+                          onChange={(e) => setFormData({ ...formData, timeBasedPricing: { ...formData.timeBasedPricing!, label: e.target.value } })}
+                          placeholder="e.g. Peak Hours, Evening Charges"
+                          className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background"
+                        />
+                      </div>
+                      {(formData.timeBasedPricing?.surchargeValue ?? 0) > 0 && (
+                        <p className="text-xs text-amber-700 bg-amber-100 rounded-lg px-3 py-2">
+                          Preview: After {formData.timeBasedPricing?.startTime} —{' '}
+                          {formData.timeBasedPricing?.surchargeType === 'fixed'
+                            ? `+₹${formData.timeBasedPricing?.surchargeValue}`
+                            : `+${formData.timeBasedPricing?.surchargeValue}%`}{' '}
+                          ({formData.timeBasedPricing?.label})
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Suggested Services Section */}

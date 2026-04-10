@@ -518,7 +518,17 @@ const serviceSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  
+
+  // Time-based pricing (e.g. peak-hours surcharge after 7 PM)
+  timeBasedPricing: {
+    enabled: { type: Boolean, default: false },
+    startTime: { type: String, default: '19:00' },   // 24-hr "HH:mm"
+    endTime:   { type: String, default: '23:59' },   // 24-hr "HH:mm"
+    surchargeType:  { type: String, enum: ['percentage', 'fixed'], default: 'percentage' },
+    surchargeValue: { type: Number, default: 0, min: 0 },
+    label: { type: String, default: 'Peak Hours' }   // shown to customer
+  },
+
   // Special instructions template
   specialInstructionsTemplate: {
     enabled: Boolean,

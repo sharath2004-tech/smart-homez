@@ -207,7 +207,8 @@ router.post('/',
         originalPrice, isActive, isQuoteService,
         workerSearchRadiusKm, allowBreakRequests,
         suggestedServices, dos, donts,
-        displayOrder, serviceCategory
+        displayOrder, serviceCategory,
+        timeBasedPricing
       } = req.body;
 
       const servicePayload = {
@@ -222,7 +223,8 @@ router.post('/',
         originalPrice, isActive, isQuoteService,
         workerSearchRadiusKm, allowBreakRequests,
         suggestedServices, dos, donts,
-        displayOrder, serviceCategory
+        displayOrder, serviceCategory,
+        timeBasedPricing
       };
 
       // Admins cannot create services directly — their request goes to super admin for approval
@@ -397,6 +399,8 @@ const handleServiceUpdate = async (req, res) => {
       defaultWorkerCount, workerWage,
       // Radius & break settings
       workerSearchRadiusKm, allowBreakRequests,
+      // Time-based pricing
+      timeBasedPricing,
       // Service capabilities
       suggestedServices, dos, donts,
       isQuoteService,
@@ -476,6 +480,7 @@ const handleServiceUpdate = async (req, res) => {
     if ('workerWage' in req.body) updateData.workerWage = workerWage;
     if ('workerSearchRadiusKm' in req.body) updateData.workerSearchRadiusKm = workerSearchRadiusKm;
     if ('allowBreakRequests' in req.body) updateData.allowBreakRequests = allowBreakRequests;
+    if ('timeBasedPricing' in req.body) updateData.timeBasedPricing = timeBasedPricing;
     if ('suggestedServices' in req.body) updateData.suggestedServices = suggestedServices;
     if ('dos' in req.body) updateData.dos = dos;
     if ('donts' in req.body) updateData.donts = donts;

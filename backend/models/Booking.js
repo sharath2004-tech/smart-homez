@@ -579,6 +579,10 @@ const bookingSchema = new mongoose.Schema({
     type: Number,
     default: 0 // Additional charges for overtime
   },
+  peakHoursSurcharge: {
+    type: Number,
+    default: 0 // Surcharge applied when booking falls in a peak-hours window
+  },
   // Photo Verification at Service Completion
   completionPhoto: {
     url: {

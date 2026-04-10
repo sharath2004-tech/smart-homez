@@ -24,6 +24,7 @@ import {
 import { calculateDistance } from '../utils/geolocation.js';
 import notificationService from '../utils/notificationService.js';
 import { findWorkerWithPreferences } from '../utils/preferenceAssignment.js';
+import { applyTimeBasedSurcharge } from '../utils/pricingUtils.js';
 import { getNextRecurringScheduleDate, projectSubscriptionSessions } from '../utils/recurringSchedule.js';
 import { checkSlotAvailability } from '../utils/slotManagement.js';
 import {
@@ -1754,7 +1755,7 @@ router.post('/',
         : null;
 
       const serviceConfig = await Service.findById(service)
-        .select('name category duration durationOptions sizeParameters pricingTiers workerSearchRadiusKm defaultWorkerCount workerWage')
+        .select('name category duration durationOptions sizeParameters pricingTiers workerSearchRadiusKm defaultWorkerCount workerWage timeBasedPricing')
         .lean();
 
       if (!serviceConfig) {
@@ -1774,6 +1775,20 @@ router.post('/',
           if (tier?.price) {
             totalAmount = tier.price; // Use server-authoritative price, not client-sent value
           }
+        }
+      }
+
+      // ── Time-based pricing (peak-hours surcharge) ──────────────────────
+      let peakHoursSurcharge = 0;
+      if (serviceConfig?.timeBasedPricing?.enabled) {
+        // Use startTime for instant bookings, preferredTime for subscriptions
+        const bookingTimeStr = isSubscription
+          ? (subscriptionDetails?.preferredTime || null)
+          : (startTime ? String(startTime).slice(0, 5) : null);
+        const surchargeResult = applyTimeBasedSurcharge(totalAmount, serviceConfig.timeBasedPricing, bookingTimeStr);
+        if (surchargeResult.isPeakHours) {
+          totalAmount = surchargeResult.finalPrice;
+          peakHoursSurcharge = surchargeResult.surchargeAmount;
         }
       }
 
@@ -2061,6 +2076,7 @@ router.post('/',
         preferences: preferences || {},
         scheduledDurationMinutes: bookingWindow.durationMinutes,
         paymentStatus: 'pending',
+        ...(peakHoursSurcharge > 0 && { peakHoursSurcharge }),
         ...(serviceDetails && { serviceDetails })
       };
 
