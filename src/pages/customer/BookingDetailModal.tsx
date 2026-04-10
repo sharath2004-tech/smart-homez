@@ -519,6 +519,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
   const shouldShowPaymentProofStep = Boolean(
     booking
     && !isBookingPaymentSettled
+    && booking.paymentProof?.reviewStatus !== 'pending'
     && !isSubscriptionChildVisit
     && booking.status !== 'cancelled'
     && paymentSummary?.pendingAmount !== null
@@ -1042,6 +1043,31 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                       </div>
                     )}
                   </div>
+                </div>
+              )}
+
+              {booking.paymentProof?.url && (
+                <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="text-sm font-semibold text-foreground">Your uploaded payment proof</p>
+                    {booking.paymentProof.reviewStatus === 'approved' && (
+                      <span className="inline-flex rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">Approved</span>
+                    )}
+                    {booking.paymentProof.reviewStatus === 'pending' && (
+                      <span className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">Pending review</span>
+                    )}
+                    {booking.paymentProof.reviewStatus === 'rejected' && (
+                      <span className="inline-flex rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">Rejected</span>
+                    )}
+                  </div>
+                  <img
+                    src={bookingsAPI.getCompletionPhotoUrl(booking.paymentProof.url)}
+                    alt="Payment proof"
+                    className="w-full max-w-xs rounded-xl border border-border object-contain"
+                  />
+                  {booking.paymentProof.reviewStatus === 'rejected' && booking.paymentProof.reviewNotes && (
+                    <p className="text-xs text-red-600 bg-red-50 rounded-xl px-3 py-2">Rejection reason: {booking.paymentProof.reviewNotes}</p>
+                  )}
                 </div>
               )}
 
