@@ -5091,7 +5091,11 @@ router.get('/subscription-tracker', authenticate, authorize('admin', 'super_admi
     }
 
     if (status && status !== 'all') {
-      matchStage['subscription.activationStatus'] = status;
+      if (status === 'cancelled') {
+        matchStage.status = 'cancelled';
+      } else {
+        matchStage['subscription.activationStatus'] = status;
+      }
     }
 
     // Get parent bookings
@@ -5119,12 +5123,14 @@ router.get('/subscription-tracker', authenticate, authorize('admin', 'super_admi
       const childBookings = await Booking.find({
         parentBooking: b._id,
         'subscription.isSubscription': true,
-      }).select('status actualStartTime actualEndTime actualDurationMinutes scheduledDurationMinutes overtimeMinutes overtimeCharges bookingDate startTime endTime worker').populate('worker', 'name').lean();
+      }).select('status overtimeMinutes overtimeCharges').lean();
 
-      const done = childBookings.filter(c => c.status === 'completed').length;
-      const upcoming = childBookings.filter(c => ['confirmed', 'assigned', 'pending', 'in-progress'].includes(c.status)).length;
-      const totalOvertimeMinutes = childBookings.reduce((s, c) => s + (c.overtimeMinutes || 0), 0);
-      const totalOvertimeCharges = childBookings.reduce((s, c) => s + (c.overtimeCharges || 0), 0);
+      // Root booking itself is session #1; include it in all counts
+      const allSessions = [b, ...childBookings];
+      const done = allSessions.filter(c => c.status === 'completed').length;
+      const upcoming = allSessions.filter(c => ['confirmed', 'assigned', 'pending', 'in-progress'].includes(c.status)).length;
+      const totalOvertimeMinutes = allSessions.reduce((s, c) => s + (c.overtimeMinutes || 0), 0);
+      const totalOvertimeCharges = allSessions.reduce((s, c) => s + (c.overtimeCharges || 0), 0);
 
       return {
         _id: b._id,
@@ -5136,6 +5142,7 @@ router.get('/subscription-tracker', authenticate, authorize('admin', 'super_admi
         subscriptionStartDate: b.subscription?.subscriptionStartDate,
         subscriptionEndDate: b.subscription?.subscriptionEndDate,
         activationStatus: b.subscription?.activationStatus,
+        bookingStatus: b.status,
         isPaused: b.subscription?.isPaused,
         isPrepaid: b.subscription?.isPrepaid,
         totalAmount: b.totalAmount,
@@ -5143,7 +5150,7 @@ router.get('/subscription-tracker', authenticate, authorize('admin', 'super_admi
         preferredTime: b.subscription?.preferredTime || b.startTime,
         durationPerSession: b.subscription?.durationPerSession,
         frequency: b.recurringSchedule?.frequency,
-        sessionsTotal: childBookings.length,
+        sessionsTotal: allSessions.length,
         sessionsDone: done,
         sessionsUpcoming: upcoming,
         totalOvertimeMinutes,
@@ -5186,31 +5193,46 @@ router.get('/subscription-tracker/:bookingId/sessions', authenticate, authorize(
       .sort({ bookingDate: 1 })
       .lean();
 
-    const sessionRows = sessions.map((s, idx) => {
-      const scheduledMins = s.scheduledDurationMinutes ||
-        (() => {
-          if (!s.startTime || !s.endTime) return null;
-          const [sh, sm] = s.startTime.split(':').map(Number);
-          const [eh, em] = s.endTime.split(':').map(Number);
-          return (eh * 60 + em) - (sh * 60 + sm);
-        })();
+    const calcScheduledMins = (s) => s.scheduledDurationMinutes ||
+      (() => {
+        if (!s.startTime || !s.endTime) return null;
+        const [sh, sm] = s.startTime.split(':').map(Number);
+        const [eh, em] = s.endTime.split(':').map(Number);
+        return (eh * 60 + em) - (sh * 60 + sm);
+      })();
 
-      return {
-        sessionNumber: idx + 1,
-        _id: s._id,
-        bookingDate: s.bookingDate,
-        startTime: s.startTime,
-        endTime: s.endTime,
-        worker: s.worker,
-        status: s.status,
-        actualStartTime: s.actualStartTime,
-        actualEndTime: s.actualEndTime,
-        actualDurationMinutes: s.actualDurationMinutes,
-        scheduledDurationMinutes: scheduledMins,
-        overtimeMinutes: s.overtimeMinutes || 0,
-        overtimeCharges: s.overtimeCharges || 0,
-      };
-    });
+    // Root booking itself is session #1 (the first occurrence)
+    const rootRow = {
+      sessionNumber: 1,
+      _id: parent._id,
+      bookingDate: parent.bookingDate,
+      startTime: parent.startTime,
+      endTime: parent.endTime,
+      worker: parent.worker,
+      status: parent.status,
+      actualStartTime: parent.actualStartTime,
+      actualEndTime: parent.actualEndTime,
+      actualDurationMinutes: parent.actualDurationMinutes,
+      scheduledDurationMinutes: calcScheduledMins(parent),
+      overtimeMinutes: parent.overtimeMinutes || 0,
+      overtimeCharges: parent.overtimeCharges || 0,
+    };
+
+    const sessionRows = [rootRow, ...sessions.map((s, idx) => ({
+      sessionNumber: idx + 2,
+      _id: s._id,
+      bookingDate: s.bookingDate,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      worker: s.worker,
+      status: s.status,
+      actualStartTime: s.actualStartTime,
+      actualEndTime: s.actualEndTime,
+      actualDurationMinutes: s.actualDurationMinutes,
+      scheduledDurationMinutes: calcScheduledMins(s),
+      overtimeMinutes: s.overtimeMinutes || 0,
+      overtimeCharges: s.overtimeCharges || 0,
+    }))];
 
     const totalOvertimeMinutes = sessionRows.reduce((s, r) => s + r.overtimeMinutes, 0);
     const totalOvertimeCharges = sessionRows.reduce((s, r) => s + r.overtimeCharges, 0);
@@ -5228,6 +5250,7 @@ router.get('/subscription-tracker/:bookingId/sessions', authenticate, authorize(
         paymentStatus: parent.paymentStatus,
         isPrepaid: parent.subscription?.isPrepaid,
         activationStatus: parent.subscription?.activationStatus,
+        bookingStatus: parent.status,
         subscriptionStartDate: parent.subscription?.subscriptionStartDate,
         subscriptionEndDate: parent.subscription?.subscriptionEndDate,
         preferredTime: parent.subscription?.preferredTime || parent.startTime,

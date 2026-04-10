@@ -957,6 +957,25 @@ const CustomerDashboard = () => {
           )}
         </motion.div>
 
+        {/* My Subscriptions quick link */}
+        <motion.div variants={itemVariants}>
+          <motion.div whileHover="hover" whileTap="tap" variants={cardHoverVariants}>
+            <Link
+              to="/customer/subscriptions"
+              className="card-elevated-hover p-4 flex items-center gap-4 group block"
+            >
+              <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
+                <RefreshCw className="w-6 h-6 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-foreground">{t('nav.mySubscriptions')}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t('subscriptionPage.subtitle')}</p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground group-hover:translate-x-1 transition-all" />
+            </Link>
+          </motion.div>
+        </motion.div>
+
         {/* Account Settings quick link */}
         <motion.div variants={itemVariants}>
           <motion.div whileHover="hover" whileTap="tap" variants={cardHoverVariants}>

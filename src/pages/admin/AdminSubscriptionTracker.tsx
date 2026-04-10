@@ -30,6 +30,7 @@ interface SubscriptionRow {
   subscriptionStartDate?: string;
   subscriptionEndDate?: string;
   activationStatus: string;
+  bookingStatus?: string;
   isPaused?: boolean;
   isPrepaid?: boolean;
   totalAmount: number;
@@ -96,9 +97,15 @@ const fmtDate = (d?: string) => {
     return d;
   }
 };
+const resolveDisplayStatus = (sub: { activationStatus: string; bookingStatus?: string; isPaused?: boolean }) => {
+  if (sub.bookingStatus === 'cancelled') return 'cancelled';
+  if (sub.isPaused) return 'paused';
+  return sub.activationStatus;
+};
 const statusBadge = (s: string) => {
   const map: Record<string, string> = {
     active: "bg-green-100 text-green-800",
+    paused: "bg-yellow-100 text-yellow-800",
     payment_pending: "bg-yellow-100 text-yellow-800",
     approval_pending: "bg-blue-100 text-blue-800",
     completed: "bg-slate-100 text-slate-700",
@@ -263,6 +270,7 @@ const AdminSubscriptionTracker = () => {
             <option value="active">Active</option>
             <option value="payment_pending">Payment Pending</option>
             <option value="approval_pending">Approval Pending</option>
+            <option value="cancelled">Cancelled</option>
           </select>
         </div>
 
@@ -340,8 +348,8 @@ const AdminSubscriptionTracker = () => {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusBadge(sub.activationStatus)}`}>
-                          {sub.isPaused ? "Paused" : sub.activationStatus?.replace(/_/g, " ")}
+                        <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusBadge(resolveDisplayStatus(sub))}`}>
+                          {resolveDisplayStatus(sub).replace(/_/g, " ")}
                         </span>
                         {sub.isPrepaid && (
                           <p className="text-xs text-green-700 mt-0.5 flex items-center gap-0.5">
@@ -422,8 +430,8 @@ const AdminSubscriptionTracker = () => {
                   <div className="bg-muted/40 rounded-2xl p-4 space-y-2 text-sm">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-foreground text-base">{detail.subscription.service?.name ?? detail.subscription.bookingType}</span>
-                      <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusBadge(detail.subscription.activationStatus)}`}>
-                        {detail.subscription.isPaused ? "Paused" : detail.subscription.activationStatus?.replace(/_/g, " ")}
+                      <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusBadge(resolveDisplayStatus(detail.subscription))}`}>
+                        {resolveDisplayStatus(detail.subscription).replace(/_/g, " ")}
                       </span>
                     </div>
                     <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">

@@ -6016,7 +6016,7 @@ router.get('/customer/my-subscriptions', authenticate, authorize('customer'), as
       .lean();
 
     const result = await Promise.all(parentBookings.map(async (b) => {
-      const sessions = await Booking.find({
+      const childSessions = await Booking.find({
         parentBooking: b._id,
         'subscription.isSubscription': true,
       })
@@ -6025,30 +6025,47 @@ router.get('/customer/my-subscriptions', authenticate, authorize('customer'), as
         .sort({ bookingDate: 1 })
         .lean();
 
-      const sessionRows = sessions.map((s, idx) => {
-        const scheduledMins = s.scheduledDurationMinutes ||
-          (() => {
-            if (!s.startTime || !s.endTime) return null;
-            const [sh, sm] = s.startTime.split(':').map(Number);
-            const [eh, em] = s.endTime.split(':').map(Number);
-            return (eh * 60 + em) - (sh * 60 + sm);
-          })();
-        return {
-          sessionNumber: idx + 1,
-          _id: s._id,
-          bookingDate: s.bookingDate,
-          startTime: s.startTime,
-          endTime: s.endTime,
-          status: s.status,
-          worker: s.worker ? { name: s.worker.name } : null,
-          actualStartTime: s.actualStartTime,
-          actualEndTime: s.actualEndTime,
-          actualDurationMinutes: s.actualDurationMinutes,
-          scheduledDurationMinutes: scheduledMins,
-          overtimeMinutes: s.overtimeMinutes || 0,
-          overtimeCharges: s.overtimeCharges || 0,
-        };
-      });
+      // Helper to compute scheduled minutes from startTime/endTime strings
+      const calcScheduledMins = (s) => s.scheduledDurationMinutes ||
+        (() => {
+          if (!s.startTime || !s.endTime) return null;
+          const [sh, sm] = s.startTime.split(':').map(Number);
+          const [eh, em] = s.endTime.split(':').map(Number);
+          return (eh * 60 + em) - (sh * 60 + sm);
+        })();
+
+      // Root booking itself is session #1 (the first occurrence of the subscription)
+      const rootRow = {
+        sessionNumber: 1,
+        _id: b._id,
+        bookingDate: b.bookingDate,
+        startTime: b.startTime,
+        endTime: b.endTime,
+        status: b.status,
+        worker: b.worker ? { name: b.worker.name } : null,
+        actualStartTime: b.actualStartTime,
+        actualEndTime: b.actualEndTime,
+        actualDurationMinutes: b.actualDurationMinutes,
+        scheduledDurationMinutes: calcScheduledMins(b),
+        overtimeMinutes: b.overtimeMinutes || 0,
+        overtimeCharges: b.overtimeCharges || 0,
+      };
+
+      const sessionRows = [rootRow, ...childSessions.map((s, idx) => ({
+        sessionNumber: idx + 2,
+        _id: s._id,
+        bookingDate: s.bookingDate,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        status: s.status,
+        worker: s.worker ? { name: s.worker.name } : null,
+        actualStartTime: s.actualStartTime,
+        actualEndTime: s.actualEndTime,
+        actualDurationMinutes: s.actualDurationMinutes,
+        scheduledDurationMinutes: calcScheduledMins(s),
+        overtimeMinutes: s.overtimeMinutes || 0,
+        overtimeCharges: s.overtimeCharges || 0,
+      }))];
 
       const done = sessionRows.filter(r => r.status === 'completed').length;
       const upcoming = sessionRows.filter(r => ['confirmed', 'assigned', 'pending'].includes(r.status)).length;
