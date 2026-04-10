@@ -64,6 +64,7 @@ interface Booking {
   serviceStartQRCode?: string;
   actualStartTime?: string;
   pendingCancellation?: boolean;
+  cancellationPenaltyProof?: string | null;
   cancellationPenaltyReviewStatus?: 'pending_review' | 'approved' | 'rejected' | null;
 }
 
@@ -342,8 +343,11 @@ const BookingsPage = () => {
             </div>
           ) : (
             bookings.map((booking) => {
+              const proofUploaded = booking.pendingCancellation && !!booking.cancellationPenaltyProof;
               const statusInfo = booking.pendingCancellation
-                ? { label: 'Pending Cancellation', bg: 'bg-orange-100', text: 'text-orange-800' }
+                ? proofUploaded
+                  ? { label: 'Cancellation Under Review', bg: 'bg-orange-100', text: 'text-orange-800' }
+                  : { label: 'Fee Required — Action Needed', bg: 'bg-amber-100', text: 'text-amber-800' }
                 : getStatusInfo(booking.status);
               const isUpcoming = activeTab === "upcoming";
               const isOngoing = activeTab === "ongoing";
@@ -491,23 +495,39 @@ const BookingsPage = () => {
                   <div className="flex flex-col sm:flex-row gap-2 pt-2">
                     {isUpcoming && booking.status !== 'cancelled' && (
                       <>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleReschedule(booking); }}
-                          className="w-full sm:flex-1 py-2.5 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors"
-                        >
-                          Reschedule
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleCancelBooking(booking._id); }}
-                          disabled={booking.status === 'in-progress' || cancellingBookingId === booking._id}
-                          className="w-full sm:flex-1 py-2.5 bg-destructive text-destructive-foreground rounded-lg text-sm font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
-                          title={booking.status === 'in-progress' ? 'Cannot cancel a service already in progress' : ''}
-                        >
-                          {cancellingBookingId === booking._id
-                            ? <><Loader2 className="w-4 h-4 animate-spin" /> Cancelling…</>
-                            : 'Cancel'
-                          }
-                        </button>
+                        {/* When penalty is already pending but no proof uploaded yet, show Upload Proof button */}
+                        {booking.pendingCancellation && !booking.cancellationPenaltyProof ? (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleCancelBooking(booking._id); }}
+                            disabled={cancellingBookingId === booking._id}
+                            className="w-full py-2.5 bg-amber-500 text-white rounded-lg text-sm font-semibold hover:bg-amber-600 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-2"
+                          >
+                            {cancellingBookingId === booking._id
+                              ? <><Loader2 className="w-4 h-4 animate-spin" /> Loading…</>
+                              : <><Upload className="w-4 h-4" /> Upload Cancellation Fee Proof</>
+                            }
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleReschedule(booking); }}
+                              className="w-full sm:flex-1 py-2.5 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors"
+                            >
+                              Reschedule
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleCancelBooking(booking._id); }}
+                              disabled={booking.status === 'in-progress' || cancellingBookingId === booking._id}
+                              className="w-full sm:flex-1 py-2.5 bg-destructive text-destructive-foreground rounded-lg text-sm font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+                              title={booking.status === 'in-progress' ? 'Cannot cancel a service already in progress' : ''}
+                            >
+                              {cancellingBookingId === booking._id
+                                ? <><Loader2 className="w-4 h-4 animate-spin" /> Cancelling…</>
+                                : 'Cancel'
+                              }
+                            </button>
+                          </>
+                        )}
                       </>
                     )}
                     

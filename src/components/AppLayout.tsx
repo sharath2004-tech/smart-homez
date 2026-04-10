@@ -149,6 +149,7 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
     { to: "/admin/workforce",          icon: Users,           label: t('nav.workforce') },
     { to: "/admin/salary-settlements", icon: IndianRupee,     label: "Salary Settlements" },
     { to: "/admin/reports",            icon: BarChart3,       label: "Reports" },
+    { to: "/admin/cancellations",       icon: FileText,        label: "Cancellation Report" },
     { to: "/admin/quotes",             icon: FileText,        label: "Quote Requests" },
     { to: "/admin/help-messages",      icon: MessageSquare,   label: "Help Messages" },
     { to: "/admin/locations",          icon: MapPin,          label: t('nav.locations') },
@@ -207,6 +208,7 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
         { to: "/admin/expenses", icon: IndianRupee, label: "Expenses" },
         { to: "/admin/subscription-sections", icon: Grid3x3, label: "Subscriptions" },
         { to: "/admin/subscription-tracker", icon: BarChart3, label: "Sub Tracker" },
+        { to: "/admin/cancellations", icon: FileText, label: "Cancellation Report" },
         { to: "/admin/sos", icon: AlertTriangle, label: "SOS Alerts" },
       ]
     },
@@ -241,6 +243,7 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
     { to: "/super-admin/workforce",          icon: Users,           label: t('nav.workforce') },
     { to: "/super-admin/salary-settlements", icon: IndianRupee,     label: "Salary Settlements" },
     { to: "/super-admin/reports",            icon: BarChart3,       label: "Reports" },
+    { to: "/super-admin/cancellations",       icon: FileText,        label: "Cancellation Report" },
     { to: "/super-admin/quotes",             icon: FileText,        label: "Quote Requests" },
     { to: "/super-admin/help-messages",      icon: MessageSquare,   label: "Help Messages" },
     { to: "/super-admin/locations",          icon: MapPin,          label: "Locations & Admins" },
@@ -301,6 +304,7 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
         { to: "/admin/expenses", icon: IndianRupee, label: "Expenses" },
         { to: "/admin/subscription-sections", icon: Grid3x3, label: "Subscriptions" },
         { to: "/admin/subscription-tracker", icon: BarChart3, label: "Sub Tracker" },
+        { to: "/super-admin/cancellations", icon: FileText, label: "Cancellation Report" },
         { to: "/super-admin/sos", icon: AlertTriangle, label: "SOS Alerts" },
       ]
     },

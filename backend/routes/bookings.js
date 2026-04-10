@@ -6011,6 +6011,127 @@ router.patch('/:id/workforce', authenticate, authorize('admin', 'super_admin'), 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CANCELLATION REPORT
+// @route   GET /api/bookings/reports/cancellations
+// @desc    Aggregated cancellation data for admin/super-admin reporting
+// @access  Admin, Super Admin
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/reports/cancellations', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { startDate, endDate, locationId } = req.query;
+
+    // Date filter
+    const dateFilter = {};
+    if (startDate) dateFilter.$gte = new Date(startDate);
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.$lte = end;
+    }
+
+    const baseMatch = { status: 'cancelled' };
+    if (Object.keys(dateFilter).length) baseMatch.cancellationDate = dateFilter;
+
+    // Restrict non-super-admin to their assigned locations
+    if (req.user.role === 'admin') {
+      const admin = await User.findById(req.user._id).lean();
+      const adminLocationIds = (admin?.adminProfile?.assignedLocations || []).map(String);
+      if (adminLocationIds.length > 0) {
+        baseMatch['location.locationId'] = { $in: adminLocationIds };
+      }
+    } else if (locationId) {
+      baseMatch['location.locationId'] = locationId;
+    }
+
+    const cancelled = await Booking.find(baseMatch)
+      .populate('service', 'name category serviceType')
+      .populate('customer', 'name phone')
+      .populate('worker', 'name')
+      .sort({ cancellationDate: -1 })
+      .lean();
+
+    // Summary stats
+    let totalCancellations = cancelled.length;
+    let freeCancellations = 0;
+    let penaltyPaid = 0;
+    let penaltyPending = 0;
+    let totalPenaltyCollected = 0;
+    let totalRefundIssued = 0;
+
+    // Group by service
+    const byService = {};
+    // Group by reason
+    const byReason = {};
+
+    for (const b of cancelled) {
+      const hasPenalty = b.pendingCancellation || b.cancellationPenaltyPaid;
+      if (!hasPenalty && (!b.refund || b.refund.percentage === 100)) {
+        freeCancellations++;
+      }
+      if (b.cancellationPenaltyPaid) {
+        penaltyPaid++;
+        totalPenaltyCollected += (b.refund?.penaltyCharge || 0);
+      } else if (b.pendingCancellation && !b.cancellationPenaltyPaid && !b.cancellationPenaltyProof) {
+        penaltyPending++;
+      }
+      totalRefundIssued += (b.refund?.amount || 0);
+
+      // By service
+      const svcKey = b.service?.name || b.bookingType || 'Unknown';
+      if (!byService[svcKey]) byService[svcKey] = { service: b.service?.name || b.bookingType || 'Unknown', category: b.service?.category || '', count: 0 };
+      byService[svcKey].count++;
+
+      // By reason
+      const reason = b.cancellationReason || 'No reason provided';
+      const truncated = reason.length > 60 ? reason.slice(0, 60) + '…' : reason;
+      byReason[truncated] = (byReason[truncated] || 0) + 1;
+    }
+
+    const serviceBreakdown = Object.values(byService).sort((a, b) => b.count - a.count);
+    const reasonBreakdown = Object.entries(byReason)
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    res.json({
+      summary: {
+        total: totalCancellations,
+        free: freeCancellations,
+        penaltyPaid,
+        penaltyPending,
+        totalPenaltyCollected: Math.round(totalPenaltyCollected * 100) / 100,
+        totalRefundIssued: Math.round(totalRefundIssued * 100) / 100,
+      },
+      serviceBreakdown,
+      reasonBreakdown,
+      cancellations: cancelled.map(b => ({
+        _id: b._id,
+        service: b.service ? { name: b.service.name, category: b.service.category } : null,
+        bookingType: b.bookingType,
+        customer: b.customer ? { name: b.customer.name, phone: b.customer.phone } : null,
+        worker: b.worker ? { name: b.worker.name } : null,
+        bookingDate: b.bookingDate,
+        cancellationDate: b.cancellationDate,
+        cancellationReason: b.cancellationReason,
+        totalAmount: b.totalAmount,
+        refundAmount: b.refund?.amount ?? 0,
+        penaltyStatus: b.cancellationPenaltyPaid
+          ? 'paid'
+          : b.cancellationPenaltyProof
+            ? 'proof_submitted'
+            : b.pendingCancellation
+              ? 'proof_required'
+              : 'none',
+        location: b.location ? { area: b.location.area, city: b.location.city } : null,
+      })),
+    });
+  } catch (error) {
+    console.error('Cancellation report error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // CUSTOMER SUBSCRIPTION TRACKER
 // @route   GET /api/bookings/customer/my-subscriptions
 // @desc    All subscriptions belonging to the authenticated customer with session detail

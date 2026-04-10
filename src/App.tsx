@@ -56,6 +56,7 @@ import WorkerTasks from "./pages/worker/WorkerTasks";
 
 // Admin pages
 import AdminBookings from "./pages/admin/AdminBookings";
+import AdminCancellationReport from "./pages/admin/AdminCancellationReport";
 import AdminCustomerDetails from "./pages/admin/AdminCustomerDetails";
 import AdminCustomers from "./pages/admin/AdminCustomers";
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -191,6 +192,7 @@ const App = () => (
           <Route path="/admin/quotes" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminQuotes /></ProtectedRoute>} />
           <Route path="/admin/business-expenses" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><BusinessExpenses /></ProtectedRoute>} />
           <Route path="/admin/reports" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminReports /></ProtectedRoute>} />
+          <Route path="/admin/cancellations" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminCancellationReport /></ProtectedRoute>} />
 
           {/* Super Admin */}
           <Route path="/super-admin/dashboard" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminDashboard /></ProtectedRoute>} />
@@ -214,6 +216,7 @@ const App = () => (
           <Route path="/super-admin/heatmap" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminHeatmap /></ProtectedRoute>} />
           <Route path="/super-admin/business-expenses" element={<ProtectedRoute allowedRoles={['super_admin']}><BusinessExpenses /></ProtectedRoute>} />
           <Route path="/super-admin/reports" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminReports /></ProtectedRoute>} />
+          <Route path="/super-admin/cancellations" element={<ProtectedRoute allowedRoles={['super_admin']}><AdminCancellationReport /></ProtectedRoute>} />
 
           {/* Catch-all */}
           <Route path="*" element={<NotFound />} />

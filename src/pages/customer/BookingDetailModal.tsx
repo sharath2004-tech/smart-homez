@@ -198,14 +198,27 @@ const STATUS_ORDER: Record<string, number> = {
 
 const DEFAULT_PAYMENT_METHOD = 'qr-upi';
 
-const BookingStatusStepper = ({ status, pendingCancellation }: { status: string; pendingCancellation?: boolean }) => {
+const BookingStatusStepper = ({ status, pendingCancellation, cancellationPenaltyProof }: { status: string; pendingCancellation?: boolean; cancellationPenaltyProof?: string | null }) => {
   if (pendingCancellation) {
+    // Proof already uploaded — awaiting admin review
+    if (cancellationPenaltyProof) {
+      return (
+        <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl p-4">
+          <XCircle className="w-6 h-6 text-orange-500 shrink-0" />
+          <div>
+            <p className="font-semibold text-orange-800">Cancellation Under Review</p>
+            <p className="text-xs text-orange-600">Your cancellation fee proof has been submitted. Admin will review and confirm cancellation shortly.</p>
+          </div>
+        </div>
+      );
+    }
+    // No proof uploaded yet — customer action required
     return (
-      <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl p-4">
-        <XCircle className="w-6 h-6 text-orange-500 shrink-0" />
+      <div className="flex items-center gap-3 bg-amber-50 border border-amber-300 rounded-xl p-4">
+        <XCircle className="w-6 h-6 text-amber-500 shrink-0" />
         <div>
-          <p className="font-semibold text-orange-800">Cancellation Under Review</p>
-          <p className="text-xs text-orange-600">Your cancellation fee proof has been submitted. Admin will review and confirm cancellation shortly.</p>
+          <p className="font-semibold text-amber-800">Cancellation Fee Required</p>
+          <p className="text-xs text-amber-700 mt-0.5">A cancellation fee applies. Please pay via UPI and upload the payment screenshot from the My Bookings page to complete your cancellation.</p>
         </div>
       </div>
     );
@@ -653,7 +666,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
             </div>
 
             {/* Booking Status Stepper */}
-            <BookingStatusStepper status={booking.status} pendingCancellation={booking.pendingCancellation} />
+            <BookingStatusStepper status={booking.status} pendingCancellation={booking.pendingCancellation} cancellationPenaltyProof={booking.cancellationPenaltyProof} />
 
             {/* Status Badge */}
             <div className="flex items-center justify-between">

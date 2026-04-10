@@ -695,6 +695,14 @@ export const bookingsAPI = {
     });
   },
 
+  getCancellationReport: async (params?: { startDate?: string; endDate?: string; locationId?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.startDate) q.set('startDate', params.startDate);
+    if (params?.endDate) q.set('endDate', params.endDate);
+    if (params?.locationId) q.set('locationId', params.locationId);
+    return apiCall(`/bookings/reports/cancellations${q.toString() ? `?${q.toString()}` : ''}`);
+  },
+
   getUpcoming: async () => {
     return apiCall('/bookings?status=confirmed,pending');
   },
