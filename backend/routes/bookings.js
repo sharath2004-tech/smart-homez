@@ -46,9 +46,6 @@ import {
     monitorWorkerPool
 } from '../utils/workerPoolManager.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const router = express.Router();
 
 const SUBSCRIPTION_FLOW_NOTIFICATIONS_ENABLED = process.env.SUBSCRIPTION_FLOW_NOTIFICATIONS_ENABLED !== 'false';
