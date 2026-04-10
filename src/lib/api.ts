@@ -875,7 +875,9 @@ export const bookingsAPI = {
 
   getCompletionPhotoUrl: (photoPath: string) => {
     if (!photoPath) return '';
-    // Remove /api/ from API_BASE_URL if present and remove /uploads prefix from photoPath if it starts with it
+    // Cloudinary URLs are already absolute — return as-is
+    if (photoPath.startsWith('http://') || photoPath.startsWith('https://')) return photoPath;
+    // Legacy local paths: prefix with backend origin
     const baseUrl = API_BASE_URL.replace('/api', '');
     return `${baseUrl}${photoPath}`;
   },

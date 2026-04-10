@@ -1,9 +1,7 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { uploadToCloudinary } from '../middleware/cloudinary.js';
 import upload from '../middleware/upload.js';
 import Booking from '../models/Booking.js';
 import BusinessHours from '../models/BusinessHours.js';
@@ -3977,8 +3975,10 @@ router.post('/:id/upload-arrival-photo',
         return res.status(400).json({ error: { message: 'Arrival photo file is required', status: 400 } });
       }
 
+      const arrivalPhotoUrl = await uploadToCloudinary(req.file.buffer, 'smart-homez/arrival-photos');
+
       booking.arrivalPhoto = {
-        url: `/uploads/${req.file.filename}`,
+        url: arrivalPhotoUrl,
         timestamp: new Date(),
         uploadedBy: req.user._id
       };
@@ -4068,7 +4068,7 @@ router.post('/:id/upload-completion-photo',
       }
 
       // Save completion photo
-      const photoUrl = `/uploads/completion-photos/${req.file.filename}`;
+      const photoUrl = await uploadToCloudinary(req.file.buffer, 'smart-homez/completion-photos');
       const isReupload = booking.completionPhoto && booking.completionPhoto.url;
       
       booking.completionPhoto = {
@@ -4141,7 +4141,7 @@ router.post('/:id/add-completion-photo',
         return res.status(400).json({ error: { message: 'Photo file is required', status: 400 } });
       }
 
-      const photoUrl = `/uploads/completion-photos/${req.file.filename}`;
+      const photoUrl = await uploadToCloudinary(req.file.buffer, 'smart-homez/completion-photos');
       if (!booking.completionPhotos) booking.completionPhotos = [];
 
       booking.completionPhotos.push({
@@ -4263,7 +4263,7 @@ router.post('/:id/upload-payment-proof',
       }
 
       // Save payment proof photo
-      const photoUrl = `/uploads/completion-photos/${req.file.filename}`;
+      const photoUrl = await uploadToCloudinary(req.file.buffer, 'smart-homez/payment-proofs');
       const existingPaymentProofs = ensurePaymentProofHistory(booking);
       const isReupload = existingPaymentProofs.length > 0;
 
@@ -4811,7 +4811,6 @@ router.post('/:id/upload-photo',
             });
           }
 
-          const imageType = matches[1];
           const base64Data = matches[2];
           const buffer = Buffer.from(base64Data, 'base64');
 
@@ -4822,25 +4821,12 @@ router.post('/:id/upload-photo',
             });
           }
 
-          // Create uploads directory if it doesn't exist
-          const uploadsDir = path.join(__dirname, '..', 'uploads', 'work-documentation');
-          if (!fs.existsSync(uploadsDir)) {
-            fs.mkdirSync(uploadsDir, { recursive: true });
-          }
+          // Upload to Cloudinary instead of saving to disk
+          savedPhotoUrl = await uploadToCloudinary(buffer, 'smart-homez/work-documentation');
 
-          // Generate unique filename
-          const filename = `work-doc-${booking._id}-${Date.now()}.${imageType}`;
-          const filePath = path.join(uploadsDir, filename);
-
-          // Save file to disk
-          fs.writeFileSync(filePath, buffer);
-
-          // Store relative path
-          savedPhotoUrl = `/uploads/work-documentation/${filename}`;
-
-          console.log(`✅ Saved work documentation photo: ${savedPhotoUrl}`);
+          console.log(`✅ Saved work documentation photo to Cloudinary: ${savedPhotoUrl}`);
         } catch (conversionError) {
-          console.error('Error converting base64 to file:', conversionError);
+          console.error('Error uploading work documentation image:', conversionError);
           return res.status(500).json({
             error: { message: 'Failed to save image', status: 500 }
           });
@@ -6202,8 +6188,8 @@ router.patch('/:id/cancel-penalty-proof',
         return res.status(400).json({ error: { message: 'Payment proof image is required', status: 400 } });
       }
 
-      // Build file path (relative, consistent with other proof uploads)
-      const proofUrl = `/uploads/${req.file.filename}`;
+      // Upload proof to Cloudinary for persistent storage
+      const proofUrl = await uploadToCloudinary(req.file.buffer, 'smart-homez/cancel-penalty-proofs');
 
       // Save proof — do NOT cancel yet. Admin must review and approve first.
       booking.cancellationPenaltyProof = proofUrl;

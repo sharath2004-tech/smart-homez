@@ -4,6 +4,7 @@ import rateLimit from 'express-rate-limit';
 import { body, validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
 import { authenticate } from '../middleware/auth.js';
+import { uploadToCloudinary } from '../middleware/cloudinary.js';
 import { uploadProfilePicture, uploadWorkerFiles } from '../middleware/upload.js';
 import Location from '../models/Location.js';
 import Notification from '../models/Notification.js';
@@ -470,7 +471,7 @@ router.patch('/me', authenticate, handleProfilePictureUpload,
       if (gender !== undefined) updateData.gender = gender;
       if (religion !== undefined) updateData.religion = religion;
       if (req.file) {
-        updateData.profileImage = `/uploads/profile-pics/${req.file.filename}`;
+        updateData.profileImage = await uploadToCloudinary(req.file.buffer, 'smart-homez/profile-pics');
       }
 
       // Email change: check for duplicates before updating
@@ -1137,6 +1138,13 @@ router.post('/register-worker',
       const aadhaarFrontFile = req.files.aadhaarFront[0];
       const aadhaarBackFile = req.files.aadhaarBack?.[0] || null;
 
+      // Upload documents to Cloudinary for persistent storage
+      const [profileImageUrl, aadhaarFrontUrl, aadhaarBackUrl] = await Promise.all([
+        uploadToCloudinary(profilePicFile.buffer, 'smart-homez/profile-pics'),
+        uploadToCloudinary(aadhaarFrontFile.buffer, 'smart-homez/worker-docs'),
+        aadhaarBackFile ? uploadToCloudinary(aadhaarBackFile.buffer, 'smart-homez/worker-docs') : Promise.resolve(null),
+      ]);
+
       const userData = {
         name: name.trim(),
         ...(email && email.trim() ? { email: email.toLowerCase().trim() } : {}),
@@ -1144,7 +1152,7 @@ router.post('/register-worker',
         role: 'worker',
         phone: normalizedPhone,
         gender: gender || 'prefer_not_to_say',
-        profileImage: `/uploads/profile-pics/${profilePicFile.filename}`,
+        profileImage: profileImageUrl,
         isFirstLogin: false,
         isPhoneVerified: phoneVerified === 'true' || phoneVerified === true,
         isEmailVerified: false,
@@ -1156,8 +1164,8 @@ router.post('/register-worker',
           dailyWage: null,
           monthlyWage: null,
           documents: {
-            aadhaarFront: `/uploads/worker-docs/${aadhaarFrontFile.filename}`,
-            aadhaarBack: aadhaarBackFile ? `/uploads/worker-docs/${aadhaarBackFile.filename}` : null,
+            aadhaarFront: aadhaarFrontUrl,
+            aadhaarBack: aadhaarBackUrl,
             uploadedAt: new Date()
           }
         }

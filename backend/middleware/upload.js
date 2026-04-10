@@ -1,21 +1,5 @@
-import fs from 'fs';
 import multer from 'multer';
-import path, { dirname } from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-// Create uploads directories if they don't exist
-const uploadsDir = path.join(__dirname, '..', 'uploads', 'completion-photos');
-const profilePicsDir = path.join(__dirname, '..', 'uploads', 'profile-pics');
-const workerDocsDir = path.join(__dirname, '..', 'uploads', 'worker-docs');
-const adminDocsDir = path.join(__dirname, '..', 'uploads', 'admin-docs');
-const expenseProofsDir = path.join(__dirname, '..', 'uploads', 'expense-proofs');
-
-[uploadsDir, profilePicsDir, workerDocsDir, adminDocsDir, expenseProofsDir].forEach(dir => {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-});
+import path from 'path';
 
 // Shared regex patterns for file type validation (anchored for exact matching)
 const IMAGE_EXTENSION_REGEX = /\.(jpeg|jpg|png|webp)$/i;
@@ -46,91 +30,43 @@ const docFileFilter = (req, file, cb) => {
   cb(new Error('Documents must be images (JPEG, PNG, WEBP) or PDF files'));
 };
 
-// ── Booking completion photo upload ──────────────────────────────────────────
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadsDir);
-  },
-  filename: function (req, file, cb) {
-    const bookingId = req.params.id || 'unknown';
-    const timestamp = Date.now();
-    const ext = path.extname(file.originalname);
-    cb(null, `booking-${bookingId}-${timestamp}${ext}`);
-  }
-});
+// All multer instances use in-memory storage.
+// Files are streamed directly to Cloudinary in each route handler.
+const memoryStorage = multer.memoryStorage();
 
+// ── Booking completion photo upload ──────────────────────────────────────────
 const upload = multer({
-  storage: storage,
+  storage: memoryStorage,
   limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: fileFilter
+  fileFilter: fileFilter,
 });
 
 // ── Worker registration file upload (profile pic + Aadhaar documents) ────────
-const workerFilesStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, file.fieldname === 'profilePicture' ? profilePicsDir : workerDocsDir);
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname);
-    cb(null, `${file.fieldname}-${Date.now()}${ext}`);
-  }
-});
-
 export const uploadWorkerFiles = multer({
-  storage: workerFilesStorage,
+  storage: memoryStorage,
   limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: docFileFilter
+  fileFilter: docFileFilter,
 });
 
 // ── Generic profile picture upload for self-service profile updates ─────────
-const profilePictureStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, profilePicsDir);
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname);
-    cb(null, `profile-picture-${Date.now()}${ext}`);
-  }
-});
-
 export const uploadProfilePicture = multer({
-  storage: profilePictureStorage,
+  storage: memoryStorage,
   limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: fileFilter
+  fileFilter: fileFilter,
 }).single('profilePicture');
 
 // ── Admin ID document upload ──────────────────────────────────────────────────
-const adminDocsStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, adminDocsDir);
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname);
-    cb(null, `admin-doc-${Date.now()}${ext}`);
-  }
-});
-
 export const uploadAdminDoc = multer({
-  storage: adminDocsStorage,
+  storage: memoryStorage,
   limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: docFileFilter
+  fileFilter: docFileFilter,
 }).single('idDocument');
 
 // ── Expense proof uploads (bills, product photos, receipts) ─────────────────
-const expenseProofsStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, expenseProofsDir);
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname);
-    cb(null, `expense-proof-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
-  }
-});
-
 export const uploadExpenseProofs = multer({
-  storage: expenseProofsStorage,
+  storage: memoryStorage,
   limits: { fileSize: 7 * 1024 * 1024 },
-  fileFilter: docFileFilter
+  fileFilter: docFileFilter,
 });
 
 export default upload;

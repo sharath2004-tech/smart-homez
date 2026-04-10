@@ -1,23 +1,21 @@
-/**
- * Business Expenses Routes
- * Admins and super admins can log and view business expenses
- */
-
 import express from 'express';
 import { body, param, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { uploadToCloudinary } from '../middleware/cloudinary.js';
 import { uploadExpenseProofs } from '../middleware/upload.js';
 import Booking from '../models/Booking.js';
 import BusinessExpense from '../models/BusinessExpense.js';
 
 const router = express.Router();
 
-const mapUploadedProofFiles = (files = []) => files.map((file) => ({
-  url: `/uploads/expense-proofs/${file.filename}`,
-  originalName: file.originalname,
-  mimeType: file.mimetype,
-  uploadedAt: new Date()
-}));
+const mapUploadedProofFiles = async (files = []) => {
+  return Promise.all(files.map(async (file) => ({
+    url: await uploadToCloudinary(file.buffer, 'smart-homez/expense-proofs'),
+    originalName: file.originalname,
+    mimeType: file.mimetype,
+    uploadedAt: new Date()
+  })));
+};
 
 /**
  * Create a business expense
@@ -58,7 +56,7 @@ router.post(
         resolvedLocationId = linkedBooking.location?.locationId || null;
       }
 
-      const uploadedProofFiles = mapUploadedProofFiles(req.files);
+      const uploadedProofFiles = await mapUploadedProofFiles(req.files);
 
       const expense = new BusinessExpense({
         title,
@@ -191,7 +189,7 @@ router.patch(
         return res.status(403).json({ error: { message: 'Not authorized to update this expense' } });
       }
 
-      const uploadedProofFiles = mapUploadedProofFiles(req.files);
+      const uploadedProofFiles = await mapUploadedProofFiles(req.files);
 
       const { title, amount, category, customCategory, description, date, locationId, bookingId, type } = req.body;
 

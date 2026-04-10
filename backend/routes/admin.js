@@ -3,6 +3,7 @@ import { body, validationResult } from 'express-validator';
 import mongoose from 'mongoose';
 import twilio from 'twilio';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { uploadToCloudinary } from '../middleware/cloudinary.js';
 import { uploadAdminDoc, uploadWorkerFiles } from '../middleware/upload.js';
 import Booking from '../models/Booking.js';
 import BusinessExpense from '../models/BusinessExpense.js';
@@ -574,7 +575,7 @@ router.post('/create-admin',
       let assignedLocationIds = req.body.assignedLocationIds;
       if (typeof assignedLocationIds === 'string') assignedLocationIds = [assignedLocationIds];
       else if (!assignedLocationIds) assignedLocationIds = [];
-      const idDocumentPath = req.file ? `/uploads/admin-docs/${req.file.filename}` : null;
+      const idDocumentPath = req.file ? await uploadToCloudinary(req.file.buffer, 'smart-homez/admin-docs') : null;
 
       // Check if email exists
       const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
@@ -1112,11 +1113,11 @@ router.post('/workers',
       // Extract uploaded verification document paths
       const files = req.files || {};
       const profileImagePath = files.profilePicture?.[0]
-        ? `/uploads/profile-pics/${files.profilePicture[0].filename}` : null;
+        ? await uploadToCloudinary(files.profilePicture[0].buffer, 'smart-homez/profile-pics') : null;
       const aadhaarFrontPath = files.aadhaarFront?.[0]
-        ? `/uploads/worker-docs/${files.aadhaarFront[0].filename}` : null;
+        ? await uploadToCloudinary(files.aadhaarFront[0].buffer, 'smart-homez/worker-docs') : null;
       const aadhaarBackPath = files.aadhaarBack?.[0]
-        ? `/uploads/worker-docs/${files.aadhaarBack[0].filename}` : null;
+        ? await uploadToCloudinary(files.aadhaarBack[0].buffer, 'smart-homez/worker-docs') : null;
 
       // Check for duplicate phone number
       const existingUser = await User.findOne({ phone });
@@ -1949,15 +1950,15 @@ router.put('/workers/:workerId',
       // Handle file uploads
       if (files) {
         if (files.aadhaarFront && files.aadhaarFront[0]) {
-          updateData['workerProfile.documents.aadhaarFront'] = `/uploads/worker-docs/${files.aadhaarFront[0].filename}`;
+          updateData['workerProfile.documents.aadhaarFront'] = await uploadToCloudinary(files.aadhaarFront[0].buffer, 'smart-homez/worker-docs');
           updateData['workerProfile.documents.uploadedAt'] = new Date();
         }
         if (files.aadhaarBack && files.aadhaarBack[0]) {
-          updateData['workerProfile.documents.aadhaarBack'] = `/uploads/worker-docs/${files.aadhaarBack[0].filename}`;
+          updateData['workerProfile.documents.aadhaarBack'] = await uploadToCloudinary(files.aadhaarBack[0].buffer, 'smart-homez/worker-docs');
           updateData['workerProfile.documents.uploadedAt'] = new Date();
         }
         if (files.profilePicture && files.profilePicture[0]) {
-          updateData.profileImage = `/uploads/profile-pics/${files.profilePicture[0].filename}`;
+          updateData.profileImage = await uploadToCloudinary(files.profilePicture[0].buffer, 'smart-homez/profile-pics');
         }
       }
 
@@ -4735,16 +4736,16 @@ router.patch('/workers/:id/documents',
       const updates = {};
 
       if (files.profilePicture?.[0]) {
-        updates.profileImage = `/uploads/profile-pics/${files.profilePicture[0].filename}`;
+        updates.profileImage = await uploadToCloudinary(files.profilePicture[0].buffer, 'smart-homez/profile-pics');
       }
 
       if (files.aadhaarFront?.[0]) {
-        updates['workerProfile.documents.aadhaarFront'] = `/uploads/worker-docs/${files.aadhaarFront[0].filename}`;
+        updates['workerProfile.documents.aadhaarFront'] = await uploadToCloudinary(files.aadhaarFront[0].buffer, 'smart-homez/worker-docs');
         updates['workerProfile.documents.uploadedAt'] = new Date();
       }
 
       if (files.aadhaarBack?.[0]) {
-        updates['workerProfile.documents.aadhaarBack'] = `/uploads/worker-docs/${files.aadhaarBack[0].filename}`;
+        updates['workerProfile.documents.aadhaarBack'] = await uploadToCloudinary(files.aadhaarBack[0].buffer, 'smart-homez/worker-docs');
         updates['workerProfile.documents.uploadedAt'] = new Date();
       }
 
