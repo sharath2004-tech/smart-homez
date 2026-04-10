@@ -5238,6 +5238,13 @@ router.get('/subscription-tracker/:bookingId/sessions', authenticate, authorize(
     const totalOvertimeCharges = sessionRows.reduce((s, r) => s + r.overtimeCharges, 0);
     const sessionsDone = sessionRows.filter(r => r.status === 'completed').length;
 
+    // Append projected future sessions so admins see the full upcoming schedule
+    const projectedRows = projectSubscriptionSessions(parent, sessionRows);
+    const allRows = [...sessionRows, ...projectedRows];
+    const sessionsUpcoming = allRows.filter(r =>
+      ['confirmed', 'assigned', 'pending', 'scheduled'].includes(r.status)
+    ).length;
+
     res.json({
       subscription: {
         _id: parent._id,
@@ -5257,11 +5264,11 @@ router.get('/subscription-tracker/:bookingId/sessions', authenticate, authorize(
         durationPerSession: parent.subscription?.durationPerSession,
         frequency: parent.recurringSchedule?.frequency,
       },
-      sessions: sessionRows,
+      sessions: allRows,
       summary: {
-        total: sessionRows.length,
+        total: allRows.length,
         done: sessionsDone,
-        upcoming: sessionRows.length - sessionsDone,
+        upcoming: sessionsUpcoming,
         totalOvertimeMinutes,
         totalOvertimeCharges: Math.round(totalOvertimeCharges * 100) / 100,
       },

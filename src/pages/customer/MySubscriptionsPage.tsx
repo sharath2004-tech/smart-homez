@@ -22,6 +22,7 @@ interface SessionRow {
   scheduledDurationMinutes?: number;
   overtimeMinutes: number;
   overtimeCharges: number;
+  isProjected?: boolean;
 }
 
 // ── Subscription object returned by /bookings/customer/my-subscriptions ───────
@@ -594,38 +595,46 @@ const MySubscriptionsPage = () => {
                             </thead>
                             <tbody>
                               {sessions.map((session, idx) => (
-                                <tr key={session._id} className={idx % 2 === 0 ? '' : 'bg-muted/30'}>
+                                <tr key={session._id} className={`${
+                                  session.isProjected
+                                    ? 'opacity-60 bg-sky-50/40 dark:bg-sky-900/10'
+                                    : idx % 2 === 0 ? '' : 'bg-muted/30'
+                                }`}>
                                   <td className="px-3 py-2 text-muted-foreground font-medium">{session.sessionNumber}</td>
                                   <td className="px-3 py-2 whitespace-nowrap">{fmtDate(session.bookingDate)}</td>
                                   <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
                                     {session.startTime} – {session.endTime}
                                   </td>
                                   <td className="px-3 py-2 whitespace-nowrap">
-                                    {session.actualStartTime
+                                    {!session.isProjected && session.actualStartTime
                                       ? `${fmtTime(session.actualStartTime)} – ${fmtTime(session.actualEndTime)}`
                                       : <span className="text-muted-foreground">—</span>}
                                   </td>
                                   <td className="px-3 py-2 whitespace-nowrap">
-                                    {session.actualDurationMinutes
+                                    {!session.isProjected && session.actualDurationMinutes
                                       ? `${session.actualDurationMinutes} min`
                                       : fmtMins(session.scheduledDurationMinutes ?? (subscription.durationPerSession ?? 1) * 60)}
                                   </td>
                                   <td className="px-3 py-2 whitespace-nowrap">
-                                    {session.overtimeMinutes > 0 ? (
+                                    {!session.isProjected && session.overtimeMinutes > 0 ? (
                                       <span className="text-orange-600 font-semibold">
                                         +{session.overtimeMinutes}m / ₹{session.overtimeCharges.toFixed(0)}
                                       </span>
                                     ) : <span className="text-muted-foreground">—</span>}
                                   </td>
                                   <td className="px-3 py-2">
-                                    <span className={`capitalize font-medium ${
-                                      session.status === 'completed' ? 'text-green-600' :
-                                      session.status === 'in-progress' ? 'text-blue-600' :
-                                      session.status === 'cancelled' ? 'text-red-500' :
-                                      'text-muted-foreground'
-                                    }`}>
-                                      {session.status}
-                                    </span>
+                                    {session.isProjected ? (
+                                      <span className="text-xs text-sky-600 font-medium">📅 scheduled</span>
+                                    ) : (
+                                      <span className={`capitalize font-medium ${
+                                        session.status === 'completed' ? 'text-green-600' :
+                                        session.status === 'in-progress' ? 'text-blue-600' :
+                                        session.status === 'cancelled' ? 'text-red-500' :
+                                        'text-muted-foreground'
+                                      }`}>
+                                        {session.status}
+                                      </span>
+                                    )}
                                   </td>
                                 </tr>
                               ))}

@@ -60,6 +60,7 @@ interface SessionRow {
   scheduledDurationMinutes?: number;
   overtimeMinutes: number;
   overtimeCharges: number;
+  isProjected?: boolean;
 }
 
 interface SessionDetail {
@@ -498,7 +499,7 @@ const AdminSubscriptionTracker = () => {
                   <div>
                     <p className="font-semibold text-foreground mb-2 flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-primary" />
-                      Session Log ({detail.sessions.length} total)
+                      Session Log ({detail.summary.done} done · {detail.summary.upcoming} upcoming · {detail.sessions.length} total)
                     </p>
                     <div className="space-y-2">
                       {detail.sessions.map((s) => (
@@ -524,42 +525,50 @@ const SESSION_STATUS_COLOR: Record<string, string> = {
   assigned: "bg-slate-100 text-slate-700",
   pending: "bg-muted text-muted-foreground",
   cancelled: "bg-red-100 text-red-700",
+  scheduled: "bg-sky-50 text-sky-600 border border-sky-200",
 };
 
 const SessionCard = ({ session: s }: { session: SessionRow }) => {
   const [open, setOpen] = useState(false);
   const hasOvertime = s.overtimeMinutes > 0;
+  const isProjected = s.isProjected;
 
   return (
-    <div className={`rounded-xl border ${hasOvertime ? "border-orange-200 bg-orange-50/40" : "border-border bg-background"}`}>
+    <div className={`rounded-xl border ${
+      isProjected
+        ? "border-sky-200 bg-sky-50/30 opacity-75"
+        : hasOvertime ? "border-orange-200 bg-orange-50/40" : "border-border bg-background"
+    }`}>
       <button
         className="w-full flex items-center justify-between px-4 py-3 text-sm"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => !isProjected && setOpen((o) => !o)}
       >
         <div className="flex items-center gap-3">
-          <span className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0">
+          <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+            isProjected ? "bg-sky-100 text-sky-500" : "bg-muted text-muted-foreground"
+          }`}>
             {s.sessionNumber}
           </span>
-          <span className="font-medium text-foreground">{fmtDate(s.bookingDate)}</span>
+          <span className={`font-medium ${isProjected ? "text-muted-foreground" : "text-foreground"}`}>{fmtDate(s.bookingDate)}</span>
           <span className="text-xs text-muted-foreground">{s.startTime} – {s.endTime}</span>
-          {s.worker?.name && (
+          {!isProjected && s.worker?.name && (
             <span className="text-xs text-muted-foreground">· {s.worker.name}</span>
           )}
         </div>
         <div className="flex items-center gap-2">
-          {hasOvertime && (
+          {!isProjected && hasOvertime && (
             <span className="text-xs text-orange-700 font-medium bg-orange-100 px-2 py-0.5 rounded-full">
               +{fmt(s.overtimeMinutes)} ₹{s.overtimeCharges.toFixed(0)}
             </span>
           )}
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${SESSION_STATUS_COLOR[s.status] ?? "bg-muted text-muted-foreground"}`}>
-            {s.status.replace(/-/g, " ")}
+            {isProjected ? "📅 scheduled" : s.status.replace(/-/g, " ")}
           </span>
-          {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+          {!isProjected && (open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />)}
         </div>
       </button>
 
-      {open && (
+      {open && !isProjected && (
         <div className="border-t border-border px-4 py-3 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
           <div>
             <p className="text-muted-foreground">Scheduled</p>

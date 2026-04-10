@@ -72,3 +72,74 @@ export const getNextRecurringScheduleDate = ({ frequency, startDate, selectedDay
 
   return addDays(startDate, 1);
 };
+
+/**
+ * Given an existing (ordered) list of session rows for a subscription root booking,
+ * generates projected future session entries up to the subscription end date
+ * (or 60 days ahead when there is no end date).
+ *
+ * Projected entries have status 'scheduled' and isProjected=true so callers can
+ * render them differently from real DB-backed sessions.
+ *
+ * @param {object} rootBooking - Lean root booking document (with recurringSchedule, subscription, startTime, endTime)
+ * @param {Array}  existingRows - Already-built session row array (may be empty, root included)
+ * @returns {Array} Array of projected session row objects to append
+ */
+export const projectSubscriptionSessions = (rootBooking, existingRows) => {
+  const frequency = rootBooking.recurringSchedule?.frequency;
+  const selectedDays = rootBooking.recurringSchedule?.selectedDays || [];
+  const rawEnd = rootBooking.subscription?.subscriptionEndDate
+    || rootBooking.recurringSchedule?.endDate;
+
+  // Horizon: subscription end date, or 60 days from today (for open-ended plans)
+  const horizon = rawEnd
+    ? startOfDay(rawEnd)
+    : addDays(new Date(), 60);
+
+  // Build a set of existing dates for deduplication
+  const existingDateSet = new Set(
+    existingRows.map(s => startOfDay(s.bookingDate).toISOString().split('T')[0])
+  );
+
+  // Start projecting from the date of the last known session
+  let cursor;
+  if (existingRows.length > 0) {
+    const maxTs = Math.max(...existingRows.map(s => new Date(s.bookingDate).getTime()));
+    cursor = new Date(maxTs);
+  } else {
+    cursor = startOfDay(rootBooking.subscription?.subscriptionStartDate || rootBooking.bookingDate || new Date());
+  }
+
+  const projected = [];
+  let sessionNum = existingRows.length + 1;
+  let safety = 0;
+
+  while (safety++ < 300) {
+    const next = getNextRecurringScheduleDate({ frequency, startDate: cursor, selectedDays });
+    if (next > horizon) break;
+
+    const dateKey = next.toISOString().split('T')[0];
+    if (!existingDateSet.has(dateKey)) {
+      projected.push({
+        sessionNumber: sessionNum++,
+        _id: `proj-${dateKey}`,
+        bookingDate: next.toISOString(),
+        startTime: rootBooking.startTime,
+        endTime: rootBooking.endTime,
+        status: 'scheduled',
+        worker: null,
+        actualStartTime: null,
+        actualEndTime: null,
+        actualDurationMinutes: null,
+        scheduledDurationMinutes: null,
+        overtimeMinutes: 0,
+        overtimeCharges: 0,
+        isProjected: true,
+      });
+      existingDateSet.add(dateKey);
+    }
+    cursor = next;
+  }
+
+  return projected;
+};

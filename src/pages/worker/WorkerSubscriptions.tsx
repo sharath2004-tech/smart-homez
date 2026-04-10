@@ -28,6 +28,7 @@ interface SessionRow {
   scheduledDurationMinutes?: number;
   overtimeMinutes: number;
   overtimeCharges: number;
+  isProjected?: boolean;
 }
 
 interface WorkerSubscription {
@@ -89,6 +90,7 @@ const sessionStatusColor: Record<string, string> = {
   assigned: "bg-slate-100 text-slate-600",
   pending: "bg-muted text-muted-foreground",
   cancelled: "bg-red-100 text-red-700",
+  scheduled: "bg-sky-50 text-sky-600 border border-sky-200",
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -274,7 +276,7 @@ const SubscriptionCard = ({
         {expanded ? (
           <><ChevronUp className="w-4 h-4" /> Hide Session Log</>
         ) : (
-          <><ChevronDown className="w-4 h-4" /> Show Session Log ({sub.sessions.length})</>
+          <><ChevronDown className="w-4 h-4" /> Show Session Log ({sub.sessionsTotal})</>
         )}
       </button>
 
@@ -285,29 +287,35 @@ const SubscriptionCard = ({
             <p className="text-center text-sm text-muted-foreground py-6">No sessions scheduled yet</p>
           ) : (
             sub.sessions.map((s) => (
-              <div key={s._id} className={`px-4 py-3 flex items-center gap-3 text-sm ${s.overtimeMinutes > 0 ? "bg-orange-50/50" : ""}`}>
-                <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0">
+              <div key={s._id} className={`px-4 py-3 flex items-center gap-3 text-sm ${
+                s.isProjected ? "opacity-70" : s.overtimeMinutes > 0 ? "bg-orange-50/50" : ""
+              }`}>
+                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                  s.isProjected ? "bg-sky-50 text-sky-500" : "bg-muted text-muted-foreground"
+                }`}>
                   {s.sessionNumber}
                 </span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-foreground">{fmtDate(s.bookingDate)}</span>
+                    <span className={`font-medium ${s.isProjected ? "text-muted-foreground" : "text-foreground"}`}>
+                      {fmtDate(s.bookingDate)}
+                    </span>
                     <span className="text-muted-foreground">{s.startTime} – {s.endTime}</span>
                   </div>
-                  {s.actualStartTime && (
+                  {!s.isProjected && s.actualStartTime && (
                     <p className="text-xs text-muted-foreground mt-0.5">
                       Actual: {fmtTime(s.actualStartTime)} – {fmtTime(s.actualEndTime)}
                       &nbsp;({fmt(s.actualDurationMinutes)})
                     </p>
                   )}
-                  {s.overtimeMinutes > 0 && (
+                  {!s.isProjected && s.overtimeMinutes > 0 && (
                     <p className="text-xs text-orange-700 font-medium mt-0.5">
                       +{fmt(s.overtimeMinutes)} extra → ₹{s.overtimeCharges.toFixed(2)} overtime
                     </p>
                   )}
                 </div>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${sessionStatusColor[s.status] ?? "bg-muted text-muted-foreground"}`}>
-                  {s.status.replace(/-/g, " ")}
+                  {s.isProjected ? "📅 scheduled" : s.status.replace(/-/g, " ")}
                 </span>
               </div>
             ))

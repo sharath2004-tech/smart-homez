@@ -6067,8 +6067,14 @@ router.get('/customer/my-subscriptions', authenticate, authorize('customer'), as
         overtimeCharges: s.overtimeCharges || 0,
       }))];
 
+      // Append projected future sessions so customer sees the full schedule
+      const projectedRows = projectSubscriptionSessions(b, sessionRows);
+      const allRows = [...sessionRows, ...projectedRows];
+
       const done = sessionRows.filter(r => r.status === 'completed').length;
-      const upcoming = sessionRows.filter(r => ['confirmed', 'assigned', 'pending'].includes(r.status)).length;
+      const upcoming = allRows.filter(r =>
+        ['confirmed', 'assigned', 'pending', 'scheduled'].includes(r.status)
+      ).length;
       const totalOvertimeMinutes = sessionRows.reduce((acc, r) => acc + r.overtimeMinutes, 0);
       const totalOvertimeCharges = sessionRows.reduce((acc, r) => acc + r.overtimeCharges, 0);
 
@@ -6099,12 +6105,12 @@ router.get('/customer/my-subscriptions', authenticate, authorize('customer'), as
         totalAmount: b.totalAmount,
         paymentStatus: b.paymentStatus,
         paymentProof: b.paymentProof,
-        sessionsTotal: sessionRows.length,
+        sessionsTotal: allRows.length,
         sessionsDone: done,
         sessionsUpcoming: upcoming,
         totalOvertimeMinutes,
         totalOvertimeCharges: Math.round(totalOvertimeCharges * 100) / 100,
-        sessions: sessionRows,
+        sessions: allRows,
       };
     }));
 
@@ -6137,7 +6143,7 @@ router.get('/worker/my-subscriptions', authenticate, authorize('worker'), async 
       .lean();
 
     const result = await Promise.all(parentBookings.map(async (b) => {
-      const sessions = await Booking.find({
+      const childSessions = await Booking.find({
         parentBooking: b._id,
         'subscription.isSubscription': true,
       })
@@ -6145,33 +6151,55 @@ router.get('/worker/my-subscriptions', authenticate, authorize('worker'), async 
         .sort({ bookingDate: 1 })
         .lean();
 
-      const sessionRows = sessions.map((s, idx) => {
-        const scheduledMins = s.scheduledDurationMinutes ||
-          (() => {
-            if (!s.startTime || !s.endTime) return null;
-            const [sh, sm] = s.startTime.split(':').map(Number);
-            const [eh, em] = s.endTime.split(':').map(Number);
-            return (eh * 60 + em) - (sh * 60 + sm);
-          })();
-        return {
-          sessionNumber: idx + 1,
-          _id: s._id,
-          bookingDate: s.bookingDate,
-          startTime: s.startTime,
-          endTime: s.endTime,
-          status: s.status,
-          actualStartTime: s.actualStartTime,
-          actualEndTime: s.actualEndTime,
-          actualDurationMinutes: s.actualDurationMinutes,
-          scheduledDurationMinutes: scheduledMins,
-          overtimeMinutes: s.overtimeMinutes || 0,
-          overtimeCharges: s.overtimeCharges || 0,
-        };
-      });
+      const calcMins = (s) => s.scheduledDurationMinutes ||
+        (() => {
+          if (!s.startTime || !s.endTime) return null;
+          const [sh, sm] = s.startTime.split(':').map(Number);
+          const [eh, em] = s.endTime.split(':').map(Number);
+          return (eh * 60 + em) - (sh * 60 + sm);
+        })();
 
-      const done = sessionRows.filter(r => r.status === 'completed').length;
-      const totalOvertimeMinutes = sessionRows.reduce((s, r) => s + r.overtimeMinutes, 0);
-      const totalOvertimeCharges = sessionRows.reduce((s, r) => s + r.overtimeCharges, 0);
+      // Root booking is session #1; child bookings are subsequent sessions
+      const rootRow = {
+        sessionNumber: 1,
+        _id: b._id,
+        bookingDate: b.bookingDate,
+        startTime: b.startTime,
+        endTime: b.endTime,
+        status: b.status,
+        actualStartTime: b.actualStartTime,
+        actualEndTime: b.actualEndTime,
+        actualDurationMinutes: b.actualDurationMinutes,
+        scheduledDurationMinutes: calcMins(b),
+        overtimeMinutes: b.overtimeMinutes || 0,
+        overtimeCharges: b.overtimeCharges || 0,
+      };
+
+      const dbRows = [rootRow, ...childSessions.map((s, idx) => ({
+        sessionNumber: idx + 2,
+        _id: s._id,
+        bookingDate: s.bookingDate,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        status: s.status,
+        actualStartTime: s.actualStartTime,
+        actualEndTime: s.actualEndTime,
+        actualDurationMinutes: s.actualDurationMinutes,
+        scheduledDurationMinutes: calcMins(s),
+        overtimeMinutes: s.overtimeMinutes || 0,
+        overtimeCharges: s.overtimeCharges || 0,
+      }))];
+
+      // Append projected future sessions so workers see the full upcoming schedule
+      const projectedRows = projectSubscriptionSessions(b, dbRows);
+      const sessionRows = [...dbRows, ...projectedRows];
+
+      const done = dbRows.filter(r => r.status === 'completed').length;
+      const upcoming = sessionRows.filter(r =>
+        ['confirmed', 'assigned', 'pending', 'scheduled'].includes(r.status)
+      ).length;
+      const totalOvertimeMinutes = dbRows.reduce((s, r) => s + r.overtimeMinutes, 0);
+      const totalOvertimeCharges = dbRows.reduce((s, r) => s + r.overtimeCharges, 0);
 
       return {
         _id: b._id,
@@ -6189,7 +6217,7 @@ router.get('/worker/my-subscriptions', authenticate, authorize('worker'), async 
         frequency: b.recurringSchedule?.frequency,
         sessionsTotal: sessionRows.length,
         sessionsDone: done,
-        sessionsUpcoming: sessionRows.length - done,
+        sessionsUpcoming: upcoming,
         totalOvertimeMinutes,
         totalOvertimeCharges: Math.round(totalOvertimeCharges * 100) / 100,
         sessions: sessionRows,
