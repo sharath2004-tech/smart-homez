@@ -1443,6 +1443,23 @@
     "resendOtpCountdown": "Resend OTP in {{count}}s",
     "resendOtp": "Resend OTP",
     "cancel": "Cancel",
-    "postConstructionDesc": "Get a custom quote for villas, offices, restaurants, bungalows and handover cleaning."
+    "postConstructionDesc": "Get a custom quote for villas, offices, restaurants, bungalows and handover cleaning.",
+    "checkingRegion": "Checking your current region...",
+    "setLocationToSeeServices": "Set your location to see services",
+    "checkingRegionDesc": "We are tracing your location and verifying whether it is inside an active service region.",
+    "chooseLocationDesc": "Choose a location to check whether services are available in your region.",
+    "nearestServiceArea": "Nearest service area",
+    "distanceAway": "{{dist}} km away",
+    "chooseLocation": "Choose location",
+    "setLocation": "Set location",
+    "requestingDeepCleaning": "Requesting...",
+    "requestDeepCleaning": "Request Deep Cleaning",
+    "retry": "Retry",
+    "searchNoResults": "No services found for",
+    "seeAllResults": "See all results for",
+    "serviceTypeSubscription": "Subscription",
+    "serviceTypeCustomQuote": "Custom Quote",
+    "serviceTypeBookInstantly": "Book Instantly",
+    "chooseServiceableLocation": "Choose Serviceable Location"
   }
 }

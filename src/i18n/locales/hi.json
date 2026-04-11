@@ -1438,6 +1438,23 @@
     "resendOtpCountdown": "{{count}} सेकंड में OTP पुनः भेजें",
     "resendOtp": "OTP पुनः भेजें",
     "cancel": "रद्द करें",
-    "postConstructionDesc": "विला, कार्यालय, रेस्तरां, बंगलों के लिए कस्टम कोट पाएं।"
+    "postConstructionDesc": "विला, कार्यालय, रेस्तरां, बंगलों के लिए कस्टम कोट पाएं।",
+    "checkingRegion": "आपका वर्तमान क्षेत्र जांच रहे हैं...",
+    "setLocationToSeeServices": "सेवाएं देखने के लिए अपना स्थान सेट करें",
+    "checkingRegionDesc": "हम आपका स्थान खोज रहे हैं और यह पता लगा रहे हैं कि क्या यह सेवा क्षेत्र में है।",
+    "chooseLocationDesc": "अपने क्षेत्र में सेवा उपलब्धता जांचने के लिए स्थान चुनें।",
+    "nearestServiceArea": "नजदीकी सेवा क्षेत्र",
+    "distanceAway": "{{dist}} किमी दूर",
+    "chooseLocation": "स्थान चुनें",
+    "setLocation": "स्थान सेट करें",
+    "requestingDeepCleaning": "अनुरोध कर रहे हैं...",
+    "requestDeepCleaning": "डीप क्लीनिंग अनुरोध करें",
+    "retry": "पुनः प्रयास करें",
+    "searchNoResults": "खोज में कोई सेवा नहीं मिली",
+    "seeAllResults": "सभी परिणाम देखें",
+    "serviceTypeSubscription": "सदस्यता",
+    "serviceTypeCustomQuote": "कस्टम कोट",
+    "serviceTypeBookInstantly": "तुरंत बुक करें",
+    "chooseServiceableLocation": "सेवायोग्य स्थान चुनें"
   }
 }

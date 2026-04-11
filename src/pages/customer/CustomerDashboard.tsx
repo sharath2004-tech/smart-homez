@@ -1,6 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import LocationSelector, { type LocationData } from "@/components/LocationSelector";
 import { useGeolocation } from "@/hooks/useGeolocation";
+import { useTranslateText } from "@/hooks/useTranslateText";
 import { authAPI, bookingsAPI, dashboardPreferencesAPI, locationsAPI, serviceAreasAPI, servicesAPI, setStoredCustomerLocation } from "@/lib/api";
 import * as msg91Widget from "@/lib/msg91Widget";
 import { motion } from "framer-motion";
@@ -128,6 +129,114 @@ const dedupeQuickServiceCards = (items: QuickServiceCard[]) => {
     seen.add(key);
     return true;
   });
+};
+
+// ---------------------------------------------------------------------------
+// Sub-components that use useTranslateText for dynamic DB strings
+// ---------------------------------------------------------------------------
+
+interface QuickServiceCardItemProps {
+  s: QuickServiceCard;
+}
+const QuickServiceCardItem = ({ s }: QuickServiceCardItemProps) => {
+  const tName = useTranslateText(s.name);
+  const tSubtitle = useTranslateText(s.subtitle);
+  const tBadge = useTranslateText(s.badge ?? null);
+  return (
+    <Link
+      to={s.path}
+      className="card-elevated-hover p-4 text-center group block flex flex-col items-center justify-center min-h-[130px]"
+    >
+      <motion.div className="text-3xl mb-2" whileHover={{ scale: 1.15 }} transition={{ duration: 0.2, ease: "easeOut" }}>
+        {s.icon}
+      </motion.div>
+      <p className="text-xs font-semibold text-foreground leading-tight">{tName}</p>
+      <p className={`text-xs mt-0.5 leading-tight hidden sm:block ${s.name.includes('Move In') ? 'text-muted-foreground/70 font-light' : 'text-muted-foreground'}`}>{tSubtitle}</p>
+      {s.badge && <span className="badge-primary mt-1.5 text-xs inline-block">{tBadge}</span>}
+    </Link>
+  );
+};
+
+interface SearchResultItemProps {
+  service: { _id: string; name: string; serviceCategory?: string; isQuoteService?: boolean; subscriptionOptions?: { enabled?: boolean } };
+  getServicePath: (s: { _id: string; name: string; serviceCategory?: string; isQuoteService?: boolean; subscriptionOptions?: { enabled?: boolean } }) => string;
+  onClose: () => void;
+}
+const SearchResultItem = ({ service, getServicePath, onClose }: SearchResultItemProps) => {
+  const { t } = useTranslation();
+  const tName = useTranslateText(service.name);
+  return (
+    <Link
+      key={service._id}
+      to={getServicePath(service)}
+      onClick={onClose}
+      className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border last:border-b-0"
+    >
+      <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center text-base shrink-0">
+        {service.serviceCategory === "instant_services" ? "⚡"
+          : service.serviceCategory === "subscription_services" ? "📅"
+          : service.serviceCategory === "deep_cleaning" ? "✨"
+          : service.isQuoteService ? "📋"
+          : "🧹"}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-foreground truncate">{tName}</p>
+        <p className="text-xs text-muted-foreground">
+          {service.subscriptionOptions?.enabled ? t('dashboardExtra.serviceTypeSubscription') : service.isQuoteService ? t('dashboardExtra.serviceTypeCustomQuote') : t('dashboardExtra.serviceTypeBookInstantly')}
+        </p>
+      </div>
+      <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+    </Link>
+  );
+};
+
+interface BookingCardItemProps {
+  b: { _id: string; service?: { name: string } | null; bookingType?: string; worker?: { name: string; workerProfile: { rating: number } }; bookingDate: string; startTime: string; status: string };
+  index: number;
+  formatDate: (date: string, time: string) => string;
+}
+const BookingCardItem = ({ b, index, formatDate }: BookingCardItemProps) => {
+  const { t } = useTranslation();
+  const tServiceName = useTranslateText(b.service?.name ?? (b.bookingType === 'deep-cleaning-cart' ? '✨ Move In / Move Out Cleaning' : 'Booking'));
+  return (
+    <Link key={b._id} to="/customer/bookings" state={{ openBookingId: b._id }}>
+      <motion.div
+        className="card-elevated p-4 flex items-center gap-4 cursor-pointer"
+        variants={{ hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0 } }}
+        custom={index}
+        whileHover={{ scale: 1.015, y: -2 }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+      >
+        <div className="w-12 h-12 bg-accent rounded-xl flex items-center justify-center text-xl shrink-0">
+          {(b.service?.name ?? '').toLowerCase().includes("deep") || b.bookingType === 'deep-cleaning-cart' ? "✨" : "🧹"}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-foreground text-sm">{tServiceName}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {b.worker?.name || t('customer.dashboard.workerWillBeAssigned')}
+          </p>
+          <div className="flex items-center gap-3 mt-1.5">
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Clock className="w-3 h-3" /> {formatDate(b.bookingDate, b.startTime)}
+            </span>
+            {b.worker && (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Star className="w-3 h-3 fill-warning text-warning" /> {b.worker.workerProfile.rating.toFixed(1)}
+              </span>
+            )}
+          </div>
+        </div>
+        <motion.span
+          className="shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold badge-primary"
+          initial={{ opacity: 0, scale: 0.85 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.25, ease: "easeOut", delay: 0.15 + index * 0.05 }}
+        >
+          {b.status === "confirmed" ? t('customer.dashboard.confirmed') : t('customer.dashboard.pending')}
+        </motion.span>
+      </motion.div>
+    </Link>
+  );
 };
 
 const CustomerDashboard = () => {
@@ -669,39 +778,24 @@ const CustomerDashboard = () => {
                   <div className="px-4 py-3 text-sm text-muted-foreground text-center">{t('dashboardExtra.searching')}</div>
                 ) : searchResults.length === 0 ? (
                   <div className="px-4 py-3 text-sm text-muted-foreground text-center">
-                    No services found for "<span className="font-medium text-foreground">{searchQuery}</span>"
+                    {t('dashboardExtra.searchNoResults')} "<span className="font-medium text-foreground">{searchQuery}</span>"
                   </div>
                 ) : (
                   <>
                     {searchResults.map((service) => (
-                      <Link
+                      <SearchResultItem
                         key={service._id}
-                        to={getServicePath(service)}
-                        onClick={() => { setSearchFocused(false); setSearchQuery(""); }}
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border last:border-b-0"
-                      >
-                        <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center text-base shrink-0">
-                          {service.serviceCategory === "instant_services" ? "⚡"
-                            : service.serviceCategory === "subscription_services" ? "📅"
-                            : service.serviceCategory === "deep_cleaning" ? "✨"
-                            : service.isQuoteService ? "📋"
-                            : "🧹"}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{service.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {service.subscriptionOptions?.enabled ? "Subscription" : service.isQuoteService ? "Custom Quote" : "Book Instantly"}
-                          </p>
-                        </div>
-                        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                      </Link>
+                        service={service}
+                        getServicePath={getServicePath}
+                        onClose={() => { setSearchFocused(false); setSearchQuery(""); }}
+                      />
                     ))}
                     <Link
                       to={`/customer/services?search=${encodeURIComponent(searchQuery)}`}
                       onClick={() => setSearchFocused(false)}
                       className="flex items-center justify-center gap-2 px-4 py-2.5 bg-muted/50 text-sm text-primary font-medium hover:bg-muted transition-colors"
                     >
-                      See all results for "{searchQuery}" <ArrowRight className="w-3.5 h-3.5" />
+                      {t('dashboardExtra.seeAllResults')} "{searchQuery}" <ArrowRight className="w-3.5 h-3.5" />
                     </Link>
                   </>
                 )}
@@ -749,22 +843,22 @@ const CustomerDashboard = () => {
             <div className="flex-1">
               <p className="text-sm font-semibold text-foreground">
                 {locationLoading
-                  ? 'Checking your current region...'
+                  ? t('dashboardExtra.checkingRegion')
                   : serviceableStatus === 'unavailable'
                   ? t('customer.dashboard.areaNotServiceable')
-                  : 'Set your location to see services'}
+                  : t('dashboardExtra.setLocationToSeeServices')}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {locationLoading
-                  ? 'We are tracing your location and verifying whether it is inside an active service region.'
+                  ? t('dashboardExtra.checkingRegionDesc')
                   : serviceableStatus === 'unavailable'
                   ? (serviceabilityMessage || t('customer.dashboard.bookElsewhere'))
-                  : (locationError || 'Choose a location to check whether services are available in your region.')}
+                  : (locationError || t('dashboardExtra.chooseLocationDesc'))}
               </p>
               {nearestServiceArea?.name && serviceableStatus === 'unavailable' && (
                 <p className="text-xs text-amber-700 mt-2">
-                  Nearest service area: <strong>{nearestServiceArea.name}</strong>
-                  {typeof nearestServiceArea.distance === 'number' ? ` (${nearestServiceArea.distance.toFixed(1)} km away)` : ''}
+                  {t('dashboardExtra.nearestServiceArea')}: <strong>{nearestServiceArea.name}</strong>
+                  {typeof nearestServiceArea.distance === 'number' ? ` (${t('dashboardExtra.distanceAway', { dist: nearestServiceArea.distance.toFixed(1) })})` : ''}
                 </p>
               )}
             </div>
@@ -783,7 +877,7 @@ const CustomerDashboard = () => {
                   disabled={requestingDeepCleaning}
                   className="rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  {requestingDeepCleaning ? 'Requesting...' : 'Request Deep Cleaning'}
+                  {requestingDeepCleaning ? t('dashboardExtra.requestingDeepCleaning') : t('dashboardExtra.requestDeepCleaning')}
                 </button>
               )}
               {locationError && (
@@ -792,7 +886,7 @@ const CustomerDashboard = () => {
                   onClick={refetch}
                   className="inline-flex items-center justify-center gap-1 rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100 whitespace-nowrap"
                 >
-                  <RefreshCw className="h-3 w-3" /> Retry
+                  <RefreshCw className="h-3 w-3" /> {t('dashboardExtra.retry')}
                 </button>
               )}
             </div>
@@ -841,21 +935,7 @@ const CustomerDashboard = () => {
                 whileTap="tap"
                 custom={index}
               >
-                <Link
-                  to={s.path}
-                  className="card-elevated-hover p-4 text-center group block flex flex-col items-center justify-center min-h-[130px]"
-                >
-                  <motion.div
-                    className="text-3xl mb-2"
-                    whileHover={{ scale: 1.15 }}
-                    transition={{ duration: 0.2, ease: "easeOut" }}
-                  >
-                    {s.icon}
-                  </motion.div>
-                  <p className="text-xs font-semibold text-foreground leading-tight">{s.name}</p>
-                  <p className={`text-xs mt-0.5 leading-tight hidden sm:block ${s.name.includes('Move In') ? 'text-muted-foreground/70 font-light' : 'text-muted-foreground'}`}>{s.subtitle}</p>
-                  {s.badge && <span className="badge-primary mt-1.5 text-xs inline-block">{s.badge}</span>}
-                </Link>
+                <QuickServiceCardItem s={s} />
               </motion.div>
             ))}
           </motion.div>
@@ -904,7 +984,7 @@ const CustomerDashboard = () => {
                     onClick={() => setShowLocationSelector(true)}
                     className="btn-brand mt-4 text-sm inline-flex items-center gap-2"
                   >
-                    {serviceableStatus === 'unavailable' ? 'Choose Serviceable Location' : 'Set Location'} <ArrowRight className="w-3.5 h-3.5" />
+                  {serviceableStatus === 'unavailable' ? t('dashboardExtra.chooseServiceableLocation') : t('dashboardExtra.setLocation')} <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
@@ -915,43 +995,7 @@ const CustomerDashboard = () => {
               variants={containerVariants}
             >
               {upcomingBookings.map((b, index) => (
-                <Link key={b._id} to={`/customer/bookings`} state={{ openBookingId: b._id }}>
-                <motion.div
-                  className="card-elevated p-4 flex items-center gap-4 cursor-pointer"
-                  variants={itemVariants}
-                  custom={index}
-                  whileHover={{ scale: 1.015, y: -2 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                >
-                  <div className="w-12 h-12 bg-accent rounded-xl flex items-center justify-center text-xl shrink-0">
-                    {(b.service?.name ?? '').toLowerCase().includes("deep") || b.bookingType === 'deep-cleaning-cart' ? "✨" : "🧹"}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-foreground text-sm">{b.service?.name ?? (b.bookingType === 'deep-cleaning-cart' ? '✨ Move In / Move Out Cleaning' : 'Booking')}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {b.worker?.name || t('customer.dashboard.workerWillBeAssigned')}
-                    </p>
-                    <div className="flex items-center gap-3 mt-1.5">
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Clock className="w-3 h-3" /> {formatDate(b.bookingDate, b.startTime)}
-                      </span>
-                      {b.worker && (
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Star className="w-3 h-3 fill-warning text-warning" /> {b.worker.workerProfile.rating.toFixed(1)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <motion.span
-                    className="shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold badge-primary"
-                    initial={{ opacity: 0, scale: 0.85 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.25, ease: "easeOut", delay: 0.15 + index * 0.05 }}
-                  >
-                    {b.status === "confirmed" ? t('customer.dashboard.confirmed') : t('customer.dashboard.pending')}
-                  </motion.span>
-                </motion.div>
-                </Link>
+                <BookingCardItem key={b._id} b={b} index={index} formatDate={formatDate} />
               ))}
             </motion.div>
           )}

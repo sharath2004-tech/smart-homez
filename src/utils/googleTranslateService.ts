@@ -18,17 +18,33 @@ interface CacheEntry {
   timestamp: number;
 }
 
-function cacheKey(lang: string): string {
-  return `gt_translations_${lang}`;
+/**
+ * Compute a cheap FNV-1a hash of the sorted key names in a bundle.
+ * This changes whenever keys are added/removed from en.json, which forces
+ * stale cached translations to be discarded and re-fetched.
+ */
+export function computeBundleVersion(bundle: NestedBundle): string {
+  const flat = flattenBundle(bundle);
+  const keys = Object.keys(flat).sort().join('|');
+  let h = 2166136261; // FNV offset basis (32-bit)
+  for (let i = 0; i < keys.length; i++) {
+    h ^= keys.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0; // FNV prime, keep unsigned 32-bit
+  }
+  return h.toString(36);
 }
 
-function readCache(lang: string): Record<string, string> | null {
+function cacheKey(lang: string, version: string): string {
+  return `gt_translations_${lang}_${version}`;
+}
+
+function readCache(lang: string, version: string): Record<string, string> | null {
   try {
-    const raw = localStorage.getItem(cacheKey(lang));
+    const raw = localStorage.getItem(cacheKey(lang, version));
     if (!raw) return null;
     const entry: CacheEntry = JSON.parse(raw);
     if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
-      localStorage.removeItem(cacheKey(lang));
+      localStorage.removeItem(cacheKey(lang, version));
       return null;
     }
     return entry.bundle;
@@ -37,10 +53,10 @@ function readCache(lang: string): Record<string, string> | null {
   }
 }
 
-function writeCache(lang: string, bundle: Record<string, string>): void {
+function writeCache(lang: string, version: string, bundle: Record<string, string>): void {
   try {
     const entry: CacheEntry = { bundle, timestamp: Date.now() };
-    localStorage.setItem(cacheKey(lang), JSON.stringify(entry));
+    localStorage.setItem(cacheKey(lang, version), JSON.stringify(entry));
   } catch {
     // Ignore storage errors (e.g. private-browsing quota)
   }
@@ -135,8 +151,10 @@ export async function translateBundle(
   englishBundle: NestedBundle,
   targetLang: string,
 ): Promise<NestedBundle> {
-  // Check cache first
-  const cached = readCache(targetLang);
+  const version = computeBundleVersion(englishBundle);
+
+  // Check cache first — version-keyed so stale entries are auto-bypassed
+  const cached = readCache(targetLang, version);
   if (cached) {
     return unflattenBundle(cached);
   }
@@ -152,14 +170,19 @@ export async function translateBundle(
     flatTranslated[k] = translatedValues[i] ?? flatEn[k];
   });
 
-  writeCache(targetLang, flatTranslated);
+  writeCache(targetLang, version, flatTranslated);
   return unflattenBundle(flatTranslated);
 }
 
 /**
- * Invalidates the cached translation for a specific language so the next
- * call to translateBundle fetches fresh data.
+ * Invalidates ALL cached translations for a specific language (all versions).
  */
 export function invalidateTranslationCache(lang: string): void {
-  localStorage.removeItem(cacheKey(lang));
+  const prefix = `gt_translations_${lang}_`;
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(prefix)) keysToRemove.push(k);
+  }
+  keysToRemove.forEach((k) => localStorage.removeItem(k));
 }

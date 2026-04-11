@@ -1438,6 +1438,23 @@
     "resendOtpCountdown": "{{count}} సెకన్లలో OTP మళ్లీ పంపండి",
     "resendOtp": "OTP మళ్లీ పంపండి",
     "cancel": "రద్దు చేయండి",
-    "postConstructionDesc": "విల్లాలు, కార్యాలయాలు, రెస్టారెంట్లు, బంగ్లాలకు కస్టమ్ కోట్ పొందండి."
+    "postConstructionDesc": "విల్లాలు, కార్యాలయాలు, రెస్టారెంట్లు, బంగ్లాలకు కస్టమ్ కోట్ పొందండి.",
+    "checkingRegion": "మీ ప్రస్తుత ప్రాంతం తనిఖీ చేస్తున్నాము...",
+    "setLocationToSeeServices": "సేవలు చూడడానికి మీ స్థానం సెట్ చేయండి",
+    "checkingRegionDesc": "మీ స్థానాన్ని గుర్తిస్తున్నాము మరియు సేవా ప్రాంతంలో ఉందా అని తనిఖీ చేస్తున్నాము.",
+    "chooseLocationDesc": "మీ ప్రాంతంలో సేవలు అందుబాటులో ఉన్నాయా అని తనిఖీ చేయడానికి స్థానాన్ని ఎంచుకోండి.",
+    "nearestServiceArea": "సమీప సేవా ప్రాంతం",
+    "distanceAway": "{{dist}} కిమీ దూరం",
+    "chooseLocation": "స్థానం ఎంచుకోండి",
+    "setLocation": "స్థానం సెట్ చేయండి",
+    "requestingDeepCleaning": "అభ్యర్థిస్తున్నాము...",
+    "requestDeepCleaning": "డీప్ క్లీనింగ్ అభ్యర్థించండి",
+    "retry": "మళ్లీ ప్రయత్నించండి",
+    "searchNoResults": "వెతుకులో సేవ కనుగొనబడలేదు",
+    "seeAllResults": "ఈ ఫలితాలు చూడండి",
+    "serviceTypeSubscription": "సభ్యత్వం",
+    "serviceTypeCustomQuote": "కస్టమ్ కోట్",
+    "serviceTypeBookInstantly": "వెంటనే బుక్ చేయండి",
+    "chooseServiceableLocation": "సేవాయోగ్య స్థానం ఎంచుకోండి"
   }
 }
