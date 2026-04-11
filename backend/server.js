@@ -40,6 +40,7 @@ import subscriptionRoutes from './routes/subscriptions.js';
 import subscriptionSectionsRoutes from './routes/subscriptionSections.js';
 import superAdminRoutes from './routes/superAdmin.js';
 import trackingRoutes from './routes/tracking.js';
+import translationRoutes from './routes/translation.js';
 import twilioAuthRoutes from './routes/twilioAuth.js';
 import userRoutes from './routes/users.js';
 
@@ -250,6 +251,7 @@ app.use('/api/location-requests', locationRequestsRoutes);
 app.use('/api/reliability', reliabilityRoutes);
 app.use('/api/dashboard-preferences', dashboardPreferencesRoutes);
 app.use('/api/home-config', homeConfigRoutes);
+app.use('/api/translate', translationRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

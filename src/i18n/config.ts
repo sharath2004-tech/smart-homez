@@ -6,6 +6,24 @@ import enTranslations from './locales/en.json';
 import hiTranslations from './locales/hi.json';
 import teTranslations from './locales/te.json';
 
+/**
+ * Language codes that have hand-crafted locale files.
+ * All other Indian languages are translated dynamically via Google Translate.
+ */
+export const STATIC_LOCALES = ['en', 'hi', 'te'] as const;
+
+/**
+ * All supported Indian languages (ISO 639-1 / Google Translate codes).
+ * The first three have static locale files; the rest use Google Translate.
+ */
+export const INDIAN_LANGUAGE_CODES = [
+  'en', 'hi', 'te',
+  'as', 'bn', 'gu', 'kn', 'kok', 'ks', 'ml', 'mni-Mtei',
+  'mr', 'ne', 'or', 'pa', 'sa', 'sat', 'sd', 'ta', 'ur',
+] as const;
+
+export type IndianLanguageCode = (typeof INDIAN_LANGUAGE_CODES)[number];
+
 i18n
   .use(LanguageDetector)
   .use(initReactI18next)
@@ -26,3 +44,4 @@ i18n
   });
 
 export default i18n;
+
