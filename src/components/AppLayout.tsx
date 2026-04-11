@@ -51,8 +51,8 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
 
   const passwordMenuLabel = useMemo(() => {
     const needsSetup = storedUser.needsPasswordSetup ?? storedUser.isFirstLogin ?? storedUser.hasCustomPassword === false;
-    return needsSetup ? 'Add Password' : 'Change Password';
-  }, [storedUser]);
+    return needsSetup ? t('nav.addPassword') : t('nav.changePassword');
+  }, [storedUser, t]);
 
   useEffect(() => {
     const fetchUnread = () => {
@@ -114,23 +114,23 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
     { to: "/customer/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },
     { to: "/customer/services", icon: Wrench, label: t('nav.services') },
     { to: "/customer/bookings", icon: Calendar, label: t('nav.myBookings') },
-    { to: "/customer/my-quotes", icon: FileText, label: "My Quotes" },
+    { to: "/customer/my-quotes", icon: FileText, label: t('nav.myQuotes') },
     { to: "/customer/subscriptions", icon: RefreshCw, label: t('nav.mySubscriptions') },
     { to: "/customer/payments", icon: CreditCard, label: t('nav.payments') },
     { to: "/customer/profile", icon: User, label: t('nav.profile') },
-    { to: "/customer/help", icon: HelpCircle, label: "Help" },
+    { to: "/customer/help", icon: HelpCircle, label: t('nav.help') },
     { to: "/change-password", icon: KeyRound, label: passwordMenuLabel },
   ], [t, passwordMenuLabel]);
 
   const workerNav = useMemo(() => [
     { to: "/worker/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },
     { to: "/worker/tasks", icon: Calendar, label: t('nav.myTasks') },
-    { to: "/worker/earnings", icon: IndianRupee, label: "Salary Management" },
-    { to: "/worker/salary", icon: IndianRupee, label: "Salary History" },
-    { to: "/worker/subscriptions", icon: RefreshCw, label: "My Subscriptions" },
+    { to: "/worker/earnings", icon: IndianRupee, label: t('nav.salaryManagement') },
+    { to: "/worker/salary", icon: IndianRupee, label: t('nav.salaryHistory') },
+    { to: "/worker/subscriptions", icon: RefreshCw, label: t('nav.workerSubscriptions') },
     { to: "/worker/leaves", icon: Bell, label: t('nav.myLeaves') },
     { to: "/worker/profile", icon: User, label: t('nav.profile') },
-    { to: "/worker/help", icon: HelpCircle, label: "Help" },
+    { to: "/worker/help", icon: HelpCircle, label: t('nav.help') },
     { to: "/change-password", icon: KeyRound, label: passwordMenuLabel },
   ], [t, passwordMenuLabel]);
 
@@ -138,24 +138,24 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
     { to: "/admin/dashboard",          icon: LayoutDashboard, label: t('nav.dashboard') },
     { to: "/admin/bookings",           icon: Calendar,        label: t('nav.bookings') },
     { to: "/admin/customers",          icon: UserCircle,      label: t('nav.customers') },
-    { to: "/admin/expenses",           icon: IndianRupee,     label: "Expenses" },
-    { to: "/admin/subscription-sections", icon: Grid3x3,      label: "Subscriptions" },
-    { to: "/admin/subscription-tracker",  icon: BarChart3,     label: "Sub Tracker" },
+    { to: "/admin/expenses",           icon: IndianRupee,     label: t('nav.expenses') },
+    { to: "/admin/subscription-sections", icon: Grid3x3,      label: t('nav.subscriptions') },
+    { to: "/admin/subscription-tracker",  icon: BarChart3,     label: t('nav.subTracker') },
     { to: "/admin/workers",            icon: User,            label: t('nav.workers') },
-    { to: "/admin/worker-requests",    icon: ClipboardCheck,  label: "Worker Requests" },
-    { to: "/admin/sos",                icon: AlertTriangle,   label: "SOS Alerts" },
+    { to: "/admin/worker-requests",    icon: ClipboardCheck,  label: t('nav.workerRequests') },
+    { to: "/admin/sos",                icon: AlertTriangle,   label: t('nav.sosAlerts') },
     { to: "/admin/leaves",             icon: Bell,            label: t('nav.leaves') },
     { to: "/admin/worker-schedule",    icon: Calendar,        label: t('nav.workerSchedule') },
     { to: "/admin/workforce",          icon: Users,           label: t('nav.workforce') },
-    { to: "/admin/salary-settlements", icon: IndianRupee,     label: "Salary Settlements" },
-    { to: "/admin/reports",            icon: BarChart3,       label: "Reports" },
-    { to: "/admin/cancellations",       icon: FileText,        label: "Cancellation Report" },
-    { to: "/admin/quotes",             icon: FileText,        label: "Quote Requests" },
-    { to: "/admin/help-messages",      icon: MessageSquare,   label: "Help Messages" },
+    { to: "/admin/salary-settlements", icon: IndianRupee,     label: t('nav.salarySettlements') },
+    { to: "/admin/reports",            icon: BarChart3,       label: t('nav.reports') },
+    { to: "/admin/cancellations",       icon: FileText,        label: t('nav.cancellationReport') },
+    { to: "/admin/quotes",             icon: FileText,        label: t('nav.quoteRequests') },
+    { to: "/admin/help-messages",      icon: MessageSquare,   label: t('nav.helpMessages') },
     { to: "/admin/locations",          icon: MapPin,          label: t('nav.locations') },
     { to: "/admin/services",           icon: Wrench,          label: t('nav.services') },
-    { to: "/admin/home-config",        icon: LayoutDashboard, label: "Home Screen Config" },
-    { to: "/admin/dashboard-preferences", icon: Settings2,    label: "Dashboard Preferences" },
+    { to: "/admin/home-config",        icon: LayoutDashboard, label: t('nav.homeScreenConfig') },
+    { to: "/admin/dashboard-preferences", icon: Settings2,    label: t('nav.dashboardPreferences') },
     { to: "/admin/settings",           icon: Settings,        label: t('nav.settings') },
     { to: "/change-password",          icon: KeyRound,        label: passwordMenuLabel },
   ], [t, passwordMenuLabel]);
@@ -164,7 +164,7 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
   const adminNavSections = useMemo(() => [
     {
       id: 'overview',
-      title: 'Overview & Analytics',
+      title: t('nav.sectionOverview'),
       icon: TrendingUp,
       defaultOpen: true,
       items: [
@@ -173,83 +173,83 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
     },
     {
       id: 'services',
-      title: 'Service Management',
+      title: t('nav.sectionServiceMgmt'),
       icon: Wrench,
       defaultOpen: false,
       items: [
         { to: "/admin/services", icon: Wrench, label: t('nav.services') },
-        { to: "/admin/home-config", icon: LayoutDashboard, label: "Home Screen Config" },
-        { to: "/admin/dashboard-preferences", icon: Settings2, label: "Dashboard Preferences" },
+        { to: "/admin/home-config", icon: LayoutDashboard, label: t('nav.homeScreenConfig') },
+        { to: "/admin/dashboard-preferences", icon: Settings2, label: t('nav.dashboardPreferences') },
       ]
     },
     {
       id: 'workers',
-      title: 'Worker Management',
+      title: t('nav.sectionWorkerMgmt'),
       icon: Users,
       defaultOpen: false,
       items: [
         { to: "/admin/workers", icon: User, label: t('nav.workers') },
-        { to: "/admin/worker-requests", icon: ClipboardCheck, label: "Worker Requests" },
+        { to: "/admin/worker-requests", icon: ClipboardCheck, label: t('nav.workerRequests') },
         { to: "/admin/leaves", icon: Bell, label: t('nav.leaves') },
         { to: "/admin/worker-schedule", icon: Calendar, label: t('nav.workerSchedule') },
         { to: "/admin/workforce", icon: Users, label: t('nav.workforce') },
-        { to: "/admin/salary-settlements", icon: IndianRupee, label: "Salary Settlements" },
-        { to: "/admin/reports", icon: BarChart3, label: "Reports" },
+        { to: "/admin/salary-settlements", icon: IndianRupee, label: t('nav.salarySettlements') },
+        { to: "/admin/reports", icon: BarChart3, label: t('nav.reports') },
       ]
     },
     {
       id: 'business',
-      title: 'Business Operations',
+      title: t('nav.sectionBusinessOps'),
       icon: Calendar,
       defaultOpen: false,
       items: [
         { to: "/admin/bookings", icon: Calendar, label: t('nav.bookings') },
         { to: "/admin/customers", icon: UserCircle, label: t('nav.customers') },
-        { to: "/admin/expenses", icon: IndianRupee, label: "Expenses" },
-        { to: "/admin/subscription-sections", icon: Grid3x3, label: "Subscriptions" },
-        { to: "/admin/subscription-tracker", icon: BarChart3, label: "Sub Tracker" },
-        { to: "/admin/cancellations", icon: FileText, label: "Cancellation Report" },
-        { to: "/admin/sos", icon: AlertTriangle, label: "SOS Alerts" },
+        { to: "/admin/expenses", icon: IndianRupee, label: t('nav.expenses') },
+        { to: "/admin/subscription-sections", icon: Grid3x3, label: t('nav.subscriptions') },
+        { to: "/admin/subscription-tracker", icon: BarChart3, label: t('nav.subTracker') },
+        { to: "/admin/cancellations", icon: FileText, label: t('nav.cancellationReport') },
+        { to: "/admin/sos", icon: AlertTriangle, label: t('nav.sosAlerts') },
       ]
     },
     {
       id: 'system',
-      title: 'Location & Settings',
+      title: t('nav.sectionLocationSettings'),
       icon: Settings,
       defaultOpen: false,
       items: [
         { to: "/admin/locations", icon: MapPin, label: t('nav.locations') },
         { to: "/admin/settings", icon: Settings, label: t('nav.settings') },
-        { to: "/admin/quotes", icon: FileText, label: "Quote Requests" },
-        { to: "/admin/help-messages", icon: MessageSquare, label: "Help Messages" },
+        { to: "/admin/quotes", icon: FileText, label: t('nav.quoteRequests') },
+        { to: "/admin/help-messages", icon: MessageSquare, label: t('nav.helpMessages') },
         { to: "/change-password", icon: KeyRound, label: passwordMenuLabel },
       ]
     }
   ], [t, passwordMenuLabel]);
 
   const superAdminNav = useMemo(() => [
-    { to: "/super-admin/dashboard",          icon: LayoutDashboard, label: "Overview" },
-    { to: "/super-admin/demand-requests",    icon: MapPin,          label: "Demand Requests" },
+    { to: "/super-admin/dashboard",          icon: LayoutDashboard, label: t('nav.dashboard') },
+    { to: "/super-admin/demand-requests",    icon: MapPin,          label: t('nav.demandRequests') },
     { to: "/super-admin/bookings",           icon: Calendar,        label: t('nav.bookings') },
     { to: "/admin/customers",                icon: UserCircle,      label: t('nav.customers') },
-    { to: "/admin/expenses",                 icon: IndianRupee,     label: "Expenses" },
-    { to: "/admin/subscription-sections",    icon: Grid3x3,         label: "Subscriptions" },
-    { to: "/admin/subscription-tracker",     icon: BarChart3,       label: "Sub Tracker" },
+    { to: "/admin/expenses",                 icon: IndianRupee,     label: t('nav.expenses') },
+    { to: "/admin/subscription-sections",    icon: Grid3x3,         label: t('nav.subscriptions') },
+    { to: "/admin/subscription-tracker",     icon: BarChart3,       label: t('nav.subTracker') },
     { to: "/super-admin/workers",            icon: User,            label: t('nav.workers') },
-    { to: "/super-admin/worker-requests",    icon: ClipboardCheck,  label: "Worker Requests" },
-    { to: "/super-admin/sos",                icon: AlertTriangle,   label: "SOS Alerts" },
+    { to: "/super-admin/worker-requests",    icon: ClipboardCheck,  label: t('nav.workerRequests') },
+    { to: "/super-admin/sos",                icon: AlertTriangle,   label: t('nav.sosAlerts') },
     { to: "/super-admin/leaves",             icon: Bell,            label: t('nav.leaves') },
     { to: "/super-admin/worker-schedule",    icon: Calendar,        label: t('nav.workerSchedule') },
     { to: "/super-admin/workforce",          icon: Users,           label: t('nav.workforce') },
-    { to: "/super-admin/salary-settlements", icon: IndianRupee,     label: "Salary Settlements" },
-    { to: "/super-admin/reports",            icon: BarChart3,       label: "Reports" },
-    { to: "/super-admin/cancellations",       icon: FileText,        label: "Cancellation Report" },
-    { to: "/super-admin/quotes",             icon: FileText,        label: "Quote Requests" },
-    { to: "/super-admin/help-messages",      icon: MessageSquare,   label: "Help Messages" },
-    { to: "/super-admin/locations",          icon: MapPin,          label: "Locations & Admins" },
+    { to: "/super-admin/salary-settlements", icon: IndianRupee,     label: t('nav.salarySettlements') },
+    { to: "/super-admin/reports",            icon: BarChart3,       label: t('nav.reports') },
+    { to: "/super-admin/cancellations",       icon: FileText,        label: t('nav.cancellationReport') },
+    { to: "/super-admin/quotes",             icon: FileText,        label: t('nav.quoteRequests') },
+    { to: "/super-admin/help-messages",      icon: MessageSquare,   label: t('nav.helpMessages') },
+    { to: "/super-admin/locations",          icon: MapPin,          label: t('nav.locationsAndAdmins') },
     { to: "/super-admin/services",           icon: Wrench,          label: t('nav.services') },
-    { to: "/admin/home-config",              icon: LayoutDashboard, label: "Home Screen Config" },
-    { to: "/super-admin/heatmap",            icon: BarChart3,       label: "Worker Heatmap" },
+    { to: "/admin/home-config",              icon: LayoutDashboard, label: t('nav.homeScreenConfig') },
+    { to: "/super-admin/heatmap",            icon: BarChart3,       label: t('nav.workerHeatmap') },
     { to: "/super-admin/settings",           icon: Settings,        label: t('nav.settings') },
     { to: "/change-password",                icon: KeyRound,        label: passwordMenuLabel },
   ], [t, passwordMenuLabel]);
@@ -258,66 +258,66 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
   const superAdminNavSections = useMemo(() => [
     {
       id: 'overview',
-      title: 'Overview & Analytics',
+      title: t('nav.sectionOverview'),
       icon: TrendingUp,
       defaultOpen: true,
       items: [
-        { to: "/super-admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-        { to: "/super-admin/demand-requests", icon: MapPin, label: "Demand Requests" },
-        { to: "/super-admin/heatmap", icon: BarChart3, label: "Worker Heatmap" },
+        { to: "/super-admin/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },
+        { to: "/super-admin/demand-requests", icon: MapPin, label: t('nav.demandRequests') },
+        { to: "/super-admin/heatmap", icon: BarChart3, label: t('nav.workerHeatmap') },
       ]
     },
     {
       id: 'services',
-      title: 'Service Management',
+      title: t('nav.sectionServiceMgmt'),
       icon: Wrench,
       defaultOpen: false,
       items: [
         { to: "/super-admin/services", icon: Wrench, label: t('nav.services') },
-        { to: "/admin/home-config", icon: LayoutDashboard, label: "Home Screen Config" },
-        { to: "/admin/dashboard-preferences", icon: Settings2, label: "Dashboard Preferences" },
+        { to: "/admin/home-config", icon: LayoutDashboard, label: t('nav.homeScreenConfig') },
+        { to: "/admin/dashboard-preferences", icon: Settings2, label: t('nav.dashboardPreferences') },
       ]
     },
     {
       id: 'workers',
-      title: 'Worker Management',
+      title: t('nav.sectionWorkerMgmt'),
       icon: Users,
       defaultOpen: false,
       items: [
         { to: "/super-admin/workers", icon: User, label: t('nav.workers') },
-        { to: "/super-admin/worker-requests", icon: ClipboardCheck, label: "Worker Requests" },
+        { to: "/super-admin/worker-requests", icon: ClipboardCheck, label: t('nav.workerRequests') },
         { to: "/super-admin/leaves", icon: Bell, label: t('nav.leaves') },
         { to: "/super-admin/worker-schedule", icon: Calendar, label: t('nav.workerSchedule') },
         { to: "/super-admin/workforce", icon: Users, label: t('nav.workforce') },
-        { to: "/super-admin/salary-settlements", icon: IndianRupee, label: "Salary Settlements" },
-        { to: "/super-admin/reports", icon: BarChart3, label: "Reports" },
+        { to: "/super-admin/salary-settlements", icon: IndianRupee, label: t('nav.salarySettlements') },
+        { to: "/super-admin/reports", icon: BarChart3, label: t('nav.reports') },
       ]
     },
     {
       id: 'business',
-      title: 'Business Operations',
+      title: t('nav.sectionBusinessOps'),
       icon: Calendar,
       defaultOpen: false,
       items: [
         { to: "/super-admin/bookings", icon: Calendar, label: t('nav.bookings') },
         { to: "/admin/customers", icon: UserCircle, label: t('nav.customers') },
-        { to: "/admin/expenses", icon: IndianRupee, label: "Expenses" },
-        { to: "/admin/subscription-sections", icon: Grid3x3, label: "Subscriptions" },
-        { to: "/admin/subscription-tracker", icon: BarChart3, label: "Sub Tracker" },
-        { to: "/super-admin/cancellations", icon: FileText, label: "Cancellation Report" },
-        { to: "/super-admin/sos", icon: AlertTriangle, label: "SOS Alerts" },
+        { to: "/admin/expenses", icon: IndianRupee, label: t('nav.expenses') },
+        { to: "/admin/subscription-sections", icon: Grid3x3, label: t('nav.subscriptions') },
+        { to: "/admin/subscription-tracker", icon: BarChart3, label: t('nav.subTracker') },
+        { to: "/super-admin/cancellations", icon: FileText, label: t('nav.cancellationReport') },
+        { to: "/super-admin/sos", icon: AlertTriangle, label: t('nav.sosAlerts') },
       ]
     },
     {
       id: 'system',
-      title: 'System & Settings',
+      title: t('nav.sectionSystemSettings'),
       icon: Building,
       defaultOpen: false,
       items: [
-        { to: "/super-admin/locations", icon: MapPin, label: "Locations & Admins" },
+        { to: "/super-admin/locations", icon: MapPin, label: t('nav.locationsAndAdmins') },
         { to: "/super-admin/settings", icon: Settings, label: t('nav.settings') },
-        { to: "/super-admin/quotes", icon: FileText, label: "Quote Requests" },
-        { to: "/super-admin/help-messages", icon: MessageSquare, label: "Help Messages" },
+        { to: "/super-admin/quotes", icon: FileText, label: t('nav.quoteRequests') },
+        { to: "/super-admin/help-messages", icon: MessageSquare, label: t('nav.helpMessages') },
         { to: "/change-password", icon: KeyRound, label: passwordMenuLabel },
       ]
     }
