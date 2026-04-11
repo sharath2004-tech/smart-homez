@@ -1603,6 +1603,7 @@ const BookServicePage = () => {
             <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
               <User className="w-5 h-5 text-primary" />
               {t('bookService.additionalPreferences')}
+            </h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
