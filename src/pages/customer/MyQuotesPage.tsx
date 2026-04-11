@@ -2,6 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { api, authAPI } from "@/lib/api";
 import { Briefcase, Building2, Clock, FileText, Home, Loader2, MessageSquare, UtensilsCrossed } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 interface QuoteRequest {
@@ -43,6 +44,7 @@ const STATUS_CONFIG = {
 };
 
 const MyQuotesPage = () => {
+  const { t } = useTranslation();
   const [quotes, setQuotes] = useState<QuoteRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<{ name?: string } | null>(null);
@@ -68,9 +70,9 @@ const MyQuotesPage = () => {
 
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold font-heading text-foreground">My Quote Requests</h1>
+          <h1 className="text-2xl font-bold font-heading text-foreground">{t('myQuotes.title')}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Track the status of your deep cleaning quote requests.
+            {t('myQuotes.subtitle')}
           </p>
         </div>
 
@@ -81,15 +83,15 @@ const MyQuotesPage = () => {
         ) : quotes.length === 0 ? (
           <div className="text-center py-16 border-2 border-dashed border-border rounded-2xl">
             <div className="text-5xl mb-3">📋</div>
-            <p className="font-semibold text-foreground mb-1">No quotes yet</p>
+            <p className="font-semibold text-foreground mb-1">{t('myQuotes.noQuotes')}</p>
             <p className="text-sm text-muted-foreground mb-5">
-              Request a free deep cleaning quote for your space.
+              {t('myQuotes.noQuotesDesc')}
             </p>
             <Link
               to="/deep-cleaning-quote"
               className="btn-brand px-6 inline-block text-sm"
             >
-              Get a Free Quote
+              {t('myQuotes.getFreeQuote')}
             </Link>
           </div>
         ) : (
@@ -116,7 +118,7 @@ const MyQuotesPage = () => {
                       </div>
                     </div>
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${statusCfg.color}`}>
-                      {statusCfg.label}
+                      {q.status === 'new' ? t('myQuotes.statusPending') : q.status === 'contacted' ? t('myQuotes.statusContacted') : t('myQuotes.statusClosed')}
                     </span>
                   </div>
 
@@ -131,18 +133,18 @@ const MyQuotesPage = () => {
                   {/* Footer */}
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Clock className="w-3 h-3" />
-                    <span>Submitted {formatDate(q.createdAt)}</span>
+                    <span>{t('myQuotes.submitted')} {formatDate(q.createdAt)}</span>
                   </div>
 
                   {/* Status description */}
                   {q.status === "contacted" && (
                     <div className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
-                      Our team has reached out to you. Check your phone / WhatsApp.
+                    {t('myQuotes.contactedDesc')}
                     </div>
                   )}
                   {q.status === "closed" && (
                     <div className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
-                      This quote request has been closed.
+                    {t('myQuotes.closedDesc')}
                     </div>
                   )}
                 </div>

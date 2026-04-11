@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Calendar, CheckCircle, Clock, MapPin, Minus, Plus, ShoppingCart, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -111,6 +112,7 @@ const AnimatedTotal = ({ value }: { value: number }) => (
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 export default function DeepCleaningPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const requestedItemId = searchParams.get("item");
@@ -479,15 +481,15 @@ export default function DeepCleaningPage() {
           <div className="relative z-10">
             <div className="mb-3">
               <Link to="/customer/deep-cleaning" className="inline-flex items-center gap-1.5 text-xs font-medium text-white/80 hover:text-white transition-colors">
-                ← Back to Deep Cleaning Categories
+                {t('deepCleaning.backToCategories')}
               </Link>
             </div>
             <motion.div initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }}
               transition={{ type: "spring", delay: 0.2 }} className="text-4xl mb-3 inline-block">
               ✨
             </motion.div>
-            <h1 className="text-2xl font-bold text-white mb-1">Deep Cleaning Booking</h1>
-            <p className="text-white/70 text-sm">Choose the services you need, enter your home details and continue to book.</p>
+            <h1 className="text-2xl font-bold text-white mb-1">{t('deepCleaning.title')}</h1>
+            <p className="text-white/70 text-sm">{t('deepCleaning.subtitle')}</p>
             <div className="mt-3 inline-flex items-center gap-1.5 bg-white/15 text-white text-xs font-medium px-3 py-1.5 rounded-full">
               <ShoppingCart className="w-3 h-3" /> Min cart ₹{minValue}
             </div>
@@ -506,7 +508,7 @@ export default function DeepCleaningPage() {
           {!selectedLocation ? (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-semibold text-foreground">Check service coverage before booking</p>
+                <p className="text-sm font-semibold text-foreground">{t('deepCleaning.checkCoverage')}</p>
                 <p className="text-xs text-muted-foreground mt-1">Select your location to see whether deep cleaning is available in your area.</p>
               </div>
               <button
@@ -524,12 +526,12 @@ export default function DeepCleaningPage() {
                 animate={{ rotate: 360 }}
                 transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}
               />
-              Checking whether deep cleaning is available in this location...
+              {t('deepCleaning.checkingCoverage')}
             </div>
           ) : availability?.available ? (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-semibold text-green-800">Deep cleaning is available in your area</p>
+                <p className="text-sm font-semibold text-green-800">{t('deepCleaning.available')}</p>
                 <p className="text-xs text-green-700 mt-1">
                   {[selectedLocation.area, selectedLocation.city].filter(Boolean).join(", ") || selectedLocation.address || "Selected location"}
                   {availability.serviceLocation?.name ? ` · Covered by ${availability.serviceLocation.name}` : ""}
@@ -546,7 +548,7 @@ export default function DeepCleaningPage() {
           ) : (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-semibold text-orange-900">Deep cleaning is not available in this area yet</p>
+                <p className="text-sm font-semibold text-orange-900">{t('deepCleaning.notAvailable')}</p>
                 <p className="text-xs text-orange-800 mt-1">{availability?.message || "You can request service for this location and the super admin will see it in the demand map."}</p>
                 <p className="text-xs text-orange-700 mt-1">
                   {[selectedLocation.address, selectedLocation.area, selectedLocation.city].filter(Boolean).join(", ") || "Selected location saved"}
@@ -612,7 +614,7 @@ export default function DeepCleaningPage() {
             {items.length === 0 ? (
               <div className="text-center py-16 text-muted-foreground">
                 <p className="text-3xl mb-2">🔧</p>
-                <p className="text-sm">No items in this category yet</p>
+                <p className="text-sm">{t('deepCleaning.noItems')}</p>
               </div>
             ) : items.map((item, idx) => (
               <ItemCard key={item.id} item={item} idx={idx}
@@ -677,12 +679,12 @@ export default function DeepCleaningPage() {
                   }}
                   className="btn-brand px-6 py-3 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed">
                   {!selectedLocation
-                    ? "Select location →"
+                    ? t('deepCleaning.selectLocation')
                     : availability?.available
-                      ? "Schedule & Book →"
+                      ? t('deepCleaning.scheduleAndBook')
                       : requestingService
-                        ? "Sending request..."
-                        : "Request service →"}
+                        ? t('deepCleaning.sendingRequest')
+                        : t('deepCleaning.requestServiceArrow')}
                 </motion.button>
               </div>
             </div>
@@ -715,13 +717,13 @@ export default function DeepCleaningPage() {
                     className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
                     <CheckCircle className="w-10 h-10 text-green-600" />
                   </motion.div>
-                  <h2 className="text-xl font-bold text-foreground">Booking Confirmed!</h2>
-                  <p className="text-muted-foreground text-sm text-center">Redirecting to your bookings...</p>
+                  <h2 className="text-xl font-bold text-foreground">{t('deepCleaning.bookingConfirmed')}</h2>
+                  <p className="text-muted-foreground text-sm text-center">{t('deepCleaning.redirecting')}</p>
                 </motion.div>
               ) : (
                 <>
                   <div className="flex items-center justify-between mb-5">
-                    <h2 className="text-xl font-bold text-foreground">Schedule Cleaning</h2>
+                    <h2 className="text-xl font-bold text-foreground">{t('deepCleaning.scheduleCleaning')}</h2>
                     <button onClick={() => setShowModal(false)} className="p-2 hover:bg-muted rounded-xl transition-colors">
                       <X className="w-5 h-5" />
                     </button>
@@ -736,7 +738,7 @@ export default function DeepCleaningPage() {
                       </div>
                     ))}
                     <div className="border-t border-border pt-2 mt-2 flex justify-between font-bold text-base">
-                      <span>Total</span>
+                      <span>{t('deepCleaning.total')}</span>
                       <span className="text-primary">₹{cartTotal.toLocaleString("en-IN")}</span>
                     </div>
                   </div>
@@ -796,7 +798,7 @@ export default function DeepCleaningPage() {
                           animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.8 }} />
                         Confirming...
                       </span>
-                    ) : "Confirm Booking ✓"}
+                    ) : t('deepCleaning.confirmBooking')}
                   </motion.button>
                 </>
               )}

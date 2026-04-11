@@ -565,15 +565,15 @@ const CustomerDashboard = () => {
               <Shield className="w-5 h-5 text-amber-600" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-amber-900">Verify your phone number</p>
-              <p className="text-xs text-amber-700 mt-0.5">Required to book services and receive WhatsApp updates on your bookings.</p>
+              <p className="text-sm font-semibold text-amber-900">{t('dashboardExtra.verifyPhoneBanner')}</p>
+              <p className="text-xs text-amber-700 mt-0.5">{t('dashboardExtra.verifyPhoneBannerDesc')}</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => { setPhoneOtp(''); setPhoneOtpSent(false); setPhoneError(''); setShowPhoneModal(true); }}
                 className="text-xs font-semibold text-amber-800 bg-amber-200 hover:bg-amber-300 px-3 py-1.5 rounded-lg transition-colors"
               >
-                Verify now
+                {t('dashboardExtra.verifyNow')}
               </button>
               <button onClick={() => setShowPhoneBanner(false)} className="text-amber-500 hover:text-amber-700 p-1">
                 <X className="w-4 h-4" />
@@ -666,7 +666,7 @@ const CustomerDashboard = () => {
             {searchFocused && searchQuery.trim() && (
               <div className="absolute z-50 mt-1 w-full bg-card border border-border rounded-xl shadow-lg overflow-hidden">
                 {searchLoading && searchResults.length === 0 ? (
-                  <div className="px-4 py-3 text-sm text-muted-foreground text-center">Searching…</div>
+                  <div className="px-4 py-3 text-sm text-muted-foreground text-center">{t('dashboardExtra.searching')}</div>
                 ) : searchResults.length === 0 ? (
                   <div className="px-4 py-3 text-sm text-muted-foreground text-center">
                     No services found for "<span className="font-medium text-foreground">{searchQuery}</span>"
@@ -812,10 +812,10 @@ const CustomerDashboard = () => {
               ✨
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-green-900 text-sm leading-tight">Post Construction — Commercial &amp; Residential</p>
-              <p className="text-xs text-green-700 mt-0.5">Get a custom quote for villas, offices, restaurants, bungalows and handover cleaning.</p>
+              <p className="font-bold text-green-900 text-sm leading-tight">{t('dashboardExtra.postConstruction')}</p>
+              <p className="text-xs text-green-700 mt-0.5">{t('dashboardExtra.postConstructionDesc')}</p>
             </div>
-            <span className="shrink-0 text-xs font-semibold bg-green-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">Get Quote</span>
+            <span className="shrink-0 text-xs font-semibold bg-green-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">{t('dashboardExtra.getQuote')}</span>
           </Link>
         </motion.div>
         )}
@@ -1015,16 +1015,16 @@ const CustomerDashboard = () => {
               <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
                 <Phone className="w-6 h-6 text-green-600" />
               </div>
-              <h2 className="text-lg font-bold text-foreground">Verify your phone</h2>
+              <h2 className="text-lg font-bold text-foreground">{t('dashboardExtra.verifyPhone')}</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Enter your mobile number to receive an OTP and activate WhatsApp booking updates.
+                {t('dashboardExtra.verifyPhoneDesc')}
               </p>
             </div>
 
             {!phoneOtpSent ? (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Mobile Number</label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">{t('dashboardExtra.mobileNumber')}</label>
                   <div className="relative flex items-center">
                     <span className="absolute left-4 text-muted-foreground font-medium text-sm select-none">+91</span>
                     <input
@@ -1046,10 +1046,10 @@ const CustomerDashboard = () => {
                   disabled={phoneLoading || phoneInput.replace(/\D/g, '').length < 10}
                   className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {phoneLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</> : 'Send OTP'}
+                  {phoneLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> {t('dashboardExtra.sendingOtp')}</> : t('dashboardExtra.sendOtp')}
                 </button>
                 <button onClick={() => setShowPhoneModal(false)} className="w-full text-sm text-muted-foreground hover:text-foreground text-center">
-                  Cancel
+                  {t('dashboardExtra.cancel')}
                 </button>
               </>
             ) : (
@@ -1058,7 +1058,7 @@ const CustomerDashboard = () => {
                   OTP sent to <strong>+91 {phoneInput}</strong>. Check your SMS.
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Enter OTP</label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">{t('dashboardExtra.enterOtp')}</label>
                   <input
                     type="text"
                     inputMode="numeric"
@@ -1077,17 +1077,17 @@ const CustomerDashboard = () => {
                   disabled={phoneLoading || phoneOtp.length < 6}
                   className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {phoneLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</> : 'Verify & Activate'}
+                  {phoneLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> {t('dashboardExtra.verifying')}</> : t('dashboardExtra.verifyAndActivate')}
                 </button>
                 <button
                   onClick={phoneResend > 0 ? undefined : handleSendOtp}
                   disabled={phoneResend > 0 || phoneLoading}
                   className="w-full text-sm text-muted-foreground hover:text-foreground text-center disabled:opacity-50"
                 >
-                  {phoneResend > 0 ? `Resend OTP in ${phoneResend}s` : 'Resend OTP'}
+                  {phoneResend > 0 ? t('dashboardExtra.resendOtpCountdown', { count: phoneResend }) : t('dashboardExtra.resendOtp')}
                 </button>
                 <button onClick={() => setShowPhoneModal(false)} className="w-full text-sm text-muted-foreground hover:text-foreground text-center">
-                  Cancel
+                  {t('dashboardExtra.cancel')}
                 </button>
               </>
             )}

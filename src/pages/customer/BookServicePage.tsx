@@ -7,6 +7,7 @@ import { getCustomerPlanFrequencyLabel } from "@/utils/subscriptionPlanDetails";
 import { getMinimumSubscriptionStartDate, isSubscriptionStartTimeExpired } from "@/utils/subscriptionStartRules";
 import { Calendar, CalendarClock, Clock, Info, MapPin, Sparkles, Star, User, Users, Zap } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -81,6 +82,7 @@ type TimePeriod = 'morning' | 'afternoon' | 'evening';
 type BookingMode = 'now' | 'schedule';
 
 const BookServicePage = () => {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -817,7 +819,7 @@ const BookServicePage = () => {
       <AppLayout userType="customer" userName={profile?.name || "Loading..."}>
         <div className="w-full py-16 flex flex-col items-center gap-4">
           <div className="sweep-loader"><span className="dot w-3 h-3" /><span className="dot w-3 h-3" /><span className="dot w-3 h-3" /></div>
-          <p className="text-sm text-muted-foreground">Loading service...</p>
+          <p className="text-sm text-muted-foreground">{t('bookService.loading')}</p>
         </div>
       </AppLayout>
     );
@@ -828,9 +830,9 @@ const BookServicePage = () => {
       <AppLayout userType="customer" userName={profile?.name || "Guest"}>
         <div className="max-w-2xl mx-auto py-12 text-center">
           <div className="text-5xl mb-3">😕</div>
-          <p className="font-medium text-foreground">Service not found</p>
+          <p className="font-medium text-foreground">{t('bookService.serviceNotFound')}</p>
           <Link to="/customer/services" className="text-primary hover:underline text-sm mt-2 inline-block">
-            Back to services
+            {t('bookService.backToServices')}
           </Link>
         </div>
       </AppLayout>
@@ -850,8 +852,8 @@ const BookServicePage = () => {
       <div className="w-full px-4 sm:px-5 md:px-7 lg:px-10 space-y-6 pb-20 md:pb-0">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold font-heading text-foreground">Book Service</h1>
-          <p className="text-sm text-muted-foreground">Complete your booking details</p>
+          <h1 className="text-2xl font-bold font-heading text-foreground">{t('bookService.title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('bookService.subtitle')}</p>
         </div>
 
         {/* Service Details Card */}
@@ -875,7 +877,7 @@ const BookServicePage = () => {
             {!loadingWorkers && workers.length > 0 && (
               <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400 font-medium">
                 <Users className="w-4 h-4" />
-                <span>{workers.filter(w => w.workerProfile.availability).length} workers available</span>
+                <span>{t('bookService.workersAvailable', { count: workers.filter(w => w.workerProfile.availability).length })}</span>
               </div>
             )}
           </div>
@@ -893,12 +895,12 @@ const BookServicePage = () => {
             <div className="space-y-1 text-sm">
               <p className="font-semibold text-foreground">
                 {checkingAvailability
-                  ? 'Checking service region...'
+                  ? t('bookService.checkingRegion')
                   : isOutOfRegion
-                  ? 'This service is outside your service region'
+                  ? t('bookService.serviceOutRegion')
                   : hasResolvedLocation
-                  ? 'This service can be booked in your region'
-                  : 'Service location needed before booking'}
+                  ? t('bookService.serviceInRegion')
+                  : t('bookService.serviceLocationNeeded')}
               </p>
               <p className="text-muted-foreground">
                 {checkingAvailability
@@ -992,9 +994,9 @@ const BookServicePage = () => {
               >
                 <div className="flex items-center gap-2 justify-center mb-1">
                   <Zap className="w-5 h-5 text-primary" />
-                  <div className="font-semibold text-foreground">Book Now</div>
+                  <div className="font-semibold text-foreground">{t('bookService.bookNow')}</div>
                 </div>
-                <div className="text-xs text-muted-foreground">Within 1-2 hours</div>
+                <div className="text-xs text-muted-foreground">{t('bookService.within12Hours')}</div>
               </button>
 
               <button
@@ -1008,9 +1010,9 @@ const BookServicePage = () => {
               >
                 <div className="flex items-center gap-2 justify-center mb-1">
                   <Calendar className="w-5 h-5 text-primary" />
-                  <div className="font-semibold text-foreground">Schedule</div>
+                  <div className="font-semibold text-foreground">{t('bookService.schedule')}</div>
                 </div>
-                <div className="text-xs text-muted-foreground">Pick date & time</div>
+                <div className="text-xs text-muted-foreground">{t('bookService.pickDateAndTime')}</div>
               </button>
             </div>
           </div>
@@ -1071,10 +1073,10 @@ const BookServicePage = () => {
                         }`}>
                           <CalendarClock className="w-3.5 h-3.5 shrink-0" />
                           {openCount === 0
-                            ? 'No slots available on this date'
+                            ? t('bookService.noSlotsOnDate')
                             : openCount <= 4
-                            ? `Only ${openCount} slot${openCount !== 1 ? 's' : ''} left on this date`
-                            : `${openCount} slots available on this date`}
+                            ? t('bookService.onlyNSlotsLeft', { count: openCount })
+                            : t('bookService.nSlotsAvailable', { count: openCount })}
                         </div>
                       );
                     })()
@@ -1102,9 +1104,9 @@ const BookServicePage = () => {
                   {/* 15-min slot grid */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
                     {!selectedDate ? (
-                      <p className="col-span-4 text-sm text-muted-foreground py-4 text-center">Select a date first to see available slots</p>
+                      <p className="col-span-4 text-sm text-muted-foreground py-4 text-center">{t('bookService.selectDateFirst')}</p>
                     ) : loadingSlots ? (
-                      <p className="col-span-4 text-sm text-muted-foreground py-4 text-center">Loading slots...</p>
+                      <p className="col-span-4 text-sm text-muted-foreground py-4 text-center">{t('bookService.loadingSlots')}</p>
                     ) : (
                       getSlotsForPeriod(selectedPeriod).map((time) => {
                         const unavailable = isSlotUnavailable(time);
@@ -1138,8 +1140,8 @@ const BookServicePage = () => {
                                 : 'text-muted-foreground'
                             }`}>
                               {unavailable
-                                ? (isPast ? 'Past' : 'Full')
-                                  : `${available} available`}
+                                ? (isPast ? t('bookService.past') : t('bookService.full'))
+                                  : `${available} ${t('bookService.available')}`}
                             </span>
                           </button>
                         );
@@ -1175,7 +1177,7 @@ const BookServicePage = () => {
                       <div className="flex items-start gap-2">
                         <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
                         <div className="text-xs text-amber-800 dark:text-amber-200">
-                          <p className="font-semibold mb-1">No workers available at your location</p>
+                    <p className="font-semibold mb-1">{t('bookService.noWorkersAtLocation')}</p>
                           <p className="text-amber-700 dark:text-amber-300">
                             There are currently no active workers assigned to serve your area. 
                             Please contact support or try a different location.
@@ -1198,7 +1200,7 @@ const BookServicePage = () => {
                 Select Booking Plan
               </h3>
               {bookingType !== 'oneTime' && (
-                <span className="badge-primary text-xs">Save up to 35%</span>
+                <span className="badge-primary text-xs">{t('bookService.saveUpTo35')}</span>
               )}
             </div>
             
@@ -1246,10 +1248,10 @@ const BookServicePage = () => {
                     );
                   })()}
                   {plan.name === 'oneTime' && (
-                    <div className="text-xs text-muted-foreground mt-0.5">per session</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{t('bookService.perSession')}</div>
                   )}
                   {plan.requiresFixedWorker && (
-                    <div className="text-xs text-muted-foreground mt-2">✓ Fixed worker</div>
+                    <div className="text-xs text-muted-foreground mt-2">✓ {t('bookService.fixedWorker')}</div>
                   )}
                 </button>
               ))}
@@ -1261,12 +1263,12 @@ const BookServicePage = () => {
                 <div className="flex items-start gap-2 mb-2">
                   <Sparkles className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-semibold text-foreground mb-1">Subscription Benefits</p>
+                    <p className="text-sm font-semibold text-foreground mb-1">{t('bookService.subscriptionBenefits')}</p>
                     <ul className="text-xs text-muted-foreground space-y-1">
-                      <li>• Cancel or pause your subscription anytime with 24-hour notice</li>
-                      <li>• Priority worker assignment during peak hours</li>
-                      <li>• Dedicated support team for subscription members</li>
-                      <li>• Free unlimited rescheduling (up to 2 hours before service)</li>
+                      <li>• {t('bookService.cancelPauseAnytime')}</li>
+                      <li>• {t('bookService.priorityWorker')}</li>
+                      <li>• {t('bookService.dedicatedSupport')}</li>
+                      <li>• {t('bookService.freeRescheduling')}</li>
                     </ul>
                   </div>
                 </div>
@@ -1280,14 +1282,14 @@ const BookServicePage = () => {
             <div className="card-elevated p-4 sm:p-5 md:p-6">
               <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-primary" />
-                Subscription Schedule
+                {t('bookService.subscriptionSchedule')}
               </h3>
               
               <div className="space-y-4">
                 {/* Start Date */}
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
-                    Start Date <span className="text-destructive">*</span>
+                    {t('bookService.startDate')} <span className="text-destructive">*</span>
                   </label>
                   <input
                     type="date"
@@ -1314,7 +1316,7 @@ const BookServicePage = () => {
                 {/* End Date (Optional) */}
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
-                    End Date <span className="text-xs text-muted-foreground">(Optional)</span>
+                    {t('bookService.endDate')} <span className="text-xs text-muted-foreground">(Optional)</span>
                   </label>
                   <input
                     type="date"
@@ -1323,13 +1325,13 @@ const BookServicePage = () => {
                     min={subscriptionStartDate || new Date().toISOString().split('T')[0]}
                     className="input-clean"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Leave empty for ongoing subscription</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t('bookService.endDateNote')}</p>
                 </div>
 
                 {/* Preferred Time */}
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
-                    Preferred Time <span className="text-destructive">*</span>
+                    {t('bookService.preferredTime')} <span className="text-destructive">*</span>
                   </label>
                   <input
                     type="time"
@@ -1347,7 +1349,7 @@ const BookServicePage = () => {
                 {bookingType === 'weekly' && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Select Days <span className="text-destructive">*</span>
+                      {t('bookService.selectDays')} <span className="text-destructive">*</span>
                     </label>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {[
@@ -1391,7 +1393,7 @@ const BookServicePage = () => {
                 {/* Auto-Renewal Toggle */}
                 <div className="flex items-start justify-between p-4 bg-muted/50 rounded-lg">
                   <div className="flex-1">
-                    <p className="font-medium text-foreground">Auto-Renewal</p>
+                    <p className="font-medium text-foreground">{t('bookService.autoRenewal')}</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       Automatically renew subscription when it ends
                     </p>
@@ -1414,7 +1416,7 @@ const BookServicePage = () => {
                 {/* Allow Pause Toggle */}
                 <div className="flex items-start justify-between p-4 bg-muted/50 rounded-lg">
                   <div className="flex-1">
-                    <p className="font-medium text-foreground">Allow Pause</p>
+                    <p className="font-medium text-foreground">{t('bookService.allowPause')}</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       Enable ability to pause subscription temporarily
                     </p>
@@ -1454,7 +1456,7 @@ const BookServicePage = () => {
           {preferredWorkerId && selectedWorker === preferredWorkerId && (
             <div className="card-elevated p-4 bg-blue-50 border-2 border-blue-200 flex items-center justify-between gap-3">
               <div>
-                <p className="font-semibold text-blue-800 text-sm">Preferred Worker Selected</p>
+                <p className="font-semibold text-blue-800 text-sm">{t('bookService.preferredWorkerSelected')}</p>
                 <p className="text-xs text-blue-600">
                   Your previous worker {preferredWorkerName ? <strong>{preferredWorkerName}</strong> : 'from last booking'} will be requested.
                 </p>
@@ -1565,8 +1567,8 @@ const BookServicePage = () => {
                 {workers.filter(w => w.workerProfile.availability).length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
                     <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p>No workers available right now</p>
-                    <p className="text-sm">Please try scheduling for later</p>
+                    <p>{t('bookService.noWorkersNow')}</p>
+                    <p className="text-sm">{t('bookService.trySchedulingLater')}</p>
                   </div>
                 )}
               </div>
@@ -1600,20 +1602,18 @@ const BookServicePage = () => {
           <div className="card-elevated p-4 sm:p-5 md:p-6">
             <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
               <User className="w-5 h-5 text-primary" />
-              Additional Preferences
-            </h3>
-            
+              {t('bookService.additionalPreferences')}
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  Gender Preference
+                  {t('bookService.genderPreference')}
                 </label>
                 <select
                   value={preferences.workerGenderPreference}
                   onChange={(e) => setPreferences({ ...preferences, workerGenderPreference: e.target.value })}
                   className="input-clean"
                 >
-                  <option value="any">No Preference</option>
+                  <option value="any">{t('bookService.noPreference')}</option>
                   <option value="male">Male</option>
                   <option value="female">Female</option>
                 </select>
@@ -1621,14 +1621,14 @@ const BookServicePage = () => {
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  Language Preference
+                  {t('bookService.languagePreference')}
                 </label>
                 <select
                   value={preferences.languagePreference}
                   onChange={(e) => setPreferences({ ...preferences, languagePreference: e.target.value })}
                   className="input-clean"
                 >
-                  <option value="any">No Preference</option>
+                  <option value="any">{t('bookService.noPreference')}</option>
                   <option value="english">English</option>
                   <option value="hindi">Hindi</option>
                   <option value="tamil">Tamil</option>
@@ -1642,14 +1642,14 @@ const BookServicePage = () => {
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  Religion Preference
+                  {t('bookService.religionPreference')}
                 </label>
                 <select
                   value={preferences.religionPreference}
                   onChange={(e) => setPreferences({ ...preferences, religionPreference: e.target.value })}
                   className="input-clean"
                 >
-                  <option value="any">No Preference</option>
+                  <option value="any">{t('bookService.noPreference')}</option>
                   <option value="hindu">Hindu</option>
                   <option value="muslim">Muslim</option>
                   <option value="christian">Christian</option>
@@ -1662,7 +1662,7 @@ const BookServicePage = () => {
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  Special Instructions (Optional)
+                  {t('bookService.specialInstructions')}
                 </label>
                 <textarea
                   value={preferences.specialInstructions}
@@ -1684,7 +1684,7 @@ const BookServicePage = () => {
             <div className="flex gap-3 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-xl">
               <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
               <div className="text-sm">
-                <p className="font-medium text-blue-900 dark:text-blue-100">Recurring Booking</p>
+                <p className="font-medium text-blue-900 dark:text-blue-100">{t('bookService.recurringBooking')}</p>
                 <p className="text-blue-700 dark:text-blue-300 mt-1">
                   This {bookingType} booking will automatically schedule services. 
                   You can manage or cancel anytime from your bookings page.
@@ -1695,19 +1695,19 @@ const BookServicePage = () => {
 
           {/* Summary */}
           <div className="card-elevated p-4 sm:p-5 md:p-6 bg-accent border-2 border-primary/20">
-            <h3 className="font-bold text-foreground mb-4">Booking Summary</h3>
+            <h3 className="font-bold text-foreground mb-4">{t('bookService.bookingSummary')}</h3>
             
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Service</span>
+                <span className="text-muted-foreground">{t('bookService.service')}</span>
                 <span className="font-medium text-foreground">{service.name}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Type</span>
+                <span className="text-muted-foreground">{t('bookService.type')}</span>
                 <span className="font-medium text-foreground capitalize">{bookingType}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Duration</span>
+                <span className="text-muted-foreground">{t('bookService.duration')}</span>
                 <span className="font-medium text-foreground">
                   {bookingType === 'oneTime'
                     ? `${service.duration} min`
@@ -1726,7 +1726,7 @@ const BookServicePage = () => {
                 </div>
               )}
               <div className="flex justify-between items-end text-lg">
-                <span className="font-bold text-foreground">Total</span>
+                <span className="font-bold text-foreground">{t('bookService.total')}</span>
                 <div className="text-right">
                   <div className="text-xs text-muted-foreground line-through">₹{calculateMrp().toLocaleString('en-IN')}</div>
                   <span className="font-bold text-green-700">₹{calculatePrice().toLocaleString('en-IN')}</span>
@@ -1741,7 +1741,7 @@ const BookServicePage = () => {
               to="/customer/services"
               className="flex-1 py-3 border-2 border-border rounded-xl text-center font-semibold hover:bg-muted transition-colors"
             >
-              Cancel
+              {t('bookService.cancel')}
             </Link>
             {isOutOfRegion ? (
               <button
@@ -1750,7 +1750,7 @@ const BookServicePage = () => {
                 disabled={requestingService || checkingAvailability}
                 className="flex-1 rounded-xl bg-amber-100 py-3 text-center font-semibold text-amber-900 transition-colors hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {requestingService ? 'Sending request...' : 'Request Service'}
+                {requestingService ? t('bookService.sendingRequest') : t('bookService.requestService')}
               </button>
             ) : (
               <button
@@ -1759,12 +1759,12 @@ const BookServicePage = () => {
                 className="flex-1 btn-brand disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {checkingAvailability
-                  ? 'Checking region...'
+                  ? t('bookService.checkingAvailability')
                   : booking
-                  ? 'Processing...'
+                  ? t('bookService.processing')
                   : !hasResolvedLocation
-                  ? 'Set Location First'
-                  : `Confirm Booking - ₹${calculatePrice()}`}
+                  ? t('bookService.setLocationFirst')
+                  : t('bookService.confirmBookingPrice', { price: calculatePrice() })}
               </button>
             )}
           </div>
@@ -1788,7 +1788,7 @@ const BookServicePage = () => {
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
                   <User className="w-6 h-6 text-primary" />
                 </div>
-                <h2 className="text-lg font-bold text-foreground">Verify Your Phone</h2>
+                <h2 className="text-lg font-bold text-foreground">{t('bookService.verifyPhone')}</h2>
                 <p className="text-sm text-muted-foreground mt-1">
                   We need your verified phone number to send booking updates via WhatsApp.
                 </p>
@@ -1797,7 +1797,7 @@ const BookServicePage = () => {
               {!phoneVerifyOtpSent ? (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">Mobile Number</label>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">{t('bookService.mobileNumber')}</label>
                     <div className="relative flex items-center">
                       <span className="absolute left-4 text-muted-foreground font-medium text-sm">+91</span>
                       <input
@@ -1823,23 +1823,23 @@ const BookServicePage = () => {
                     disabled={phoneVerifyLoading || phoneVerifyNumber.replace(/\D/g, '').length < 10}
                     className="btn-brand w-full flex items-center justify-center gap-2"
                   >
-                    {phoneVerifyLoading ? 'Sending…' : 'Send OTP'}
+                    {phoneVerifyLoading ? t('bookService.sendingOtp') : t('bookService.sendOtp')}
                   </button>
                   <button
                     onClick={() => setShowPhoneVerifyModal(false)}
                     className="w-full text-sm text-muted-foreground hover:text-foreground text-center"
                   >
-                    Cancel
+                    {t('bookService.cancel')}
                   </button>
                 </>
               ) : (
                 <>
                   <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800">
-                    OTP sent to <strong>+91 {phoneVerifyNumber}</strong>. Check your WhatsApp / SMS.
+                    {t('bookService.otpSentMessage', { phone: phoneVerifyNumber })}
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">Enter OTP</label>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">{t('bookService.enterOtp')}</label>
                     <input
                       type="text"
                       inputMode="numeric"
@@ -1862,7 +1862,7 @@ const BookServicePage = () => {
                     disabled={phoneVerifyLoading || phoneVerifyOtp.length < 6}
                     className="btn-brand w-full flex items-center justify-center gap-2"
                   >
-                    {phoneVerifyLoading ? 'Verifying…' : 'Verify & Continue'}
+                    {phoneVerifyLoading ? t('bookService.verifying') : t('bookService.verifyAndContinue')}
                   </button>
 
                   <button
@@ -1871,14 +1871,14 @@ const BookServicePage = () => {
                     className="w-full text-sm text-muted-foreground hover:text-foreground text-center disabled:opacity-50"
                   >
                     {phoneVerifyResendCountdown > 0
-                      ? `Resend OTP in ${phoneVerifyResendCountdown}s`
-                      : 'Resend OTP'}
+                      ? t('bookService.resendOtpIn', { count: phoneVerifyResendCountdown })
+                      : t('bookService.resendOtp')}
                   </button>
                   <button
                     onClick={() => setShowPhoneVerifyModal(false)}
                     className="w-full text-sm text-muted-foreground hover:text-foreground text-center"
                   >
-                    Cancel
+                    {t('bookService.cancel')}
                   </button>
                 </>
               )}

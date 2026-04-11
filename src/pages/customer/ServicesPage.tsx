@@ -338,10 +338,10 @@ const ServicesPage = () => {
                 <div className="text-2xl mb-1">{cat.icon}</div>
                 <div>
                   <p className="text-xs font-semibold text-foreground leading-tight">
-                    {cat.key === 'deep' ? 'Move In / Move Out Cleaning' : t(cat.labelKey)}
+                    {cat.key === 'deep' ? t('servicesPageExtra.moveInOutDeepClean') : t(cat.labelKey)}
                   </p>
                   {cat.key === 'deep' && (
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Full Home Deep Clean</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{t('servicesPageExtra.moveInOutDeepCleanFull')}</p>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block leading-tight">{t(cat.descKey)}</p>
@@ -364,10 +364,10 @@ const ServicesPage = () => {
                 🧹
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-cyan-900 text-sm leading-tight">Mini Services  — Spot Cleaning</p>
-                <p className="text-xs text-cyan-700 mt-0.5">Kitchen · Bathroom · Sofa · Fan · Fridge · Balcony &amp; more</p>
+                <p className="font-bold text-cyan-900 text-sm leading-tight">{t('servicesPageExtra.spotCleanBanner')}</p>
+                <p className="text-xs text-cyan-700 mt-0.5">{t('servicesPageExtra.spotCleanSubtitle')}</p>
               </div>
-              <span className="shrink-0 text-xs font-semibold bg-cyan-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">From ₹149 →</span>
+              <span className="shrink-0 text-xs font-semibold bg-cyan-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">{t('servicesPageExtra.spotCleanBadge')}</span>
             </Link>
           </motion.div>
 
@@ -385,10 +385,10 @@ const ServicesPage = () => {
                 <Sparkles className="w-6 h-6 text-green-700" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-green-900 text-sm leading-tight">Move In / Move Out — Commercial &amp; Residential</p>
-                <p className="text-xs text-green-700 mt-0.5">Villas · Restaurants · Offices · Bungalows</p>
+                <p className="font-bold text-green-900 text-sm leading-tight">{t('servicesPageExtra.commercialBanner')}</p>
+                <p className="text-xs text-green-700 mt-0.5">{t('servicesPageExtra.commercialSubtitle')}</p>
               </div>
-              <span className="shrink-0 text-xs font-semibold bg-green-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">Get Free Quote →</span>
+              <span className="shrink-0 text-xs font-semibold bg-green-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">{t('servicesPageExtra.commercialBadge')}</span>
             </Link>
           </motion.div>
 
@@ -399,16 +399,16 @@ const ServicesPage = () => {
             transition={{ delay: 0.45 }}
             className="space-y-3"
           >
-            <h3 className="text-sm font-semibold text-foreground px-1">Dedicated Deep-Clean Service Pages</h3>
+            <h3 className="text-sm font-semibold text-foreground px-1">{t('servicesPageExtra.deepCleanPages')}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Link
                 to="/customer/services/intense-washroom-cleaning"
                 className="p-4 rounded-xl border-2 border-purple-300 bg-purple-50 hover:bg-purple-100 hover:border-purple-400 transition-all text-center group"
               >
                 <div className="text-3xl mb-2">🚿</div>
-                <p className="font-semibold text-purple-900 text-sm">Intense Washroom Cleaning</p>
-                <p className="text-xs text-purple-700 mt-1">Tiles · fittings · stain removal</p>
-                <span className="inline-block mt-2 text-[10px] font-semibold bg-purple-600 text-white px-2 py-1 rounded-full">Open Page</span>
+                <p className="font-semibold text-purple-900 text-sm">{t('servicesPageExtra.washroomTitle')}</p>
+                <p className="text-xs text-purple-700 mt-1">{t('servicesPageExtra.washroomSubtitle')}</p>
+                <span className="inline-block mt-2 text-[10px] font-semibold bg-purple-600 text-white px-2 py-1 rounded-full">{t('servicesPageExtra.openPage')}</span>
               </Link>
 
               <Link
@@ -416,9 +416,9 @@ const ServicesPage = () => {
                 className="p-4 rounded-xl border-2 border-orange-300 bg-orange-50 hover:bg-orange-100 hover:border-orange-400 transition-all text-center group"
               >
                 <div className="text-3xl mb-2">🍽️</div>
-                <p className="font-semibold text-orange-900 text-sm">Kitchen Deep Clean</p>
-                <p className="text-xs text-orange-700 mt-1">Grease · appliances · tiles</p>
-                <span className="inline-block mt-2 text-[10px] font-semibold bg-orange-600 text-white px-2 py-1 rounded-full">Open Page</span>
+                <p className="font-semibold text-orange-900 text-sm">{t('servicesPageExtra.kitchenTitle')}</p>
+                <p className="text-xs text-orange-700 mt-1">{t('servicesPageExtra.kitchenSubtitle')}</p>
+                <span className="inline-block mt-2 text-[10px] font-semibold bg-orange-600 text-white px-2 py-1 rounded-full">{t('servicesPageExtra.openPage')}</span>
               </Link>
 
               <Link
@@ -426,9 +426,9 @@ const ServicesPage = () => {
                 className="p-4 rounded-xl border-2 border-blue-300 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 transition-all text-center group"
               >
                 <div className="text-3xl mb-2">🪟</div>
-                <p className="font-semibold text-blue-900 text-sm">Window Deep Cleaning</p>
-                <p className="text-xs text-blue-700 mt-1">Glass · frames · tracks</p>
-                <span className="inline-block mt-2 text-[10px] font-semibold bg-blue-600 text-white px-2 py-1 rounded-full">Open Page</span>
+                <p className="font-semibold text-blue-900 text-sm">{t('servicesPageExtra.windowTitle')}</p>
+                <p className="text-xs text-blue-700 mt-1">{t('servicesPageExtra.windowSubtitle')}</p>
+                <span className="inline-block mt-2 text-[10px] font-semibold bg-blue-600 text-white px-2 py-1 rounded-full">{t('servicesPageExtra.openPage')}</span>
               </Link>
             </div>
           </motion.div>
@@ -523,10 +523,10 @@ const ServicesPage = () => {
                             }`}>
                               <CalendarClock className="w-3 h-3" />
                               {todayAvailableSlotCount === 0
-                                ? 'Fully booked today'
+                                ? t('servicesPageExtra.fullyBooked')
                                 : todayAvailableSlotCount <= 4
-                                ? `${todayAvailableSlotCount} slots left`
-                                : `${todayAvailableSlotCount} slots today`}
+                                ? t('servicesPageExtra.slotsLeft', { count: todayAvailableSlotCount })
+                                : t('servicesPageExtra.slotsToday', { count: todayAvailableSlotCount })}
                             </span>
                           )}
                         </div>
@@ -551,7 +551,7 @@ const ServicesPage = () => {
                     <div className="flex items-center justify-between mb-3">
                       <div>
                         {service.isQuoteService ? (
-                          <span className="text-sm font-bold text-green-700">Custom Quote</span>
+                          <span className="text-sm font-bold text-green-700">{t('servicesPageExtra.customQuote')}</span>
                         ) : service.subscriptionOptions?.enabled ? (
                           <div>
                             <div className="text-xs text-muted-foreground line-through">
@@ -588,21 +588,21 @@ const ServicesPage = () => {
                           disabled={requestingServiceId === service._id}
                           className="w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors bg-amber-100 text-amber-900 hover:bg-amber-200 disabled:opacity-60"
                         >
-                          {requestingServiceId === service._id ? "Sending request..." : "Request service in my location"}
+                          {requestingServiceId === service._id ? t('servicesPageExtra.sendingRequest') : t('servicesPageExtra.requestInLocation')}
                         </button>
                       ) : service.isQuoteService ? (
                         <Link
                           to="/customer/deep-cleaning"
                           className="w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors btn-brand"
                         >
-                          Book Now ✨
+                          {t('servicesPageExtra.bookNow')} ✨
                         </Link>
                       ) : service.subscriptionOptions?.enabled ? (
                         <Link
                           to={`/customer/subscribe/${service._id}`}
                           className="w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors btn-brand"
                         >
-                          Subscribe 📅
+                          {t('servicesPageExtra.subscribe')} 📅
                         </Link>
                       ) : (
                         <Link

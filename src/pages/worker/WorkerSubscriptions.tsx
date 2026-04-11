@@ -13,6 +13,7 @@ import {
     User,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 interface SessionRow {
@@ -95,6 +96,7 @@ const sessionStatusColor: Record<string, string> = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const WorkerSubscriptions = () => {
+  const { t } = useTranslation();
   const [subscriptions, setSubscriptions] = useState<WorkerSubscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -134,8 +136,8 @@ const WorkerSubscriptions = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-foreground">My Subscriptions</h1>
-            <p className="text-sm text-muted-foreground">Track all your assigned subscription customers</p>
+            <h1 className="text-xl font-bold text-foreground">{t('workerSubscriptions.title')}</h1>
+            <p className="text-sm text-muted-foreground">{t('workerSubscriptions.subtitle')}</p>
           </div>
           <button onClick={fetchData} className="p-2 hover:bg-muted rounded-xl border border-border">
             <RefreshCw className="w-4 h-4" />
@@ -146,16 +148,16 @@ const WorkerSubscriptions = () => {
         <div className="flex gap-3 flex-wrap">
           <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-green-50 border border-green-200">
             <CheckCircle className="w-4 h-4 text-green-600" />
-            <span className="text-sm font-semibold text-green-800">{activeCount} Active</span>
+            <span className="text-sm font-semibold text-green-800">{t('workerSubscriptions.activeCount', { count: activeCount })}</span>
           </div>
           <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-blue-50 border border-blue-200">
             <Calendar className="w-4 h-4 text-blue-600" />
-            <span className="text-sm font-semibold text-blue-800">{doneToday} Done today</span>
+            <span className="text-sm font-semibold text-blue-800">{t('workerSubscriptions.doneToday', { count: doneToday })}</span>
           </div>
           {pendingOvertimeCharges > 0 && (
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-orange-50 border border-orange-200">
               <Timer className="w-4 h-4 text-orange-600" />
-              <span className="text-sm font-semibold text-orange-800">₹{pendingOvertimeCharges.toFixed(2)} overtime logged</span>
+              <span className="text-sm font-semibold text-orange-800">{t('workerSubscriptions.overtimeLogged', { amount: pendingOvertimeCharges.toFixed(2) })}</span>
             </div>
           )}
         </div>
@@ -167,8 +169,8 @@ const WorkerSubscriptions = () => {
         ) : subscriptions.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
             <RefreshCw className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p className="font-medium">No subscriptions assigned yet</p>
-            <p className="text-sm mt-1">Your subscription customers will appear here once assigned</p>
+            <p className="font-medium">{t('workerSubscriptions.noSubscriptions')}</p>
+            <p className="text-sm mt-1">{t('workerSubscriptions.noSubscriptionsDesc')}</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -197,6 +199,7 @@ const SubscriptionCard = ({
   expanded: boolean;
   onToggle: () => void;
 }) => {
+  const { t } = useTranslation();
   const pct = sub.sessionsTotal > 0 ? Math.round((sub.sessionsDone / sub.sessionsTotal) * 100) : 0;
   const nextSession = sub.sessions.find(s => ["confirmed", "assigned", "pending"].includes(s.status));
 
@@ -219,7 +222,7 @@ const SubscriptionCard = ({
             </p>
           </div>
           <span className={`text-xs px-2.5 py-1 rounded-full font-medium border ${statusColor[sub.activationStatus] ?? "bg-muted text-muted-foreground border-border"}`}>
-            {sub.isPaused ? "Paused" : sub.activationStatus?.replace(/_/g, " ")}
+            {sub.isPaused ? t('workerSubscriptions.paused') : sub.activationStatus?.replace(/_/g, " ")}
           </span>
         </div>
 
@@ -238,13 +241,13 @@ const SubscriptionCard = ({
         {/* Progress */}
         <div>
           <div className="flex justify-between text-xs text-muted-foreground mb-1">
-            <span>{sub.sessionsDone} sessions completed</span>
-            <span>{sub.sessionsUpcoming} remaining</span>
+            <span>{t('workerSubscriptions.sessionsCompleted', { count: sub.sessionsDone })}</span>
+            <span>{t('workerSubscriptions.sessionsRemaining', { count: sub.sessionsUpcoming })}</span>
           </div>
           <div className="w-full bg-muted rounded-full h-2.5">
             <div className="bg-primary h-2.5 rounded-full transition-all" style={{ width: `${pct}%` }} />
           </div>
-          <p className="text-xs text-muted-foreground mt-1">{pct}% complete · {sub.sessionsTotal} total sessions</p>
+          <p className="text-xs text-muted-foreground mt-1">{t('workerSubscriptions.pctComplete', { pct, total: sub.sessionsTotal })}</p>
         </div>
 
         {/* Next session */}
@@ -273,10 +276,10 @@ const SubscriptionCard = ({
         onClick={onToggle}
         className="w-full flex items-center justify-center gap-1.5 py-2.5 border-t border-border text-xs font-medium text-primary hover:bg-muted/40 transition-colors"
       >
-        {expanded ? (
-          <><ChevronUp className="w-4 h-4" /> Hide Session Log</>
+          {expanded ? (
+          <><ChevronUp className="w-4 h-4" /> {t('workerSubscriptions.hideSessionLog')}</>
         ) : (
-          <><ChevronDown className="w-4 h-4" /> Show Session Log ({sub.sessionsTotal})</>
+          <><ChevronDown className="w-4 h-4" /> {t('workerSubscriptions.showSessionLog', { count: sub.sessionsTotal })}</>
         )}
       </button>
 
@@ -284,7 +287,7 @@ const SubscriptionCard = ({
       {expanded && (
         <div className="border-t border-border divide-y divide-border">
           {sub.sessions.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground py-6">No sessions scheduled yet</p>
+            <p className="text-center text-sm text-muted-foreground py-6">{t('workerSubscriptions.noSessionsYet')}</p>
           ) : (
             sub.sessions.map((s) => (
               <div key={s._id} className={`px-4 py-3 flex items-center gap-3 text-sm ${

@@ -1,6 +1,7 @@
 import { API_BASE_URL } from "@/lib/api";
-import { Building2, CheckCircle, ChevronDown, Home, Loader2, MapPin, Phone, UtensilsCrossed, Briefcase } from "lucide-react";
+import { Briefcase, Building2, CheckCircle, ChevronDown, Home, Loader2, MapPin, Phone, UtensilsCrossed } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 const PROPERTY_TYPES = [
@@ -15,6 +16,7 @@ const PROPERTY_TYPES = [
 interface CityOption { city: string; }
 
 const DeepCleaningQuotePage = () => {
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     name: "", phone: "", email: "",
     propertyType: "", propertyTypeCustom: "",
@@ -43,15 +45,15 @@ const DeepCleaningQuotePage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!form.name.trim()) { setError("Name is required"); return; }
+    if (!form.name.trim()) { setError(t('deepCleaningQuote.nameRequired')); return; }
     const digits = form.phone.replace(/\D/g, "").slice(-10);
-    if (digits.length < 10) { setError("Enter a valid 10-digit phone number"); return; }
-    if (!form.propertyType) { setError("Please select a property type"); return; }
+    if (digits.length < 10) { setError(t('deepCleaningQuote.invalidPhone')); return; }
+    if (!form.propertyType) { setError(t('deepCleaningQuote.selectPropertyTypeError')); return; }
     if (form.propertyType === "other" && !form.propertyTypeCustom.trim()) {
-      setError("Please describe your property type"); return;
+      setError(t('deepCleaningQuote.describePropertyError')); return;
     }
-    if (!form.city.trim()) { setError("Please select your city"); return; }
-    if (!form.placeSize.trim()) { setError("Please enter the place size"); return; }
+    if (!form.city.trim()) { setError(t('deepCleaningQuote.selectCityError')); return; }
+    if (!form.placeSize.trim()) { setError(t('deepCleaningQuote.placeSizeRequired')); return; }
 
     setLoading(true);
     try {
@@ -82,19 +84,19 @@ const DeepCleaningQuotePage = () => {
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-10 h-10 text-green-600" />
           </div>
-          <h2 className="text-2xl font-bold font-heading text-foreground mb-3">Request Submitted!</h2>
+          <h2 className="text-2xl font-bold font-heading text-foreground mb-3">{t('deepCleaningQuote.requestSubmitted')}</h2>
           <p className="text-muted-foreground mb-4">
-            Our team will review your request and <strong>call you within 24 hours</strong> with a custom quote.
+            {t('deepCleaningQuote.requestDesc')}
           </p>
           <p className="text-sm text-muted-foreground bg-muted rounded-xl p-4 mb-6">
-            Make sure your phone is reachable. Our team may also send details via WhatsApp.
+            {t('deepCleaningQuote.phoneReachable')}
           </p>
           <div className="flex flex-col gap-3">
             {isLoggedIn && (
-              <Link to="/customer/my-quotes" className="btn-brand px-8 inline-block">View My Quotes</Link>
+              <Link to="/customer/my-quotes" className="btn-brand px-8 inline-block">{t('deepCleaningQuote.viewMyQuotes')}</Link>
             )}
             <Link to={isLoggedIn ? "/customer/services" : "/"} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              {isLoggedIn ? "← Back to Services" : "← Back to Home"}
+              {isLoggedIn ? t('deepCleaningQuote.backToServices') : t('deepCleaningQuote.backToHome')}
             </Link>
           </div>
         </div>
@@ -107,11 +109,10 @@ const DeepCleaningQuotePage = () => {
       {/* Hero */}
       <div className="relative overflow-hidden py-14 px-6 text-center" style={{ background: "var(--gradient-hero)" }}>
         <h1 className="text-3xl md:text-4xl font-bold font-heading text-primary-foreground mb-3">
-          Deep Cleaning — Commercial &amp; Residential
+          {t('deepCleaningQuote.heroTitle')}
         </h1>
         <p className="text-primary-foreground/80 max-w-xl mx-auto text-base">
-          Professional deep cleaning for villas, restaurants, offices and more.
-          Tell us about your space and we'll call you with a custom price.
+          {t('deepCleaningQuote.heroSubtitle')}
         </p>
       </div>
 
@@ -138,8 +139,8 @@ const DeepCleaningQuotePage = () => {
 
         {/* Form */}
         <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-          <h2 className="text-lg font-bold font-heading text-foreground mb-1">Get a Free Quote</h2>
-          <p className="text-sm text-muted-foreground mb-6">Fill in your details and we'll call you back with a price.</p>
+          <h2 className="text-lg font-bold font-heading text-foreground mb-1">{t('deepCleaningQuote.title')}</h2>
+          <p className="text-sm text-muted-foreground mb-6">{t('deepCleaningQuote.fillDetails')}</p>
 
           {error && (
             <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">{error}</div>
@@ -150,12 +151,12 @@ const DeepCleaningQuotePage = () => {
             {/* Name + Phone */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Full Name <span className="text-destructive">*</span></label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">{t('deepCleaningQuote.fullName')} <span className="text-destructive">*</span></label>
                 <input className="input-clean" placeholder="e.g. Ramesh Sharma" value={form.name} onChange={set("name")} required />
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">
-                  <Phone className="inline w-3.5 h-3.5 mr-1" />Phone Number <span className="text-destructive">*</span>
+                  <Phone className="inline w-3.5 h-3.5 mr-1" />{t('deepCleaningQuote.phoneNumber')} <span className="text-destructive">*</span>
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">+91</span>
@@ -172,16 +173,16 @@ const DeepCleaningQuotePage = () => {
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Email Address <span className="text-muted-foreground font-normal">(optional)</span></label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">{t('deepCleaningQuote.emailAddress')} <span className="text-muted-foreground font-normal">{t('deepCleaningQuote.optional')}</span></label>
               <input type="email" className="input-clean" placeholder="you@example.com" value={form.email} onChange={set("email")} />
             </div>
 
             {/* Property Type dropdown */}
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Property Type <span className="text-destructive">*</span></label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">{t('deepCleaningQuote.propertyType')} <span className="text-destructive">*</span></label>
               <div className="relative">
                 <select className="input-clean pr-10 appearance-none" value={form.propertyType} onChange={set("propertyType")} required>
-                  <option value="">-- Select property type --</option>
+                  <option value="">{t('deepCleaningQuote.selectPropertyType')}</option>
                   {PROPERTY_TYPES.map(pt => (
                     <option key={pt.value} value={pt.value}>{pt.label}</option>
                   ))}
@@ -193,7 +194,7 @@ const DeepCleaningQuotePage = () => {
             {/* Custom property type if "other" */}
             {form.propertyType === "other" && (
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Describe Your Place <span className="text-destructive">*</span></label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">{t('deepCleaningQuote.describeYourPlace')} <span className="text-destructive">*</span></label>
                 <input
                   className="input-clean"
                   placeholder="e.g. Warehouse, Hospital, School, Gym..."
@@ -208,12 +209,12 @@ const DeepCleaningQuotePage = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">
-                  <MapPin className="inline w-3.5 h-3.5 mr-1" />City <span className="text-destructive">*</span>
+                  <MapPin className="inline w-3.5 h-3.5 mr-1" />{t('deepCleaningQuote.city')} <span className="text-destructive">*</span>
                 </label>
                 {cities.length > 0 ? (
                   <div className="relative">
                     <select className="input-clean pr-10 appearance-none" value={form.city} onChange={set("city")} required>
-                      <option value="">-- Select city --</option>
+                      <option value="">{t('deepCleaningQuote.selectCityPlaceholder')}</option>
                       {cities.map(c => (
                         <option key={c.city} value={c.city}>{c.city}</option>
                       ))}
@@ -225,7 +226,7 @@ const DeepCleaningQuotePage = () => {
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Place Size <span className="text-destructive">*</span></label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">{t('deepCleaningQuote.placeSize')} <span className="text-destructive">*</span></label>
                 <input
                   className="input-clean"
                   placeholder="e.g. 2000 sq ft, 3 floors, 10 rooms"
@@ -238,7 +239,7 @@ const DeepCleaningQuotePage = () => {
 
             {/* Message */}
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Additional Details <span className="text-muted-foreground font-normal">(optional)</span></label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">{t('deepCleaningQuote.additionalDetails')} <span className="text-muted-foreground font-normal">{t('deepCleaningQuote.optional')}</span></label>
               <textarea
                 className="input-clean resize-none" rows={3}
                 placeholder="e.g. last cleaned 6 months ago, need same-day service, have a specific area of concern..."
@@ -249,7 +250,7 @@ const DeepCleaningQuotePage = () => {
 
             <button type="submit" disabled={loading} className="btn-brand w-full mt-2">
               {loading ? <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> : null}
-              Request Free Quote
+              {t('deepCleaningQuote.requestFreeQuote')}
             </button>
           </form>
         </div>
