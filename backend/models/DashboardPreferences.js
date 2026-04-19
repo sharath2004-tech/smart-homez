@@ -135,15 +135,8 @@ dashboardPreferencesSchema.statics.getDefaultConfig = async function() {
   } else {
     let hasChanges = false;
 
-    DEFAULT_SERVICES.forEach((defaultService) => {
-      const existingService = config.services.find((service) => service.id === defaultService.id);
-
-      if (!existingService) {
-        config.services.push(defaultService);
-        hasChanges = true;
-        return;
-      }
-
+    // Patch existing services for missing fields (no longer re-adds deleted tiles)
+    config.services.forEach((existingService) => {
       if (typeof existingService.customName !== 'string') {
         existingService.customName = '';
         hasChanges = true;
@@ -156,11 +149,6 @@ dashboardPreferencesSchema.statics.getDefaultConfig = async function() {
 
       if (typeof existingService.customSubtitle !== 'string') {
         existingService.customSubtitle = '';
-        hasChanges = true;
-      }
-
-      if (!existingService.path) {
-        existingService.path = defaultService.path;
         hasChanges = true;
       }
     });

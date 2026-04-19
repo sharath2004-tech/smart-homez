@@ -577,16 +577,14 @@ const AdminDashboardPreferences = () => {
                   >
                     {service.isActive ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
                   </button>
-                  {!service.isDefault && (
-                    <button
-                      onClick={() => handleRemoveService(service.id)}
-                      className="p-2 rounded-lg transition-colors text-destructive bg-destructive/5 hover:bg-destructive/10"
-                      title="Remove service card"
-                      type="button"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleRemoveService(service.id)}
+                    className="p-2 rounded-lg transition-colors text-destructive bg-destructive/5 hover:bg-destructive/10"
+                    title="Remove service card"
+                    type="button"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
                 </div>
               </div>
             ))}
