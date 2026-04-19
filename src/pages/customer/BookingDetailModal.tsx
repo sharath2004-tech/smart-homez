@@ -715,7 +715,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
                   <div className="flex items-center gap-3">
                     {booking.worker.profileImage ? (
                       <img
-                        src={`${API_BASE_URL.replace('/api', '')}${booking.worker.profileImage}`}
+                        src={booking.worker.profileImage.startsWith('http') ? booking.worker.profileImage : `${API_BASE_URL.replace('/api', '')}${booking.worker.profileImage}`}
                         alt={booking.worker.name}
                         className="w-12 h-12 rounded-full object-cover border-2 border-border shrink-0"
                       />
