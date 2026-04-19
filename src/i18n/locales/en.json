@@ -102,6 +102,9 @@
   "subscription": {
     "mySubscriptions": "My Subscriptions",
     "failedToLoad": "Failed to load service details",
+    "serviceNotFound": "Service not found",
+    "serviceNotFoundDesc": "This service is no longer available or has been removed.",
+    "backToServices": "Browse services",
     "plan": "plan",
     "status": "Status",
     "active": "active",

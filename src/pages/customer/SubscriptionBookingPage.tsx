@@ -51,6 +51,7 @@ export default function SubscriptionBookingPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [service, setService] = useState<Service | null>(null);
+  const [serviceNotFound, setServiceNotFound] = useState(false);
   const [profile, setProfile] = useState<{
     name?: string;
     isPhoneVerified?: boolean;
@@ -105,6 +106,7 @@ export default function SubscriptionBookingPage() {
         setProfile(profileData.user || profileData);
       } catch (error) {
         console.error('Error fetching data:', error);
+        setServiceNotFound(true);
         toast.error(t('subscription.failedToLoad'));
       } finally {
         setLoading(false);
@@ -284,6 +286,24 @@ export default function SubscriptionBookingPage() {
             <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
             <p className="text-muted-foreground">{t('common.loading')}</p>
           </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (serviceNotFound || !service) {
+    return (
+      <AppLayout userType="customer" userName={profile?.name}>
+        <div className="flex flex-col items-center justify-center min-h-[400px] px-4 text-center">
+          <div className="text-6xl mb-4">🔍</div>
+          <h2 className="text-xl font-bold text-foreground mb-2">{t('subscription.serviceNotFound', 'Service not found')}</h2>
+          <p className="text-muted-foreground text-sm mb-6">{t('subscription.serviceNotFoundDesc', 'This service is no longer available or has been removed.')}</p>
+          <button
+            onClick={() => navigate('/customer/services')}
+            className="btn-brand px-6 py-3"
+          >
+            {t('subscription.backToServices', 'Browse services')}
+          </button>
         </div>
       </AppLayout>
     );
