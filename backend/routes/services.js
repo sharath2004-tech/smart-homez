@@ -6,6 +6,20 @@ import { checkServiceAvailability } from '../utils/geolocation.js';
 
 const router = express.Router();
 
+router.get('/categories', async (req, res) => {
+  try {
+    const categories = await Service.aggregate([
+      { $match: { isActive: true } },
+      { $group: { _id: '$serviceCategory', count: { $sum: 1 } } },
+      { $match: { _id: { $ne: null } } },
+      { $sort: { count: -1 } }
+    ]);
+    res.json({ categories: categories.map(c => ({ serviceCategory: c._id, count: c.count })) });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to load categories' });
+  }
+});
+
 // @route   GET /api/services
 // @desc    Get all services (with optional location filtering)
 // @access  Public
@@ -14,6 +28,7 @@ router.get('/', async (req, res) => {
     const { 
       category, 
       serviceType,
+      serviceCategory,
       search, 
       isActive, 
       page = 1, 
@@ -25,6 +40,7 @@ router.get('/', async (req, res) => {
     
     const query = {};
     if (category) query.category = category;
+    if (serviceCategory) query.serviceCategory = serviceCategory;
     if (serviceType) {
       // Support comma-separated serviceType values
       const types = serviceType.split(',').map(t => t.trim());

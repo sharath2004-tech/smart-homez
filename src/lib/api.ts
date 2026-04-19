@@ -545,6 +545,7 @@ export const publicAPI = {
 export const servicesAPI = {
   getAll: async (params?: {
     category?: string;
+    serviceCategory?: string;
     search?: string;
     latitude?: number;
     longitude?: number;
@@ -596,6 +597,10 @@ export const servicesAPI = {
     return apiCall(`/services/${id}`, {
       method: 'DELETE'
     });
+  },
+
+  getCategories: async () => {
+    return apiCall('/services/categories');
   }
 };
 

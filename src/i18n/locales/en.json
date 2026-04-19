@@ -45,7 +45,8 @@
     "optional": "optional",
     "showAdvanced": "Advanced Settings",
     "hideAdvanced": "Hide Advanced",
-    "continue": "Continue"
+    "continue": "Continue",
+    "booking": "Booking"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -100,6 +101,7 @@
   },
   "subscription": {
     "mySubscriptions": "My Subscriptions",
+    "failedToLoad": "Failed to load service details",
     "plan": "plan",
     "status": "Status",
     "active": "active",

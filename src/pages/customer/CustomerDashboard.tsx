@@ -197,7 +197,7 @@ interface BookingCardItemProps {
 }
 const BookingCardItem = ({ b, index, formatDate }: BookingCardItemProps) => {
   const { t } = useTranslation();
-  const tServiceName = useTranslateText(b.service?.name ?? (b.bookingType === 'deep-cleaning-cart' ? '✨ Move In / Move Out Cleaning' : 'Booking'));
+  const tServiceName = useTranslateText(b.service?.name ?? (b.bookingType === 'deep-cleaning-cart' ? t('customer.dashboard.deepCleaning') : t('common.booking')));
   return (
     <Link key={b._id} to="/customer/bookings" state={{ openBookingId: b._id }}>
       <motion.div
@@ -823,7 +823,7 @@ const CustomerDashboard = () => {
                 🧹
               </div>
               <div className="flex-1">
-                <p className="font-semibold text-foreground text-sm">{ongoingBooking.service?.name ?? '✨ Move In / Move Out Cleaning'}</p>
+                <p className="font-semibold text-foreground text-sm">{ongoingBooking.service?.name ?? t('customer.dashboard.deepCleaning')}</p>
                 <p className="text-xs text-muted-foreground">{ongoingBooking.worker?.name || t('customer.dashboard.workerAssigned')}</p>
               </div>
               <Link to="/customer/bookings" className="btn-brand text-xs py-2 px-3 shrink-0">
@@ -868,7 +868,7 @@ const CustomerDashboard = () => {
                 onClick={() => setShowLocationSelector(true)}
                 className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-200 whitespace-nowrap"
               >
-                {serviceableStatus === 'unavailable' ? 'Choose location' : 'Set location'}
+                {serviceableStatus === 'unavailable' ? t('dashboardExtra.chooseLocation') : t('dashboardExtra.setLocation')}
               </button>
               {serviceableStatus === 'unavailable' && selectedLocation && deepCleaningRequestServiceId && (
                 <button

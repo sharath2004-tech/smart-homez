@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import LocationSelector, { LocationData } from "@/components/LocationSelector";
 import { authAPI, serviceAreasAPI, servicesAPI, setStoredCustomerLocation, settingsAPI } from "@/lib/api";
 import { motion } from "framer-motion";
-import { CalendarClock, Clock, MapPin, Search, Sparkles, Star, Users } from "lucide-react";
+import { CalendarClock, Clock, MapPin, Search, Star, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -13,6 +13,7 @@ interface Service {
   name: string;
   description: string;
   category: string;
+  serviceCategory?: string;
   serviceType?: string;
   price: number;
   duration: number;
@@ -25,17 +26,26 @@ interface Service {
   };
 }
 
-const SERVICE_CATEGORIES = [
-  { key: 'insta',        labelKey: 'customer.services.catInstaLabel', icon: '⚡', descKey: 'customer.services.catInstaDesc', color: 'bg-amber-50 border-amber-300',  badgeKey: 'customer.services.catInstaBadge', badgeColor: 'bg-teal-100 text-teal-700', path: '/customer/services/insta' },
-  { key: 'subscription', labelKey: 'customer.services.catSubLabel',   icon: '📅', descKey: 'customer.services.catSubDesc',   color: 'bg-blue-50 border-blue-300',    badgeKey: 'customer.services.catSubBadge',   badgeColor: 'bg-teal-100 text-teal-700', path: '/customer/services/subscription' },
-  { key: 'deep',         labelKey: 'customer.services.catDeepLabel',  icon: '✨', descKey: 'customer.services.catDeepDesc',  color: 'bg-green-50 border-green-300',  badgeKey: 'customer.services.catDeepBadge',  badgeColor: 'bg-teal-100 text-teal-700', path: '/customer/deep-cleaning' },
-];
+const CATEGORY_META: Record<string, { icon: string; route: string; color: string; badgeColor: string }> = {
+  instant_services:      { icon: '⚡', route: '/customer/services/insta',               color: 'bg-amber-50 border-amber-300',  badgeColor: 'bg-teal-100 text-teal-700' },
+  subscription_services: { icon: '📅', route: '/customer/services/subscription',         color: 'bg-blue-50 border-blue-300',    badgeColor: 'bg-teal-100 text-teal-700' },
+  deep_cleaning:         { icon: '✨', route: '/customer/deep-cleaning',                 color: 'bg-green-50 border-green-300',  badgeColor: 'bg-teal-100 text-teal-700' },
+  spot_cleaning:         { icon: '🧹', route: '/customer/services/category/spot_cleaning',      color: 'bg-cyan-50 border-cyan-300',    badgeColor: 'bg-cyan-100 text-cyan-700' },
+  kitchen_services:      { icon: '🍳', route: '/customer/services/category/kitchen_services',   color: 'bg-orange-50 border-orange-300',badgeColor: 'bg-orange-100 text-orange-700' },
+  bathroom_services:     { icon: '🚿', route: '/customer/services/category/bathroom_services',  color: 'bg-purple-50 border-purple-300',badgeColor: 'bg-purple-100 text-purple-700' },
+  furniture_services:    { icon: '🛋️', route: '/customer/services/category/furniture_services', color: 'bg-rose-50 border-rose-300',    badgeColor: 'bg-rose-100 text-rose-700' },
+  hvac_services:         { icon: '❄️', route: '/customer/services/category/hvac_services',      color: 'bg-sky-50 border-sky-300',      badgeColor: 'bg-sky-100 text-sky-700' },
+  other:                 { icon: '🏠', route: '/customer/services/category/other',               color: 'bg-slate-50 border-slate-300',  badgeColor: 'bg-slate-100 text-slate-700' },
+};
 
-const HIDDEN_ROOT_SERVICE_TYPES = new Set([
-  'instant_hourly',
-  'monthly_subscription',
-  'deep_cleaning_full_house',
-]);
+const getCategoryRoute = (serviceCategory: string) =>
+  (CATEGORY_META[serviceCategory] ?? CATEGORY_META['other']).route;
+
+const getCategoryIcon = (serviceCategory: string) =>
+  (CATEGORY_META[serviceCategory] ?? CATEGORY_META['other']).icon;
+
+const getCategoryColors = (serviceCategory: string) =>
+  CATEGORY_META[serviceCategory] ?? CATEGORY_META['other'];
 
 const dedupeServices = (items: Service[]) => {
   const seen = new Set<string>();
@@ -67,6 +77,7 @@ const ServicesPage = () => {
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   const [requestingServiceId, setRequestingServiceId] = useState<string | null>(null);
   const [todayAvailableSlotCount, setTodayAvailableSlotCount] = useState<number | null>(null);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   const [favouriteIds, setFavouriteIds] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem('favouriteServiceIds');
@@ -98,6 +109,12 @@ const ServicesPage = () => {
 
   useEffect(() => {
     fetchProfile();
+    // Fetch available service categories
+    servicesAPI.getCategories()
+      .then((data: { categories: { serviceCategory: string }[] }) => {
+        setAvailableCategories((data.categories || []).map((c) => c.serviceCategory));
+      })
+      .catch(() => {});
     // Fetch today's available slot count once
     const today = new Date().toISOString().split('T')[0];
     settingsAPI.getAvailableSlotsByDate(today)
@@ -231,21 +248,11 @@ const ServicesPage = () => {
 
   const matchesCategory = (service: Service) => {
     if (!activeCategory) return true;
-    const n = service.name.toLowerCase();
-    const c = service.category.toLowerCase();
-    if (activeCategory === 'insta') return n.includes('insta') || n.includes('adhoc') || n.includes('hourly');
-    if (activeCategory === 'subscription') return n.includes('subscription') || n.includes('monthly') || n.includes('weekly') || c.includes('subscription');
-    if (activeCategory === 'deep') return n.includes('deep') || n.includes('full home');
-    return true;
+    return service.serviceCategory === activeCategory
+      || service.category === activeCategory;
   };
 
-  const displayedServices = services.filter((service) => {
-    if (service.serviceType && HIDDEN_ROOT_SERVICE_TYPES.has(service.serviceType)) {
-      return false;
-    }
-    return matchesCategory(service);
-  }).sort((a, b) => {
-    // Favourites float to top
+  const displayedServices = services.filter(matchesCategory).sort((a, b) => {
     const aFav = favouriteIds.has(a._id) ? 0 : 1;
     const bFav = favouriteIds.has(b._id) ? 0 : 1;
     return aFav - bFav;
@@ -327,111 +334,28 @@ const ServicesPage = () => {
           </motion.div>
 
 
-          {/* 3 Category Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {SERVICE_CATEGORIES.map((cat) => (
-              <button
-                key={cat.key}
-                onClick={() => navigate(cat.path)}
-                className={`p-3 rounded-2xl border-2 text-center transition-all ${cat.color} hover:border-primary/60 hover:shadow-md active:scale-95`}
-              >
-                <div className="text-2xl mb-1">{cat.icon}</div>
-                <div>
-                  <p className="text-xs font-semibold text-foreground leading-tight">
-                    {cat.key === 'deep' ? t('servicesPageExtra.moveInOutDeepClean') : t(cat.labelKey)}
-                  </p>
-                  {cat.key === 'deep' && (
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{t('servicesPageExtra.moveInOutDeepCleanFull')}</p>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block leading-tight">{t(cat.descKey)}</p>
-                <span className={`inline-block mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full ${cat.badgeColor}`}>{t(cat.badgeKey)}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Spot Clean Mini Services Banner */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.40 }}
-          >
-            <Link
-              to="/customer/services/spot-clean"
-              className="flex items-center gap-4 p-4 rounded-2xl border-2 border-cyan-300 bg-cyan-50 hover:bg-cyan-100 hover:border-cyan-400 transition-all group"
-            >
-              <div className="w-12 h-12 bg-cyan-200 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform text-2xl">
-                🧹
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-cyan-900 text-sm leading-tight">{t('servicesPageExtra.spotCleanBanner')}</p>
-                <p className="text-xs text-cyan-700 mt-0.5">{t('servicesPageExtra.spotCleanSubtitle')}</p>
-              </div>
-              <span className="shrink-0 text-xs font-semibold bg-cyan-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">{t('servicesPageExtra.spotCleanBadge')}</span>
-            </Link>
-          </motion.div>
-
-          {/* Deep Cleaning Commercial Quote Banner */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35 }}
-          >
-            <Link
-              to="/deep-cleaning-quote"
-              className="flex items-center gap-4 p-4 rounded-2xl border-2 border-green-300 bg-green-50 hover:bg-green-100 hover:border-green-400 transition-all group"
-            >
-              <div className="w-12 h-12 bg-green-200 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                <Sparkles className="w-6 h-6 text-green-700" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-green-900 text-sm leading-tight">{t('servicesPageExtra.commercialBanner')}</p>
-                <p className="text-xs text-green-700 mt-0.5">{t('servicesPageExtra.commercialSubtitle')}</p>
-              </div>
-              <span className="shrink-0 text-xs font-semibold bg-green-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">{t('servicesPageExtra.commercialBadge')}</span>
-            </Link>
-          </motion.div>
-
-          {/* Deep Cleaning Sub-Services Cards */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.45 }}
-            className="space-y-3"
-          >
-            <h3 className="text-sm font-semibold text-foreground px-1">{t('servicesPageExtra.deepCleanPages')}</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Link
-                to="/customer/services/intense-washroom-cleaning"
-                className="p-4 rounded-xl border-2 border-purple-300 bg-purple-50 hover:bg-purple-100 hover:border-purple-400 transition-all text-center group"
-              >
-                <div className="text-3xl mb-2">🚿</div>
-                <p className="font-semibold text-purple-900 text-sm">{t('servicesPageExtra.washroomTitle')}</p>
-                <p className="text-xs text-purple-700 mt-1">{t('servicesPageExtra.washroomSubtitle')}</p>
-                <span className="inline-block mt-2 text-[10px] font-semibold bg-purple-600 text-white px-2 py-1 rounded-full">{t('servicesPageExtra.openPage')}</span>
-              </Link>
-
-              <Link
-                to="/customer/services/kitchen-deep-clean"
-                className="p-4 rounded-xl border-2 border-orange-300 bg-orange-50 hover:bg-orange-100 hover:border-orange-400 transition-all text-center group"
-              >
-                <div className="text-3xl mb-2">🍽️</div>
-                <p className="font-semibold text-orange-900 text-sm">{t('servicesPageExtra.kitchenTitle')}</p>
-                <p className="text-xs text-orange-700 mt-1">{t('servicesPageExtra.kitchenSubtitle')}</p>
-                <span className="inline-block mt-2 text-[10px] font-semibold bg-orange-600 text-white px-2 py-1 rounded-full">{t('servicesPageExtra.openPage')}</span>
-              </Link>
-
-              <Link
-                to="/customer/services/window-deep-cleaning"
-                className="p-4 rounded-xl border-2 border-blue-300 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 transition-all text-center group"
-              >
-                <div className="text-3xl mb-2">🪟</div>
-                <p className="font-semibold text-blue-900 text-sm">{t('servicesPageExtra.windowTitle')}</p>
-                <p className="text-xs text-blue-700 mt-1">{t('servicesPageExtra.windowSubtitle')}</p>
-                <span className="inline-block mt-2 text-[10px] font-semibold bg-blue-600 text-white px-2 py-1 rounded-full">{t('servicesPageExtra.openPage')}</span>
-              </Link>
+          {/* Dynamic Category Cards — driven by serviceCategory values from the API */}
+          {availableCategories.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {availableCategories.map((cat) => {
+                const colors = getCategoryColors(cat);
+                const label = t(`customer.services.cat.${cat}`, cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => navigate(getCategoryRoute(cat))}
+                    className={`p-3 rounded-2xl border-2 text-center transition-all ${colors.color} hover:border-primary/60 hover:shadow-md active:scale-95`}
+                  >
+                    <div className="text-2xl mb-1">{getCategoryIcon(cat)}</div>
+                    <p className="text-xs font-semibold text-foreground leading-tight">{label}</p>
+                    <span className={`inline-block mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full ${colors.badgeColor}`}>
+                      {t('customer.services.explore', 'Explore')}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-          </motion.div>
+          )}
 
           {/* Search */}
           <motion.div

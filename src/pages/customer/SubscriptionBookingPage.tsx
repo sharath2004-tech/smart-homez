@@ -19,6 +19,10 @@ interface Service {
   category: string;
   price: number;
   duration: number;
+  subscriptionOptions?: {
+    discount?: number;
+    planDiscounts?: Partial<Record<'daily' | 'weekly' | 'biweekly' | 'monthly', number>>;
+  };
 }
 
 interface RecurringSchedule {
@@ -101,7 +105,7 @@ export default function SubscriptionBookingPage() {
         setProfile(profileData.user || profileData);
       } catch (error) {
         console.error('Error fetching data:', error);
-        toast.error('Failed to load service details');
+        toast.error(t('subscription.failedToLoad'));
       } finally {
         setLoading(false);
       }
@@ -115,12 +119,23 @@ export default function SubscriptionBookingPage() {
     const basePrice = service.price;
     
     // Apply discounts based on plan
+    const getPlanDiscount = (plan: string): number => {
+      const planDiscounts = service.subscriptionOptions?.planDiscounts;
+      const serviceDiscount = service.subscriptionOptions?.discount;
+      const defaults: Record<string, number> = { oneTime: 0, daily: 10, weekly: 15, biweekly: 12, monthly: 20 };
+      if (plan !== 'oneTime') {
+        const key = plan as 'daily' | 'weekly' | 'biweekly' | 'monthly';
+        if (planDiscounts?.[key] !== undefined) return planDiscounts[key]!;
+        if (serviceDiscount !== undefined) return serviceDiscount;
+      }
+      return defaults[plan] ?? 0;
+    };
     const discounts: Record<string, number> = {
       oneTime: 0,
-      daily: 10,
-      weekly: 15,
-      biweekly: 12,
-      monthly: 20
+      daily: getPlanDiscount('daily'),
+      weekly: getPlanDiscount('weekly'),
+      biweekly: getPlanDiscount('biweekly'),
+      monthly: getPlanDiscount('monthly')
     };
     
     const discount = discounts[selectedPlan];
@@ -426,6 +441,8 @@ export default function SubscriptionBookingPage() {
                 }));
               }}
               basePrice={service?.price || 0}
+              serviceDiscount={service?.subscriptionOptions?.discount}
+              planDiscounts={service?.subscriptionOptions?.planDiscounts}
             />
           )}
 

@@ -15,10 +15,25 @@ interface SubscriptionPlanSelectorProps {
   selectedPlan: string;
   onPlanChange: (plan: 'oneTime' | 'daily' | 'weekly' | 'biweekly' | 'monthly') => void;
   basePrice: number;
+  serviceDiscount?: number;
+  planDiscounts?: Partial<Record<'daily' | 'weekly' | 'biweekly' | 'monthly', number>>;
 }
 
-export function SubscriptionPlanSelector({ selectedPlan, onPlanChange, basePrice }: SubscriptionPlanSelectorProps) {
+export function SubscriptionPlanSelector({ selectedPlan, onPlanChange, basePrice, serviceDiscount, planDiscounts }: SubscriptionPlanSelectorProps) {
   const { t } = useTranslation();
+
+  const defaultDiscounts: Record<'daily' | 'weekly' | 'biweekly' | 'monthly', number> = {
+    daily: 10,
+    weekly: 15,
+    biweekly: 12,
+    monthly: 20
+  };
+
+  const resolveDiscount = (plan: 'daily' | 'weekly' | 'biweekly' | 'monthly'): number => {
+    if (planDiscounts?.[plan] !== undefined) return planDiscounts[plan]!;
+    if (serviceDiscount !== undefined) return serviceDiscount;
+    return defaultDiscounts[plan];
+  };
 
   const plans: PlanOption[] = [
     {
@@ -36,7 +51,7 @@ export function SubscriptionPlanSelector({ selectedPlan, onPlanChange, basePrice
       value: 'daily',
       label: t('subscription.plans.daily'),
       description: t('subscription.plans.dailyDesc'),
-      discount: 10,
+      discount: resolveDiscount('daily'),
       features: [
         t('subscription.features.save10'),
         t('subscription.features.dailyService'),
@@ -49,7 +64,7 @@ export function SubscriptionPlanSelector({ selectedPlan, onPlanChange, basePrice
       value: 'weekly',
       label: t('subscription.plans.weekly'),
       description: t('subscription.plans.weeklyDesc'),
-      discount: 15,
+      discount: resolveDiscount('weekly'),
       popular: true,
       features: [
         t('subscription.features.save15'),
@@ -64,7 +79,7 @@ export function SubscriptionPlanSelector({ selectedPlan, onPlanChange, basePrice
       value: 'biweekly',
       label: t('subscription.plans.biweekly'),
       description: t('subscription.plans.biweeklyDesc'),
-      discount: 12,
+      discount: resolveDiscount('biweekly'),
       features: [
         t('subscription.features.save12'),
         t('subscription.features.twiceWeekly'),
@@ -77,7 +92,7 @@ export function SubscriptionPlanSelector({ selectedPlan, onPlanChange, basePrice
       value: 'monthly',
       label: t('subscription.plans.monthly'),
       description: t('subscription.plans.monthlyDesc'),
-      discount: 20,
+      discount: resolveDiscount('monthly'),
       features: [
         t('subscription.features.save20'),
         t('subscription.features.monthlyService'),

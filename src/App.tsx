@@ -37,9 +37,9 @@ import PreferencesPage from "./pages/customer/PreferencesPage";
 import ProfilePage from "./pages/customer/ProfilePage";
 import ServiceAreaDemo from "./pages/customer/ServiceAreaDemo";
 import ServiceRouter from "./pages/customer/ServiceRouter";
+import CategoryServicePage from "./pages/customer/services/CategoryServicePage";
 import DeepCleaningServicePage from "./pages/customer/services/DeepCleaningServicePage";
 import InstaServicePage from "./pages/customer/services/InstaServicePage";
-import SpotCleanPage from "./pages/customer/services/SpotCleanPage";
 import SubscriptionServicePage from "./pages/customer/services/SubscriptionServicePage";
 import ServicesPage from "./pages/customer/ServicesPage";
 import SubscriptionBookingPage from "./pages/customer/SubscriptionBookingPage";
@@ -131,13 +131,14 @@ const App = () => (
           {/* Customer */}
           <Route path="/customer/dashboard" element={<ProtectedRoute allowedRoles={['customer']}><CustomerDashboard /></ProtectedRoute>} />
           <Route path="/customer/services" element={<ProtectedRoute allowedRoles={['customer']}><ServicesPage /></ProtectedRoute>} />
+          <Route path="/customer/services/category/:slug" element={<ProtectedRoute allowedRoles={['customer']}><CategoryServicePage /></ProtectedRoute>} />
           <Route path="/customer/services/insta" element={<ProtectedRoute allowedRoles={['customer']}><InstaServicePage /></ProtectedRoute>} />
           <Route path="/customer/services/subscription" element={<ProtectedRoute allowedRoles={['customer']}><SubscriptionServicePage /></ProtectedRoute>} />
           <Route path="/customer/services/deep-cleaning" element={<ProtectedRoute allowedRoles={['customer']}><DeepCleaningServicePage /></ProtectedRoute>} />
-          <Route path="/customer/services/spot-clean" element={<ProtectedRoute allowedRoles={['customer']}><SpotCleanPage /></ProtectedRoute>} />
-          <Route path="/customer/services/intense-washroom-cleaning" element={<ProtectedRoute allowedRoles={['customer']}><SpotCleanPage /></ProtectedRoute>} />
-          <Route path="/customer/services/kitchen-deep-clean" element={<ProtectedRoute allowedRoles={['customer']}><SpotCleanPage /></ProtectedRoute>} />
-          <Route path="/customer/services/window-deep-cleaning" element={<ProtectedRoute allowedRoles={['customer']}><SpotCleanPage /></ProtectedRoute>} />
+          <Route path="/customer/services/spot-clean" element={<ProtectedRoute allowedRoles={['customer']}><CategoryServicePage /></ProtectedRoute>} />
+          <Route path="/customer/services/intense-washroom-cleaning" element={<ProtectedRoute allowedRoles={['customer']}><CategoryServicePage /></ProtectedRoute>} />
+          <Route path="/customer/services/kitchen-deep-clean" element={<ProtectedRoute allowedRoles={['customer']}><CategoryServicePage /></ProtectedRoute>} />
+          <Route path="/customer/services/window-deep-cleaning" element={<ProtectedRoute allowedRoles={['customer']}><CategoryServicePage /></ProtectedRoute>} />
           <Route path="/customer/deep-cleaning" element={<ProtectedRoute allowedRoles={['customer']}><DeepCleaningLandingPage /></ProtectedRoute>} />
           <Route path="/customer/deep-cleaning/:categoryId" element={<ProtectedRoute allowedRoles={['customer']}><DeepCleaningCategoryPage /></ProtectedRoute>} />
           <Route path="/customer/deep-cleaning/customize" element={<ProtectedRoute allowedRoles={['customer']}><DeepCleaningPage /></ProtectedRoute>} />
