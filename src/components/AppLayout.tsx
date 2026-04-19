@@ -119,8 +119,7 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
     { to: "/customer/payments", icon: CreditCard, label: t('nav.payments') },
     { to: "/customer/profile", icon: User, label: t('nav.profile') },
     { to: "/customer/help", icon: HelpCircle, label: t('nav.help') },
-    { to: "/change-password", icon: KeyRound, label: passwordMenuLabel },
-  ], [t, passwordMenuLabel]);
+  ], [t]);
 
   const workerNav = useMemo(() => [
     { to: "/worker/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },

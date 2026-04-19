@@ -114,6 +114,7 @@ router.post('/register',
     body('email').optional({ checkFalsy: true }).isEmail().withMessage('Enter a valid email address'),
     body('phone').if(body('role').not().equals('worker')).notEmpty().withMessage('Mobile number is required'),
     body('password')
+      .if(body('role').not().equals('customer'))
       .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
       .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter')
       .matches(/[a-z]/).withMessage('Password must contain at least one lowercase letter')
@@ -174,7 +175,10 @@ router.post('/register',
       const userData = {
         name,
         ...(email && email.trim() ? { email: email.toLowerCase().trim() } : {}),
-        password,
+        password: (normalizedRole === 'customer' && !password)
+          ? crypto.randomBytes(32).toString('hex')
+          : password,
+        hasCustomPassword: normalizedRole !== 'customer' || Boolean(password),
         role: normalizedRole,
         phone: normalizedPhone || phone,
         gender: gender || 'prefer_not_to_say',

@@ -1,16 +1,17 @@
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { authAPI, publicAPI } from "@/lib/api";
+import * as msg91Widget from "@/lib/msg91Widget";
 import {
     CheckCircle,
     ChevronDown,
-    Eye,
-    EyeOff,
     Home,
     Loader2,
     MapPin,
     Navigation,
+    Phone,
+    RefreshCw,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 
@@ -45,15 +46,12 @@ interface ServiceCity {
 
 const CustomerSignUp = () => {
   const [step, setStep] = useState<Step>("form");
-  const [form, setForm] = useState({
-    name: "",
-    phone: "",
-    password: "",
-    confirmPassword: "",
-    gender: "",
-  });
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [form, setForm] = useState({ name: "", phone: "", gender: "" });
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [resendCountdown, setResendCountdown] = useState(0);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [loading, setLoading] = useState(false);
   const [locLoading, setLocLoading] = useState(false);
   const [error, setError] = useState("");
@@ -75,63 +73,70 @@ const CustomerSignUp = () => {
       .finally(() => setCitiesLoading(false));
   }, [step]);
 
+  // Cleanup countdown interval on unmount
+  useEffect(() => () => { if (countdownRef.current) clearInterval(countdownRef.current); }, []);
+
   const set =
     (field: keyof typeof form) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
-  const handleFormNext = (e: React.FormEvent) => {
+  const startResendCountdown = () => {
+    setResendCountdown(30);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    countdownRef.current = setInterval(() => {
+      setResendCountdown((prev) => {
+        if (prev <= 1) { clearInterval(countdownRef.current!); countdownRef.current = null; return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim()) {
-      setError("Name is required");
-      return;
-    }
+    if (!form.name.trim()) { setError("Name is required"); return; }
     const phoneDigits = form.phone.replace(/\D/g, "").slice(-10);
-    if (phoneDigits.length < 10) {
-      setError("Mobile number is required");
-      return;
-    }
-    // Validate password field requirements
-    if (form.password.length < 8) {
-      setError("Password must be at least 8 characters");
-      return;
-    }
-    if (!/[A-Z]/.test(form.password)) {
-      setError("Password must contain at least one uppercase letter");
-      return;
-    }
-    if (!/[0-9]/.test(form.password)) {
-      setError("Password must contain at least one number");
-      return;
-    }
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(form.password)) {
-      setError("Password must include a special character (e.g. @, #, $, !)");
-      return;
-    }
-    // Validate confirm password field requirements
-    if (form.confirmPassword.length < 8) {
-      setError("Confirm password must be at least 8 characters");
-      return;
-    }
-    if (!/[A-Z]/.test(form.confirmPassword)) {
-      setError("Confirm password must contain at least one uppercase letter");
-      return;
-    }
-    if (!/[0-9]/.test(form.confirmPassword)) {
-      setError("Confirm password must contain at least one number");
-      return;
-    }
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(form.confirmPassword)) {
-      setError("Confirm password must include a special character (e.g. @, #, $, !)");
-      return;
-    }
-    // Finally, check if passwords match
-    if (form.password !== form.confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
+    if (phoneDigits.length < 10) { setError("Mobile number is required"); return; }
+    setOtpLoading(true);
     setError("");
-    setStep("location");
+    try {
+      await msg91Widget.sendOtp("91" + phoneDigits);
+      setOtpSent(true);
+      startResendCountdown();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send OTP. Please try again.");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    if (!otpCode || otpCode.length < 6) { setError("Enter the 6-digit OTP"); return; }
+    setOtpLoading(true);
+    setError("");
+    try {
+      await msg91Widget.verifyOtp(otpCode);
+      setStep("location");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Verification failed. Please try again.");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    if (resendCountdown > 0) return;
+    setOtpCode("");
+    setError("");
+    setOtpLoading(true);
+    try {
+      await msg91Widget.retryOtp(null);
+      startResendCountdown();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to resend OTP.");
+    } finally {
+      setOtpLoading(false);
+    }
   };
 
   const registerAccount = async (geo: GeoResult | null) => {
@@ -140,11 +145,10 @@ const CustomerSignUp = () => {
       const phoneDigits = form.phone.replace(/\D/g, "").slice(-10);
       const payload: Record<string, unknown> = {
         name: form.name.trim(),
-        password: form.password,
         role: "customer",
         gender: form.gender || "prefer_not_to_say",
         phone: "+91" + phoneDigits,
-        isPhoneVerified: false,
+        isPhoneVerified: true,
       };
 
       if (geo) {
@@ -269,8 +273,8 @@ const CustomerSignUp = () => {
     }
   };
 
-  const steps = ["Your details", "Your area", "All set!"];
-  const stepIdx = step === "form" ? 0 : step === "location" ? 1 : 2;
+  const steps = ["Your details", "Verify phone", "Your area", "All set!"];
+  const stepIdx = step === "form" ? (otpSent ? 1 : 0) : step === "location" ? 2 : 3;
 
   if (step === "done") {
     return (
@@ -351,92 +355,104 @@ const CustomerSignUp = () => {
               <h2 className="text-2xl font-bold font-heading text-foreground mb-1">Create your account</h2>
               <p className="text-muted-foreground mb-6">Join Healthy Homez as a customer</p>
 
-              <form onSubmit={handleFormNext} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Full Name</label>
-                  <input className="input-clean" placeholder="e.g. Priya Sharma" value={form.name} onChange={set("name")} required />
-                </div>
+              {!otpSent ? (
+                <form onSubmit={handleSendOTP} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Full Name</label>
+                    <input className="input-clean" placeholder="e.g. Priya Sharma" value={form.name} onChange={set("name")} required />
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Mobile Number
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">+91</span>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Mobile Number</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">+91</span>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        maxLength={10}
+                        className="input-clean pl-12"
+                        placeholder="98765 43210"
+                        value={form.phone}
+                        onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value.replace(/\D/g, "") }))}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">
+                      Gender <span className="text-muted-foreground font-normal">(optional)</span>
+                    </label>
+                    <select className="input-clean" value={form.gender} onChange={set("gender")}>
+                      <option value="">Select gender</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                      <option value="prefer_not_to_say">Prefer not to say</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={otpLoading}
+                    className="btn-brand w-full mt-2 flex items-center justify-center gap-2"
+                  >
+                    {otpLoading
+                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTP&hellip;</>
+                      : <><Phone className="w-4 h-4" /> Send OTP</>}
+                  </button>
+                </form>
+              ) : (
+                <div className="space-y-4">
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 flex items-start gap-2">
+                    <Phone className="w-4 h-4 mt-0.5 shrink-0 text-green-600" />
+                    <span>OTP sent to <strong>+91&nbsp;{form.phone}</strong>. Check your SMS.</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Enter OTP</label>
                     <input
-                      type="tel"
+                      type="text"
                       inputMode="numeric"
-                      maxLength={10}
-                      className="input-clean pl-12"
-                      placeholder="98765 43210"
-                      value={form.phone}
-                      onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value.replace(/\D/g, "") }))}
-                      required
+                      maxLength={6}
+                      className="input-clean tracking-[0.5em] text-center text-lg font-mono"
+                      placeholder="· · · · · ·"
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                      onKeyDown={(e) => e.key === "Enter" && handleVerifyOTP()}
+                      autoFocus
                     />
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Gender <span className="text-muted-foreground font-normal">(optional)</span>
-                  </label>
-                  <select className="input-clean" value={form.gender} onChange={set("gender")}>
-                    <option value="">Select gender</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
-                    <option value="prefer_not_to_say">Prefer not to say</option>
-                  </select>
-                </div>
+                  <button
+                    onClick={handleVerifyOTP}
+                    disabled={otpLoading || otpCode.length < 6}
+                    className="btn-brand w-full flex items-center justify-center gap-2"
+                  >
+                    {otpLoading
+                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying&hellip;</>
+                      : "Verify & Continue"}
+                  </button>
 
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Password</label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      className="input-clean pr-12"
-                      placeholder="Min. 8 characters"
-                      value={form.password}
-                      onChange={set("password")}
-                      required
-                      autoComplete="new-password"
-                    />
+                  <div className="flex items-center justify-between text-sm">
                     <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onClick={() => { setOtpSent(false); setOtpCode(""); setError(""); setResendCountdown(0); }}
+                      className="text-muted-foreground hover:text-foreground transition-colors"
                     >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      Change number
+                    </button>
+                    <button
+                      onClick={handleResendOTP}
+                      disabled={otpLoading || resendCountdown > 0}
+                      className="flex items-center gap-1.5 text-primary hover:text-primary/80 disabled:text-muted-foreground disabled:cursor-not-allowed transition-colors font-medium"
+                    >
+                      {resendCountdown > 0
+                        ? <span>Resend in {resendCountdown}s</span>
+                        : <><RefreshCw className="w-3.5 h-3.5" /> Resend OTP</>}
                     </button>
                   </div>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Confirm Password</label>
-                  <div className="relative">
-                    <input
-                      type={showConfirm ? "text" : "password"}
-                      className="input-clean pr-12"
-                      placeholder="Re-enter your password"
-                      value={form.confirmPassword}
-                      onChange={set("confirmPassword")}
-                      required
-                      autoComplete="new-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirm(!showConfirm)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <button type="submit" className="btn-brand w-full mt-2">
-                  Continue
-                </button>
-              </form>
+              )}
 
               <p className="text-center text-sm text-muted-foreground mt-6">
                 Already have an account?{" "}
@@ -561,6 +577,8 @@ const CustomerSignUp = () => {
                 <button
                   onClick={() => {
                     setStep("form");
+                    setOtpSent(false);
+                    setOtpCode("");
                     setError("");
                   }}
                   className="w-full py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm"
