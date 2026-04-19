@@ -4,6 +4,7 @@ import { adminAPI, authAPI } from "@/lib/api";
 import { AlertCircle, BarChart2, Calendar, CheckCircle, ChevronRight, Settings, TrendingUp, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 
 interface Stats {
   todayBookings: number;
@@ -101,9 +102,9 @@ const AdminDashboard = () => {
   const handleResolveAlert = async (alertItem: SystemAlert) => {
     if (alertItem.action === 'assign-workers') {
       // Navigate to bookings page or handle assignment
-      window.alert('Auto-assignment in progress. Check bookings page for details.');
+      toast.info('Auto-assignment in progress. Check bookings page for details.');
     } else if (alertItem.action === 'contact-workers') {
-      window.alert('Contact worker feature coming soon!');
+      toast.info('Contact worker feature coming soon!');
     }
   };
 

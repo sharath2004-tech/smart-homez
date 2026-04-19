@@ -30,6 +30,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -274,7 +275,7 @@ const SuperAdminDashboard = () => {
       await superAdminAPI.archiveWorker(workerId);
       fetchLocationData(selectedLocationId, bookingsPage);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to archive worker");
+      toast.error(err instanceof Error ? err.message : "Failed to archive worker");
     }
   };
 
@@ -284,7 +285,7 @@ const SuperAdminDashboard = () => {
       await superAdminAPI.unarchiveWorker(workerId);
       fetchLocationData(selectedLocationId, bookingsPage);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to restore worker");
+      toast.error(err instanceof Error ? err.message : "Failed to restore worker");
     }
   };
 
@@ -293,7 +294,7 @@ const SuperAdminDashboard = () => {
       await superAdminAPI.updateWorkerAvailability(workerId, availability);
       fetchLocationData(selectedLocationId, bookingsPage);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to update worker availability');
+      toast.error(err instanceof Error ? err.message : 'Failed to update worker availability');
     }
   };
 
@@ -314,7 +315,7 @@ const SuperAdminDashboard = () => {
         setBhDraft(JSON.parse(JSON.stringify(res.businessHours)));
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to save business hours');
+      toast.error(err instanceof Error ? err.message : 'Failed to save business hours');
     } finally {
       setBhSaving(false);
     }
@@ -334,7 +335,7 @@ const SuperAdminDashboard = () => {
     if (!bhDraft) return;
     if (!newBreak.start || !newBreak.end) return;
     if (newBreak.start >= newBreak.end) {
-      alert(t('bh.breakEndBeforeStart'));
+      toast.warning(t('bh.breakEndBeforeStart'));
       return;
     }
     const schedule = bhDraft.schedule.map((d, i) => {
@@ -350,7 +351,7 @@ const SuperAdminDashboard = () => {
   const addHoliday = () => {
     if (!bhDraft || !newHolidayDate) return;
     const already = bhDraft.holidays?.some(h => h.date === newHolidayDate);
-    if (already) { alert(t('bh.alreadyHoliday')); return; }
+    if (already) { toast.warning(t('bh.alreadyHoliday')); return; }
     setBhDraft({
       ...bhDraft,
       holidays: [...(bhDraft.holidays ?? []), { date: newHolidayDate, label: newHolidayLabel || 'Holiday' }]

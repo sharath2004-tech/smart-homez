@@ -3,6 +3,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { MapPin, Navigation, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 // Fix Leaflet default marker icon issue
 // @ts-expect-error - Modifying Leaflet internals for marker icon fix
@@ -297,7 +298,7 @@ const LocationSelector = ({
       },
       (error) => {
         console.error("GPS error:", error);
-        alert("Unable to get your location. Please enable location permissions or select manually on the map.");
+        toast.error("Unable to get your location. Please enable location permissions or select manually on the map.");
         setIsLoadingGPS(false);
       },
       { enableHighAccuracy: true, timeout: 10000 }
@@ -328,12 +329,12 @@ const LocationSelector = ({
         handleMapClick(firstResult.lat, firstResult.lng);
       } else {
         setSearchResults([]);
-        alert("Address not found. Please try a different search or select on the map.");
+        toast.warning("Address not found. Please try a different search or select on the map.");
       }
     } catch (error) {
       console.error("Search error:", error);
       setSearchResults([]);
-      alert("Search failed. Please try again or select manually on the map.");
+      toast.error("Search failed. Please try again or select manually on the map.");
     } finally {
       setIsSearching(false);
     }
@@ -359,7 +360,7 @@ const LocationSelector = ({
 
   const handleConfirmLocation = () => {
     if (!selectedLocation || !availabilityInfo) {
-      alert("Please select a location on the map first.");
+      toast.warning("Please select a location on the map first.");
       return;
     }
 
@@ -379,7 +380,7 @@ const LocationSelector = ({
 
   const handleConfirmUnavailableLocation = () => {
     if (!selectedLocation || !availabilityInfo) {
-      alert("Please select a location on the map first.");
+      toast.warning("Please select a location on the map first.");
       return;
     }
 
@@ -559,7 +560,7 @@ const LocationSelector = ({
                 </div>
               </div>
               <button
-                onClick={allowUnavailableConfirmation ? handleConfirmUnavailableLocation : () => alert("We'll notify you when we expand to your area!")}
+                onClick={allowUnavailableConfirmation ? handleConfirmUnavailableLocation : () => toast.info("We'll notify you when we expand to your area!")}
                 className="w-full bg-muted text-foreground py-3 rounded-lg text-sm font-medium hover:bg-border transition-colors"
               >
                 {allowUnavailableConfirmation ? unavailableConfirmLabel : "Notify Me When Available"}

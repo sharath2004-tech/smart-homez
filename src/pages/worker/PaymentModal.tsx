@@ -3,6 +3,7 @@ import { ArrowLeft, Camera, CheckCircle, IndianRupee, MapPin, QrCode, Upload } f
 import QRCodeLib from "qrcode";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 
 interface QRPayment {
   _id: string;
@@ -100,7 +101,7 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
       }
     } catch (error) {
       console.error('Error fetching payment:', error);
-      alert(t('worker.paymentModal.failedLoadPayment'));
+      toast.error(t('worker.paymentModal.failedLoadPayment'));
       onClose();
     } finally {
       setLoading(false);
@@ -135,13 +136,13 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
 
     // Check file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert(t('worker.paymentModal.fileTooLarge'));
+      toast.warning(t('worker.paymentModal.fileTooLarge'));
       return;
     }
 
     // Check file type
     if (!file.type.startsWith('image/')) {
-      alert(t('worker.paymentModal.invalidFileType'));
+      toast.warning(t('worker.paymentModal.invalidFileType'));
       return;
     }
 
@@ -154,12 +155,12 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
 
   const handleConfirmPayment = async () => {
     if (!transactionId.trim()) {
-      alert(t('worker.paymentModal.enterTxnId'));
+      toast.warning(t('worker.paymentModal.enterTxnId'));
       return;
     }
 
     if (!screenshot) {
-      alert(t('worker.paymentModal.uploadScreenshot'));
+      toast.warning(t('worker.paymentModal.uploadScreenshot'));
       return;
     }
 
@@ -175,11 +176,11 @@ const PaymentModal = ({ bookingId, onClose, onPaymentConfirmed }: PaymentModalPr
         await qrPaymentsAPI.workerConfirm(qrPayment!._id, transactionId, screenshot);
       }
       
-      alert(t('worker.paymentModal.paymentConfirmed'));
+      toast.success(t('worker.paymentModal.paymentConfirmed'));
       onPaymentConfirmed();
     } catch (error) {
       console.error('Error confirming payment:', error);
-      alert(t('worker.paymentModal.failedConfirmPayment'));
+      toast.error(t('worker.paymentModal.failedConfirmPayment'));
     } finally {
       setUploading(false);
     }

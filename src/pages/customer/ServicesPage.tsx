@@ -130,7 +130,7 @@ const ServicesPage = () => {
 
   const handleLocationConfirmed = (location: LocationData) => {
     if (!location.isAvailable) {
-      alert(t('customer.services.areaNotServiceable'));
+      toast.warning(t('customer.services.areaNotServiceable'));
       return;
     }
     

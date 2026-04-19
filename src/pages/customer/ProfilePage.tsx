@@ -5,6 +5,7 @@ import { API_ORIGIN, authAPI, locationsAPI, usersAPI } from "@/lib/api";
 import { Bell, Camera, Check, ChevronRight, Edit2, Eye, EyeOff, Loader2, MapPin, Plus, Star, Trash2, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 
 interface Address {
   _id: string;
@@ -221,7 +222,7 @@ const ProfilePage = () => {
       await fetchProfileData();
     } catch (error) {
       console.error('Error adding address:', error);
-      alert(t('customer.profile.failedToAddAddress'));
+      toast.error(t('customer.profile.failedToAddAddress'));
     } finally {
       setGeocoding(false);
     }
@@ -295,7 +296,7 @@ const ProfilePage = () => {
       await fetchProfileData();
     } catch (error) {
       console.error('Error updating address:', error);
-      alert(t('customer.profile.failedToUpdateAddress'));
+      toast.error(t('customer.profile.failedToUpdateAddress'));
     } finally {
       setGeocoding(false);
     }
@@ -406,7 +407,7 @@ const ProfilePage = () => {
       await fetchProfileData();
     } catch (error) {
       console.error('Error deleting address:', error);
-      alert(t('customer.profile.failedToDeleteAddress'));
+      toast.error(t('customer.profile.failedToDeleteAddress'));
     }
   };
 
@@ -416,12 +417,12 @@ const ProfilePage = () => {
       await fetchProfileData();
     } catch (error) {
       console.error('Error setting default address:', error);
-      alert(t('customer.profile.failedToSetDefault'));
+      toast.error(t('customer.profile.failedToSetDefault'));
     }
   };
 
   const handleUseCurrentLocation = async () => {
-    alert('Please enable location access and try again — use the GPS icon after allowing location permission.');
+    toast.info('Please enable location access and try again — use the GPS icon after allowing location permission.');
   };
 
   const handleProfilePictureChange = (file: File | null) => {

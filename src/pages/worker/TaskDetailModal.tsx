@@ -17,6 +17,7 @@ import {
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 
 const START_QR_VISIBLE_LEAD_MINUTES = 20;
 
@@ -210,7 +211,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       }
     } catch (error) {
       console.error('Error fetching task detail:', error);
-      if (!silent) alert(t('worker.taskDetail.failedLoadTask'));
+      if (!silent) toast.error(t('worker.taskDetail.failedLoadTask'));
     } finally {
       if (!silent) setLoading(false);
     }
@@ -310,10 +311,10 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       const response = await bookingsAPI.generateStartQR(taskId, true);
       setTask({ ...task!, serviceStartQRCode: response.qrCode });
       generateQRCode(response.qrCode);
-      alert(t('worker.taskDetail.qrGenerated'));
+      toast.success(t('worker.taskDetail.qrGenerated'));
     } catch (error) {
       console.error('Error generating QR:', error);
-      alert((error as Error).message || t('worker.taskDetail.failedGenerateQR'));
+      toast.error((error as Error).message || t('worker.taskDetail.failedGenerateQR'));
     }
   };
 
@@ -322,10 +323,10 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       const response = await bookingsAPI.generateEndQR(taskId);
       setTask({ ...task!, serviceEndQRCode: response.qrCode });
       generateQRCode(response.qrCode);
-      alert(t('worker.taskDetail.endQRGenerated'));
+      toast.success(t('worker.taskDetail.endQRGenerated'));
     } catch (error) {
       console.error('Error generating end QR:', error);
-      alert(t('worker.taskDetail.failedEndQR'));
+      toast.error(t('worker.taskDetail.failedEndQR'));
     }
   };
 
@@ -338,7 +339,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       await fetchTaskDetail(true);
     } catch (error) {
       console.error('Error uploading completion photo:', error);
-      alert((error as Error).message || 'Failed to upload completion photo');
+      toast.error((error as Error).message || 'Failed to upload completion photo');
     } finally {
       setUploadingCompletionPhoto(false);
     }
@@ -361,14 +362,14 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       setPaymentTransactionId('');
       setPaymentTransactionTime('');
       
-      alert(t('worker.taskDetail.proofUploadSuccess'));
+      toast.success(t('worker.taskDetail.proofUploadSuccess'));
       
       // Refresh task data
       await fetchTaskDetail(true);
       onRefresh(); // Refresh parent list
     } catch (error) {
       console.error('Error uploading payment proof:', error);
-      alert((error as Error).message || t('worker.taskDetail.failedUploadProof'));
+      toast.error((error as Error).message || t('worker.taskDetail.failedUploadProof'));
     } finally {
       setUploadingPaymentProof(false);
     }
@@ -376,7 +377,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
 
   const handleOpenPaymentProofCapture = () => {
     if (!paymentTransactionId.trim()) {
-      alert(t('worker.taskDetail.pleaseEnterTxnId'));
+      toast.warning(t('worker.taskDetail.pleaseEnterTxnId'));
       return;
     }
     setPaymentTransactionTime(new Date().toISOString());
@@ -465,7 +466,7 @@ const TaskDetailModal = ({ taskId, onClose, onRefresh }: TaskDetailModalProps) =
       setBreakReason('');
       setShowBreakForm(false);
     } catch (e) {
-      alert((e as Error).message || 'Failed to request break');
+      toast.error((e as Error).message || 'Failed to request break');
     } finally {
       setRequestingBreak(false);
     }

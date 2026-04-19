@@ -9,6 +9,7 @@ import { AlertTriangle, Calendar, CalendarPlus, Clock, Loader2, MapPin, Phone, Q
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import BookingDetailModal from "./BookingDetailModal";
 import ReviewModal from "./ReviewModal";
 
@@ -184,7 +185,7 @@ const BookingsPage = () => {
       await fetchBookings();
     } catch (error) {
       console.error('Error cancelling booking:', error);
-      alert(error instanceof Error ? error.message : t('customer.bookings.failedCancel'));
+      toast.error(error instanceof Error ? error.message : t('customer.bookings.failedCancel'));
     } finally {
       setCancellingBookingId(null);
     }
@@ -197,11 +198,11 @@ const BookingsPage = () => {
       await bookingsAPI.submitCancelPenaltyProof(penaltyInfo.bookingId, penaltyProofFile);
       setPenaltyInfo(null);
       setPenaltyProofFile(null);
-      alert('Payment proof submitted successfully. Admin will review and confirm your cancellation shortly.');
+      toast.success('Payment proof submitted successfully. Admin will review and confirm your cancellation shortly.');
       await fetchBookings();
     } catch (error) {
       console.error('Error submitting penalty proof:', error);
-      alert(error instanceof Error ? error.message : 'Failed to submit payment proof');
+      toast.error(error instanceof Error ? error.message : 'Failed to submit payment proof');
     } finally {
       setPenaltySubmitting(false);
     }
@@ -220,7 +221,7 @@ const BookingsPage = () => {
       
       // Show success message with worker reassignment info if applicable
       if (result.rescheduleInfo?.workerReassigned) {
-        alert(`Booking rescheduled successfully!\n\nNote: Your original worker was not available at the new time.\nNew worker assigned: ${result.rescheduleInfo.newWorker?.name || 'TBD'}`);
+        toast.success(`Booking rescheduled. New worker assigned: ${result.rescheduleInfo.newWorker?.name || 'TBD'}`);
       }
       
       await fetchBookings();
@@ -234,7 +235,7 @@ const BookingsPage = () => {
 
   const handleTrackWorker = (booking: Booking) => {
     if (!booking.worker) {
-      alert(t('customer.bookings.workerNotAssigned'));
+      toast.warning(t('customer.bookings.workerNotAssigned'));
       return;
     }
     setTrackingBooking(booking);
@@ -242,7 +243,7 @@ const BookingsPage = () => {
 
   const handleContactWorker = (worker: Worker) => {
     if (!worker.phone) {
-      alert(t('customer.bookings.workerPhoneUnavailable'));
+      toast.warning(t('customer.bookings.workerPhoneUnavailable'));
       return;
     }
     window.open(`tel:${worker.phone}`);

@@ -111,7 +111,7 @@ const WorkerTasks = () => {
       await fetchTasks();
     } catch (error) {
       console.error('Error starting task:', error);
-      alert('Failed to start task');
+      toast.error('Failed to start task');
     }
   };
 
@@ -120,10 +120,10 @@ const WorkerTasks = () => {
       try {
         await bookingsAPI.update(taskId, { status: 'pending-review', completedAt: new Date().toISOString() });
         await fetchTasks();
-        alert('Task submitted for admin approval. Upload completion photos if needed and wait for review.');
+        toast.success('Task submitted for admin approval. Upload completion photos if needed and wait for review.');
       } catch (error) {
         console.error('Error completing task:', error);
-        alert('Failed to complete task');
+        toast.error('Failed to complete task');
       }
     }
   };

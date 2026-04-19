@@ -3,6 +3,7 @@ import { bookingsAPI, reviewsAPI } from "@/lib/api";
 import { ArrowLeft, Star } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from 'react-i18next';
+import { toast } from "sonner";
 
 interface ReviewModalProps {
   bookingId: string;
@@ -37,11 +38,11 @@ const ReviewModal = ({ bookingId, workers, onClose, onReviewSubmitted }: ReviewM
 
   const handleSubmitReview = async () => {
     if (overallRating === 0) {
-      alert(t('customer.review.selectRating'));
+      toast.warning(t('customer.review.selectRating'));
       return;
     }
     if (qualityRating === 0 || timelinessRating === 0 || professionalismRating === 0) {
-      alert(t('customer.review.rateAllCategories'));
+      toast.warning(t('customer.review.rateAllCategories'));
       return;
     }
 
@@ -68,11 +69,11 @@ const ReviewModal = ({ bookingId, workers, onClose, onReviewSubmitted }: ReviewM
         review: comment.trim() || undefined
       });
       
-      alert(t('customer.review.reviewSuccess'));
+      toast.success(t('customer.review.reviewSuccess'));
       onReviewSubmitted();
     } catch (error) {
       console.error('Error submitting review:', error);
-      alert(t('customer.review.reviewFailed'));
+      toast.error(t('customer.review.reviewFailed'));
     } finally {
       setSubmitting(false);
     }

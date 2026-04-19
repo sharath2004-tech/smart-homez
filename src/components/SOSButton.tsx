@@ -1,8 +1,9 @@
 import { useMutation } from '@tanstack/react-query';
-import { useState } from 'react';
-import { api } from '../../lib/api';
-import { Button } from '../../components/ui/button';
 import { AlertTriangle } from 'lucide-react';
+import { useState } from 'react';
+import { toast } from 'sonner';
+import { Button } from '../../components/ui/button';
+import { api } from '../../lib/api';
 
 export default function SOSButton({ booking }) {
   const [location, setLocation] = useState(null);
@@ -23,7 +24,7 @@ export default function SOSButton({ booking }) {
       });
     },
     onSuccess: () => {
-      alert('Emergency alert sent! Help is on the way.');
+      toast.success('Emergency alert sent! Help is on the way.');
     }
   });
 

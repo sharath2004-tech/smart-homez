@@ -8,6 +8,7 @@ import { adminAPI, API_BASE_URL, reliabilityAPI, reviewAnalyticsAPI, superAdminA
 import * as msg91Widget from "@/lib/msg91Widget";
 import { AlertTriangle, Archive, ArchiveRestore, BarChart3, CheckCircle, Clock, Edit, Eye, EyeOff, FileText, Info, Loader2, MapPin, Plus, Search, Star, TrendingUp, Upload, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
 interface Location {
   _id: string;
@@ -458,7 +459,7 @@ const AdminWorkers = () => {
       fetchWorkerAnalytics(workerId);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load worker details';
-      alert(message);
+      toast.error(message);
     }
   };
 
@@ -472,32 +473,32 @@ const AdminWorkers = () => {
 
     // Validate resignedDate
     if (!resignedDate || resignedDate.trim() === '') {
-      alert('Please provide a resigned date');
+      toast.warning('Please provide a resigned date');
       return;
     }
 
     const parsedDate = new Date(resignedDate);
     if (isNaN(parsedDate.getTime())) {
-      alert('Invalid resigned date. Please enter a valid date.');
+      toast.warning('Invalid resigned date. Please enter a valid date.');
       return;
     }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (parsedDate > today) {
-      alert('Resigned date cannot be in the future');
+      toast.warning('Resigned date cannot be in the future');
       return;
     }
 
     try {
       await workerCollectionApi.archiveWorker(archiveWorkerData.id, resignedDate);
-      alert('Worker archived successfully');
+      toast.success('Worker archived successfully');
       setArchiveWorkerData(null);
       setResignedDate("");
       fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to archive worker';
-      alert(message);
+      toast.error(message);
     }
   };
 
@@ -505,11 +506,11 @@ const AdminWorkers = () => {
     if (!await confirm('Restore this worker? They will be reactivated.')) return;
     try {
       await workerCollectionApi.unarchiveWorker(workerId);
-      alert('Worker restored successfully');
+      toast.success('Worker restored successfully');
       fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to restore worker';
-      alert(message);
+      toast.error(message);
     }
   };
 
@@ -519,7 +520,7 @@ const AdminWorkers = () => {
       fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to update worker availability';
-      alert(message);
+      toast.error(message);
     }
   };
 
@@ -552,7 +553,7 @@ const AdminWorkers = () => {
       setShowCredentials(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load worker details';
-      alert(message);
+      toast.error(message);
     }
   };
 
@@ -585,11 +586,11 @@ const AdminWorkers = () => {
         ? Object.entries(response.deliveryResults).map(([key, value]) => `${key}: ${value}`).join(', ')
         : 'pending';
 
-      alert(`Temporary password reset successfully! ✅\n\nNew Temporary Password: ${response.temporaryPassword || '(check delivery channel)'}\n\nDelivery: ${response.credentialDelivery || credentialDelivery}\nStatus: ${deliveryStatus}\n\nThe worker must log in and change this password before going online.`);
+      toast.success(`Temporary password reset successfully! New Temporary Password: ${response.temporaryPassword || '(check delivery channel)'}. Delivery: ${response.credentialDelivery || credentialDelivery}. Status: ${deliveryStatus}. The worker must log in and change this password before going online.`);
       fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to reset password';
-      alert(message);
+      toast.error(message);
     } finally {
       setResettingPassword(false);
     }
@@ -647,13 +648,13 @@ const AdminWorkers = () => {
       if (editDocFiles.aadhaarBack) formData.append('aadhaarBack', editDocFiles.aadhaarBack);
 
       const response = await adminAPI.updateWorker(editWorker._id, formData);
-      alert('Worker updated successfully!');
+      toast.success('Worker updated successfully!');
       setEditDocFiles({ profilePicture: null, aadhaarFront: null, aadhaarBack: null });
       setEditWorker(response.worker || null);
       fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to update worker';
-      alert(message);
+      toast.error(message);
     } finally {
       setUpdatingWorker(false);
     }
@@ -663,12 +664,12 @@ const AdminWorkers = () => {
     e.preventDefault();
 
     if (workerForm.specialization.length === 0) {
-      alert('Please select at least one specialization');
+      toast.warning('Please select at least one specialization');
       return;
     }
 
     if (workerForm.selectedLocations.length === 0) {
-      alert('Please assign worker to at least one location');
+      toast.warning('Please assign worker to at least one location');
       return;
     }
 
@@ -676,7 +677,7 @@ const AdminWorkers = () => {
     if (workerForm.aadhaarNumber) {
       const digits = workerForm.aadhaarNumber.replace(/\s/g, '');
       if (!/^\d{12}$/.test(digits)) {
-        alert('Aadhaar number must be exactly 12 digits');
+        toast.warning('Aadhaar number must be exactly 12 digits');
         return;
       }
     }
@@ -688,36 +689,36 @@ const AdminWorkers = () => {
       const age = today.getFullYear() - dob.getFullYear() -
         (today < new Date(today.getFullYear(), dob.getMonth(), dob.getDate()) ? 1 : 0);
       if (age < 18) {
-        alert('Worker must be at least 18 years old');
+        toast.warning('Worker must be at least 18 years old');
         return;
       }
     }
 
     if (!workerForm.phone) {
-      alert('Phone number is required to create a worker account');
+      toast.warning('Phone number is required to create a worker account');
       return;
     }
 
     if (!createPhoneVerified) {
-      alert('Please verify the worker\'s phone number via OTP before creating the account');
+      toast.warning("Please verify the worker's phone number via OTP before creating the account");
       return;
     }
 
     const rate = Number(workerForm.hourlyRate);
     if (!workerForm.hourlyRate || rate <= 0 || isNaN(rate)) {
-      alert('Please provide a valid hourly rate greater than 0');
+      toast.warning('Please provide a valid hourly rate greater than 0');
       return;
     }
 
     // Validate gender and experience if provided
     if (workerForm.gender && !['male', 'female', 'other'].includes(workerForm.gender.toLowerCase())) {
-      alert('Please select a valid gender option');
+      toast.warning('Please select a valid gender option');
       return;
     }
     if (workerForm.experience) {
       const exp = Number(workerForm.experience);
       if (isNaN(exp) || exp < 0) {
-        alert('Experience must be a positive number');
+        toast.warning('Experience must be a positive number');
         return;
       }
     }
@@ -748,7 +749,7 @@ const AdminWorkers = () => {
       const deliveryStatus = response.deliveryResults
         ? Object.entries(response.deliveryResults).map(([k, v]) => `${k}: ${v}`).join(', ')
         : 'pending';
-      alert(`Worker created successfully! ✅\n\nTemporary Password: ${response.temporaryPassword || '(see delivery channel)'}\n\nCredentials sent via SMS to: ${workerForm.phone}\nStatus: ${deliveryStatus}\n\nPlease save this password as backup.`);
+      toast.success(`Worker created successfully! Temp password: ${response.temporaryPassword || '(see delivery channel)'}. Credentials sent via SMS to: ${workerForm.phone}. Status: ${deliveryStatus}.`);
       
       setShowWorkerForm(false);
       setWorkerForm({
@@ -772,7 +773,7 @@ const AdminWorkers = () => {
       fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create worker';
-      alert('❌ Error: ' + message);
+      toast.error(message);
     } finally {
       setCreatingWorker(false);
     }
@@ -2166,7 +2167,7 @@ const AdminWorkers = () => {
                                   type="button"
                                   onClick={() => {
                                     navigator.clipboard.writeText(editWorker.email);
-                                    alert('Email copied to clipboard!');
+                                    toast.success('Email copied to clipboard!');
                                   }}
                                   className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-amber-700 hover:text-amber-900"
                                 >
@@ -2188,7 +2189,7 @@ const AdminWorkers = () => {
                                     type="button"
                                     onClick={() => {
                                       navigator.clipboard.writeText(editWorker.phone || '');
-                                      alert('Phone copied to clipboard!');
+                                      toast.success('Phone copied to clipboard!');
                                     }}
                                     className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-amber-700 hover:text-amber-900"
                                   >
@@ -2214,7 +2215,7 @@ const AdminWorkers = () => {
                                     type="button"
                                     onClick={() => {
                                       navigator.clipboard.writeText(tempPassword);
-                                      alert('Password copied to clipboard!');
+                                      toast.success('Password copied to clipboard!');
                                     }}
                                     className="text-xs text-green-700 hover:text-green-900 underline"
                                   >

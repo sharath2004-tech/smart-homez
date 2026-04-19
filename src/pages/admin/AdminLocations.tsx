@@ -6,6 +6,7 @@ import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Building, CheckCircle, Clock, FileText, MapPin, Pencil, Plus, QrCode, Search, Shield, Trash2, Upload, UserPlus, X, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 interface Location {
   _id: string;
@@ -221,11 +222,11 @@ const AdminLocations = () => {
 
     try {
       await locationApi.deleteLocation(locationId);
-      alert('Location deleted successfully!');
+      toast.success('Location deleted successfully!');
       fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to delete location';
-      alert(message);
+      toast.error(message);
     }
   };
 
@@ -255,11 +256,11 @@ const AdminLocations = () => {
 
     try {
       await adminAPI.deleteAdmin(adminId);
-      alert('Admin deleted successfully!');
+      toast.success('Admin deleted successfully!');
       fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to delete admin';
-      alert(message);
+      toast.error(message);
     }
   };
 
@@ -302,11 +303,11 @@ const AdminLocations = () => {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB');
+      toast.warning('File size must be less than 5MB');
       return;
     }
     if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file');
+      toast.warning('Please upload an image file');
       return;
     }
 
@@ -333,14 +334,14 @@ const AdminLocations = () => {
           setQRFormData(prev => ({ ...prev, qrCodeImage: canvas.toDataURL('image/png') }));
           setUploadingQR(false);
         };
-        img.onerror = () => { alert('Image processing failed.'); setUploadingQR(false); };
+        img.onerror = () => { toast.error('Image processing failed.'); setUploadingQR(false); };
         img.src = cropped;
       } catch {
-        alert('Failed to process image.');
+        toast.error('Failed to process image.');
         setUploadingQR(false);
       }
     };
-    reader.onerror = () => { alert('Failed to read file.'); setUploadingQR(false); };
+    reader.onerror = () => { toast.error('Failed to read file.'); setUploadingQR(false); };
     reader.readAsDataURL(file);
   };
 
@@ -348,19 +349,19 @@ const AdminLocations = () => {
     if (!selectedLocation) return;
 
     if (!qrFormData.qrCodeImage) {
-      alert('Please upload a QR code image');
+      toast.warning('Please upload a QR code image');
       return;
     }
 
     try {
       setUploadingQR(true);
       await locationsAPI.updatePaymentQR(selectedLocation._id, qrFormData);
-      alert('✅ Payment QR updated successfully! Workers will see this QR when collecting payment at this location.');
+      toast.success('Payment QR updated successfully! Workers will see this QR when collecting payment at this location.');
       setShowQRModal(false);
       fetchData();
     } catch (error) {
       console.error('Error updating payment QR:', error);
-      alert('Failed to update payment QR');
+      toast.error('Failed to update payment QR');
     } finally {
       setUploadingQR(false);
     }
@@ -375,12 +376,12 @@ const AdminLocations = () => {
 
     try {
       await locationsAPI.deletePaymentQR(selectedLocation._id);
-      alert('Payment QR removed successfully');
+      toast.success('Payment QR removed successfully');
       setShowQRModal(false);
       fetchData();
     } catch (error) {
       console.error('Error deleting payment QR:', error);
-      alert('Failed to delete payment QR');
+      toast.error('Failed to delete payment QR');
     }
   };
 
@@ -493,10 +494,10 @@ const AdminLocations = () => {
 
       if (editingLocation) {
         await locationApi.updateLocation(editingLocation._id, payload);
-        alert('Location updated successfully!');
+        toast.success('Location updated successfully!');
       } else {
         await locationApi.createLocation(payload);
-        alert('Location created successfully!');
+        toast.success('Location created successfully!');
       }
 
       handleCloseLocationForm();
@@ -507,7 +508,7 @@ const AdminLocations = () => {
         : editingLocation
           ? 'Failed to update location'
           : 'Failed to create location';
-      alert(message);
+      toast.error(message);
     }
   };
 
@@ -515,7 +516,7 @@ const AdminLocations = () => {
     e.preventDefault();
     
     if (!adminForm.city) {
-      alert('Please select a city for the admin');
+      toast.warning('Please select a city for the admin');
       return;
     }
 
@@ -530,7 +531,7 @@ const AdminLocations = () => {
         idDocument: adminForm.idDocumentFile,
         idDocumentType: adminForm.idDocumentType || undefined
       });
-      alert('Admin created successfully!');
+      toast.success('Admin created successfully!');
       setShowAdminForm(false);
       setAdminForm({
         name: "",
@@ -545,7 +546,7 @@ const AdminLocations = () => {
       fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create admin';
-      alert(message);
+      toast.error(message);
     }
   };
 
@@ -579,12 +580,12 @@ const AdminLocations = () => {
         assignedLocationIds: editAdminForm.selectedLocations,
         permissions: editAdminForm.permissions
       });
-      alert('Admin updated successfully!');
+      toast.success('Admin updated successfully!');
       setEditingAdmin(null);
       fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to update admin';
-      alert(message);
+      toast.error(message);
     } finally {
       setUpdatingAdmin(false);
     }
@@ -610,7 +611,7 @@ const AdminLocations = () => {
 
   const handleSearchLocation = async () => {
     if (!locationForm.apartmentName || !locationForm.area || !locationForm.city) {
-      alert('Please fill in Apartment Name, Area, and City before searching');
+      toast.warning('Please fill in Apartment Name, Area, and City before searching');
       return;
     }
 
@@ -633,13 +634,13 @@ const AdminLocations = () => {
           latitude: result.coordinates.latitude.toString(),
           longitude: result.coordinates.longitude.toString()
         }));
-        alert('Location found! Coordinates have been filled in.');
+        toast.success('Location found! Coordinates have been filled in.');
       } else {
-        alert('Could not find exact coordinates. Please enter them manually.');
+        toast.warning('Could not find exact coordinates. Please enter them manually.');
       }
     } catch (error) {
       console.error('Geocoding error:', error);
-      alert('Could not find location. Please enter coordinates manually.');
+      toast.warning('Could not find location. Please enter coordinates manually.');
     } finally {
       setGeocoding(false);
     }
@@ -679,13 +680,13 @@ const AdminLocations = () => {
         zipCode: requestForm.zipCode || undefined,
         reason: requestForm.reason || undefined,
       });
-      alert('✅ Location request submitted! Super admin will review it and approve or reject.');
+      toast.success('Location request submitted! Super admin will review it and approve or reject.');
       setActiveTab('locations');
       setRequestForm({ apartmentName: "", building: "", area: "", city: "", state: "", zipCode: "", reason: "" });
       fetchLocationRequests();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to submit request';
-      alert(message);
+      toast.error(message);
     } finally {
       setRequestSubmitting(false);
     }
@@ -696,15 +697,15 @@ const AdminLocations = () => {
       const lat = parseFloat(requestReviewLatitude);
       const lng = parseFloat(requestReviewLongitude);
       if (!requestReviewLatitude || !requestReviewLongitude || isNaN(lat) || isNaN(lng)) {
-        alert('Please provide valid coordinates (latitude and longitude) to approve');
+        toast.warning('Please provide valid coordinates (latitude and longitude) to approve');
         return;
       }
       if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-        alert('Invalid coordinates. Lat: -90 to 90, Lng: -180 to 180');
+        toast.warning('Invalid coordinates. Lat: -90 to 90, Lng: -180 to 180');
         return;
       }
       if (lat === 0 && lng === 0) {
-        alert('Placeholder coordinates [0, 0] are not allowed. Please provide actual location coordinates.');
+        toast.warning('Placeholder coordinates [0, 0] are not allowed. Please provide actual location coordinates.');
         return;
       }
     }
@@ -713,7 +714,7 @@ const AdminLocations = () => {
     try {
       const coordinates = status === "approved" ? [parseFloat(requestReviewLongitude), parseFloat(requestReviewLatitude)] as [number, number] : undefined;
       await locationRequestsAPI.review(id, status, requestReviewNote, coordinates);
-      alert(status === "approved" ? '✅ Location approved and created!' : '❌ Location request rejected.');
+      toast.success(status === "approved" ? 'Location approved and created!' : 'Location request rejected.');
       setRequestReviewingId(null);
       setRequestReviewNote("");
       setRequestReviewLatitude("");
@@ -721,7 +722,7 @@ const AdminLocations = () => {
       fetchLocationRequests();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to review request';
-      alert(message);
+      toast.error(message);
     } finally {
       setRequestReviewLoading(false);
     }

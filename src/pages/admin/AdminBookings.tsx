@@ -8,6 +8,7 @@ import ExcelJS from "exceljs";
 import html2pdf from "html2pdf.js";
 import { CheckCircle, Coffee, Crown, Download, Eye, MapPin, Printer, Search, User, Users, Wallet, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
 interface ProofPhoto {
   url: string;
@@ -347,7 +348,7 @@ const AdminBookings = () => {
       await fetchBookings();
     } catch (error) {
       console.error('Approve error:', error);
-      alert((error as Error).message || 'Failed to approve booking');
+      toast.error((error as Error).message || 'Failed to approve booking');
     } finally {
       setApprovingBookingId(null);
     }
@@ -368,10 +369,10 @@ const AdminBookings = () => {
       setBookings((prev) => prev.map((item) => item._id === booking._id ? { ...item, ...updatedBooking } : item));
       setSelectedProofBooking((prev) => prev && prev._id === booking._id ? { ...prev, ...updatedBooking } : prev);
 
-      alert(action === 'approve' ? 'Payment proof approved successfully' : 'Payment proof rejected successfully');
+      toast.success(action === 'approve' ? 'Payment proof approved successfully' : 'Payment proof rejected successfully');
     } catch (error) {
       console.error('Payment proof review error:', error);
-      alert((error as Error).message || `Failed to ${action} payment proof`);
+      toast.error((error as Error).message || `Failed to ${action} payment proof`);
     } finally {
       setReviewingPaymentBookingId(null);
     }
@@ -386,10 +387,10 @@ const AdminBookings = () => {
       const response = await bookingsAPI.reviewCancelPenaltyProof(booking._id, action, reason || undefined);
       setSelectedProofBooking((prev) => prev && prev._id === booking._id ? { ...prev, ...response.booking } : prev);
       setBookings((prev) => prev.map((b) => b._id === booking._id ? { ...b, ...response.booking } : b));
-      alert(action === 'approve' ? 'Cancellation approved. Booking has been cancelled.' : 'Proof rejected. Customer will be notified to reupload.');
+      toast.success(action === 'approve' ? 'Cancellation approved. Booking has been cancelled.' : 'Proof rejected. Customer will be notified to reupload.');
     } catch (error) {
       console.error('Cancel penalty review error:', error);
-      alert((error as Error).message || `Failed to ${action} cancellation proof`);
+      toast.error((error as Error).message || `Failed to ${action} cancellation proof`);
     } finally {
       setReviewingCancelPenaltyId(null);
     }
@@ -417,7 +418,7 @@ const AdminBookings = () => {
         ? { ...b, workforce: res.workforce, actualDurationMinutes: res.actualDurationMinutes, scheduledDurationMinutes: res.scheduledDurationMinutes, endTime: res.endTime }
         : b));
     } catch (e) {
-      alert((e as Error).message || 'Failed to update workforce');
+      toast.error((e as Error).message || 'Failed to update workforce');
     } finally {
       setWorkforceLoading(false);
     }
@@ -454,7 +455,7 @@ const AdminBookings = () => {
       setSelectedTeamBooking(prev => prev ? { ...prev, supportStaff: res.supportStaff } : prev);
       setBookings(prev => prev.map(b => b._id === selectedTeamBooking._id ? { ...b, supportStaff: res.supportStaff } : b));
     } catch (e) {
-      alert((e as Error).message || 'Failed to add support staff');
+      toast.error((e as Error).message || 'Failed to add support staff');
     } finally {
       setTeamActionLoading(false);
     }
@@ -468,7 +469,7 @@ const AdminBookings = () => {
       setSelectedTeamBooking(prev => prev ? { ...prev, supportStaff: res.supportStaff } : prev);
       setBookings(prev => prev.map(b => b._id === selectedTeamBooking._id ? { ...b, supportStaff: res.supportStaff } : b));
     } catch (e) {
-      alert((e as Error).message || 'Failed to remove support staff');
+      toast.error((e as Error).message || 'Failed to remove support staff');
     } finally {
       setTeamActionLoading(false);
     }
@@ -482,7 +483,7 @@ const AdminBookings = () => {
       setSelectedTeamBooking(prev => prev ? { ...prev, worker: res.worker, supportStaff: res.supportStaff } : prev);
       setBookings(prev => prev.map(b => b._id === selectedTeamBooking._id ? { ...b, worker: res.worker, supportStaff: res.supportStaff } : b));
     } catch (e) {
-      alert((e as Error).message || 'Failed to set team head');
+      toast.error((e as Error).message || 'Failed to set team head');
     } finally {
       setTeamActionLoading(false);
     }
@@ -497,7 +498,7 @@ const AdminBookings = () => {
       const res = await adminAPI.getAvailableWorkersForBooking(booking._id);
       setAvailableWorkers(res.workers || []);
     } catch (e) {
-      alert((e as Error).message || 'Failed to load available workers for this booking');
+      toast.error((e as Error).message || 'Failed to load available workers for this booking');
       setReassignBooking(null);
     } finally {
       setAvailableWorkersLoading(false);
@@ -513,15 +514,15 @@ const AdminBookings = () => {
       await fetchBookings();
       setReassignBooking(null);
       setAvailableWorkers([]);
-      alert('Worker reassigned successfully');
+      toast.success('Worker reassigned successfully');
     } catch (e) {
       const message = (e as Error).message || 'Failed to reassign worker';
       if (message.toLowerCase().includes('approve the customer payment proof')) {
         setSelectedProofBooking(reassignBooking);
         setReassignBooking(null);
-        alert('Approve the payment proof first in the proof window, then assign the worker.');
+        toast.warning('Approve the payment proof first in the proof window, then assign the worker.');
       } else {
-        alert(message);
+        toast.error(message);
       }
     } finally {
       setTeamActionLoading(false);

@@ -382,7 +382,7 @@ const AdminServiceAreas = () => {
 
   const handleSaveArea = async () => {
     if (!formData.name || !formData.city || !selectedLocation) {
-      alert('Please fill in all required fields and select a location on the map');
+      toast.warning('Please fill in all required fields and select a location on the map');
       return;
     }
 
@@ -412,11 +412,11 @@ const AdminServiceAreas = () => {
         handleCancelAdding();
       } else {
         const error = await response.json();
-        alert(error.message || 'Failed to save service area');
+        toast.error(error.message || 'Failed to save service area');
       }
     } catch (error) {
       console.error('Error saving service area:', error);
-      alert('Failed to save service area');
+      toast.error('Failed to save service area');
     }
   };
 
@@ -446,11 +446,11 @@ const AdminServiceAreas = () => {
       if (response.ok) {
         await fetchServiceAreas();
       } else {
-        alert('Failed to delete service area');
+        toast.error('Failed to delete service area');
       }
     } catch (error) {
       console.error('Error deleting service area:', error);
-      alert('Failed to delete service area');
+      toast.error('Failed to delete service area');
     }
   };
 

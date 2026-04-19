@@ -10,6 +10,7 @@ import html2pdf from "html2pdf.js";
 import { ArrowLeft, Calendar, Camera, CheckCircle, ClipboardCheck, Clock3, Coffee, Download, IndianRupee, MapPin, MessageCircle, Pause, Phone, Play, Printer, QrCode, Timer, User, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import ReviewModal from "./ReviewModal";
 
 interface Worker {
@@ -305,7 +306,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
       setBooking(response.booking);
     } catch (error) {
       console.error('Error fetching booking detail:', error);
-      if (!silent) alert(t('customer.bookings.failedToLoadDetails'));
+      if (!silent) toast.error(t('customer.bookings.failedToLoadDetails'));
     } finally {
       if (!silent) setLoading(false);
     }
@@ -379,14 +380,14 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
   const handleScanStartQR = useCallback(async (qrCode: string) => {
     try {
       const response = await bookingsAPI.scanStartQR(bookingId, qrCode, true);
-      alert(t('customer.bookings.serviceStartedSuccess'));
+      toast.success(t('customer.bookings.serviceStartedSuccess'));
       setShowScanner(false);
       fetchBookingDetail();
       onRefresh();
     } catch (error) {
       console.error('Error scanning QR:', error);
       const errorMessage = error instanceof Error ? error.message : t('customer.bookings.failedToScanQR');
-      alert(errorMessage);
+      toast.error(errorMessage);
       setShowScanner(false);
     }
   }, [bookingId, fetchBookingDetail, onRefresh, t]);
@@ -401,14 +402,14 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
         message += `\n\nOvertime: ${result.overtimeMinutes} minutes\nOvertime Charge: ₹${result.overtimeCharges.toFixed(2)}\nTotal Amount: ₹${result.totalAmount.toFixed(2)}`;
       }
       
-      alert(message);
+      toast.success(message);
       setShowEndScanner(false);
       fetchBookingDetail();
       onRefresh();
     } catch (error) {
       console.error('Error scanning end QR:', error);
       const errorMessage = error instanceof Error ? error.message : t('customer.bookings.failedToEndService');
-      alert(errorMessage);
+      toast.error(errorMessage);
       setShowEndScanner(false);
     }
   }, [bookingId, fetchBookingDetail, onRefresh, t]);
@@ -438,13 +439,13 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
         message += `\n\n💵 Total Amount: ₹${result.totalAmount.toFixed(2)}`;
       }
       
-      alert(message);
+      toast.success(message);
       fetchBookingDetail();
       onRefresh();
     } catch (error) {
       console.error('Error ending service:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to end service';
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setEndingService(false);
     }
@@ -473,7 +474,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
       const res = await bookingsAPI.approveBreak(booking._id, breakId);
       setBooking(prev => prev ? { ...prev, breakRequests: res.breakRequests, isOnBreak: res.isOnBreak } : prev);
     } catch (e) {
-      alert((e as Error).message || 'Failed to approve break');
+      toast.error((e as Error).message || 'Failed to approve break');
     } finally {
       setBreakActionLoading(false);
     }
@@ -486,7 +487,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
       const res = await bookingsAPI.resumeFromBreak(booking._id, breakId);
       setBooking(prev => prev ? { ...prev, breakRequests: res.breakRequests, isOnBreak: res.isOnBreak, totalBreakMinutes: res.totalBreakMinutes } : prev);
     } catch (e) {
-      alert((e as Error).message || 'Failed to resume work');
+      toast.error((e as Error).message || 'Failed to resume work');
     } finally {
       setBreakActionLoading(false);
     }
@@ -499,7 +500,7 @@ const BookingDetailModal = ({ bookingId, onClose, onRefresh }: BookingDetailModa
       const res = await bookingsAPI.rejectBreak(booking._id, breakId);
       setBooking(prev => prev ? { ...prev, breakRequests: res.breakRequests, isOnBreak: res.isOnBreak } : prev);
     } catch (e) {
-      alert((e as Error).message || 'Failed to reject break');
+      toast.error((e as Error).message || 'Failed to reject break');
     } finally {
       setBreakActionLoading(false);
     }

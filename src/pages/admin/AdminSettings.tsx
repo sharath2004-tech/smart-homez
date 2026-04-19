@@ -5,6 +5,7 @@ import { cropQRFromImage } from "@/utils/cropQRFromImage";
 import { Building, CheckCircle, Clock, CreditCard, FileText, IndianRupee, Lock, Save, Upload, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 interface Settings {
   payment: {
@@ -181,7 +182,7 @@ const AdminSettings = () => {
       setSettings(mergeSettingsWithDefaults(response.settings));
     } catch (error) {
       console.error('Error fetching settings:', error);
-      alert('Failed to load settings');
+      toast.error('Failed to load settings');
     } finally {
       setLoading(false);
     }
@@ -200,18 +201,18 @@ const AdminSettings = () => {
   const handleSubmitOvertimeRequest = async () => {
     const rate = parseFloat(requestedRate);
     if (!requestedRate || isNaN(rate) || rate < 0) {
-      alert('Please enter a valid rate (0 or more)');
+      toast.warning('Please enter a valid rate (0 or more)');
       return;
     }
     try {
       setSubmittingRequest(true);
       await settingsAPI.requestOvertimeRateChange(rate, requestReason.trim() || undefined);
-      alert('Request submitted. Super admin will review it.');
+      toast.success('Request submitted. Super admin will review it.');
       setRequestedRate('');
       setRequestReason('');
     } catch (error) {
       console.error('Failed to submit overtime rate request:', error);
-      alert('Failed to submit request. Please try again.');
+      toast.error('Failed to submit request. Please try again.');
     } finally {
       setSubmittingRequest(false);
     }
@@ -221,13 +222,13 @@ const AdminSettings = () => {
     try {
       setReviewingId(requestId);
       const res = await settingsAPI.reviewOvertimeRateRequest(requestId, approved, reviewNote);
-      alert(approved ? `Approved. New overtime rate: ₹${res.currentRate}/min` : 'Request rejected.');
+      toast.success(approved ? `Approved. New overtime rate: ₹${res.currentRate}/min` : 'Request rejected.');
       // Refresh rate in settings
       setSettings(prev => ({ ...prev, booking: { ...prev.booking, overtimeRate: res.currentRate } }));
       fetchOvertimeRequests();
     } catch (error) {
       console.error('Failed to review request:', error);
-      alert('Failed to process review. Please try again.');
+      toast.error('Failed to process review. Please try again.');
     } finally {
       setReviewingId(null);
     }
@@ -238,11 +239,11 @@ const AdminSettings = () => {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB');
+      toast.warning('File size must be less than 5MB');
       return;
     }
     if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file');
+      toast.warning('Please upload an image file');
       return;
     }
 
@@ -274,14 +275,14 @@ const AdminSettings = () => {
           }));
           setUploadingQR(false);
         };
-        img.onerror = () => { alert('Image processing failed.'); setUploadingQR(false); };
+        img.onerror = () => { toast.error('Image processing failed.'); setUploadingQR(false); };
         img.src = cropped;
       } catch {
-        alert('Failed to process image.');
+        toast.error('Failed to process image.');
         setUploadingQR(false);
       }
     };
-    reader.onerror = () => { alert('Failed to read file.'); setUploadingQR(false); };
+    reader.onerror = () => { toast.error('Failed to read file.'); setUploadingQR(false); };
     reader.readAsDataURL(file);
   };
 
@@ -289,13 +290,13 @@ const AdminSettings = () => {
     try {
       setSaving(true);
       await settingsAPI.updateSettings(settings);
-      alert('Settings saved successfully!');
+      toast.success('Settings saved successfully!');
     } catch (error: unknown) {
       console.error('Error saving settings:', error);
       const errorMessage = error instanceof Error 
         ? error.message 
         : 'Failed to save settings. Please try again.';
-      alert(`Failed to save settings: ${errorMessage}`);
+      toast.error(`Failed to save settings: ${errorMessage}`);
     } finally {
       setSaving(false);
     }

@@ -11,6 +11,7 @@ import { useGeolocation } from '@/hooks/useGeolocation';
 import { checkServiceAvailability, LocationCheck } from '@/utils/serviceAvailability';
 import { AlertCircle, CheckCircle2, Loader2, MapPin, Search, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 interface ServiceAvailabilityCheckerProps {
   onAvailabilityConfirmed: (serviceArea: string, coordinates: { lat: number; lng: number }) => void;
@@ -116,7 +117,7 @@ const ServiceAvailabilityChecker = ({
   // Handle notification signup
   const handleNotifySignup = async () => {
     if (!notifyEmail.trim() || !notifyEmail.includes('@')) {
-      alert('Please enter a valid email address');
+      toast.warning('Please enter a valid email address');
       return;
     }
 
