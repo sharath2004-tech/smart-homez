@@ -1094,11 +1094,15 @@ router.post('/workers',
         return res.status(400).json({ error: { message: errors.array()[0].msg, status: 400 } });
       }
 
-      const { name, email, phone, gender, religion, experience, hourlyRate, aadhaarNumber, dateOfBirth } = req.body;
+      const { name, email, gender, religion, experience, hourlyRate, aadhaarNumber, dateOfBirth } = req.body;
 
-      if (!phone) {
-        return res.status(400).json({ error: { message: 'Phone number is required', status: 400 } });
+      // Normalize phone to E.164 (+91XXXXXXXXXX) — strip all non-digits, keep last 10
+      const rawPhone = req.body.phone || '';
+      const phoneDigitsOnly = rawPhone.replace(/\D/g, '').slice(-10);
+      if (!rawPhone || phoneDigitsOnly.length !== 10) {
+        return res.status(400).json({ error: { message: 'Phone number is required and must be 10 digits', status: 400 } });
       }
+      const phone = `+91${phoneDigitsOnly}`;
 
       // Parse array fields that may come as JSON strings from multipart forms
       let specialization = req.body.specialization;
@@ -1816,7 +1820,10 @@ router.put('/workers/:workerId',
       // Basic fields
       if (req.body.name) updateData.name = req.body.name;
       if (req.body.email && /^\S+@\S+\.\S+$/.test(req.body.email)) updateData.email = req.body.email.toLowerCase().trim();
-      if (req.body.phone) updateData.phone = req.body.phone;
+      if (req.body.phone) {
+        const rawUpdatePhone = req.body.phone.replace(/\D/g, '').slice(-10);
+        if (rawUpdatePhone.length === 10) updateData.phone = `+91${rawUpdatePhone}`;
+      }
       if (req.body.gender) updateData.gender = req.body.gender;
       if (req.body.dateOfBirth) updateData.dateOfBirth = new Date(req.body.dateOfBirth);
       if (req.body.religion) updateData.religion = req.body.religion;
