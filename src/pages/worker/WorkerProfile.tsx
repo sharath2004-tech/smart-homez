@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { ImageCropDialog } from "@/components/ImageCropDialog";
 import { API_ORIGIN, authAPI, workersAPI } from "@/lib/api";
-import { Briefcase, Camera, CheckCircle, Clock, Download, FileText, Loader2, Mail, MapPin, Phone, Star, User } from "lucide-react";
+import { Briefcase, Camera, CheckCircle, Clock, Download, FileText, Loader2, Mail, MapPin, Phone, ShieldCheck, Star, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -351,6 +351,37 @@ const WorkerProfile = () => {
               <p className="text-lg font-bold text-foreground">{getWorkerPayLabel(profile.workerProfile)}</p>
               <p className="text-sm text-muted-foreground mt-1">This is the payment structure approved for your account.</p>
             </div>
+
+            {/* Reliability Score */}
+            {profile.workerProfile.reliabilityScore !== undefined && (() => {
+              const score = profile.workerProfile.reliabilityScore ?? 75;
+              const outOf20 = Math.round((score / 100) * 20 * 10) / 10;
+              const isGood = score >= 80;
+              const isMid = score >= 60 && score < 80;
+              const colorClass = isGood ? 'text-green-600' : isMid ? 'text-amber-600' : 'text-red-600';
+              const bgClass = isGood ? 'bg-green-50 border-green-200' : isMid ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200';
+              const label = isGood ? 'Excellent' : isMid ? 'Good' : 'Needs Improvement';
+              const barColor = isGood ? 'bg-green-500' : isMid ? 'bg-amber-500' : 'bg-red-500';
+              return (
+                <div className={`card-elevated p-4 sm:p-5 md:p-6 border ${bgClass}`}>
+                  <h3 className="font-bold font-heading text-foreground mb-3 flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-primary" />
+                    Reliability Score
+                  </h3>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className={`text-3xl font-bold font-heading ${colorClass}`}>{outOf20}/20</span>
+                    <span className={`text-sm font-semibold px-3 py-1 rounded-full border ${bgClass} ${colorClass}`}>{label}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+                    <div className={`h-2 rounded-full transition-all ${barColor}`} style={{ width: `${score}%` }} />
+                  </div>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p>• Base: 15 pts &nbsp;·&nbsp; +2 bonus if ≤4 leaves/month &nbsp;·&nbsp; −1 per uninformed leave (&lt;24hrs)</p>
+                    <p>Your score reflects your punctuality and leave management.</p>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Assigned Locations */}
             {profile.workerProfile.assignedApartments && profile.workerProfile.assignedApartments.length > 0 && (

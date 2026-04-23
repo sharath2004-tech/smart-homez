@@ -385,8 +385,23 @@ const AdminBookings = () => {
     setReviewingCancelPenaltyId(booking._id);
     try {
       const response = await bookingsAPI.reviewCancelPenaltyProof(booking._id, action, reason || undefined);
-      setSelectedProofBooking((prev) => prev && prev._id === booking._id ? { ...prev, ...response.booking } : prev);
-      setBookings((prev) => prev.map((b) => b._id === booking._id ? { ...b, ...response.booking } : b));
+      // Preserve populated relational fields (worker/service/customer) from existing state.
+      // The backend cancel-penalty-review route does not re-populate worker, so response.booking.worker
+      // is a raw ObjectId string — spreading it would crash WorkerProfilePreviewDialog.
+      const mergeBooking = (existing: Booking) => ({
+        ...existing,
+        ...response.booking,
+        worker: existing.worker,
+        service: existing.service,
+        customer: existing.customer,
+      });
+      setBookings((prev) => prev.map((b) => b._id === booking._id ? mergeBooking(b) : b));
+      if (action === 'approve') {
+        // Close the modal — booking is now cancelled and the proof section is no longer relevant
+        setSelectedProofBooking(null);
+      } else {
+        setSelectedProofBooking((prev) => prev && prev._id === booking._id ? mergeBooking(prev) : prev);
+      }
       toast.success(action === 'approve' ? 'Cancellation approved. Booking has been cancelled.' : 'Proof rejected. Customer will be notified to reupload.');
     } catch (error) {
       console.error('Cancel penalty review error:', error);

@@ -384,7 +384,10 @@ const WorkerDashboard = () => {
                       </span>
                     </div>
                   </div>
-                  <span className="text-sm font-bold text-primary shrink-0">₹{task.totalAmount}</span>
+                  {getWorkerWage(task) != null
+                    ? <span className="text-sm font-bold text-primary shrink-0">₹{getWorkerWage(task)}</span>
+                    : <span className="text-xs text-muted-foreground shrink-0">Wage TBD</span>
+                  }
                 </div>
               ))}
             </div>
