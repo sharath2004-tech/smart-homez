@@ -728,7 +728,7 @@ const AdminWorkers = () => {
     try {
       const formData = new FormData();
       formData.append('name', workerForm.name);
-      if (workerForm.phone) formData.append('phone', workerForm.phone);
+      if (workerForm.phone) formData.append('phone', '+91' + workerForm.phone.replace(/\D/g, '').slice(0, 10));
       if (workerForm.gender) formData.append('gender', workerForm.gender);
       if (workerForm.religion) formData.append('religion', workerForm.religion);
       if (workerForm.dateOfBirth) formData.append('dateOfBirth', workerForm.dateOfBirth);
@@ -1202,26 +1202,30 @@ const AdminWorkers = () => {
                 </div>
 
                 {/* Phone field — required, with OTP verification */}
-
-                {/* Phone field — required, with OTP verification */}
                 <div>
                   <label className="block text-sm font-medium mb-1">
                     Phone <span className="text-destructive">*</span>
                   </label>
-                  <input
-                    type="tel"
-                    required
-                    className="input-clean"
-                    placeholder="+91 9876543210"
-                    value={workerForm.phone}
-                    onChange={(e) => {
-                      setWorkerForm({...workerForm, phone: e.target.value});
-                      setCreatePhoneVerified(false);
-                      setCreatePhoneOtpSent(false);
-                      setCreatePhoneOtpCode('');
-                      setCreatePhoneOtpError('');
-                    }}
-                  />
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">+91</span>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      required
+                      className="input-clean pl-12"
+                      placeholder="9876543210"
+                      value={workerForm.phone}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        setWorkerForm({...workerForm, phone: digits});
+                        setCreatePhoneVerified(false);
+                        setCreatePhoneOtpSent(false);
+                        setCreatePhoneOtpCode('');
+                        setCreatePhoneOtpError('');
+                      }}
+                    />
+                  </div>
                   {/* Phone OTP Verification */}
                   {workerForm.phone.replace(/\D/g, '').slice(-10).length === 10 && (
                     <div className="mt-2">
@@ -1620,23 +1624,31 @@ const AdminWorkers = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Email *</label>
+                      <label className="block text-sm font-medium mb-1">Email <span className="text-muted-foreground font-normal">(Optional)</span></label>
                       <input
                         type="email"
-                        required
                         className="input-clean"
-                        value={editWorker.email}
+                        value={editWorker.email || ''}
                         onChange={(e) => setEditWorker({ ...editWorker, email: e.target.value })}
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-1">Phone</label>
-                      <input
-                        type="tel"
-                        className="input-clean"
-                        value={editWorker.phone || ''}
-                        onChange={(e) => setEditWorker({ ...editWorker, phone: e.target.value })}
-                      />
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">+91</span>
+                        <input
+                          type="tel"
+                          inputMode="numeric"
+                          maxLength={10}
+                          className="input-clean pl-12"
+                          placeholder="9876543210"
+                          value={(editWorker.phone || '').replace(/\D/g, '').slice(-10)}
+                          onChange={(e) => {
+                            const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                            setEditWorker({ ...editWorker, phone: digits ? '+91' + digits : '' });
+                          }}
+                        />
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-1">Gender</label>
