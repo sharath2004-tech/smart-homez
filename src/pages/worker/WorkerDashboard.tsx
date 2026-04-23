@@ -1,5 +1,5 @@
 import AppLayout from "@/components/AppLayout";
-import { API_BASE_URL, authAPI, workersAPI } from "@/lib/api";
+import { API_ORIGIN, authAPI, workersAPI } from "@/lib/api";
 import { Bell, CheckCircle, ChevronRight, Clock, MapPin, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -219,7 +219,7 @@ const WorkerDashboard = () => {
             <div className="flex items-center gap-3">
               {profile?.profileImage ? (
                 <img
-                  src={`${API_BASE_URL.replace('/api', '')}${profile.profileImage}`}
+                  src={/^https?:\/\//i.test(profile.profileImage) ? profile.profileImage : `${API_ORIGIN}${profile.profileImage}`}
                   alt={profile.name}
                   className="w-12 h-12 rounded-full object-cover border-2 border-border shrink-0"
                 />

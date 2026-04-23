@@ -180,6 +180,13 @@ const InstaServicePage = () => {
 
   const totalBaseAmount = selectedDurationTotal ?? hours * pricePerHour;
 
+  // Effective per-hour rates for display — derived from actual total/hours so they always match
+  const displayPricePerHour = hours > 0 ? Math.round(totalBaseAmount / hours) : pricePerHour;
+  const displayMrpPerHour = (() => {
+    const mrpBase = selectedDurationMrp ?? hours * mrpPerHour;
+    return hours > 0 && mrpBase > 0 ? Math.round(mrpBase / hours) : mrpPerHour;
+  })();
+
   // Peak-hours surcharge
   const peakSurcharge = (() => {
     const tbp = service?.timeBasedPricing;
@@ -269,6 +276,14 @@ const InstaServicePage = () => {
           setServiceId(svc._id);
           // MRP from DB — falls back to computing 25% above if not set
           setMrpPerHour(svc.originalPrice > 0 ? svc.originalPrice : Math.round((svc.price || DEFAULT_PRICE) / 0.8));
+          // Auto-select the cheapest duration option so the page lands with a valid selection
+          if (svc.durationOptions && svc.durationOptions.length > 0) {
+            const sorted = [...svc.durationOptions].sort((a: { hours: number }, b: { hours: number }) => a.hours - b.hours);
+            const defaultOpt = sorted[0];
+            setHours(defaultOpt.hours);
+            setSelectedDurationTotal(defaultOpt.price);
+            setSelectedDurationMrp(defaultOpt.originalPrice > 0 ? defaultOpt.originalPrice : null);
+          }
         } else {
           setNoServiceWarning(true);
         }
@@ -424,8 +439,8 @@ const InstaServicePage = () => {
           </h1>
           <p className="text-xs text-muted-foreground">
             On-demand hourly cleaning ·{" "}
-            {mrpPerHour > pricePerHour && <span className="line-through text-muted-foreground/60">₹{mrpPerHour}/hr </span>}
-            <span className="text-green-600 font-semibold">₹{pricePerHour}/hr</span>
+            {displayMrpPerHour > displayPricePerHour && <span className="line-through text-muted-foreground/60">₹{displayMrpPerHour}/hr </span>}
+            <span className="text-green-600 font-semibold">₹{displayPricePerHour}/hr</span>
             {discountPct > 0 && <span className="text-xs font-semibold bg-green-100 text-green-700 px-1 py-0.5 rounded-full ml-1">{discountPct}% off</span>}
           </p>
         </div>
@@ -595,7 +610,7 @@ const InstaServicePage = () => {
               <h2 className="font-semibold font-heading text-foreground mb-1 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-primary" /> Number of Hours
               </h2>
-              <p className="text-xs text-muted-foreground mb-3">Minimum {service.durationOptions[0]?.hours || 1} hour</p>
+              <p className="text-xs text-muted-foreground mb-3">Minimum {[...service.durationOptions].sort((a, b) => a.hours - b.hours)[0]?.hours || 1} hour</p>
               <div className="flex gap-2 flex-wrap">
                 {[...service.durationOptions].sort((a, b) => a.hours - b.hours).map((opt) => (
                   <button
@@ -891,7 +906,7 @@ const InstaServicePage = () => {
             <div className="card-elevated p-4 rounded-2xl space-y-2">
               <p className="text-sm font-semibold text-foreground">Price Breakdown</p>
               <div className="flex justify-between text-sm text-muted-foreground">
-                <span>{hours} hr × <span className="line-through">₹{mrpPerHour}/hr</span> <span className="text-green-600 font-medium">₹{pricePerHour}/hr</span></span>
+                <span>{hours} hr × <span className="line-through">₹{displayMrpPerHour}/hr</span> <span className="text-green-600 font-medium">₹{displayPricePerHour}/hr</span></span>
                 <div className="text-right">
                   <div className="text-xs line-through">₹{mrpTotal.toLocaleString('en-IN')}</div>
                   <div className="text-green-700 font-medium">₹{totalAmount.toLocaleString('en-IN')}</div>

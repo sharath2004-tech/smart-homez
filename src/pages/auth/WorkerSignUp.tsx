@@ -5,8 +5,6 @@ import {
     Camera,
     CheckCircle,
     Clock,
-    Eye,
-    EyeOff,
     Home,
     Loader2,
     MapPin,
@@ -40,16 +38,12 @@ const WorkerSignUp = () => {
   const [form, setForm] = useState({
     name: "",
     phone: "",
-    password: "",
-    confirmPassword: "",
     gender: "",
     experience: "",
     dateOfBirth: "",
     aadhaarNumber: "",
   });
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [locLoading, setLocLoading] = useState(false);
   const [error, setError] = useState("");
@@ -190,44 +184,6 @@ const WorkerSignUp = () => {
         return;
       }
     }
-    if (form.password.length < 8) {
-      setError("Password must be at least 8 characters");
-      return;
-    }
-    if (!/[A-Z]/.test(form.password)) {
-      setError("Password must contain at least one uppercase letter");
-      return;
-    }
-    if (!/[0-9]/.test(form.password)) {
-      setError("Password must contain at least one number");
-      return;
-    }
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(form.password)) {
-      setError("Password must include a special character (e.g. @, #, $, !)");
-      return;
-    }
-    // Validate confirm password field requirements
-    if (form.confirmPassword.length < 8) {
-      setError("Confirm password must be at least 8 characters");
-      return;
-    }
-    if (!/[A-Z]/.test(form.confirmPassword)) {
-      setError("Confirm password must contain at least one uppercase letter");
-      return;
-    }
-    if (!/[0-9]/.test(form.confirmPassword)) {
-      setError("Confirm password must contain at least one number");
-      return;
-    }
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(form.confirmPassword)) {
-      setError("Confirm password must include a special character (e.g. @, #, $, !)");
-      return;
-    }
-    // Finally, check if passwords match
-    if (form.password !== form.confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
     setError("");
     setStep("verify");
   };
@@ -271,9 +227,11 @@ const WorkerSignUp = () => {
     setError("");
     try {
       const digits = form.phone.replace(/\D/g, "").slice(-10);
+      // Generate a random temporary password — worker logs in via OTP, not password
+      const randomPwd = Math.random().toString(36).slice(-6).toUpperCase() + Math.random().toString(36).slice(-6) + '!1';
       const formData = new FormData();
       formData.append("name", form.name.trim());
-      formData.append("password", form.password);
+      formData.append("password", randomPwd);
       formData.append("phone", "+91" + digits);
       formData.append("gender", form.gender || "prefer_not_to_say");
       formData.append("experience", form.experience || "0");
@@ -474,50 +432,6 @@ const WorkerSignUp = () => {
 
                 <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
                   Worker accounts are approved with an hourly pay rate by admin after verification.
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Password</label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      className="input-clean pr-12"
-                      placeholder="Min. 8 characters"
-                      value={form.password}
-                      onChange={set("password")}
-                      required
-                      autoComplete="new-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Confirm Password</label>
-                  <div className="relative">
-                    <input
-                      type={showConfirm ? "text" : "password"}
-                      className="input-clean pr-12"
-                      placeholder="Re-enter your password"
-                      value={form.confirmPassword}
-                      onChange={set("confirmPassword")}
-                      required
-                      autoComplete="new-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirm(!showConfirm)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
                 </div>
 
                 <button type="submit" className="btn-brand w-full mt-2">
