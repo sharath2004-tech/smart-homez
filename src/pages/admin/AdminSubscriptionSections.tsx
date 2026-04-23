@@ -61,7 +61,7 @@ const AdminSubscriptionSections = () => {
     try {
       setLoading(true);
       const response = await api.get('/subscription-sections/admin/all');
-      setSections(response.data.sections || []);
+      setSections(response.sections || []);
     } catch (error) {
       toast.error("Failed to load subscription sections");
       console.error(error);
