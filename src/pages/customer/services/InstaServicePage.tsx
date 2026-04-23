@@ -278,9 +278,7 @@ const InstaServicePage = () => {
           setMrpPerHour(svc.originalPrice > 0 ? svc.originalPrice : Math.round((svc.price || DEFAULT_PRICE) / 0.8));
           // Auto-select the cheapest duration option so the page lands with a valid selection
           if (svc.durationOptions && svc.durationOptions.length > 0) {
-            const sorted = [...svc.durationOptions]
-              .filter((o: { hours: number }) => o.hours >= 1)  // minimum 1h for hourly bookings
-              .sort((a: { hours: number }, b: { hours: number }) => a.hours - b.hours);
+            const sorted = [...svc.durationOptions].sort((a: { hours: number }, b: { hours: number }) => a.hours - b.hours);
             const defaultOpt = sorted[0];
             if (defaultOpt) {
               setHours(defaultOpt.hours);
@@ -610,18 +608,15 @@ const InstaServicePage = () => {
           >
             {/* Hours — from admin-configured durationOptions */}
             {service?.durationOptions && service.durationOptions.length > 0 && (() => {
-              const hourlyTiers = [...service.durationOptions]
-                .filter(o => o.hours >= 1)
-                .sort((a, b) => a.hours - b.hours);
-              if (hourlyTiers.length === 0) return null;
+              const allTiers = [...service.durationOptions].sort((a, b) => a.hours - b.hours);
               return (
             <div>
               <h2 className="font-semibold font-heading text-foreground mb-1 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-primary" /> Number of Hours
               </h2>
-              <p className="text-xs text-muted-foreground mb-3">Minimum {hourlyTiers[0].hours} hour</p>
+              <p className="text-xs text-muted-foreground mb-3">Minimum {allTiers[0].hours} hour</p>
               <div className="flex gap-2 flex-wrap">
-                {hourlyTiers.map((opt) => (
+                {allTiers.map((opt) => (
                   <button
                     key={opt.hours}
                     onClick={() => {
