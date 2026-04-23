@@ -270,7 +270,13 @@ const InstaServicePage = () => {
         }
         const list = servicesData?.services || [];
         if (list.length > 0) {
-          const svc = list[0];
+          const svc = [...list].sort((a, b) => {
+            const aMin = Math.min(...((a.durationOptions || []).map((d) => d.hours).filter((h) => h > 0)));
+            const bMin = Math.min(...((b.durationOptions || []).map((d) => d.hours).filter((h) => h > 0)));
+            const safeAMin = Number.isFinite(aMin) ? aMin : Number.POSITIVE_INFINITY;
+            const safeBMin = Number.isFinite(bMin) ? bMin : Number.POSITIVE_INFINITY;
+            return safeAMin - safeBMin;
+          })[0];
           setService(svc); // Store the service object for dos/don'ts
           setPricePerHour(svc.price || DEFAULT_PRICE);
           setServiceId(svc._id);
