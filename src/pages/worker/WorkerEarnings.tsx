@@ -17,6 +17,7 @@ interface Earning {
   totalAmount: number;
   actualStartTime?: string;
   actualEndTime?: string;
+  duration?: number;
   actualDurationMinutes?: number;
   overtimeMinutes?: number;
   overtimeCharges?: number;
@@ -29,7 +30,7 @@ interface Earning {
 }
 
 const getWorkerEarning = (earning: Earning): number => {
-  const { workforce, actualDurationMinutes } = earning;
+  const { workforce, actualDurationMinutes, totalAmount } = earning;
   if (workforce?.totalWorkerWage && workforce.totalWorkerWage > 0) {
     return Math.round(workforce.totalWorkerWage / Math.max(workforce.workerCount || 1, 1));
   }
@@ -38,6 +39,8 @@ const getWorkerEarning = (earning: Earning): number => {
     const hours = (actualDurationMinutes || 0) / 60;
     return Math.round(workforce.wageRate * hours);
   }
+  // Fall back to totalAmount when workforce wage data is not set
+  if (totalAmount && totalAmount > 0) return Math.round(totalAmount);
   return 0;
 };
 
@@ -272,7 +275,8 @@ const WorkerEarnings = () => {
       const earnDate = new Date(earning.completedAt);
       if (isNaN(earnDate.getTime())) return;
       
-      const hours = (earning.actualDurationMinutes || 0) / 60;
+      const durationMins = earning.actualDurationMinutes || (earning.duration ? earning.duration * 60 : 0);
+      const hours = durationMins / 60;
       const amount = getWorkerEarning(earning);
       
       if (earnDate.toDateString() === today) {
