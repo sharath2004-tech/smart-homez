@@ -377,8 +377,16 @@ const AdminServices = () => {
     const isSubscriptionService = serviceData.serviceType === 'monthly_subscription';
     const normalizedSubscriptionOptions = getNormalizedSubscriptionOptions(serviceData.subscriptionOptions, isSubscriptionService);
 
+    // Auto-derive price & originalPrice from the cheapest duration tier if tiers exist
+    const sortedTiers = [...(serviceData.durationOptions || [])].sort((a, b) => a.hours - b.hours);
+    const cheapestTier = sortedTiers[0];
+    const derivedPrice = cheapestTier ? cheapestTier.price : serviceData.price;
+    const derivedOriginalPrice = cheapestTier?.originalPrice ?? serviceData.originalPrice ?? 0;
+
     return {
       ...serviceData,
+      price: derivedPrice,
+      originalPrice: derivedOriginalPrice,
       serviceType: serviceData.serviceType || 'other',
       subscriptionPlans: isSubscriptionService ? [] : (serviceData.subscriptionPlans || []),
       subscriptionOptions: normalizedSubscriptionOptions,
@@ -467,12 +475,13 @@ const AdminServices = () => {
       toast.error('Please fill in all required fields');
       return;
     }
-    
-    if (formData.price < 0) {
-      toast.error('Price cannot be negative');
+
+    // Must have at least one duration tier
+    if (!formData.durationOptions || formData.durationOptions.length === 0) {
+      toast.error('Please add at least one duration tier with a price');
       return;
     }
-    
+
     if (formData.duration <= 0) {
       toast.error('Duration must be greater than 0');
       return;
@@ -1288,47 +1297,6 @@ const AdminServices = () => {
                       required
                     />
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Base Price (₹) *
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.price}
-                    onChange={(e) => handlePriceChange(Number(e.target.value))}
-                    className="input-clean"
-                    min="0"
-                    step="any"
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    This is the base price used for calculations. You can enter any amount, and changing it will auto-recalculate all plan prices below.
-                  </p>
-                </div>
-
-                {/* MRP / Original Price */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    MRP / Original Price (₹)
-                    <span className="ml-2 text-xs font-normal text-muted-foreground">displayed as strikethrough to customers</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.originalPrice || ''}
-                    onChange={(e) => setFormData({ ...formData, originalPrice: Number(e.target.value) || 0 })}
-                    className="input-clean"
-                    min="0"
-                    step="any"
-                    placeholder="e.g. 190"
-                  />
-                  {(formData.originalPrice ?? 0) > formData.price && (
-                    <p className="text-xs text-green-600 mt-1 font-medium">
-                      {Math.round((1 - formData.price / (formData.originalPrice ?? 1)) * 100)}% discount shown to customers
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-1">Leave 0 to hide the strikethrough price.</p>
                 </div>
 
                 {/* Subscription Plans Section */}
