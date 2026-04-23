@@ -2360,25 +2360,46 @@ router.post('/',
           .populate('service', 'name description price duration allowBreakRequests');
       }
 
-      // Send in-app + WhatsApp notification now that booking status is final
+      // Send in-app + WhatsApp notifications now that booking status is final.
+      // IMPORTANT: customer confirmation must go to the saved booking.customer,
+      // not the current authenticated user object, to avoid cross-role/account mixups.
       if (booking.status === 'confirmed') {
-        const svcName = booking.serviceDetails?.name || booking.bookingType || 'Service';
+        const svcName = booking.serviceDetails?.name || serviceConfig?.name || booking.bookingType || 'Service';
         const bookingDateStr = booking.bookingDate
           ? new Date(booking.bookingDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
           : '';
-        notificationService.sendNotification({
-          userId: req.user._id,
-          type: 'booking-confirmed',
-          title: '✅ Booking Confirmed',
-          message: `Your booking for ${svcName} on ${bookingDateStr} at ${booking.startTime} is confirmed.`,
-          priority: 'high',
-          data: {
-            bookingId: String(booking._id).slice(-6).toUpperCase(),
-            serviceName: svcName,
-            date: bookingDateStr,
-            time: booking.startTime || '',
-          }
-        }).catch(err => console.error('Booking confirmed notification error:', err.message));
+        const customerNotificationUserId = booking.customer?._id || booking.customer;
+        const assignedWorkerId = booking.worker?._id || booking.worker || null;
+
+        if (customerNotificationUserId) {
+          notificationService.sendNotification({
+            userId: customerNotificationUserId,
+            type: 'booking-confirmed',
+            title: '✅ Booking Confirmed',
+            message: `Your booking for ${svcName} on ${bookingDateStr} at ${booking.startTime} is confirmed.`,
+            priority: 'high',
+            data: {
+              bookingId: String(booking._id).slice(-6).toUpperCase(),
+              serviceName: svcName,
+              date: bookingDateStr,
+              time: booking.startTime || '',
+            }
+          }).catch(err => console.error('Booking confirmed customer notification error:', err.message));
+        }
+
+        if (assignedWorkerId) {
+          notificationService.sendTemplatedNotification(
+            assignedWorkerId,
+            'WORKER_ASSIGNED',
+            {
+              bookingId: booking._id,
+              workerName: populatedBooking?.worker?.name || 'Worker',
+              serviceName: svcName,
+              date: bookingDateStr,
+              time: booking.startTime || '',
+            }
+          ).catch(err => console.error('Worker assigned notification error:', err.message));
+        }
       }
 
       res.status(201).json({ 
