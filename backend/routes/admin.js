@@ -3,7 +3,6 @@ import { body, validationResult } from 'express-validator';
 import mongoose from 'mongoose';
 import twilio from 'twilio';
 import { authenticate, authorize } from '../middleware/auth.js';
-import { uploadToCloudinary } from '../middleware/cloudinary.js';
 import { uploadAdminDoc, uploadWorkerFiles } from '../middleware/upload.js';
 import Booking from '../models/Booking.js';
 import BusinessExpense from '../models/BusinessExpense.js';
@@ -16,9 +15,8 @@ import WorkerEarnings from '../models/WorkerEarnings.js';
 import WorkerSalaryRequest from '../models/WorkerSalaryRequest.js';
 import { generateTemporaryPassword, sendTemporaryPasswordEmail } from '../utils/emailService.js';
 import notificationService from '../utils/notificationService.js';
-import { getNextRecurringScheduleDate, projectSubscriptionSessions } from '../utils/recurringSchedule.js';
+import { getNextRecurringScheduleDate } from '../utils/recurringSchedule.js';
 import { checkSlotAvailability } from '../utils/slotManagement.js';
-import { isWhatsAppConfigured, sendWhatsAppMessage } from '../utils/whatsappService.js';
 import {
     evaluateWorkerEffectiveAvailability,
     isWorkerAssignedToBooking,
@@ -26,20 +24,8 @@ import {
     isWorkerEligibleForAssignment
 } from '../utils/workerAvailability.js';
 
-// Send temporary password via preferred phone channel (WhatsApp first, SMS fallback)
+// Send temporary password via SMS (plain message, not Twilio Verify)
 async function sendTemporaryPasswordSMS(phone, name, temporaryPassword) {
-  const body = `Hi ${name}, welcome to Healthy Homez! Your temporary password is: ${temporaryPassword} Please log in and change it immediately. App: ${process.env.FRONTEND_URL || 'https://healthyhomez.app'}`;
-
-  if (isWhatsAppConfigured()) {
-    try {
-      await sendWhatsAppMessage({ phone, message: body });
-      console.log(`✅ Temporary password sent on WhatsApp to ${phone}`);
-      return { success: true, channel: 'whatsapp' };
-    } catch (error) {
-      console.warn('⚠️ WhatsApp credential delivery failed, falling back to SMS:', error.message);
-    }
-  }
-
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
   const from = process.env.TWILIO_PHONE_NUMBER;
@@ -51,6 +37,7 @@ async function sendTemporaryPasswordSMS(phone, name, temporaryPassword) {
     const client = twilio(sid, token);
     const digits = phone.replace(/\D/g, '').slice(-10);
     const to = `+91${digits}`;
+    const body = `Hi ${name}, welcome to Healthy Homez! Your temporary password is: ${temporaryPassword}  Please log in and change it immediately. App: ${process.env.FRONTEND_URL || 'https://healthyhomez.app'}`;
     await client.messages.create({ body, from, to });
     console.log(`✅ Temporary password SMS sent to ${to}`);
     return { success: true };
@@ -114,7 +101,7 @@ const buildCredentialDeliveryResults = (credentialDelivery, phone) => {
   }
 
   if (credentialDelivery === 'phone' || credentialDelivery === 'both') {
-    results.phone = phone ? 'queued' : 'skipped: phone not provided';
+    results.sms = phone ? 'queued' : 'skipped: phone not provided';
   }
 
   return results;
@@ -131,7 +118,7 @@ const queueWorkerCredentialDelivery = ({ credentialDelivery, email, phone, name,
 
     if ((credentialDelivery === 'phone' || credentialDelivery === 'both') && phone) {
       const result = await sendTemporaryPasswordSMS(phone, name, temporaryPassword);
-      deliveryResults.phone = result.success ? (result.channel || 'sent') : `failed: ${result.reason}`;
+      deliveryResults.sms = result.success ? 'sent' : `failed: ${result.reason}`;
     }
 
     console.log(`📨 Worker credential delivery completed for ${email}:`, deliveryResults);
@@ -575,7 +562,7 @@ router.post('/create-admin',
       let assignedLocationIds = req.body.assignedLocationIds;
       if (typeof assignedLocationIds === 'string') assignedLocationIds = [assignedLocationIds];
       else if (!assignedLocationIds) assignedLocationIds = [];
-      const idDocumentPath = req.file ? await uploadToCloudinary(req.file.buffer, 'smart-homez/admin-docs') : null;
+      const idDocumentPath = req.file ? `/uploads/admin-docs/${req.file.filename}` : null;
 
       // Check if email exists
       const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
@@ -957,11 +944,7 @@ router.patch('/admins/:adminId', authenticate, authorize('super_admin'), async (
 
     // Update permissions if provided
     if (permissions && typeof permissions === 'object') {
-      admin.adminProfile.permissions.canCreateWorkers = permissions.canCreateWorkers ?? admin.adminProfile.permissions.canCreateWorkers;
-      admin.adminProfile.permissions.canDeleteWorkers = permissions.canDeleteWorkers ?? admin.adminProfile.permissions.canDeleteWorkers;
-      admin.adminProfile.permissions.canManageApartments = permissions.canManageApartments ?? admin.adminProfile.permissions.canManageApartments;
-      admin.adminProfile.permissions.canViewReports = permissions.canViewReports ?? admin.adminProfile.permissions.canViewReports;
-      admin.markModified('adminProfile.permissions');
+      admin.adminProfile.permissions = { ...admin.adminProfile.permissions.toObject?.() || admin.adminProfile.permissions, ...permissions };
     }
 
     // Update assigned locations if provided
@@ -973,7 +956,6 @@ router.patch('/admins/:adminId', authenticate, authorize('super_admin'), async (
         area: loc.area,
         city: loc.city
       }));
-      admin.markModified('adminProfile.assignedLocations');
 
       // Update locations with new admin assignment
       await Location.updateMany(
@@ -1066,8 +1048,8 @@ router.post('/workers',
   handleWorkerUploadFields,
   [
     body('name').notEmpty().withMessage('Name is required'),
-    body('phone').notEmpty().withMessage('Phone number is required'),
-    body('email').optional().isEmail().withMessage('Invalid email format'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('phone').optional().notEmpty().withMessage('Phone cannot be empty'),
     body('gender').optional().isIn(['male', 'female', 'other', 'prefer_not_to_say']).withMessage('Invalid gender'),
     body('religion').optional().isString(),
     body('experience').optional().isNumeric().withMessage('Experience must be a number'),
@@ -1094,15 +1076,7 @@ router.post('/workers',
         return res.status(400).json({ error: { message: errors.array()[0].msg, status: 400 } });
       }
 
-      const { name, email, gender, religion, experience, hourlyRate, aadhaarNumber, dateOfBirth } = req.body;
-
-      // Normalize phone to E.164 (+91XXXXXXXXXX) — strip all non-digits, keep last 10
-      const rawPhone = req.body.phone || '';
-      const phoneDigitsOnly = rawPhone.replace(/\D/g, '').slice(-10);
-      if (!rawPhone || phoneDigitsOnly.length !== 10) {
-        return res.status(400).json({ error: { message: 'Phone number is required and must be 10 digits', status: 400 } });
-      }
-      const phone = `+91${phoneDigitsOnly}`;
+      const { name, email, phone, gender, religion, experience, hourlyRate, aadhaarNumber, dateOfBirth } = req.body;
 
       // Parse array fields that may come as JSON strings from multipart forms
       let specialization = req.body.specialization;
@@ -1117,17 +1091,27 @@ router.post('/workers',
       // Extract uploaded verification document paths
       const files = req.files || {};
       const profileImagePath = files.profilePicture?.[0]
-        ? await uploadToCloudinary(files.profilePicture[0].buffer, 'smart-homez/profile-pics') : null;
+        ? `/uploads/profile-pics/${files.profilePicture[0].filename}` : null;
       const aadhaarFrontPath = files.aadhaarFront?.[0]
-        ? await uploadToCloudinary(files.aadhaarFront[0].buffer, 'smart-homez/worker-docs') : null;
+        ? `/uploads/worker-docs/${files.aadhaarFront[0].filename}` : null;
       const aadhaarBackPath = files.aadhaarBack?.[0]
-        ? await uploadToCloudinary(files.aadhaarBack[0].buffer, 'smart-homez/worker-docs') : null;
+        ? `/uploads/worker-docs/${files.aadhaarBack[0].filename}` : null;
 
-      // Check for duplicate phone number
-      const existingUser = await User.findOne({ phone });
-      if (existingUser) {
-        return res.status(400).json({ error: { message: 'A worker with this phone number already exists', status: 400 } });
+      if (!email) {
+        return res.status(400).json({ error: { message: 'Email is required', status: 400 } });
       }
+
+      // Normalize email
+      const normalizedEmail = email.toLowerCase().trim();
+      
+      // Check if email exists
+      const existingUser = await User.findOne({ email: normalizedEmail });
+      if (existingUser) {
+        console.log(`⚠️ Worker creation attempt with existing email: ${normalizedEmail}`);
+        return res.status(400).json({ error: { message: 'Email already exists', status: 400 } });
+      }
+
+      console.log(`✅ No existing user found for email: ${normalizedEmail}, proceeding with worker creation`);
 
       // Check if admin has permission (only if role is admin, not super_admin)
       if (req.user.role === 'admin' && !req.user.adminProfile?.permissions?.canCreateWorkers) {
@@ -1136,7 +1120,7 @@ router.post('/workers',
 
       // Generate temporary password
       const temporaryPassword = generateTemporaryPassword();
-      console.log(`🔑 Generated temporary password for ${phone}:`, temporaryPassword);
+      console.log(`🔑 Generated temporary password for ${normalizedEmail}:`, temporaryPassword);
 
       // REQUIRE location assignment for workers
       if (!assignedApartmentIds || assignedApartmentIds.length === 0) {
@@ -1175,13 +1159,12 @@ router.post('/workers',
       // Create worker
       const worker = new User({
         name,
-        ...(email && email.trim() ? { email: email.toLowerCase().trim() } : {}),
+        email: normalizedEmail,
         password: temporaryPassword, // Will be hashed by pre-save hook
         temporaryPassword: temporaryPassword, // Store plain text for reference (not hashed)
         isFirstLogin: true, // Force password change on first login
         hasCustomPassword: false,
         phone,
-        isPhoneVerified: req.body.isPhoneVerified === 'true',
         gender: gender || 'prefer_not_to_say',
         religion: religion || undefined,
         dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
@@ -1219,17 +1202,26 @@ router.post('/workers',
         { $push: { assignedWorkers: { worker: worker._id, assignedAt: new Date() } } }
       );
 
-      // Return immediately so worker creation isn't blocked by SMS provider latency.
-      const deliveryResults = buildCredentialDeliveryResults('phone', phone);
+      // Return immediately so worker creation isn't blocked by email/SMS provider latency.
+      const credentialDelivery = req.body.credentialDelivery || 'email'; // 'email' | 'phone' | 'both'
+      const deliveryResults = buildCredentialDeliveryResults(credentialDelivery, phone);
+
+      const deliveryMessage =
+        credentialDelivery === 'both'
+          ? 'Credential delivery has been queued for email and SMS.'
+          : credentialDelivery === 'phone'
+          ? 'Credential delivery has been queued for SMS.'
+          : 'Credential delivery has been queued for email.';
 
       res.status(201).json({
         success: true,
-        message: 'Worker created successfully. Credential delivery has been queued for SMS.',
+        message: `Worker created successfully. ${deliveryMessage}`,
         deliveryResults,
-        credentialDelivery: 'phone',
+        credentialDelivery,
         worker: {
           _id: worker._id,
           name: worker.name,
+          email: worker.email,
           phone: worker.phone,
           role: worker.role,
           gender: worker.gender,
@@ -1242,7 +1234,8 @@ router.post('/workers',
       });
 
       queueWorkerCredentialDelivery({
-        credentialDelivery: 'phone',
+        credentialDelivery,
+        email: normalizedEmail,
         phone,
         name,
         temporaryPassword
@@ -1360,45 +1353,6 @@ router.patch('/workers/:workerId/unarchive', authenticate, authorize('admin', 's
     res.json({ success: true, message: 'Worker unarchived successfully' });
   } catch (error) {
     console.error('Unarchive worker error:', error);
-    res.status(500).json({ error: { message: 'Server error', status: 500 } });
-  }
-});
-
-// @route   PATCH /api/admin/workers/:workerId/availability
-// @desc    Toggle worker availability (activate/deactivate)
-// @access  Private/Admin
-router.patch('/workers/:workerId/availability', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
-  try {
-    const { availability } = req.body;
-
-    if (typeof availability !== 'boolean') {
-      return res.status(400).json({ error: { message: 'Availability must be a boolean value', status: 400 } });
-    }
-
-    const worker = await User.findById(req.params.workerId);
-    if (!worker || worker.role !== 'worker') {
-      return res.status(404).json({ error: { message: 'Worker not found', status: 404 } });
-    }
-
-    worker.workerProfile = worker.workerProfile || {};
-    worker.workerProfile.availability = availability;
-    worker.workerProfile.lastAvailabilityUpdate = new Date();
-    await worker.save({ validateBeforeSave: false });
-
-    console.log(`🔄 Worker ${worker.name} availability set to ${availability ? 'ACTIVE' : 'INACTIVE'} by ${req.user.role} ${req.user.name}`);
-
-    res.json({
-      success: true,
-      message: `Worker marked as ${availability ? 'active' : 'inactive'} successfully`,
-      worker: {
-        _id: worker._id,
-        availability: worker.workerProfile.availability,
-        isArchived: worker.isArchived,
-        isActive: worker.isActive
-      }
-    });
-  } catch (error) {
-    console.error('Admin worker availability update error:', error);
     res.status(500).json({ error: { message: 'Server error', status: 500 } });
   }
 });
@@ -1819,7 +1773,7 @@ router.put('/workers/:workerId',
 
       // Basic fields
       if (req.body.name) updateData.name = req.body.name;
-      if (req.body.email && /^\S+@\S+\.\S+$/.test(req.body.email)) updateData.email = req.body.email.toLowerCase().trim();
+      if (req.body.email) updateData.email = req.body.email;
       if (req.body.phone) {
         const rawUpdatePhone = req.body.phone.replace(/\D/g, '').slice(-10);
         if (rawUpdatePhone.length === 10) updateData.phone = `+91${rawUpdatePhone}`;
@@ -1957,15 +1911,15 @@ router.put('/workers/:workerId',
       // Handle file uploads
       if (files) {
         if (files.aadhaarFront && files.aadhaarFront[0]) {
-          updateData['workerProfile.documents.aadhaarFront'] = await uploadToCloudinary(files.aadhaarFront[0].buffer, 'smart-homez/worker-docs');
+          updateData['workerProfile.documents.aadhaarFront'] = `/uploads/worker-docs/${files.aadhaarFront[0].filename}`;
           updateData['workerProfile.documents.uploadedAt'] = new Date();
         }
         if (files.aadhaarBack && files.aadhaarBack[0]) {
-          updateData['workerProfile.documents.aadhaarBack'] = await uploadToCloudinary(files.aadhaarBack[0].buffer, 'smart-homez/worker-docs');
+          updateData['workerProfile.documents.aadhaarBack'] = `/uploads/worker-docs/${files.aadhaarBack[0].filename}`;
           updateData['workerProfile.documents.uploadedAt'] = new Date();
         }
         if (files.profilePicture && files.profilePicture[0]) {
-          updateData.profileImage = await uploadToCloudinary(files.profilePicture[0].buffer, 'smart-homez/profile-pics');
+          updateData.profileImage = `/uploads/profile-pics/${files.profilePicture[0].filename}`;
         }
       }
 
@@ -3972,434 +3926,6 @@ router.get('/worker-schedule-comprehensive',
   }
 );
 
-// ============== REPORTS ==============
-
-// @route   GET /api/admin/reports/worker-wages
-// @desc    Worker hourly wage report (month-to-date or custom range). Per-worker: tasks, minutes, wage earned.
-// @access  Private/Admin|SuperAdmin
-router.get('/reports/worker-wages', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
-  try {
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
-
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-    monthStart.setHours(0, 0, 0, 0);
-
-    const fromDate = req.query.from ? new Date(req.query.from) : monthStart;
-    const toDate = req.query.to ? new Date(req.query.to) : today;
-    fromDate.setHours(0, 0, 0, 0);
-    toDate.setHours(23, 59, 59, 999);
-
-    // Location filter
-    let locationFilter = {};
-    if (req.query.locationId && mongoose.Types.ObjectId.isValid(req.query.locationId)) {
-      locationFilter = { 'location.locationId': new mongoose.Types.ObjectId(req.query.locationId) };
-    } else if (req.user.role === 'admin' && req.user.adminProfile?.assignedLocationIds?.length) {
-      locationFilter = {
-        'location.locationId': {
-          $in: req.user.adminProfile.assignedLocationIds.map(id => new mongoose.Types.ObjectId(id))
-        }
-      };
-    }
-
-    // Aggregate completed bookings per worker in period
-    const wageRows = await Booking.aggregate([
-      {
-        $match: {
-          ...REVENUE_BOOKING_MATCH,
-          ...locationFilter,
-          worker: { $ne: null },
-        }
-      },
-      {
-        $addFields: { effectiveCompletedAt: COMPLETED_BOOKING_DATE_EXPR }
-      },
-      {
-        $match: { effectiveCompletedAt: { $gte: fromDate, $lte: toDate } }
-      },
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'worker',
-          foreignField: '_id',
-          as: 'workerDoc'
-        }
-      },
-      { $unwind: '$workerDoc' },
-      {
-        $addFields: {
-          effectiveMinutes: {
-            $cond: [
-              { $gt: ['$actualDurationMinutes', 0] },
-              '$actualDurationMinutes',
-              { $ifNull: ['$scheduledDurationMinutes', 0] }
-            ]
-          }
-        }
-      },
-      {
-        $group: {
-          _id: '$workerDoc._id',
-          name: { $first: '$workerDoc.name' },
-          phone: { $first: '$workerDoc.phone' },
-          hourlyRate: { $first: '$workerDoc.workerProfile.hourlyRate' },
-          totalMinutesWorked: { $sum: '$effectiveMinutes' },
-          completedTasks: { $sum: 1 }
-        }
-      },
-      {
-        $addFields: {
-          totalHoursWorked: { $round: [{ $divide: ['$totalMinutesWorked', 60] }, 2] },
-          wageEarned: {
-            $round: [
-              { $multiply: [{ $divide: ['$totalMinutesWorked', 60] }, { $ifNull: ['$hourlyRate', 0] }] },
-              2
-            ]
-          }
-        }
-      },
-      { $sort: { name: 1 } }
-    ]);
-
-    const totalWage = wageRows.reduce((s, r) => s + (r.wageEarned || 0), 0);
-    const totalMinutes = wageRows.reduce((s, r) => s + (r.totalMinutesWorked || 0), 0);
-
-    res.json({
-      success: true,
-      period: { from: fromDate, to: toDate },
-      summary: {
-        totalWorkers: wageRows.length,
-        totalMinutesWorked: totalMinutes,
-        totalHoursWorked: Math.round((totalMinutes / 60) * 100) / 100,
-        totalWageEarned: Math.round(totalWage * 100) / 100
-      },
-      workers: wageRows
-    });
-  } catch (error) {
-    console.error('Worker wage report error:', error);
-    res.status(500).json({ error: { message: 'Server error', status: 500 } });
-  }
-});
-
-// @route   GET /api/admin/reports/worker-wages/export
-// @desc    CSV export of worker wage report
-// @access  Private/Admin|SuperAdmin
-router.get('/reports/worker-wages/export', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
-  try {
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-    monthStart.setHours(0, 0, 0, 0);
-
-    const fromDate = req.query.from ? new Date(req.query.from) : monthStart;
-    const toDate = req.query.to ? new Date(req.query.to) : today;
-    fromDate.setHours(0, 0, 0, 0);
-    toDate.setHours(23, 59, 59, 999);
-
-    let locationFilter = {};
-    if (req.query.locationId && mongoose.Types.ObjectId.isValid(req.query.locationId)) {
-      locationFilter = { 'location.locationId': new mongoose.Types.ObjectId(req.query.locationId) };
-    } else if (req.user.role === 'admin' && req.user.adminProfile?.assignedLocationIds?.length) {
-      locationFilter = {
-        'location.locationId': {
-          $in: req.user.adminProfile.assignedLocationIds.map(id => new mongoose.Types.ObjectId(id))
-        }
-      };
-    }
-
-    const wageRows = await Booking.aggregate([
-      { $match: { ...REVENUE_BOOKING_MATCH, ...locationFilter, worker: { $ne: null } } },
-      { $addFields: { effectiveCompletedAt: COMPLETED_BOOKING_DATE_EXPR } },
-      { $match: { effectiveCompletedAt: { $gte: fromDate, $lte: toDate } } },
-      { $lookup: { from: 'users', localField: 'worker', foreignField: '_id', as: 'workerDoc' } },
-      { $unwind: '$workerDoc' },
-      {
-        $addFields: {
-          effectiveMinutes: {
-            $cond: [
-              { $gt: ['$actualDurationMinutes', 0] },
-              '$actualDurationMinutes',
-              { $ifNull: ['$scheduledDurationMinutes', 0] }
-            ]
-          }
-        }
-      },
-      {
-        $group: {
-          _id: '$workerDoc._id',
-          name: { $first: '$workerDoc.name' },
-          phone: { $first: '$workerDoc.phone' },
-          hourlyRate: { $first: '$workerDoc.workerProfile.hourlyRate' },
-          totalMinutesWorked: { $sum: '$effectiveMinutes' },
-          completedTasks: { $sum: 1 }
-        }
-      },
-      {
-        $addFields: {
-          totalHoursWorked: { $round: [{ $divide: ['$totalMinutesWorked', 60] }, 2] },
-          wageEarned: {
-            $round: [
-              { $multiply: [{ $divide: ['$totalMinutesWorked', 60] }, { $ifNull: ['$hourlyRate', 0] }] },
-              2
-            ]
-          }
-        }
-      },
-      { $sort: { name: 1 } }
-    ]);
-
-    const fromStr = fromDate.toISOString().split('T')[0];
-    const toStr = toDate.toISOString().split('T')[0];
-    const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-
-    const header = ['Worker Name', 'Phone', 'Hourly Rate (₹)', 'Tasks Completed', 'Total Minutes', 'Total Hours', 'Wage Earned (₹)'].map(q).join(',');
-    const rows = wageRows.map(r =>
-      [r.name, r.phone, r.hourlyRate ?? 0, r.completedTasks, r.totalMinutesWorked, r.totalHoursWorked, r.wageEarned].map(q).join(',')
-    );
-    // Append summary footer
-    const totalWage = wageRows.reduce((s, r) => s + (r.wageEarned || 0), 0);
-    rows.push(['TOTAL', '', '', wageRows.reduce((s, r) => s + r.completedTasks, 0), wageRows.reduce((s, r) => s + r.totalMinutesWorked, 0), Math.round((wageRows.reduce((s, r) => s + r.totalMinutesWorked, 0) / 60) * 100) / 100, Math.round(totalWage * 100) / 100].map(q).join(','));
-
-    const csv = [header, ...rows].join('\n');
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="worker-wages-${fromStr}-to-${toStr}.csv"`);
-    res.send(csv);
-  } catch (error) {
-    console.error('Worker wage export error:', error);
-    res.status(500).json({ error: { message: 'Server error', status: 500 } });
-  }
-});
-
-// @route   GET /api/admin/reports/customer-bills
-// @desc    Customer bill report: subscription hours billed + extra/overtime charges in a date range
-// @access  Private/Admin|SuperAdmin
-router.get('/reports/customer-bills', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
-  try {
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-    monthStart.setHours(0, 0, 0, 0);
-
-    const fromDate = req.query.from ? new Date(req.query.from) : monthStart;
-    const toDate = req.query.to ? new Date(req.query.to) : today;
-    fromDate.setHours(0, 0, 0, 0);
-    toDate.setHours(23, 59, 59, 999);
-
-    let locationFilter = {};
-    if (req.query.locationId && mongoose.Types.ObjectId.isValid(req.query.locationId)) {
-      locationFilter = { 'location.locationId': new mongoose.Types.ObjectId(req.query.locationId) };
-    } else if (req.user.role === 'admin' && req.user.adminProfile?.assignedLocationIds?.length) {
-      locationFilter = {
-        'location.locationId': {
-          $in: req.user.adminProfile.assignedLocationIds.map(id => new mongoose.Types.ObjectId(id))
-        }
-      };
-    }
-
-    const billRows = await Booking.aggregate([
-      {
-        $match: {
-          ...REVENUE_BOOKING_MATCH,
-          ...locationFilter,
-          customer: { $ne: null }
-        }
-      },
-      {
-        $addFields: { effectiveCompletedAt: COMPLETED_BOOKING_DATE_EXPR }
-      },
-      {
-        $match: { effectiveCompletedAt: { $gte: fromDate, $lte: toDate } }
-      },
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'customer',
-          foreignField: '_id',
-          as: 'customerDoc'
-        }
-      },
-      { $unwind: '$customerDoc' },
-      {
-        $addFields: {
-          isSubscriptionBooking: {
-            $cond: [
-              {
-                $or: [
-                  { $eq: ['$bookingType', 'monthly-subscription'] },
-                  { $eq: ['$bookingType', 'daily'] },
-                  { $eq: ['$bookingType', 'weekly'] },
-                  { $eq: ['$bookingType', 'biweekly'] },
-                  { $eq: ['$bookingType', 'monthly'] },
-                  { $eq: ['$subscription.isSubscription', true] }
-                ]
-              },
-              true,
-              false
-            ]
-          },
-          overtimeAmt: { $ifNull: ['$overtimeCharges', 0] }
-        }
-      },
-      {
-        $group: {
-          _id: '$customerDoc._id',
-          name: { $first: '$customerDoc.name' },
-          phone: { $first: '$customerDoc.phone' },
-          totalBookings: { $sum: 1 },
-          subscriptionBookings: { $sum: { $cond: ['$isSubscriptionBooking', 1, 0] } },
-          oneTimeBookings: { $sum: { $cond: ['$isSubscriptionBooking', 0, 1] } },
-          subscriptionBill: {
-            $sum: {
-              $cond: ['$isSubscriptionBooking', '$totalAmount', 0]
-            }
-          },
-          oneTimeBill: {
-            $sum: {
-              $cond: ['$isSubscriptionBooking', 0, '$totalAmount']
-            }
-          },
-          extraUtilisationBill: { $sum: '$overtimeAmt' },
-          grossBill: { $sum: '$totalAmount' }
-        }
-      },
-      {
-        $addFields: {
-          totalBill: { $round: [{ $add: ['$grossBill', '$extraUtilisationBill'] }, 2] },
-          subscriptionBill: { $round: ['$subscriptionBill', 2] },
-          oneTimeBill: { $round: ['$oneTimeBill', 2] },
-          extraUtilisationBill: { $round: ['$extraUtilisationBill', 2] }
-        }
-      },
-      { $sort: { name: 1 } }
-    ]);
-
-    const totals = billRows.reduce(
-      (acc, r) => ({
-        subscriptionBill: acc.subscriptionBill + r.subscriptionBill,
-        oneTimeBill: acc.oneTimeBill + r.oneTimeBill,
-        extraUtilisationBill: acc.extraUtilisationBill + r.extraUtilisationBill,
-        totalBill: acc.totalBill + r.totalBill
-      }),
-      { subscriptionBill: 0, oneTimeBill: 0, extraUtilisationBill: 0, totalBill: 0 }
-    );
-
-    res.json({
-      success: true,
-      period: { from: fromDate, to: toDate },
-      summary: {
-        totalCustomers: billRows.length,
-        totalSubscriptionBill: Math.round(totals.subscriptionBill * 100) / 100,
-        totalOneTimeBill: Math.round(totals.oneTimeBill * 100) / 100,
-        totalExtraUtilisationBill: Math.round(totals.extraUtilisationBill * 100) / 100,
-        grandTotal: Math.round(totals.totalBill * 100) / 100
-      },
-      customers: billRows
-    });
-  } catch (error) {
-    console.error('Customer bill report error:', error);
-    res.status(500).json({ error: { message: 'Server error', status: 500 } });
-  }
-});
-
-// @route   GET /api/admin/reports/customer-bills/export
-// @desc    CSV export of customer bill report
-// @access  Private/Admin|SuperAdmin
-router.get('/reports/customer-bills/export', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
-  try {
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-    monthStart.setHours(0, 0, 0, 0);
-
-    const fromDate = req.query.from ? new Date(req.query.from) : monthStart;
-    const toDate = req.query.to ? new Date(req.query.to) : today;
-    fromDate.setHours(0, 0, 0, 0);
-    toDate.setHours(23, 59, 59, 999);
-
-    let locationFilter = {};
-    if (req.query.locationId && mongoose.Types.ObjectId.isValid(req.query.locationId)) {
-      locationFilter = { 'location.locationId': new mongoose.Types.ObjectId(req.query.locationId) };
-    } else if (req.user.role === 'admin' && req.user.adminProfile?.assignedLocationIds?.length) {
-      locationFilter = {
-        'location.locationId': {
-          $in: req.user.adminProfile.assignedLocationIds.map(id => new mongoose.Types.ObjectId(id))
-        }
-      };
-    }
-
-    const billRows = await Booking.aggregate([
-      { $match: { ...REVENUE_BOOKING_MATCH, ...locationFilter, customer: { $ne: null } } },
-      { $addFields: { effectiveCompletedAt: COMPLETED_BOOKING_DATE_EXPR } },
-      { $match: { effectiveCompletedAt: { $gte: fromDate, $lte: toDate } } },
-      { $lookup: { from: 'users', localField: 'customer', foreignField: '_id', as: 'customerDoc' } },
-      { $unwind: '$customerDoc' },
-      {
-        $addFields: {
-          isSubscriptionBooking: {
-            $cond: [
-              {
-                $or: [
-                  { $eq: ['$bookingType', 'monthly-subscription'] },
-                  { $eq: ['$bookingType', 'daily'] },
-                  { $eq: ['$bookingType', 'weekly'] },
-                  { $eq: ['$bookingType', 'biweekly'] },
-                  { $eq: ['$bookingType', 'monthly'] },
-                  { $eq: ['$subscription.isSubscription', true] }
-                ]
-              },
-              true,
-              false
-            ]
-          },
-          overtimeAmt: { $ifNull: ['$overtimeCharges', 0] }
-        }
-      },
-      {
-        $group: {
-          _id: '$customerDoc._id',
-          name: { $first: '$customerDoc.name' },
-          phone: { $first: '$customerDoc.phone' },
-          totalBookings: { $sum: 1 },
-          subscriptionBookings: { $sum: { $cond: ['$isSubscriptionBooking', 1, 0] } },
-          oneTimeBookings: { $sum: { $cond: ['$isSubscriptionBooking', 0, 1] } },
-          subscriptionBill: { $sum: { $cond: ['$isSubscriptionBooking', '$totalAmount', 0] } },
-          oneTimeBill: { $sum: { $cond: ['$isSubscriptionBooking', 0, '$totalAmount'] } },
-          extraUtilisationBill: { $sum: '$overtimeAmt' },
-          grossBill: { $sum: '$totalAmount' }
-        }
-      },
-      {
-        $addFields: {
-          totalBill: { $round: [{ $add: ['$grossBill', '$extraUtilisationBill'] }, 2] },
-          subscriptionBill: { $round: ['$subscriptionBill', 2] },
-          oneTimeBill: { $round: ['$oneTimeBill', 2] },
-          extraUtilisationBill: { $round: ['$extraUtilisationBill', 2] }
-        }
-      },
-      { $sort: { name: 1 } }
-    ]);
-
-    const fromStr = fromDate.toISOString().split('T')[0];
-    const toStr = toDate.toISOString().split('T')[0];
-    const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-
-    const header = ['Customer Name', 'Phone', 'Total Bookings', 'Subscription Bookings', 'One-Time Bookings', 'Subscription Bill (₹)', 'One-Time Bill (₹)', 'Extra Utilisation (₹)', 'Total Bill (₹)'].map(q).join(',');
-    const rows = billRows.map(r =>
-      [r.name, r.phone, r.totalBookings, r.subscriptionBookings, r.oneTimeBookings, r.subscriptionBill, r.oneTimeBill, r.extraUtilisationBill, r.totalBill].map(q).join(',')
-    );
-    const totals = billRows.reduce((acc, r) => ({ sb: acc.sb + r.subscriptionBill, ob: acc.ob + r.oneTimeBill, eb: acc.eb + r.extraUtilisationBill, tb: acc.tb + r.totalBill }), { sb: 0, ob: 0, eb: 0, tb: 0 });
-    rows.push(['TOTAL', '', billRows.reduce((s, r) => s + r.totalBookings, 0), billRows.reduce((s, r) => s + r.subscriptionBookings, 0), billRows.reduce((s, r) => s + r.oneTimeBookings, 0), Math.round(totals.sb * 100) / 100, Math.round(totals.ob * 100) / 100, Math.round(totals.eb * 100) / 100, Math.round(totals.tb * 100) / 100].map(q).join(','));
-
-    const csv = [header, ...rows].join('\n');
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="customer-bills-${fromStr}-to-${toStr}.csv"`);
-    res.send(csv);
-  } catch (error) {
-    console.error('Customer bill export error:', error);
-    res.status(500).json({ error: { message: 'Server error', status: 500 } });
-  }
-});
-
 // @route   GET /api/admin/worker-schedule-export
 // @desc    Export worker schedules to Excel/CSV
 // @access  Private/Admin
@@ -4743,16 +4269,16 @@ router.patch('/workers/:id/documents',
       const updates = {};
 
       if (files.profilePicture?.[0]) {
-        updates.profileImage = await uploadToCloudinary(files.profilePicture[0].buffer, 'smart-homez/profile-pics');
+        updates.profileImage = `/uploads/profile-pics/${files.profilePicture[0].filename}`;
       }
 
       if (files.aadhaarFront?.[0]) {
-        updates['workerProfile.documents.aadhaarFront'] = await uploadToCloudinary(files.aadhaarFront[0].buffer, 'smart-homez/worker-docs');
+        updates['workerProfile.documents.aadhaarFront'] = `/uploads/worker-docs/${files.aadhaarFront[0].filename}`;
         updates['workerProfile.documents.uploadedAt'] = new Date();
       }
 
       if (files.aadhaarBack?.[0]) {
-        updates['workerProfile.documents.aadhaarBack'] = await uploadToCloudinary(files.aadhaarBack[0].buffer, 'smart-homez/worker-docs');
+        updates['workerProfile.documents.aadhaarBack'] = `/uploads/worker-docs/${files.aadhaarBack[0].filename}`;
         updates['workerProfile.documents.uploadedAt'] = new Date();
       }
 
@@ -5018,272 +4544,5 @@ router.get('/customers/:id',
     }
   }
 );
-
-// ── WhatsApp Debug / Test ──────────────────────────────────────────────────
-// GET  /api/admin/debug-whatsapp          → config status (no message sent)
-// POST /api/admin/debug-whatsapp { phone } → send a test message to that number
-import { isMsg91WhatsAppConfigured } from '../utils/msg91WhatsappService.js';
-
-router.get('/debug-whatsapp', authenticate, authorize('admin', 'super_admin'), (req, res) => {
-  const authKey   = process.env.MSG91_AUTH_KEY;
-  const intNumber = process.env.MSG91_WHATSAPP_INTEGRATED_NUMBER;
-  const channel   = process.env.OTP_DELIVERY_CHANNEL || 'not set';
-
-  res.json({
-    configured: isMsg91WhatsAppConfigured(),
-    channel,
-    MSG91_AUTH_KEY: authKey ? `${authKey.slice(0, 6)}…` : '❌ MISSING',
-    MSG91_WHATSAPP_INTEGRATED_NUMBER: intNumber
-      ? `${intNumber.slice(0, 4)}…${intNumber.slice(-4)}`
-      : '❌ MISSING',
-    tip: !intNumber
-      ? 'Set MSG91_WHATSAPP_INTEGRATED_NUMBER=91XXXXXXXXXX (no +) in Render env vars'
-      : intNumber.startsWith('+')
-        ? '⚠️  Remove the + prefix — must be 91XXXXXXXXXX not +91XXXXXXXXXX'
-        : '✅ Format looks correct',
-  });
-});
-
-router.post('/debug-whatsapp', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
-  const { phone } = req.body;
-  if (!phone) return res.status(400).json({ error: 'phone required in body' });
-
-  if (!isMsg91WhatsAppConfigured()) {
-    return res.status(503).json({
-      error: 'MSG91 WhatsApp not configured',
-      missing: [
-        !process.env.MSG91_AUTH_KEY && 'MSG91_AUTH_KEY',
-        !process.env.MSG91_WHATSAPP_INTEGRATED_NUMBER && 'MSG91_WHATSAPP_INTEGRATED_NUMBER',
-      ].filter(Boolean),
-    });
-  }
-
-  try {
-    const { sendMsg91WhatsApp } = await import('../utils/msg91WhatsappService.js');
-    const result = await sendMsg91WhatsApp({
-      phone,
-      templateKey: 'WELCOME',
-      variables: { name: 'Test User' },
-    });
-    res.json({ result, phone });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SUBSCRIPTION TRACKER
-// ─────────────────────────────────────────────────────────────────────────────
-
-// @route   GET /api/admin/subscription-tracker
-// @desc    List all active subscriptions with session counts, overtime totals
-// @access  Admin / Super Admin
-router.get('/subscription-tracker', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
-  try {
-    const { status, search, page = 1, limit = 30 } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
-
-    // Build filter for parent subscription bookings
-    const matchStage = {
-      'subscription.isSubscription': true,
-      parentBooking: null,   // top-level parent only
-    };
-
-    // Admin: restrict to locations they manage
-    if (req.user.role === 'admin') {
-      const locationIds = (req.user.adminProfile?.assignedLocations || []).map(l => l.locationId);
-      if (locationIds.length > 0) {
-        matchStage['location.locationId'] = { $in: locationIds.map(id => new mongoose.Types.ObjectId(id)) };
-      }
-    }
-
-    if (status && status !== 'all') {
-      if (status === 'cancelled') {
-        matchStage.status = 'cancelled';
-      } else {
-        matchStage['subscription.activationStatus'] = status;
-      }
-    }
-
-    // Get parent bookings
-    const parentBookings = await Booking.find(matchStage)
-      .populate('customer', 'name phone')
-      .populate('worker', 'name phone')
-      .populate('service', 'name category')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit))
-      .lean();
-
-    const total = await Booking.countDocuments(matchStage);
-
-    // For each parent booking, get child session counts + overtime totals
-    const result = await Promise.all(parentBookings.map(async (b) => {
-      // Filter by search
-      if (search) {
-        const q = search.toLowerCase();
-        const nameMatch = b.customer?.name?.toLowerCase().includes(q);
-        const serviceMatch = b.service?.name?.toLowerCase().includes(q);
-        if (!nameMatch && !serviceMatch) return null;
-      }
-
-      const childBookings = await Booking.find({
-        parentBooking: b._id,
-        'subscription.isSubscription': true,
-      }).select('status overtimeMinutes overtimeCharges').lean();
-
-      // Root booking itself is session #1; include it in all counts
-      const allSessions = [b, ...childBookings];
-      const done = allSessions.filter(c => c.status === 'completed').length;
-      const upcoming = allSessions.filter(c => ['confirmed', 'assigned', 'pending', 'in-progress'].includes(c.status)).length;
-      const totalOvertimeMinutes = allSessions.reduce((s, c) => s + (c.overtimeMinutes || 0), 0);
-      const totalOvertimeCharges = allSessions.reduce((s, c) => s + (c.overtimeCharges || 0), 0);
-
-      return {
-        _id: b._id,
-        customer: b.customer,
-        worker: b.worker,
-        service: b.service,
-        bookingType: b.bookingType,
-        location: b.location,
-        subscriptionStartDate: b.subscription?.subscriptionStartDate,
-        subscriptionEndDate: b.subscription?.subscriptionEndDate,
-        activationStatus: b.subscription?.activationStatus,
-        bookingStatus: b.status,
-        isPaused: b.subscription?.isPaused,
-        isPrepaid: b.subscription?.isPrepaid,
-        totalAmount: b.totalAmount,
-        paymentStatus: b.paymentStatus,
-        preferredTime: b.subscription?.preferredTime || b.startTime,
-        durationPerSession: b.subscription?.durationPerSession,
-        frequency: b.recurringSchedule?.frequency,
-        sessionsTotal: allSessions.length,
-        sessionsDone: done,
-        sessionsUpcoming: upcoming,
-        totalOvertimeMinutes,
-        totalOvertimeCharges: Math.round(totalOvertimeCharges * 100) / 100,
-        createdAt: b.createdAt,
-      };
-    }));
-
-    const filtered = result.filter(Boolean);
-
-    res.json({ subscriptions: filtered, total, page: Number(page), limit: Number(limit) });
-  } catch (error) {
-    console.error('Subscription tracker error:', error);
-    res.status(500).json({ error: { message: 'Server error', status: 500 } });
-  }
-});
-
-// @route   GET /api/admin/subscription-tracker/:bookingId/sessions
-// @desc    Full session statement for one subscription (parent + all child bookings)
-// @access  Admin / Super Admin
-router.get('/subscription-tracker/:bookingId/sessions', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
-  try {
-    const { bookingId } = req.params;
-
-    const parent = await Booking.findById(bookingId)
-      .populate('customer', 'name phone')
-      .populate('worker', 'name phone')
-      .populate('service', 'name category')
-      .lean();
-
-    if (!parent) {
-      return res.status(404).json({ error: { message: 'Subscription not found', status: 404 } });
-    }
-
-    const sessions = await Booking.find({
-      parentBooking: bookingId,
-      'subscription.isSubscription': true,
-    })
-      .populate('worker', 'name phone')
-      .sort({ bookingDate: 1 })
-      .lean();
-
-    const calcScheduledMins = (s) => s.scheduledDurationMinutes ||
-      (() => {
-        if (!s.startTime || !s.endTime) return null;
-        const [sh, sm] = s.startTime.split(':').map(Number);
-        const [eh, em] = s.endTime.split(':').map(Number);
-        return (eh * 60 + em) - (sh * 60 + sm);
-      })();
-
-    // Root booking itself is session #1 (the first occurrence)
-    const rootRow = {
-      sessionNumber: 1,
-      _id: parent._id,
-      bookingDate: parent.bookingDate,
-      startTime: parent.startTime,
-      endTime: parent.endTime,
-      worker: parent.worker,
-      status: parent.status,
-      actualStartTime: parent.actualStartTime,
-      actualEndTime: parent.actualEndTime,
-      actualDurationMinutes: parent.actualDurationMinutes,
-      scheduledDurationMinutes: calcScheduledMins(parent),
-      overtimeMinutes: parent.overtimeMinutes || 0,
-      overtimeCharges: parent.overtimeCharges || 0,
-    };
-
-    const sessionRows = [rootRow, ...sessions.map((s, idx) => ({
-      sessionNumber: idx + 2,
-      _id: s._id,
-      bookingDate: s.bookingDate,
-      startTime: s.startTime,
-      endTime: s.endTime,
-      worker: s.worker,
-      status: s.status,
-      actualStartTime: s.actualStartTime,
-      actualEndTime: s.actualEndTime,
-      actualDurationMinutes: s.actualDurationMinutes,
-      scheduledDurationMinutes: calcScheduledMins(s),
-      overtimeMinutes: s.overtimeMinutes || 0,
-      overtimeCharges: s.overtimeCharges || 0,
-    }))];
-
-    const totalOvertimeMinutes = sessionRows.reduce((s, r) => s + r.overtimeMinutes, 0);
-    const totalOvertimeCharges = sessionRows.reduce((s, r) => s + r.overtimeCharges, 0);
-    const sessionsDone = sessionRows.filter(r => r.status === 'completed').length;
-
-    // Append projected future sessions so admins see the full upcoming schedule
-    const projectedRows = projectSubscriptionSessions(parent, sessionRows);
-    const allRows = [...sessionRows, ...projectedRows];
-    const sessionsUpcoming = allRows.filter(r =>
-      ['confirmed', 'assigned', 'pending', 'scheduled'].includes(r.status)
-    ).length;
-
-    res.json({
-      subscription: {
-        _id: parent._id,
-        customer: parent.customer,
-        worker: parent.worker,
-        service: parent.service,
-        bookingType: parent.bookingType,
-        location: parent.location,
-        totalAmount: parent.totalAmount,
-        paymentStatus: parent.paymentStatus,
-        isPrepaid: parent.subscription?.isPrepaid,
-        activationStatus: parent.subscription?.activationStatus,
-        bookingStatus: parent.status,
-        subscriptionStartDate: parent.subscription?.subscriptionStartDate,
-        subscriptionEndDate: parent.subscription?.subscriptionEndDate,
-        preferredTime: parent.subscription?.preferredTime || parent.startTime,
-        durationPerSession: parent.subscription?.durationPerSession,
-        frequency: parent.recurringSchedule?.frequency,
-      },
-      sessions: allRows,
-      summary: {
-        total: allRows.length,
-        done: sessionsDone,
-        upcoming: sessionsUpcoming,
-        totalOvertimeMinutes,
-        totalOvertimeCharges: Math.round(totalOvertimeCharges * 100) / 100,
-      },
-    });
-  } catch (error) {
-    console.error('Subscription sessions error:', error);
-    res.status(500).json({ error: { message: 'Server error', status: 500 } });
-  }
-});
 
 export default router;

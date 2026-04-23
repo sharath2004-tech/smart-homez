@@ -3,12 +3,9 @@ import AppLayout from "@/components/AppLayout";
 import { ReliabilityScoreCard } from "@/components/ReliabilityScoreCard";
 import { WorkerRatingAnalytics } from "@/components/WorkerRatingAnalytics";
 import { useAdminRole } from "@/hooks/useAdminRole";
-import { useConfirm } from "@/hooks/useConfirm";
 import { adminAPI, API_BASE_URL, reliabilityAPI, reviewAnalyticsAPI, superAdminAPI } from "@/lib/api";
-import * as msg91Widget from "@/lib/msg91Widget";
 import { AlertTriangle, Archive, ArchiveRestore, BarChart3, CheckCircle, Clock, Edit, Eye, EyeOff, FileText, Info, Loader2, MapPin, Plus, Search, Star, TrendingUp, Upload, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
 
 interface Location {
   _id: string;
@@ -32,7 +29,6 @@ interface Worker {
     languages?: string[];
     rating: number;
     completedJobs: number;
-    totalBookingsCompleted?: number;
     totalEarnings: number;
     availability: boolean;
     manualAvailability?: boolean;
@@ -262,7 +258,6 @@ const formatMinutes = (mins: number) => {
 const AdminWorkers = () => {
   const WORKERS_PER_PAGE = 8;
   const { role, name, isSuperAdmin } = useAdminRole();
-  const confirm = useConfirm();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -272,7 +267,7 @@ const AdminWorkers = () => {
   const [noRegionAssigned, setNoRegionAssigned] = useState(false);
   const [showWorkerForm, setShowWorkerForm] = useState(false);
   const [creatingWorker, setCreatingWorker] = useState(false);
-  // credentialDelivery is always 'phone' — no email-based delivery
+  const [credentialDelivery, setCredentialDelivery] = useState<"email" | "phone" | "both">("email");
   const [customCreateSpecialization, setCustomCreateSpecialization] = useState("");
   const [customEditSpecialization, setCustomEditSpecialization] = useState("");
 
@@ -307,6 +302,7 @@ const AdminWorkers = () => {
 
   const [workerForm, setWorkerForm] = useState({
     name: "",
+    email: "",
     phone: "",
     gender: "" as string,
     dateOfBirth: "",
@@ -327,13 +323,6 @@ const AdminWorkers = () => {
     aadhaarFront: null,
     aadhaarBack: null
   });
-
-  // Phone OTP verification state (worker creation form)
-  const [createPhoneOtpSent, setCreatePhoneOtpSent] = useState(false);
-  const [createPhoneOtpCode, setCreatePhoneOtpCode] = useState('');
-  const [createPhoneOtpLoading, setCreatePhoneOtpLoading] = useState(false);
-  const [createPhoneOtpError, setCreatePhoneOtpError] = useState('');
-  const [createPhoneVerified, setCreatePhoneVerified] = useState(false);
 
   const profilePicRef = useRef<HTMLInputElement>(null);
   const aadhaarFrontRef = useRef<HTMLInputElement>(null);
@@ -459,7 +448,7 @@ const AdminWorkers = () => {
       fetchWorkerAnalytics(workerId);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load worker details';
-      toast.error(message);
+      alert(message);
     }
   };
 
@@ -473,54 +462,44 @@ const AdminWorkers = () => {
 
     // Validate resignedDate
     if (!resignedDate || resignedDate.trim() === '') {
-      toast.warning('Please provide a resigned date');
+      alert('Please provide a resigned date');
       return;
     }
 
     const parsedDate = new Date(resignedDate);
     if (isNaN(parsedDate.getTime())) {
-      toast.warning('Invalid resigned date. Please enter a valid date.');
+      alert('Invalid resigned date. Please enter a valid date.');
       return;
     }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (parsedDate > today) {
-      toast.warning('Resigned date cannot be in the future');
+      alert('Resigned date cannot be in the future');
       return;
     }
 
     try {
       await workerCollectionApi.archiveWorker(archiveWorkerData.id, resignedDate);
-      toast.success('Worker archived successfully');
+      alert('Worker archived successfully');
       setArchiveWorkerData(null);
       setResignedDate("");
       fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to archive worker';
-      toast.error(message);
+      alert(message);
     }
   };
 
   const handleUnarchiveWorker = async (workerId: string) => {
-    if (!await confirm('Restore this worker? They will be reactivated.')) return;
+    if (!confirm('Restore this worker? They will be reactivated.')) return;
     try {
       await workerCollectionApi.unarchiveWorker(workerId);
-      toast.success('Worker restored successfully');
+      alert('Worker restored successfully');
       fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to restore worker';
-      toast.error(message);
-    }
-  };
-
-  const handleToggleWorkerAvailability = async (workerId: string, currentAvailability: boolean) => {
-    try {
-      await workerCollectionApi.updateWorkerAvailability(workerId, !currentAvailability);
-      fetchData();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update worker availability';
-      toast.error(message);
+      alert(message);
     }
   };
 
@@ -553,13 +532,13 @@ const AdminWorkers = () => {
       setShowCredentials(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load worker details';
-      toast.error(message);
+      alert(message);
     }
   };
 
   const handleResetWorkerPassword = async () => {
     if (!editWorker) return;
-    if (!await confirm(`Generate a new temporary password for ${editWorker.name}? This will invalidate their current password.`)) return;
+    if (!confirm(`Generate a new temporary password for ${editWorker.name}? This will invalidate their current password.`)) return;
 
     setResettingPassword(true);
     try {
@@ -577,7 +556,7 @@ const AdminWorkers = () => {
             availability: false,
             manualAvailability: false,
             effectiveAvailability: false,
-            availabilityReason: 'Worker will go online after logging in'
+            availabilityReason: 'Worker must sign in and change the system-generated password before taking bookings'
           }
         };
       });
@@ -586,11 +565,11 @@ const AdminWorkers = () => {
         ? Object.entries(response.deliveryResults).map(([key, value]) => `${key}: ${value}`).join(', ')
         : 'pending';
 
-      toast.success(`Temporary password reset successfully! New Temporary Password: ${response.temporaryPassword || '(check delivery channel)'}. Delivery: ${response.credentialDelivery || credentialDelivery}. Status: ${deliveryStatus}. The worker must log in and change this password before going online.`);
+      alert(`Temporary password reset successfully! ✅\n\nNew Temporary Password: ${response.temporaryPassword || '(check delivery channel)'}\n\nDelivery: ${response.credentialDelivery || credentialDelivery}\nStatus: ${deliveryStatus}\n\nThe worker must log in and change this password before going online.`);
       fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to reset password';
-      toast.error(message);
+      alert(message);
     } finally {
       setResettingPassword(false);
     }
@@ -606,7 +585,7 @@ const AdminWorkers = () => {
 
       // Basic fields
       formData.append('name', editWorker.name);
-      if (editWorker.email && editWorker.email.includes('@')) formData.append('email', editWorker.email);
+      formData.append('email', editWorker.email);
       if (editWorker.phone) formData.append('phone', editWorker.phone);
       if (editWorker.gender) formData.append('gender', editWorker.gender);
       if (editWorker.dateOfBirth) formData.append('dateOfBirth', editWorker.dateOfBirth);
@@ -648,13 +627,13 @@ const AdminWorkers = () => {
       if (editDocFiles.aadhaarBack) formData.append('aadhaarBack', editDocFiles.aadhaarBack);
 
       const response = await adminAPI.updateWorker(editWorker._id, formData);
-      toast.success('Worker updated successfully!');
+      alert('Worker updated successfully!');
       setEditDocFiles({ profilePicture: null, aadhaarFront: null, aadhaarBack: null });
       setEditWorker(response.worker || null);
       fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to update worker';
-      toast.error(message);
+      alert(message);
     } finally {
       setUpdatingWorker(false);
     }
@@ -664,12 +643,12 @@ const AdminWorkers = () => {
     e.preventDefault();
 
     if (workerForm.specialization.length === 0) {
-      toast.warning('Please select at least one specialization');
+      alert('Please select at least one specialization');
       return;
     }
 
     if (workerForm.selectedLocations.length === 0) {
-      toast.warning('Please assign worker to at least one location');
+      alert('Please assign worker to at least one location');
       return;
     }
 
@@ -677,7 +656,7 @@ const AdminWorkers = () => {
     if (workerForm.aadhaarNumber) {
       const digits = workerForm.aadhaarNumber.replace(/\s/g, '');
       if (!/^\d{12}$/.test(digits)) {
-        toast.warning('Aadhaar number must be exactly 12 digits');
+        alert('Aadhaar number must be exactly 12 digits');
         return;
       }
     }
@@ -689,36 +668,36 @@ const AdminWorkers = () => {
       const age = today.getFullYear() - dob.getFullYear() -
         (today < new Date(today.getFullYear(), dob.getMonth(), dob.getDate()) ? 1 : 0);
       if (age < 18) {
-        toast.warning('Worker must be at least 18 years old');
+        alert('Worker must be at least 18 years old');
         return;
       }
     }
 
-    if (!workerForm.phone) {
-      toast.warning('Phone number is required to create a worker account');
+    // Credential delivery validation
+    if (!workerForm.email) {
+      alert('Email is required to create a worker account');
       return;
     }
-
-    if (!createPhoneVerified) {
-      toast.warning("Please verify the worker's phone number via OTP before creating the account");
+    if (credentialDelivery === 'phone' && !workerForm.phone) {
+      alert('Phone is required for phone credential delivery');
       return;
     }
 
     const rate = Number(workerForm.hourlyRate);
     if (!workerForm.hourlyRate || rate <= 0 || isNaN(rate)) {
-      toast.warning('Please provide a valid hourly rate greater than 0');
+      alert('Please provide a valid hourly rate greater than 0');
       return;
     }
 
     // Validate gender and experience if provided
     if (workerForm.gender && !['male', 'female', 'other'].includes(workerForm.gender.toLowerCase())) {
-      toast.warning('Please select a valid gender option');
+      alert('Please select a valid gender option');
       return;
     }
     if (workerForm.experience) {
       const exp = Number(workerForm.experience);
       if (isNaN(exp) || exp < 0) {
-        toast.warning('Experience must be a positive number');
+        alert('Experience must be a positive number');
         return;
       }
     }
@@ -728,6 +707,7 @@ const AdminWorkers = () => {
     try {
       const formData = new FormData();
       formData.append('name', workerForm.name);
+      if (workerForm.email) formData.append('email', workerForm.email);
       if (workerForm.phone) formData.append('phone', '+91' + workerForm.phone.replace(/\D/g, '').slice(0, 10));
       if (workerForm.gender) formData.append('gender', workerForm.gender);
       if (workerForm.religion) formData.append('religion', workerForm.religion);
@@ -737,8 +717,7 @@ const AdminWorkers = () => {
       formData.append('assignedApartmentIds', JSON.stringify(workerForm.selectedLocations));
       if (workerForm.aadhaarNumber) formData.append('aadhaarNumber', workerForm.aadhaarNumber.replace(/\s/g, ''));
       formData.append('hourlyRate', workerForm.hourlyRate);
-      formData.append('credentialDelivery', 'phone');
-      if (createPhoneVerified) formData.append('isPhoneVerified', 'true');
+      formData.append('credentialDelivery', credentialDelivery);
       if (docFiles.profilePicture) formData.append('profilePicture', docFiles.profilePicture);
       if (docFiles.aadhaarFront) formData.append('aadhaarFront', docFiles.aadhaarFront);
       if (docFiles.aadhaarBack) formData.append('aadhaarBack', docFiles.aadhaarBack);
@@ -746,14 +725,20 @@ const AdminWorkers = () => {
       const response = await workerCollectionApi.createWorker(formData);
       
       // Show temporary password to admin
+      const deliveryLabel =
+        credentialDelivery === "both" ? `📧 Email: ${workerForm.email}\n📱 Phone: ${workerForm.phone}` :
+        credentialDelivery === "phone" ? `📱 Phone: ${workerForm.phone}` :
+        `📧 Email: ${workerForm.email}`;
       const deliveryStatus = response.deliveryResults
         ? Object.entries(response.deliveryResults).map(([k, v]) => `${k}: ${v}`).join(', ')
         : 'pending';
-      toast.success(`Worker created successfully! Temp password: ${response.temporaryPassword || '(see delivery channel)'}. Credentials sent via SMS to: ${workerForm.phone}. Status: ${deliveryStatus}.`);
+      alert(`Worker created successfully! ✅\n\nTemporary Password: ${response.temporaryPassword || '(see delivery channel)'}\n\nCredentials sent via:\n${deliveryLabel}\nStatus: ${deliveryStatus}\n\nPlease save this password as backup.`);
       
       setShowWorkerForm(false);
+      setCredentialDelivery("email");
       setWorkerForm({
         name: "",
+        email: "",
         phone: "",
         gender: "",
         dateOfBirth: "",
@@ -766,47 +751,12 @@ const AdminWorkers = () => {
       });
       setCustomCreateSpecialization("");
       setDocFiles({ profilePicture: null, aadhaarFront: null, aadhaarBack: null });
-      setCreatePhoneOtpSent(false);
-      setCreatePhoneOtpCode('');
-      setCreatePhoneOtpError('');
-      setCreatePhoneVerified(false);
       fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create worker';
-      toast.error(message);
+      alert('❌ Error: ' + message);
     } finally {
       setCreatingWorker(false);
-    }
-  };
-
-  const handleSendCreatePhoneOtp = async () => {
-    const digits = workerForm.phone.replace(/\D/g, '').slice(-10);
-    if (digits.length !== 10) { setCreatePhoneOtpError('Enter a valid 10-digit mobile number'); return; }
-    setCreatePhoneOtpLoading(true);
-    setCreatePhoneOtpError('');
-    try {
-      await msg91Widget.sendOtp('91' + digits);
-      setCreatePhoneOtpSent(true);
-    } catch (err) {
-      setCreatePhoneOtpError(err instanceof Error ? err.message : 'Failed to send OTP');
-    } finally {
-      setCreatePhoneOtpLoading(false);
-    }
-  };
-
-  const handleVerifyCreatePhoneOtp = async () => {
-    if (createPhoneOtpCode.length !== 6) { setCreatePhoneOtpError('Enter the 6-digit OTP'); return; }
-    setCreatePhoneOtpLoading(true);
-    setCreatePhoneOtpError('');
-    try {
-      await msg91Widget.verifyOtp(createPhoneOtpCode);
-      setCreatePhoneVerified(true);
-      setCreatePhoneOtpSent(false);
-      setCreatePhoneOtpCode('');
-    } catch (err) {
-      setCreatePhoneOtpError(err instanceof Error ? err.message : 'Invalid OTP. Please try again.');
-    } finally {
-      setCreatePhoneOtpLoading(false);
     }
   };
 
@@ -1010,14 +960,14 @@ const AdminWorkers = () => {
                       )}
                     </div>
                     <div className="text-center">
-                      <p className="text-sm font-bold text-foreground">{w.workerProfile?.completedJobs ?? w.workerProfile?.totalBookingsCompleted ?? 0}</p>
+                      <p className="text-sm font-bold text-foreground">{w.workerProfile?.completedJobs || 0}</p>
                       <p className="text-xs text-muted-foreground">Jobs</p>
                       <p className="text-xs text-green-600">
                         {w.workerProfile?.rating && w.workerProfile.rating >= 4 ? '🔥 Top Performer' : ''}
                       </p>
                     </div>
                     <div className="text-center">
-                      <p className="text-sm font-bold text-foreground">₹{w.workerProfile?.totalEarnings ?? 0}</p>
+                      <p className="text-sm font-bold text-foreground">₹{w.workerProfile?.totalEarnings || 0}</p>
                       <p className="text-xs text-muted-foreground">Earned</p>
                       <p className="text-xs text-purple-600">
                         {isWorkerEffectivelyOnline(w) ? '🟢 Online' : '🔴 Offline'}
@@ -1133,19 +1083,6 @@ const AdminWorkers = () => {
                     <Edit className="w-3.5 h-3.5" /> Edit Worker
                   </button>
 
-                  {!w.isArchived && (
-                    <button
-                      onClick={() => handleToggleWorkerAvailability(w._id, !!w.workerProfile?.availability)}
-                      className={`w-full py-2 mb-2 border rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
-                        w.workerProfile?.availability
-                          ? 'border-slate-300 text-slate-700 hover:bg-slate-50'
-                          : 'border-green-300 text-green-700 hover:bg-green-50'
-                      }`}
-                    >
-                      <CheckCircle className="w-3.5 h-3.5" /> {w.workerProfile?.availability ? 'Set Inactive' : 'Set Active'}
-                    </button>
-                  )}
-
                   {w.isArchived ? (
                     <button
                       onClick={() => handleUnarchiveWorker(w._id)}
@@ -1201,10 +1138,45 @@ const AdminWorkers = () => {
                   />
                 </div>
 
-                {/* Phone field — required, with OTP verification */}
+                {/* Credential delivery method — affects which fields are required */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Send temporary password via</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {(["email", "phone", "both"] as const).map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setCredentialDelivery(opt)}
+                        className={`py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
+                          credentialDelivery === opt
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background border-border hover:bg-muted text-foreground"
+                        }`}
+                      >
+                        {opt === "email" ? "📧 Email" : opt === "phone" ? "📱 Phone" : "📧+📱 Both"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    Phone <span className="text-destructive">*</span>
+                    Email <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    className="input-clean"
+                    placeholder="worker@example.com"
+                    value={workerForm.email}
+                    onChange={(e) => setWorkerForm({...workerForm, email: e.target.value})}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Worker login and password backup are always tied to email.</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Phone {credentialDelivery === 'email' ? <span className="text-muted-foreground font-normal">(Optional)</span> : <span className="text-destructive">*</span>}
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">+91</span>
@@ -1212,70 +1184,22 @@ const AdminWorkers = () => {
                       type="tel"
                       inputMode="numeric"
                       maxLength={10}
-                      required
+                      required={credentialDelivery !== 'email'}
                       className="input-clean pl-12"
                       placeholder="9876543210"
                       value={workerForm.phone}
-                      onChange={(e) => {
-                        const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
-                        setWorkerForm({...workerForm, phone: digits});
-                        setCreatePhoneVerified(false);
-                        setCreatePhoneOtpSent(false);
-                        setCreatePhoneOtpCode('');
-                        setCreatePhoneOtpError('');
-                      }}
+                      onChange={(e) => setWorkerForm({...workerForm, phone: e.target.value.replace(/\D/g, '').slice(0, 10)})}
                     />
                   </div>
-                  {/* Phone OTP Verification */}
-                  {workerForm.phone.replace(/\D/g, '').slice(-10).length === 10 && (
-                    <div className="mt-2">
-                      {createPhoneVerified ? (
-                        <p className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
-                          <CheckCircle className="w-3.5 h-3.5" /> Phone verified
-                        </p>
-                      ) : !createPhoneOtpSent ? (
-                        <button
-                          type="button"
-                          onClick={handleSendCreatePhoneOtp}
-                          disabled={createPhoneOtpLoading}
-                          className="flex items-center gap-1.5 text-xs text-primary font-medium hover:underline disabled:opacity-50"
-                        >
-                          {createPhoneOtpLoading && <Loader2 className="w-3 h-3 animate-spin" />}
-                          Verify phone via OTP
-                        </button>
-                      ) : (
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            maxLength={6}
-                            className="input-clean"
-                            placeholder="Enter 6-digit OTP"
-                            value={createPhoneOtpCode}
-                            onChange={(e) => setCreatePhoneOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                          />
-                          <button
-                            type="button"
-                            onClick={handleVerifyCreatePhoneOtp}
-                            disabled={createPhoneOtpLoading || createPhoneOtpCode.length < 6}
-                            className="w-full py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
-                          >
-                            {createPhoneOtpLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                            Verify OTP
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => { setCreatePhoneOtpSent(false); setCreatePhoneOtpCode(''); setCreatePhoneOtpError(''); }}
-                            className="text-xs text-muted-foreground hover:underline"
-                          >
-                            Change number
-                          </button>
-                        </div>
-                      )}
-                      {createPhoneOtpError && <p className="text-xs text-destructive mt-1">{createPhoneOtpError}</p>}
-                    </div>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-1">Temporary password will be sent as an SMS to this number.</p>
+                </div>
+
+                {/* Credential delivery method */}
+                <div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {credentialDelivery === "email" && "Temporary password will be sent to the email address."}
+                    {credentialDelivery === "phone" && "Temporary password will be sent as an SMS to the phone number."}
+                    {credentialDelivery === "both" && "Temporary password will be sent to both email and phone."}
+                  </p>
                 </div>
 
                 <div>
@@ -2179,7 +2103,7 @@ const AdminWorkers = () => {
                                   type="button"
                                   onClick={() => {
                                     navigator.clipboard.writeText(editWorker.email);
-                                    toast.success('Email copied to clipboard!');
+                                    alert('Email copied to clipboard!');
                                   }}
                                   className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-amber-700 hover:text-amber-900"
                                 >
@@ -2201,7 +2125,7 @@ const AdminWorkers = () => {
                                     type="button"
                                     onClick={() => {
                                       navigator.clipboard.writeText(editWorker.phone || '');
-                                      toast.success('Phone copied to clipboard!');
+                                      alert('Phone copied to clipboard!');
                                     }}
                                     className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-amber-700 hover:text-amber-900"
                                   >
@@ -2227,7 +2151,7 @@ const AdminWorkers = () => {
                                     type="button"
                                     onClick={() => {
                                       navigator.clipboard.writeText(tempPassword);
-                                      toast.success('Password copied to clipboard!');
+                                      alert('Password copied to clipboard!');
                                     }}
                                     className="text-xs text-green-700 hover:text-green-900 underline"
                                   >

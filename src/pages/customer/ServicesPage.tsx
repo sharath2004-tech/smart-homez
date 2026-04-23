@@ -1,8 +1,8 @@
 import AppLayout from "@/components/AppLayout";
 import LocationSelector, { LocationData } from "@/components/LocationSelector";
-import { authAPI, serviceAreasAPI, servicesAPI, setStoredCustomerLocation, settingsAPI } from "@/lib/api";
+import { authAPI, serviceAreasAPI, servicesAPI, setStoredCustomerLocation } from "@/lib/api";
 import { motion } from "framer-motion";
-import { CalendarClock, Clock, MapPin, Search, Star, Users } from "lucide-react";
+import { Clock, MapPin, Search, Sparkles, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -13,7 +13,6 @@ interface Service {
   name: string;
   description: string;
   category: string;
-  serviceCategory?: string;
   serviceType?: string;
   price: number;
   duration: number;
@@ -26,26 +25,17 @@ interface Service {
   };
 }
 
-const CATEGORY_META: Record<string, { icon: string; route: string; color: string; badgeColor: string }> = {
-  instant_services:      { icon: '⚡', route: '/customer/services/insta',               color: 'bg-amber-50 border-amber-300',  badgeColor: 'bg-teal-100 text-teal-700' },
-  subscription_services: { icon: '📅', route: '/customer/services/subscription',         color: 'bg-blue-50 border-blue-300',    badgeColor: 'bg-teal-100 text-teal-700' },
-  deep_cleaning:         { icon: '✨', route: '/customer/deep-cleaning',                 color: 'bg-green-50 border-green-300',  badgeColor: 'bg-teal-100 text-teal-700' },
-  spot_cleaning:         { icon: '🧹', route: '/customer/services/category/spot_cleaning',      color: 'bg-cyan-50 border-cyan-300',    badgeColor: 'bg-cyan-100 text-cyan-700' },
-  kitchen_services:      { icon: '🍳', route: '/customer/services/category/kitchen_services',   color: 'bg-orange-50 border-orange-300',badgeColor: 'bg-orange-100 text-orange-700' },
-  bathroom_services:     { icon: '🚿', route: '/customer/services/category/bathroom_services',  color: 'bg-purple-50 border-purple-300',badgeColor: 'bg-purple-100 text-purple-700' },
-  furniture_services:    { icon: '🛋️', route: '/customer/services/category/furniture_services', color: 'bg-rose-50 border-rose-300',    badgeColor: 'bg-rose-100 text-rose-700' },
-  hvac_services:         { icon: '❄️', route: '/customer/services/category/hvac_services',      color: 'bg-sky-50 border-sky-300',      badgeColor: 'bg-sky-100 text-sky-700' },
-  other:                 { icon: '🏠', route: '/customer/services/category/other',               color: 'bg-slate-50 border-slate-300',  badgeColor: 'bg-slate-100 text-slate-700' },
-};
+const SERVICE_CATEGORIES = [
+  { key: 'insta',        labelKey: 'customer.services.catInstaLabel', icon: '⚡', descKey: 'customer.services.catInstaDesc', color: 'bg-amber-50 border-amber-300',  badgeKey: 'customer.services.catInstaBadge', badgeColor: 'bg-teal-100 text-teal-700', path: '/customer/services/insta' },
+  { key: 'subscription', labelKey: 'customer.services.catSubLabel',   icon: '📅', descKey: 'customer.services.catSubDesc',   color: 'bg-blue-50 border-blue-300',    badgeKey: 'customer.services.catSubBadge',   badgeColor: 'bg-teal-100 text-teal-700', path: '/customer/services/subscription' },
+  { key: 'deep',         labelKey: 'customer.services.catDeepLabel',  icon: '✨', descKey: 'customer.services.catDeepDesc',  color: 'bg-green-50 border-green-300',  badgeKey: 'customer.services.catDeepBadge',  badgeColor: 'bg-teal-100 text-teal-700', path: '/customer/deep-cleaning' },
+];
 
-const getCategoryRoute = (serviceCategory: string) =>
-  (CATEGORY_META[serviceCategory] ?? CATEGORY_META['other']).route;
-
-const getCategoryIcon = (serviceCategory: string) =>
-  (CATEGORY_META[serviceCategory] ?? CATEGORY_META['other']).icon;
-
-const getCategoryColors = (serviceCategory: string) =>
-  CATEGORY_META[serviceCategory] ?? CATEGORY_META['other'];
+const HIDDEN_ROOT_SERVICE_TYPES = new Set([
+  'instant_hourly',
+  'monthly_subscription',
+  'deep_cleaning_full_house',
+]);
 
 const dedupeServices = (items: Service[]) => {
   const seen = new Set<string>();
@@ -76,53 +66,10 @@ const ServicesPage = () => {
   const [showLocationSelector, setShowLocationSelector] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   const [requestingServiceId, setRequestingServiceId] = useState<string | null>(null);
-  const [todayAvailableSlotCount, setTodayAvailableSlotCount] = useState<number | null>(null);
-  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
-  const [favouriteIds, setFavouriteIds] = useState<Set<string>>(() => {
-    try {
-      const stored = localStorage.getItem('favouriteServiceIds');
-      return new Set(stored ? JSON.parse(stored) : []);
-    } catch {
-      return new Set();
-    }
-  });
-
-  const toggleFavourite = (serviceId: string) => {
-    setFavouriteIds(prev => {
-      const next = new Set(prev);
-      if (next.has(serviceId)) next.delete(serviceId);
-      else next.add(serviceId);
-      localStorage.setItem('favouriteServiceIds', JSON.stringify([...next]));
-      return next;
-    });
-  };
-
-  // Count how many of today's slots are still in the future
-  const countFutureSlots = (slots: string[]): number => {
-    const now = new Date();
-    const nowMins = now.getHours() * 60 + now.getMinutes() + 30; // 30-min buffer
-    return slots.filter((t) => {
-      const [h, m] = t.split(':').map(Number);
-      return h * 60 + m > nowMins;
-    }).length;
-  };
 
   useEffect(() => {
     fetchProfile();
-    // Fetch available service categories
-    servicesAPI.getCategories()
-      .then((data: { categories: { serviceCategory: string }[] }) => {
-        setAvailableCategories((data.categories || []).map((c) => c.serviceCategory));
-      })
-      .catch(() => {});
-    // Fetch today's available slot count once
-    const today = new Date().toISOString().split('T')[0];
-    settingsAPI.getAvailableSlotsByDate(today)
-      .then((data: { slots?: string[] }) => {
-        setTodayAvailableSlotCount(countFutureSlots(data?.slots || []));
-      })
-      .catch(() => setTodayAvailableSlotCount(null));
-
+    
     // Check if user has a saved location
     const savedLocation = localStorage.getItem('userLocation');
     if (savedLocation) {
@@ -147,7 +94,7 @@ const ServicesPage = () => {
 
   const handleLocationConfirmed = (location: LocationData) => {
     if (!location.isAvailable) {
-      toast.warning(t('customer.services.areaNotServiceable'));
+      alert(t('customer.services.areaNotServiceable'));
       return;
     }
     
@@ -248,14 +195,20 @@ const ServicesPage = () => {
 
   const matchesCategory = (service: Service) => {
     if (!activeCategory) return true;
-    return service.serviceCategory === activeCategory
-      || service.category === activeCategory;
+    const n = service.name.toLowerCase();
+    const c = service.category.toLowerCase();
+    if (activeCategory === 'insta') return n.includes('insta') || n.includes('adhoc') || n.includes('hourly');
+    if (activeCategory === 'subscription') return n.includes('subscription') || n.includes('monthly') || n.includes('weekly') || c.includes('subscription');
+    if (activeCategory === 'deep') return n.includes('deep') || n.includes('full home');
+    return true;
   };
 
-  const displayedServices = services.filter(matchesCategory).sort((a, b) => {
-    const aFav = favouriteIds.has(a._id) ? 0 : 1;
-    const bFav = favouriteIds.has(b._id) ? 0 : 1;
-    return aFav - bFav;
+  const displayedServices = services.filter((service) => {
+    if (service.serviceType && HIDDEN_ROOT_SERVICE_TYPES.has(service.serviceType)) {
+      return false;
+    }
+
+    return matchesCategory(service);
   });
 
   const getCategoryEmoji = (category: string, name: string) => {
@@ -302,7 +255,7 @@ const ServicesPage = () => {
   return (
     <>
       <AppLayout userType="customer" userName={profile?.name || "Loading..."}>
-        <div className="w-full px-4 sm:px-5 md:px-7 lg:px-10 space-y-6 pb-20 md:pb-0">
+        <div className="max-w-4xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 pb-20 md:pb-0">
           <motion.div
             initial={{ x: -20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
@@ -334,28 +287,111 @@ const ServicesPage = () => {
           </motion.div>
 
 
-          {/* Dynamic Category Cards — driven by serviceCategory values from the API */}
-          {availableCategories.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {availableCategories.map((cat) => {
-                const colors = getCategoryColors(cat);
-                const label = t(`customer.services.cat.${cat}`, cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
-                return (
-                  <button
-                    key={cat}
-                    onClick={() => navigate(getCategoryRoute(cat))}
-                    className={`p-3 rounded-2xl border-2 text-center transition-all ${colors.color} hover:border-primary/60 hover:shadow-md active:scale-95`}
-                  >
-                    <div className="text-2xl mb-1">{getCategoryIcon(cat)}</div>
-                    <p className="text-xs font-semibold text-foreground leading-tight">{label}</p>
-                    <span className={`inline-block mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full ${colors.badgeColor}`}>
-                      {t('customer.services.explore', 'Explore')}
-                    </span>
-                  </button>
-                );
-              })}
+          {/* 3 Category Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {SERVICE_CATEGORIES.map((cat) => (
+              <button
+                key={cat.key}
+                onClick={() => navigate(cat.path)}
+                className={`p-3 rounded-2xl border-2 text-center transition-all ${cat.color} hover:border-primary/60 hover:shadow-md active:scale-95`}
+              >
+                <div className="text-2xl mb-1">{cat.icon}</div>
+                <div>
+                  <p className="text-xs font-semibold text-foreground leading-tight">
+                    {cat.key === 'deep' ? 'Move In / Move Out Cleaning' : t(cat.labelKey)}
+                  </p>
+                  {cat.key === 'deep' && (
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Full Home Deep Clean</p>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block leading-tight">{t(cat.descKey)}</p>
+                <span className={`inline-block mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full ${cat.badgeColor}`}>{t(cat.badgeKey)}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Spot Clean Mini Services Banner */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.40 }}
+          >
+            <Link
+              to="/customer/services/spot-clean"
+              className="flex items-center gap-4 p-4 rounded-2xl border-2 border-cyan-300 bg-cyan-50 hover:bg-cyan-100 hover:border-cyan-400 transition-all group"
+            >
+              <div className="w-12 h-12 bg-cyan-200 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform text-2xl">
+                🧹
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-cyan-900 text-sm leading-tight">Mini Services  — Spot Cleaning</p>
+                <p className="text-xs text-cyan-700 mt-0.5">Kitchen · Bathroom · Sofa · Fan · Fridge · Balcony &amp; more</p>
+              </div>
+              <span className="shrink-0 text-xs font-semibold bg-cyan-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">From ₹149 →</span>
+            </Link>
+          </motion.div>
+
+          {/* Deep Cleaning Commercial Quote Banner */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+          >
+            <Link
+              to="/deep-cleaning-quote"
+              className="flex items-center gap-4 p-4 rounded-2xl border-2 border-green-300 bg-green-50 hover:bg-green-100 hover:border-green-400 transition-all group"
+            >
+              <div className="w-12 h-12 bg-green-200 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                <Sparkles className="w-6 h-6 text-green-700" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-green-900 text-sm leading-tight">Post Construction — Commercial &amp; Residential</p>
+                <p className="text-xs text-green-700 mt-0.5">Villas · Restaurants · Offices · Bungalows</p>
+              </div>
+              <span className="shrink-0 text-xs font-semibold bg-green-700 text-white px-3 py-1.5 rounded-full whitespace-nowrap">Get Free Quote →</span>
+            </Link>
+          </motion.div>
+
+          {/* Deep Cleaning Sub-Services Cards */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.45 }}
+            className="space-y-3"
+          >
+            <h3 className="text-sm font-semibold text-foreground px-1">Dedicated Deep-Clean Service Pages</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Link
+                to="/customer/services/intense-washroom-cleaning"
+                className="p-4 rounded-xl border-2 border-purple-300 bg-purple-50 hover:bg-purple-100 hover:border-purple-400 transition-all text-center group"
+              >
+                <div className="text-3xl mb-2">🚿</div>
+                <p className="font-semibold text-purple-900 text-sm">Intense Washroom Cleaning</p>
+                <p className="text-xs text-purple-700 mt-1">Tiles · fittings · stain removal</p>
+                <span className="inline-block mt-2 text-[10px] font-semibold bg-purple-600 text-white px-2 py-1 rounded-full">Open Page</span>
+              </Link>
+
+              <Link
+                to="/customer/services/kitchen-deep-clean"
+                className="p-4 rounded-xl border-2 border-orange-300 bg-orange-50 hover:bg-orange-100 hover:border-orange-400 transition-all text-center group"
+              >
+                <div className="text-3xl mb-2">🍽️</div>
+                <p className="font-semibold text-orange-900 text-sm">Kitchen Deep Clean</p>
+                <p className="text-xs text-orange-700 mt-1">Grease · appliances · tiles</p>
+                <span className="inline-block mt-2 text-[10px] font-semibold bg-orange-600 text-white px-2 py-1 rounded-full">Open Page</span>
+              </Link>
+
+              <Link
+                to="/customer/services/window-deep-cleaning"
+                className="p-4 rounded-xl border-2 border-blue-300 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 transition-all text-center group"
+              >
+                <div className="text-3xl mb-2">🪟</div>
+                <p className="font-semibold text-blue-900 text-sm">Window Deep Cleaning</p>
+                <p className="text-xs text-blue-700 mt-1">Glass · frames · tracks</p>
+                <span className="inline-block mt-2 text-[10px] font-semibold bg-blue-600 text-white px-2 py-1 rounded-full">Open Page</span>
+              </Link>
             </div>
-          )}
+          </motion.div>
 
           {/* Search */}
           <motion.div
@@ -423,37 +459,11 @@ const ServicesPage = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <h3 className="font-bold font-heading text-foreground text-sm">{service.name}</h3>
-                        <div className="flex flex-col items-end gap-1 shrink-0">
-                          <button
-                            onClick={() => toggleFavourite(service._id)}
-                            aria-label={favouriteIds.has(service._id) ? 'Remove from favourites' : 'Add to favourites'}
-                            className="p-1 rounded-lg hover:bg-accent transition-colors"
-                          >
-                            <Star className={`w-4 h-4 transition-colors ${favouriteIds.has(service._id) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
-                          </button>
-                          {service.availability && (
-                            <span className={`text-xs ${service.availability.available ? 'badge-success' : 'badge-warning'}`}>
-                              {service.availability.available ? t('customer.services.available') : t('customer.services.limited')}
-                            </span>
-                          )}
-                          {/* Slot count badge — skip for deep cleaning (quote) and subscriptions */}
-                          {!service.isQuoteService && !service.subscriptionOptions?.enabled && todayAvailableSlotCount !== null && (
-                            <span className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                              todayAvailableSlotCount === 0
-                                ? 'bg-red-100 text-red-700'
-                                : todayAvailableSlotCount <= 4
-                                ? 'bg-amber-100 text-amber-700'
-                                : 'bg-primary/10 text-primary'
-                            }`}>
-                              <CalendarClock className="w-3 h-3" />
-                              {todayAvailableSlotCount === 0
-                                ? t('servicesPageExtra.fullyBooked')
-                                : todayAvailableSlotCount <= 4
-                                ? t('servicesPageExtra.slotsLeft', { count: todayAvailableSlotCount })
-                                : t('servicesPageExtra.slotsToday', { count: todayAvailableSlotCount })}
-                            </span>
-                          )}
-                        </div>
+                        {service.availability && (
+                          <span className={`shrink-0 text-xs ${service.availability.available ? 'badge-success' : 'badge-warning'}`}>
+                            {service.availability.available ? t('customer.services.available') : t('customer.services.limited')}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{service.description}</p>
                     </div>
@@ -475,7 +485,7 @@ const ServicesPage = () => {
                     <div className="flex items-center justify-between mb-3">
                       <div>
                         {service.isQuoteService ? (
-                          <span className="text-sm font-bold text-green-700">{t('servicesPageExtra.customQuote')}</span>
+                          <span className="text-sm font-bold text-green-700">Custom Quote</span>
                         ) : service.subscriptionOptions?.enabled ? (
                           <div>
                             <div className="text-xs text-muted-foreground line-through">
@@ -512,21 +522,21 @@ const ServicesPage = () => {
                           disabled={requestingServiceId === service._id}
                           className="w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors bg-amber-100 text-amber-900 hover:bg-amber-200 disabled:opacity-60"
                         >
-                          {requestingServiceId === service._id ? t('servicesPageExtra.sendingRequest') : t('servicesPageExtra.requestInLocation')}
+                          {requestingServiceId === service._id ? "Sending request..." : "Request service in my location"}
                         </button>
                       ) : service.isQuoteService ? (
                         <Link
                           to="/customer/deep-cleaning"
                           className="w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors btn-brand"
                         >
-                          {t('servicesPageExtra.bookNow')} ✨
+                          Book Now ✨
                         </Link>
                       ) : service.subscriptionOptions?.enabled ? (
                         <Link
                           to={`/customer/subscribe/${service._id}`}
                           className="w-full text-xs py-2 px-3 flex items-center justify-center gap-1 rounded-xl transition-colors btn-brand"
                         >
-                          {t('servicesPageExtra.subscribe')} 📅
+                          Subscribe 📅
                         </Link>
                       ) : (
                         <Link

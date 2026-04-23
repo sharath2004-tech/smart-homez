@@ -37,28 +37,7 @@ interface Task {
   status: string;
   totalAmount: number;
   actualStartTime?: string;
-  actualDurationMinutes?: number;
-  workforce?: {
-    wageType?: string;
-    wageRate?: number;
-    totalWorkerWage?: number;
-    workerCount?: number;
-  };
 }
-
-const getWorkerWage = (task: Task): number | null => {
-  const { workforce, actualDurationMinutes } = task;
-  if (!workforce?.wageRate && !workforce?.totalWorkerWage) return null;
-  if (workforce.totalWorkerWage && workforce.totalWorkerWage > 0) {
-    return Math.round(workforce.totalWorkerWage / Math.max(workforce.workerCount || 1, 1));
-  }
-  if (workforce.wageRate) {
-    if (workforce.wageType === 'per_session') return workforce.wageRate;
-    const hours = (actualDurationMinutes || 0) / 60;
-    return Math.round(workforce.wageRate * hours);
-  }
-  return null;
-};
 
 interface Profile {
   name: string;
@@ -292,10 +271,8 @@ const WorkerDashboard = () => {
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-xs text-muted-foreground">{t('worker.earnings.yourEarning') || 'Your Wage'}</p>
-                  <span className="text-base font-bold text-primary">
-                    {getWorkerWage(currentTask) != null ? `₹${getWorkerWage(currentTask)}` : '—'}
-                  </span>
+                  <p className="text-xs text-muted-foreground">{t('worker.dashboard.collect')}</p>
+                  <span className="text-base font-bold text-primary">₹{currentTask.totalAmount}</span>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-3 bg-muted rounded-xl mb-4 text-sm">
@@ -348,7 +325,7 @@ const WorkerDashboard = () => {
             <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
             <h3 className="text-lg font-bold text-foreground mb-1">{t('worker.dashboard.offline')}</h3>
             <p className="text-sm text-muted-foreground">
-              {t('worker.dashboard.goOnline')}
+              {t('worker.dashboard.online')}
             </p>
           </div>
         )}

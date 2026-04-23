@@ -20,8 +20,9 @@ interface Service {
   price: number;
   duration: number;
   subscriptionOptions?: {
-    discount?: number;
-    planDiscounts?: Partial<Record<'daily' | 'weekly' | 'biweekly' | 'monthly', number>>;
+    enabled?: boolean;
+    discountPercentage?: number;
+    discounts?: Partial<Record<'daily' | 'weekly' | 'biweekly' | 'monthly', number>>;
   };
 }
 
@@ -51,10 +52,8 @@ export default function SubscriptionBookingPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [service, setService] = useState<Service | null>(null);
-  const [serviceNotFound, setServiceNotFound] = useState(false);
   const [profile, setProfile] = useState<{
     name?: string;
-    isPhoneVerified?: boolean;
     addresses?: Array<{
       isDefault?: boolean;
       apartmentName?: string;
@@ -67,6 +66,7 @@ export default function SubscriptionBookingPage() {
     }>;
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [serviceNotFound, setServiceNotFound] = useState(false);
   const [booking, setBooking] = useState(false);
   const [createdSubscription, setCreatedSubscription] = useState<{ bookingId: string; amount: number } | null>(null);
   const [paymentSubmitted, setPaymentSubmitted] = useState(false);
@@ -102,12 +102,15 @@ export default function SubscriptionBookingPage() {
           servicesAPI.getById(id!),
           authAPI.getProfile()
         ]);
-        setService(serviceData.service);
+        if (!serviceData.service) {
+          setServiceNotFound(true);
+        } else {
+          setService(serviceData.service);
+        }
         setProfile(profileData.user || profileData);
       } catch (error) {
         console.error('Error fetching data:', error);
         setServiceNotFound(true);
-        toast.error(t('subscription.failedToLoad'));
       } finally {
         setLoading(false);
       }
@@ -115,32 +118,35 @@ export default function SubscriptionBookingPage() {
     loadData();
   }, [id]);
 
+  // Default per-plan discount percentages used if service doesn't provide its own
+  const DEFAULT_PLAN_DISCOUNTS: Record<string, number> = {
+    oneTime: 0,
+    daily: 10,
+    weekly: 15,
+    biweekly: 12,
+    monthly: 20,
+  };
+
+  const getPlanDiscount = (plan: string): number => {
+    if (plan === 'oneTime') return 0;
+    // Use per-plan override from service config if available
+    const serviceDiscounts = service?.subscriptionOptions?.discounts;
+    if (serviceDiscounts && plan in serviceDiscounts) {
+      return serviceDiscounts[plan as keyof typeof serviceDiscounts] ?? DEFAULT_PLAN_DISCOUNTS[plan] ?? 0;
+    }
+    // Fall back to single discountPercentage from service config
+    if (service?.subscriptionOptions?.discountPercentage) {
+      return service.subscriptionOptions.discountPercentage;
+    }
+    return DEFAULT_PLAN_DISCOUNTS[plan] ?? 0;
+  };
+
   const calculateTotalPrice = () => {
     if (!service) return 0;
     
     const basePrice = service.price;
     
-    // Apply discounts based on plan
-    const getPlanDiscount = (plan: string): number => {
-      const planDiscounts = service.subscriptionOptions?.planDiscounts;
-      const serviceDiscount = service.subscriptionOptions?.discount;
-      const defaults: Record<string, number> = { oneTime: 0, daily: 10, weekly: 15, biweekly: 12, monthly: 20 };
-      if (plan !== 'oneTime') {
-        const key = plan as 'daily' | 'weekly' | 'biweekly' | 'monthly';
-        if (planDiscounts?.[key] !== undefined) return planDiscounts[key]!;
-        if (serviceDiscount !== undefined) return serviceDiscount;
-      }
-      return defaults[plan] ?? 0;
-    };
-    const discounts: Record<string, number> = {
-      oneTime: 0,
-      daily: getPlanDiscount('daily'),
-      weekly: getPlanDiscount('weekly'),
-      biweekly: getPlanDiscount('biweekly'),
-      monthly: getPlanDiscount('monthly')
-    };
-    
-    const discount = discounts[selectedPlan];
+    const discount = getPlanDiscount(selectedPlan);
     const discountedPrice = basePrice * (1 - discount / 100);
     
     // Calculate based on schedule duration
@@ -184,11 +190,6 @@ export default function SubscriptionBookingPage() {
           ? 'Checking whether this service is available in your region. Please wait a moment.'
           : 'Please set a service location in your profile or services page before booking.'
       );
-      return;
-    }
-
-    if (!profile?.isPhoneVerified) {
-      toast.error('Please verify your mobile number before confirming the booking.');
       return;
     }
 
@@ -291,23 +292,24 @@ export default function SubscriptionBookingPage() {
     );
   }
 
-  if (serviceNotFound || !service) {
+  if (serviceNotFound) {
     return (
       <AppLayout userType="customer" userName={profile?.name}>
-        <div className="flex flex-col items-center justify-center min-h-[400px] px-4 text-center">
-          <div className="text-6xl mb-4">🔍</div>
-          <h2 className="text-xl font-bold text-foreground mb-2">{t('subscription.serviceNotFound', 'Service not found')}</h2>
-          <p className="text-muted-foreground text-sm mb-6">{t('subscription.serviceNotFoundDesc', 'This service is no longer available or has been removed.')}</p>
-          <button
-            onClick={() => navigate('/customer/services')}
-            className="btn-brand px-6 py-3"
-          >
-            {t('subscription.backToServices', 'Browse services')}
-          </button>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center max-w-md">
+            <div className="text-5xl mb-4">🔍</div>
+            <h2 className="text-xl font-bold text-foreground mb-2">{t('subscription.serviceNotFound')}</h2>
+            <p className="text-muted-foreground mb-6">{t('subscription.serviceNotFoundDesc')}</p>
+            <Link to="/customer/services" className="btn-brand inline-flex items-center gap-2">
+              <ArrowLeft className="w-4 h-4" />
+              {t('subscription.backToServices')}
+            </Link>
+          </div>
         </div>
       </AppLayout>
     );
   }
+
 
   return (
     <AppLayout userType="customer" userName={profile?.name}>
@@ -461,8 +463,8 @@ export default function SubscriptionBookingPage() {
                 }));
               }}
               basePrice={service?.price || 0}
-              serviceDiscount={service?.subscriptionOptions?.discount}
-              planDiscounts={service?.subscriptionOptions?.planDiscounts}
+              serviceDiscount={service?.subscriptionOptions?.discountPercentage}
+              planDiscounts={service?.subscriptionOptions?.discounts}
             />
           )}
 
@@ -535,7 +537,7 @@ export default function SubscriptionBookingPage() {
                       <p className="text-sm font-semibold text-green-600">
                         {t('subscription.youSave')}: ₹{Math.round(service!.price * schedule.duration * 
                           getApproxMonthlyVisits(selectedPlan, schedule.specificDays?.length || 0) * 
-                          ({daily: 0.1, weekly: 0.15, biweekly: 0.12, monthly: 0.2}[selectedPlan] || 0)
+                          (getPlanDiscount(selectedPlan) / 100)
                         )}
                       </p>
                       <p className="text-xs text-muted-foreground">{t('subscription.withSubscription')}</p>

@@ -15,24 +15,27 @@ interface SubscriptionPlanSelectorProps {
   selectedPlan: string;
   onPlanChange: (plan: 'oneTime' | 'daily' | 'weekly' | 'biweekly' | 'monthly') => void;
   basePrice: number;
+  /** Optional single discount % from service config that overrides per-plan defaults for all non-oneTime plans */
   serviceDiscount?: number;
+  /** Optional per-plan discount overrides from service config */
   planDiscounts?: Partial<Record<'daily' | 'weekly' | 'biweekly' | 'monthly', number>>;
 }
 
 export function SubscriptionPlanSelector({ selectedPlan, onPlanChange, basePrice, serviceDiscount, planDiscounts }: SubscriptionPlanSelectorProps) {
   const { t } = useTranslation();
 
-  const defaultDiscounts: Record<'daily' | 'weekly' | 'biweekly' | 'monthly', number> = {
+  // Default per-plan discount percentages (used when service config doesn't provide its own)
+  const DEFAULT_DISCOUNTS: Record<string, number> = {
     daily: 10,
     weekly: 15,
     biweekly: 12,
-    monthly: 20
+    monthly: 20,
   };
 
   const resolveDiscount = (plan: 'daily' | 'weekly' | 'biweekly' | 'monthly'): number => {
-    if (planDiscounts?.[plan] !== undefined) return planDiscounts[plan]!;
-    if (serviceDiscount !== undefined) return serviceDiscount;
-    return defaultDiscounts[plan];
+    if (planDiscounts && plan in planDiscounts) return planDiscounts[plan] ?? DEFAULT_DISCOUNTS[plan];
+    if (serviceDiscount !== undefined && serviceDiscount > 0) return serviceDiscount;
+    return DEFAULT_DISCOUNTS[plan];
   };
 
   const plans: PlanOption[] = [

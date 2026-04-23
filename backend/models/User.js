@@ -9,16 +9,15 @@ const userSchema = new mongoose.Schema({
   },
   email: {
     type: String,
-    required: false,
+    required: [true, 'Email is required'],
     unique: true,
-    sparse: true,
     lowercase: true,
     trim: true,
-    match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email'],
-    set: (v) => (!v || typeof v !== 'string' || !v.trim() ? undefined : v),
+    match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email']
   },
   password: {
     type: String,
+    required: [true, 'Password is required'],
     minlength: [6, 'Password must be at least 6 characters'],
     select: false
   },
@@ -81,9 +80,7 @@ const userSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    trim: true,
-    unique: true,
-    sparse: true  // allows multiple null/undefined values; enforces uniqueness only when set
+    trim: true
   },
   isPhoneVerified: {
     type: Boolean,
@@ -110,10 +107,6 @@ const userSchema = new mongoose.Schema({
   isFirstLogin: {
     type: Boolean,
     default: false // Only true for admin-created workers with temporary passwords
-  },
-  isProfileIncomplete: {
-    type: Boolean,
-    default: false // True for OTP-only users who haven't filled in name/email/location yet
   },
   hasCustomPassword: {
     type: Boolean,
@@ -239,11 +232,9 @@ const userSchema = new mongoose.Schema({
     },
     leaves: [{
       date: {
-        type: Date
+        type: Date,
+        required: true
       },
-      dates: [{
-        type: Date
-      }],
       reason: {
         type: String,
         maxlength: 200

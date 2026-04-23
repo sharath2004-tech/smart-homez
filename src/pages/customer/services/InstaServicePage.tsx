@@ -18,7 +18,6 @@ import { toast } from "sonner";
 
 interface UserProfile {
   name: string;
-  isPhoneVerified?: boolean;
   addresses?: {
     isDefault: boolean;
     apartmentName?: string;
@@ -49,14 +48,6 @@ interface Service {
   }>;
   dos?: string[];
   donts?: string[];
-  timeBasedPricing?: {
-    enabled: boolean;
-    startTime: string;
-    endTime: string;
-    surchargeType: 'percentage' | 'fixed';
-    surchargeValue: number;
-    label: string;
-  };
 }
 
 const HOUR_OPTIONS: number[] = []; // replaced — hours derived from service.durationOptions below
@@ -178,32 +169,13 @@ const InstaServicePage = () => {
     return busy;
   }, [rawBookedRanges, genderPref, hours, generatedTimeSlots]);
 
-  const totalBaseAmount = selectedDurationTotal ?? hours * pricePerHour;
+  const totalAmount = selectedDurationTotal ?? hours * pricePerHour;
+  const mrpTotal = selectedDurationMrp ?? hours * mrpPerHour;
 
   // Effective per-hour rates for display — derived from actual total/hours so they always match
-  const displayPricePerHour = hours > 0 ? Math.round(totalBaseAmount / hours) : pricePerHour;
-  const displayMrpPerHour = (() => {
-    const mrpBase = selectedDurationMrp ?? hours * mrpPerHour;
-    return hours > 0 && mrpBase > 0 ? Math.round(mrpBase / hours) : mrpPerHour;
-  })();
+  const displayPricePerHour = hours > 0 ? Math.round(totalAmount / hours) : pricePerHour;
+  const displayMrpPerHour = hours > 0 && mrpTotal > 0 ? Math.round(mrpTotal / hours) : mrpPerHour;
 
-  // Peak-hours surcharge
-  const peakSurcharge = (() => {
-    const tbp = service?.timeBasedPricing;
-    if (!tbp?.enabled || !tbp.surchargeValue) return 0;
-    const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
-    const t = toMin(startTime);
-    const start = toMin(tbp.startTime);
-    const end = toMin(tbp.endTime);
-    const inWindow = start <= end ? t >= start && t <= end : t >= start || t <= end;
-    if (!inWindow) return 0;
-    return tbp.surchargeType === 'fixed'
-      ? Math.round(tbp.surchargeValue)
-      : Math.round(totalBaseAmount * tbp.surchargeValue / 100);
-  })();
-
-  const totalAmount = totalBaseAmount + peakSurcharge;
-  const mrpTotal = selectedDurationMrp ?? hours * mrpPerHour;
   const discountPct = mrpTotal > totalAmount && mrpTotal > 0
     ? Math.round((1 - totalAmount / mrpTotal) * 100)
     : 0;
@@ -364,11 +336,6 @@ const InstaServicePage = () => {
           ? 'Checking whether this service is available in your region. Please wait a moment.'
           : 'Please set a service location in your profile or services page before booking.'
       );
-      return;
-    }
-
-    if (!profile?.isPhoneVerified) {
-      toast.error('Please verify your mobile number before confirming the booking.');
       return;
     }
 
@@ -614,7 +581,34 @@ const InstaServicePage = () => {
           >
             {/* Hours — from admin-configured durationOptions */}
             {service?.durationOptions && service.durationOptions.length > 0 && (() => {
-              const allTiers = [...service.durationOptions].sort((a, b) => a.hours - b.hours);
+              const normalizedTiers = [...service.durationOptions]
+                .map((opt) => ({
+                  ...opt,
+                  hours: Number(opt.hours),
+                  price: Number(opt.price),
+                  originalPrice: Number(opt.originalPrice || 0),
+                }))
+                .filter((opt) => Number.isFinite(opt.hours) && opt.hours > 0 && Number.isFinite(opt.price) && opt.price >= 0);
+
+              const hasHalfHourTier = normalizedTiers.some((opt) => Math.abs(opt.hours - 0.5) < 0.001);
+              const baseTier = [...normalizedTiers].sort((a, b) => a.hours - b.hours)[0];
+
+              const allTiers = (hasHalfHourTier || !baseTier
+                ? normalizedTiers
+                : [
+                    {
+                      hours: 0.5,
+                      price: Math.max(0, Math.round((baseTier.price / baseTier.hours) * 0.5)),
+                      originalPrice: baseTier.originalPrice > 0
+                        ? Math.max(0, Math.round((baseTier.originalPrice / baseTier.hours) * 0.5))
+                        : 0,
+                    },
+                    ...normalizedTiers,
+                  ]
+              ).sort((a, b) => a.hours - b.hours);
+
+              if (allTiers.length === 0) return null;
+
               return (
             <div>
               <h2 className="font-semibold font-heading text-foreground mb-1 flex items-center gap-2">
@@ -934,17 +928,6 @@ const InstaServicePage = () => {
                   <span className="text-green-700">₹{totalAmount.toLocaleString('en-IN')}</span>
                 </div>
               </div>
-              {peakSurcharge > 0 && service?.timeBasedPricing && (
-                <div className="flex items-start gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 -mx-4 px-4 py-2 mt-1 rounded-lg">
-                  <span className="shrink-0">⚡</span>
-                  <span>
-                    <strong>{service.timeBasedPricing.label} surcharge</strong> applied ({service.timeBasedPricing.startTime}–{service.timeBasedPricing.endTime}):{' '}
-                    +{service.timeBasedPricing.surchargeType === 'fixed'
-                      ? `₹${service.timeBasedPricing.surchargeValue}`
-                      : `${service.timeBasedPricing.surchargeValue}%`} = ₹{peakSurcharge}
-                  </span>
-                </div>
-              )}
               <div className="flex items-start gap-2 pt-2 border-t border-amber-200 text-xs text-amber-800 bg-amber-50 -mx-4 -mb-4 px-4 pb-4 rounded-b-2xl mt-2">
                 <span className="shrink-0 mt-0.5">⚠️</span>
                 <span><strong>Price may vary</strong> if the service runs beyond {hours} hr{hours > 1 ? 's' : ''}. Overtime is billed at ₹{overtimeRate}/min on the final bill.</span>

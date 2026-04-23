@@ -17,14 +17,11 @@ interface Profile {
   workerProfile?: {
     rating: number;
     specialization: string[];
-    totalBookingsCompleted?: number;
+    totalJobsCompleted?: number;
     wageType?: 'hourly' | 'daily' | 'monthly';
     hourlyRate?: number;
     dailyWage?: number;
     monthlyWage?: number;
-    reliability?: number;
-    reliabilityScore?: number;
-    experience?: number;
     assignedApartments: Array<{
       apartmentName?: string;
       buildingName?: string;
@@ -34,7 +31,7 @@ interface Profile {
       city: string;
     }>;
     availability: boolean;
-    accountStatus?: string;
+    verified: boolean;
   };
   createdAt: string;
 }
@@ -137,7 +134,7 @@ const WorkerProfile = () => {
 
   const initials = profile.name.split(' ').map((n: string) => n[0]).join('').toUpperCase();
   const rating = profile.workerProfile?.rating || 0;
-  const totalJobs = profile.workerProfile?.totalBookingsCompleted || stats.thisMonth || 0;
+  const totalJobs = profile.workerProfile?.totalJobsCompleted || stats.thisMonth || 0;
   const profileImageUrl = resolveAssetUrl(profile.profileImage) || resolveAssetUrl(documents?.profileImage);
   const displayProfileImageUrl = profilePicturePreview || profileImageUrl;
 
