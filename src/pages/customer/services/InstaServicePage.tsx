@@ -917,16 +917,20 @@ const InstaServicePage = () => {
             <div className="card-elevated p-4 rounded-2xl space-y-2">
               <p className="text-sm font-semibold text-foreground">Price Breakdown</p>
               <div className="flex justify-between text-sm text-muted-foreground">
-                <span>{hours} hr × <span className="line-through">₹{displayMrpPerHour}/hr</span> <span className="text-green-600 font-medium">₹{displayPricePerHour}/hr</span></span>
+                <span>{hours} hr × {displayMrpPerHour > displayPricePerHour && <span className="line-through">₹{displayMrpPerHour}/hr</span>} <span className="text-green-600 font-medium">₹{displayPricePerHour}/hr</span></span>
                 <div className="text-right">
-                  <div className="text-xs line-through">₹{mrpTotal.toLocaleString('en-IN')}</div>
+                  {displayMrpPerHour > displayPricePerHour && (
+                    <div className="text-xs line-through">₹{Math.round(hours * displayMrpPerHour).toLocaleString('en-IN')}</div>
+                  )}
                   <div className="text-green-700 font-medium">₹{totalAmount.toLocaleString('en-IN')}</div>
                 </div>
               </div>
               <div className="flex justify-between font-bold text-foreground border-t pt-2 text-base">
                 <span>Total</span>
                 <div className="text-right">
-                  <div className="text-xs text-muted-foreground line-through">₹{mrpTotal.toLocaleString('en-IN')}</div>
+                  {mrpTotal > totalAmount && (
+                    <div className="text-xs text-muted-foreground line-through">₹{mrpTotal.toLocaleString('en-IN')}</div>
+                  )}
                   <span className="text-green-700">₹{totalAmount.toLocaleString('en-IN')}</span>
                 </div>
               </div>
