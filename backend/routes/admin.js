@@ -4545,4 +4545,298 @@ router.get('/customers/:id',
   }
 );
 
+// ── Reports ────────────────────────────────────────────────────────────────────
+
+// @route   GET /api/admin/reports/worker-wages
+// @desc    Admin/SuperAdmin: Worker wage report for a date range
+// @access  Private/Admin
+router.get('/reports/worker-wages', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { from, to, locationId } = req.query;
+    const fromDate = from ? new Date(from) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const toDate = to ? new Date(to) : new Date();
+    toDate.setHours(23, 59, 59, 999);
+
+    let workerFilter = { role: 'worker' };
+    if (req.user.role === 'admin') {
+      const locationIds = (req.user.adminProfile?.assignedLocations || []).map(l => l.locationId);
+      workerFilter['workerProfile.assignedApartments.locationId'] = { $in: locationIds };
+    } else if (locationId) {
+      workerFilter['workerProfile.assignedApartments.locationId'] = new mongoose.Types.ObjectId(locationId);
+    }
+
+    const workers = await User.find(workerFilter)
+      .select('name phone workerProfile.hourlyRate workerProfile.dailyWage workerProfile.monthlyWage workerProfile.wageType')
+      .lean();
+
+    const workerIds = workers.map(w => w._id);
+
+    const bookings = await Booking.find({
+      worker: { $in: workerIds },
+      status: 'completed',
+      bookingDate: { $gte: fromDate, $lte: toDate }
+    }).select('worker totalAmount actualDurationMinutes bookingDate').lean();
+
+    const workerMap = new Map();
+    workers.forEach(w => {
+      workerMap.set(w._id.toString(), {
+        _id: w._id,
+        name: w.name || 'Unknown',
+        phone: w.phone || '',
+        hourlyRate: w.workerProfile?.hourlyRate || 0,
+        dailyWage: w.workerProfile?.dailyWage || null,
+        monthlyWage: w.workerProfile?.monthlyWage || null,
+        wageType: w.workerProfile?.wageType || 'hourly',
+        completedTasks: 0,
+        totalMinutesWorked: 0,
+      });
+    });
+
+    bookings.forEach(b => {
+      const key = b.worker?.toString();
+      if (!key || !workerMap.has(key)) return;
+      const entry = workerMap.get(key);
+      entry.completedTasks += 1;
+      entry.totalMinutesWorked += b.actualDurationMinutes || 0;
+    });
+
+    const rows = Array.from(workerMap.values())
+      .filter(w => w.completedTasks > 0)
+      .map(w => {
+        const hours = w.totalMinutesWorked / 60;
+        let wageEarned = 0;
+        if (w.wageType === 'daily' && w.dailyWage) {
+          const days = Math.ceil(w.totalMinutesWorked / (8 * 60));
+          wageEarned = days * w.dailyWage;
+        } else if (w.wageType === 'monthly' && w.monthlyWage) {
+          wageEarned = w.monthlyWage;
+        } else {
+          wageEarned = parseFloat((hours * w.hourlyRate).toFixed(2));
+        }
+        return {
+          _id: w._id,
+          name: w.name,
+          phone: w.phone,
+          hourlyRate: w.hourlyRate,
+          completedTasks: w.completedTasks,
+          totalMinutesWorked: w.totalMinutesWorked,
+          totalHoursWorked: parseFloat(hours.toFixed(2)),
+          wageEarned,
+        };
+      })
+      .sort((a, b) => b.wageEarned - a.wageEarned);
+
+    const summary = {
+      totalWorkers: rows.length,
+      totalMinutesWorked: rows.reduce((s, r) => s + r.totalMinutesWorked, 0),
+      totalHoursWorked: parseFloat(rows.reduce((s, r) => s + r.totalHoursWorked, 0).toFixed(2)),
+      totalWageEarned: parseFloat(rows.reduce((s, r) => s + r.wageEarned, 0).toFixed(2)),
+    };
+
+    res.json({ success: true, workers: rows, summary });
+  } catch (error) {
+    console.error('Worker wage report error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   GET /api/admin/reports/worker-wages/export
+// @desc    Admin/SuperAdmin: Export worker wage report as CSV
+// @access  Private/Admin
+router.get('/reports/worker-wages/export', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { from, to, locationId } = req.query;
+    const fromDate = from ? new Date(from) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const toDate = to ? new Date(to) : new Date();
+    toDate.setHours(23, 59, 59, 999);
+
+    let workerFilter = { role: 'worker' };
+    if (req.user.role === 'admin') {
+      const locationIds = (req.user.adminProfile?.assignedLocations || []).map(l => l.locationId);
+      workerFilter['workerProfile.assignedApartments.locationId'] = { $in: locationIds };
+    } else if (locationId) {
+      workerFilter['workerProfile.assignedApartments.locationId'] = new mongoose.Types.ObjectId(locationId);
+    }
+
+    const workers = await User.find(workerFilter)
+      .select('name phone workerProfile.hourlyRate workerProfile.dailyWage workerProfile.monthlyWage workerProfile.wageType')
+      .lean();
+    const workerIds = workers.map(w => w._id);
+
+    const bookings = await Booking.find({
+      worker: { $in: workerIds },
+      status: 'completed',
+      bookingDate: { $gte: fromDate, $lte: toDate }
+    }).select('worker totalAmount actualDurationMinutes bookingDate').lean();
+
+    const workerMap = new Map();
+    workers.forEach(w => {
+      workerMap.set(w._id.toString(), {
+        name: w.name || 'Unknown', phone: w.phone || '',
+        hourlyRate: w.workerProfile?.hourlyRate || 0,
+        dailyWage: w.workerProfile?.dailyWage || null,
+        monthlyWage: w.workerProfile?.monthlyWage || null,
+        wageType: w.workerProfile?.wageType || 'hourly',
+        completedTasks: 0, totalMinutesWorked: 0,
+      });
+    });
+    bookings.forEach(b => {
+      const key = b.worker?.toString();
+      if (!key || !workerMap.has(key)) return;
+      const entry = workerMap.get(key);
+      entry.completedTasks += 1;
+      entry.totalMinutesWorked += b.actualDurationMinutes || 0;
+    });
+
+    const lines = ['Name,Phone,Wage Type,Rate,Tasks Completed,Hours Worked,Wage Earned'];
+    Array.from(workerMap.values())
+      .filter(w => w.completedTasks > 0)
+      .forEach(w => {
+        const hours = (w.totalMinutesWorked / 60).toFixed(2);
+        let rate = w.wageType === 'daily' ? `₹${w.dailyWage}/day` : w.wageType === 'monthly' ? `₹${w.monthlyWage}/month` : `₹${w.hourlyRate}/hr`;
+        let wage = w.wageType === 'daily' ? Math.ceil(w.totalMinutesWorked / (8 * 60)) * (w.dailyWage || 0) :
+          w.wageType === 'monthly' ? w.monthlyWage || 0 : ((w.totalMinutesWorked / 60) * w.hourlyRate).toFixed(2);
+        lines.push(`"${w.name}","${w.phone}","${w.wageType}","${rate}",${w.completedTasks},${hours},${wage}`);
+      });
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="worker-wages-${from || 'all'}-to-${to || 'all'}.csv"`);
+    res.send(lines.join('\n'));
+  } catch (error) {
+    console.error('Worker wage export error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   GET /api/admin/reports/customer-bills
+// @desc    Admin/SuperAdmin: Customer billing report for a date range
+// @access  Private/Admin
+router.get('/reports/customer-bills', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    const fromDate = from ? new Date(from) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const toDate = to ? new Date(to) : new Date();
+    toDate.setHours(23, 59, 59, 999);
+
+    let bookingFilter = {
+      status: 'completed',
+      bookingDate: { $gte: fromDate, $lte: toDate }
+    };
+
+    if (req.user.role === 'admin') {
+      const locationIds = (req.user.adminProfile?.assignedLocations || []).map(l => l.locationId);
+      bookingFilter.location = { $in: locationIds };
+    }
+
+    const bookings = await Booking.find(bookingFilter)
+      .select('customer bookingType totalAmount bookingDate status')
+      .populate('customer', 'name phone')
+      .lean();
+
+    const customerMap = new Map();
+    bookings.forEach(b => {
+      if (!b.customer) return;
+      const key = b.customer._id.toString();
+      if (!customerMap.has(key)) {
+        customerMap.set(key, {
+          _id: b.customer._id,
+          name: b.customer.name || 'Unknown',
+          phone: b.customer.phone || '',
+          totalBookings: 0,
+          subscriptionBookings: 0,
+          oneTimeBookings: 0,
+          subscriptionBill: 0,
+          oneTimeBill: 0,
+          extraUtilisationBill: 0,
+        });
+      }
+      const entry = customerMap.get(key);
+      const amount = b.totalAmount || 0;
+      const isSub = b.bookingType === 'subscription' || b.bookingType === 'daily' || b.bookingType === 'weekly' || b.bookingType === 'biweekly' || b.bookingType === 'monthly';
+      entry.totalBookings += 1;
+      if (isSub) {
+        entry.subscriptionBookings += 1;
+        entry.subscriptionBill += amount;
+      } else {
+        entry.oneTimeBookings += 1;
+        entry.oneTimeBill += amount;
+      }
+    });
+
+    const rows = Array.from(customerMap.values()).map(c => ({
+      ...c,
+      subscriptionBill: parseFloat(c.subscriptionBill.toFixed(2)),
+      oneTimeBill: parseFloat(c.oneTimeBill.toFixed(2)),
+      extraUtilisationBill: parseFloat(c.extraUtilisationBill.toFixed(2)),
+      totalBill: parseFloat((c.subscriptionBill + c.oneTimeBill + c.extraUtilisationBill).toFixed(2)),
+    })).sort((a, b) => b.totalBill - a.totalBill);
+
+    const summary = {
+      totalCustomers: rows.length,
+      totalSubscriptionBill: parseFloat(rows.reduce((s, r) => s + r.subscriptionBill, 0).toFixed(2)),
+      totalOneTimeBill: parseFloat(rows.reduce((s, r) => s + r.oneTimeBill, 0).toFixed(2)),
+      totalExtraUtilisationBill: parseFloat(rows.reduce((s, r) => s + r.extraUtilisationBill, 0).toFixed(2)),
+      grandTotal: parseFloat(rows.reduce((s, r) => s + r.totalBill, 0).toFixed(2)),
+    };
+
+    res.json({ success: true, customers: rows, summary });
+  } catch (error) {
+    console.error('Customer bill report error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
+// @route   GET /api/admin/reports/customer-bills/export
+// @desc    Admin/SuperAdmin: Export customer billing report as CSV
+// @access  Private/Admin
+router.get('/reports/customer-bills/export', authenticate, authorize('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    const fromDate = from ? new Date(from) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const toDate = to ? new Date(to) : new Date();
+    toDate.setHours(23, 59, 59, 999);
+
+    let bookingFilter = {
+      status: 'completed',
+      bookingDate: { $gte: fromDate, $lte: toDate }
+    };
+    if (req.user.role === 'admin') {
+      const locationIds = (req.user.adminProfile?.assignedLocations || []).map(l => l.locationId);
+      bookingFilter.location = { $in: locationIds };
+    }
+
+    const bookings = await Booking.find(bookingFilter)
+      .select('customer bookingType totalAmount bookingDate')
+      .populate('customer', 'name phone')
+      .lean();
+
+    const customerMap = new Map();
+    bookings.forEach(b => {
+      if (!b.customer) return;
+      const key = b.customer._id.toString();
+      if (!customerMap.has(key)) {
+        customerMap.set(key, { name: b.customer.name || 'Unknown', phone: b.customer.phone || '', totalBookings: 0, subscriptionBill: 0, oneTimeBill: 0 });
+      }
+      const entry = customerMap.get(key);
+      const isSub = b.bookingType === 'subscription' || b.bookingType === 'daily' || b.bookingType === 'weekly' || b.bookingType === 'biweekly' || b.bookingType === 'monthly';
+      entry.totalBookings += 1;
+      if (isSub) entry.subscriptionBill += (b.totalAmount || 0);
+      else entry.oneTimeBill += (b.totalAmount || 0);
+    });
+
+    const lines = ['Name,Phone,Total Bookings,Subscription Bill,One-Time Bill,Total Bill'];
+    Array.from(customerMap.values()).forEach(c => {
+      const total = (c.subscriptionBill + c.oneTimeBill).toFixed(2);
+      lines.push(`"${c.name}","${c.phone}",${c.totalBookings},${c.subscriptionBill.toFixed(2)},${c.oneTimeBill.toFixed(2)},${total}`);
+    });
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="customer-bills-${from || 'all'}-to-${to || 'all'}.csv"`);
+    res.send(lines.join('\n'));
+  } catch (error) {
+    console.error('Customer bill export error:', error);
+    res.status(500).json({ error: { message: 'Server error', status: 500 } });
+  }
+});
+
 export default router;
