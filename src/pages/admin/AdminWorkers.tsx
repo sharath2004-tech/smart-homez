@@ -2442,7 +2442,7 @@ const AdminWorkers = () => {
                       <ReliabilityScoreCard
                         workerId={editWorker._id}
                         workerName={editWorker.name}
-                        currentScore={editWorker.workerProfile?.reliabilityScore || 100}
+                        currentScore={editWorker.workerProfile?.reliabilityScore || 75}
                         data={workerReliabilityData}
                       />
 
@@ -2483,18 +2483,18 @@ const AdminWorkers = () => {
 
                     <div className="text-center">
                       <div className="text-lg font-bold text-gray-900 mb-1">
-                        {Math.round((editWorker.workerProfile?.reliabilityScore || 100) / 5)}/20
+                        {Math.round((editWorker.workerProfile?.reliabilityScore || 75) / 5)}/20
                       </div>
                       <p className="text-xs text-gray-600">Reliability Score</p>
                       <div className={`text-xs mt-1 font-medium ${
-                        (editWorker.workerProfile?.reliabilityScore || 100) >= 80
+                        (editWorker.workerProfile?.reliabilityScore || 75) >= 80
                           ? 'text-green-600'
-                          : (editWorker.workerProfile?.reliabilityScore || 100) >= 60
+                          : (editWorker.workerProfile?.reliabilityScore || 75) >= 60
                           ? 'text-amber-600'
                           : 'text-red-600'
                       }`}>
-                        {(editWorker.workerProfile?.reliabilityScore || 100) >= 80 ? 'Excellent' :
-                         (editWorker.workerProfile?.reliabilityScore || 100) >= 60 ? 'Good' : 'Needs Improvement'}
+                        {(editWorker.workerProfile?.reliabilityScore || 75) >= 80 ? 'Excellent' :
+                         (editWorker.workerProfile?.reliabilityScore || 75) >= 60 ? 'Good' : 'Needs Improvement'}
                       </div>
                     </div>
 
