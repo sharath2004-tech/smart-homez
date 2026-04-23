@@ -366,7 +366,7 @@ const userSchema = new mongoose.Schema({
     // Reliability score (0-100) based on punctuality, uniform, behaviour, etc.
     reliabilityScore: {
       type: Number,
-      default: 100,
+      default: 75,
       min: 0,
       max: 100
     },

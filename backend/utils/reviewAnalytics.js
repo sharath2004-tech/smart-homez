@@ -410,7 +410,7 @@ class ReviewAnalytics {
           name: worker?.name,
           currentRating: worker?.workerProfile?.rating || 0,
           totalReviews: worker?.workerProfile?.totalReviews || 0,
-          reliabilityScore: worker?.workerProfile?.reliabilityScore || 100
+          reliabilityScore: worker?.workerProfile?.reliabilityScore || 75
         },
         weeklyData,
         monthlyData,

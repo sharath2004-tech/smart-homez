@@ -52,7 +52,7 @@ router.get('/worker/:workerId', authenticate, [
       worker: {
         id: workerId,
         name: worker.name,
-        currentReliabilityScore: worker.workerProfile?.reliabilityScore || 100
+        currentReliabilityScore: worker.workerProfile?.reliabilityScore || 75
       },
       currentMonthScore: latestAvailableScore,
       currentMonthLabel: latestScoreLabel,
@@ -208,7 +208,7 @@ router.post('/bulk', authenticate, async (req, res) => {
         workerId: score.worker._id,
         workerName: score.worker.name,
         reliabilityScore: score.scoreBreakdown.finalScore,
-        normalizedScore: score.worker.workerProfile?.reliabilityScore || 100,
+        normalizedScore: score.worker.workerProfile?.reliabilityScore || 75,
         leaveData: score.leaveData,
         hasScore: true
       })),
@@ -216,7 +216,7 @@ router.post('/bulk', authenticate, async (req, res) => {
         workerId: worker._id,
         workerName: worker.name,
         reliabilityScore: null,
-        normalizedScore: worker.workerProfile?.reliabilityScore || 100,
+        normalizedScore: worker.workerProfile?.reliabilityScore || 75,
         leaveData: null,
         hasScore: false
       }))
