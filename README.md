@@ -1,4 +1,4 @@
-# Pure App Weave
+# Healthy Homez
 
 A modern health and service management application built with React, TypeScript, and MongoDB Atlas.
 
