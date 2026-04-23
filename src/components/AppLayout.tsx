@@ -125,7 +125,6 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
     { to: "/worker/dashboard", icon: LayoutDashboard, label: t('nav.dashboard') },
     { to: "/worker/tasks", icon: Calendar, label: t('nav.myTasks') },
     { to: "/worker/earnings", icon: IndianRupee, label: t('nav.salaryManagement') },
-    { to: "/worker/salary", icon: IndianRupee, label: t('nav.salaryHistory') },
     { to: "/worker/subscriptions", icon: RefreshCw, label: t('nav.workerSubscriptions') },
     { to: "/worker/leaves", icon: Bell, label: t('nav.myLeaves') },
     { to: "/worker/profile", icon: User, label: t('nav.profile') },

@@ -50,7 +50,6 @@ import WorkerDashboard from "./pages/worker/WorkerDashboard";
 import WorkerEarnings from "./pages/worker/WorkerEarnings";
 import WorkerLeaves from "./pages/worker/WorkerLeaves";
 import WorkerProfile from "./pages/worker/WorkerProfile";
-import WorkerSalaryRequest from "./pages/worker/WorkerSalaryRequest";
 import WorkerSubscriptions from "./pages/worker/WorkerSubscriptions";
 import WorkerTasks from "./pages/worker/WorkerTasks";
 
@@ -160,7 +159,6 @@ const App = () => (
           <Route path="/worker/tasks" element={<ProtectedRoute allowedRoles={['worker']}><WorkerTasks /></ProtectedRoute>} />
           <Route path="/worker/earnings" element={<ProtectedRoute allowedRoles={['worker']}><WorkerEarnings /></ProtectedRoute>} />
           <Route path="/worker/leaves" element={<ProtectedRoute allowedRoles={['worker']}><WorkerLeaves /></ProtectedRoute>} />
-          <Route path="/worker/salary" element={<ProtectedRoute allowedRoles={['worker']}><WorkerSalaryRequest /></ProtectedRoute>} />
           <Route path="/worker/profile" element={<ProtectedRoute allowedRoles={['worker']}><WorkerProfile /></ProtectedRoute>} />
           <Route path="/worker/notifications" element={<ProtectedRoute allowedRoles={['worker']}><NotificationsPage userType="worker" /></ProtectedRoute>} />
           <Route path="/worker/help" element={<ProtectedRoute allowedRoles={['worker']}><HelpPage userType="worker" /></ProtectedRoute>} />

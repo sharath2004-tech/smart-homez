@@ -456,22 +456,7 @@ const WorkerEarnings = () => {
           )}
         </div>
 
-        {/* Salary Settlement CTA */}
-        <div className="card-elevated p-4 sm:p-5 md:p-6 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h3 className="font-bold text-foreground text-sm mb-1">{t('worker.earnings.viewSalaryPayments')}</h3>
-              <p className="text-xs text-muted-foreground">{t('worker.earnings.seeMonthlySalary')}</p>
-            </div>
-            <a
-              href="/worker/salary"
-              className="btn-brand py-2.5 px-4 text-sm whitespace-nowrap flex items-center gap-1.5 shrink-0"
-            >
-              <IndianRupee className="w-4 h-4" />
-              {t('worker.earnings.salaryHistory')}
-            </a>
-          </div>
-        </div>
+
       </div>
     </AppLayout>
   );
