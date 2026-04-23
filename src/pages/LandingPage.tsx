@@ -1,5 +1,5 @@
 import { LanguageSelector } from "@/components/LanguageSelector";
-import { publicAPI } from "@/lib/api";
+import { publicAPI, servicesAPI } from "@/lib/api";
 import { ArrowRight, CheckCircle, Clock, Home, MapPin, Shield, Sparkles, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -17,9 +17,7 @@ const LandingPage = () => {
   // Track whether we got real data from the API
   const [statsLoaded, setStatsLoaded] = useState(false);
   const [liveReviews, setLiveReviews] = useState<{ _id: string; overallRating: number; comment: string; createdAt: string; customerName: string; avatar: string }[]>([]);
-
-  // Removed hardcoded services array - services should be managed by admin and fetched from API
-  // For marketing/landing page, either fetch actual services or use pure marketing content without specific services
+  const [landingServices, setLandingServices] = useState<{ _id: string; name: string; description: string; price: number; originalPrice?: number; serviceType?: string; serviceCategory?: string; durationOptions?: { hours: number; price: number }[] }[]>([]);
 
   const testimonials = [
     { nameKey: "landing.testimonials.name1", rating: 5, textKey: "landing.testimonials.review1", cityKey: "landing.testimonials.city1", avatar: "PS" },
@@ -54,8 +52,20 @@ const LandingPage = () => {
       }
     };
 
+    const fetchServices = async () => {
+      try {
+        const response = await servicesAPI.getAll({ isActive: true, limit: 8 });
+        if (response.services?.length > 0) {
+          setLandingServices(response.services);
+        }
+      } catch {
+        // non-fatal, section stays hidden
+      }
+    };
+
     fetchStats();
     fetchReviews();
+    fetchServices();
   }, []);
 
   const formatNumber = (num: number) => {
@@ -170,8 +180,48 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Services Section - REMOVED: Hardcoded services not allowed. 
-          Admin should manage services via admin panel. Customers can browse services at /customer/services */}
+      {/* Services Section */}
+      {landingServices.length > 0 && (
+        <section id="services" className="py-20 max-w-6xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <h2 className="section-title mb-3">{t('landing.nav.services')}</h2>
+            <p className="text-muted-foreground max-w-md mx-auto">{t('landing.hero.subtitle')}</p>
+          </div>
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+            {landingServices.map((svc) => {
+              const lowestPrice = svc.durationOptions?.length
+                ? Math.min(...svc.durationOptions.map((d) => d.price))
+                : svc.price;
+              return (
+                <Link
+                  key={svc._id}
+                  to="/register"
+                  className="card-elevated p-5 flex flex-col gap-3 hover:-translate-y-1 transition-transform group"
+                >
+                  <div className="w-11 h-11 bg-primary-light rounded-xl flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground text-sm leading-snug group-hover:text-primary transition-colors">{svc.name}</h3>
+                    {svc.description && (
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{svc.description}</p>
+                    )}
+                  </div>
+                  <div className="mt-auto flex items-center justify-between">
+                    <span className="text-sm font-bold text-primary">₹{lowestPrice}</span>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+          <div className="text-center mt-10">
+            <Link to="/register" className="btn-brand inline-flex items-center gap-2">
+              View All Services <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </section>
+      )}
 
       {/* How it works */}
       <section id="how-it-works" className="py-20 bg-muted">
