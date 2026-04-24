@@ -1,10 +1,10 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
+import multer from 'multer';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { uploadToCloudinary } from '../middleware/cloudinary.js';
 import Service from '../models/Service.js';
 import { checkServiceAvailability } from '../utils/geolocation.js';
-import multer from 'multer';
-import { uploadToCloudinary } from '../middleware/cloudinary.js';
 
 // Multer instance for service images (memory storage → Cloudinary)
 const uploadServiceImage = multer({
