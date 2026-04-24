@@ -41,7 +41,13 @@
     "delete": "हटाएं",
     "back": "वापस",
     "next": "अगला",
-    "language": "भाषा"
+    "language": "भाषा",
+    "booking": "बुकिंग",
+    "continue": "जारी रखें",
+    "hideAdvanced": "उन्नत छुपाएं",
+    "optional": "वैकल्पिक",
+    "showAdvanced": "उन्नत सेटिंग्स",
+    "verified": "सत्यापित"
   },
   "nav": {
     "dashboard": "डैशबोर्ड",
@@ -204,7 +210,10 @@
     "estimatedCost": "अनुमानित लागत",
     "youSave": "आप बचाते हैं",
     "withSubscription": "सदस्यता के साथ",
-    "startSubscription": "सदस्यता शुरू करें"
+    "startSubscription": "सदस्यता शुरू करें",
+    "backToServices": "सेवाएं देखें",
+    "serviceNotFound": "सेवा नहीं मिली",
+    "serviceNotFoundDesc": "यह सेवा अब उपलब्ध नहीं है या इसे हटा दिया गया है।"
   },
   "subscriptionPage": {
     "loading": "सदस्यताएं लोड हो रही हैं...",
@@ -955,6 +964,7 @@
       "confirmDeleteAddress": "क्या आप वाकई इस पते को हटाना चाहते हैं?",
       "failedToDeleteAddress": "पता हटाने में विफल।",
       "failedToSetDefault": "डिफ़ॉल्ट पता सेट करने में विफल।",
+      "failedToUpdateAddress": "पता अपडेट करने में विफल। कृपया पुनः प्रयास करें।",
       "pleaseLogIn": "कृपया लॉग इन करें",
       "needToBeLoggedIn": "अपनी प्रोफाइल देखने के लिए आपको लॉग इन होना चाहिए।",
       "goToLogin": "लॉगिन पर जाएं",
@@ -1059,7 +1069,16 @@
       "bestValue": "सर्वोत्तम मूल्य",
       "intenseWashroom": "इंटेंस वॉशरूम सफाई",
       "washroomDeepClean": "प्रोफेशनल वॉशरूम सैनिटाइजेशन",
-      "serviceNotAvailable": "क्षमा करें, हम अभी तक इस क्षेत्र में सेवा नहीं देते। विस्तार होने पर सूचित करेंगे!"
+      "serviceNotAvailable": "क्षमा करें, हम अभी तक इस क्षेत्र में सेवा नहीं देते। विस्तार होने पर सूचित करेंगे!",
+      "checkingRegion": "आपका वर्तमान क्षेत्र जांचा जा रहा है...",
+      "chooseLocation": "स्थान चुनें",
+      "chooseLocationDesc": "यह जांचने के लिए एक स्थान चुनें कि आपके क्षेत्र में सेवाएं उपलब्ध हैं या नहीं।",
+      "requestDeepCleaning": "डीप क्लीनिंग का अनुरोध करें",
+      "requesting": "अनुरोध हो रहा है...",
+      "retry": "पुनः प्रयास करें",
+      "setLocation": "स्थान सेट करें",
+      "setLocationToSee": "सेवाएं देखने के लिए अपना स्थान सेट करें",
+      "tracingLocation": "हम आपका स्थान ट्रेस कर रहे हैं और यह सत्यापित कर रहे हैं कि यह किसी सक्रिय सेवा क्षेत्र के अंदर है।"
     },
     "help": {
       "title": "सहायता और समर्थन",
