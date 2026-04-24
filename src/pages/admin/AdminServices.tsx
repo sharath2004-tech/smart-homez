@@ -465,13 +465,14 @@ const AdminServices = () => {
       return;
     }
 
-    // Must have at least one duration tier
-    if (!formData.durationOptions || formData.durationOptions.length === 0) {
+    // Duration tiers required only when size/quantity tiers are NOT used
+    const hasQuantityTiers = formData.sizeParameters?.enabled && (formData.sizeParameters?.options?.length ?? 0) > 0;
+    if (!hasQuantityTiers && (!formData.durationOptions || formData.durationOptions.length === 0)) {
       toast.error('Please add at least one duration tier with a price');
       return;
     }
 
-    if (formData.duration <= 0) {
+    if (!hasQuantityTiers && formData.duration <= 0) {
       toast.error('Duration must be greater than 0');
       return;
     }
