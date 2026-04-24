@@ -366,10 +366,15 @@ const AdminServices = () => {
     const isSubscriptionService = serviceData.serviceType === 'monthly_subscription';
     const normalizedSubscriptionOptions = getNormalizedSubscriptionOptions(serviceData.subscriptionOptions, isSubscriptionService);
 
-    // Auto-derive price & originalPrice from the cheapest duration tier if tiers exist
+    // Auto-derive price & originalPrice from the cheapest duration tier if tiers exist,
+    // or from the cheapest quantity tier if no duration tiers are configured.
     const sortedTiers = [...(serviceData.durationOptions || [])].sort((a, b) => a.hours - b.hours);
     const cheapestTier = sortedTiers[0];
-    const derivedPrice = cheapestTier ? cheapestTier.price : serviceData.price;
+    const hasQtyTiers = serviceData.sizeParameters?.enabled && (serviceData.sizeParameters?.options?.length ?? 0) > 0;
+    const cheapestQtyTier = hasQtyTiers
+      ? [...(serviceData.sizeParameters!.options)].sort((a, b) => a.price - b.price)[0]
+      : null;
+    const derivedPrice = cheapestTier ? cheapestTier.price : (cheapestQtyTier ? cheapestQtyTier.price : serviceData.price);
     const derivedOriginalPrice = cheapestTier?.originalPrice ?? serviceData.originalPrice ?? 0;
 
     return {
@@ -776,6 +781,18 @@ const AdminServices = () => {
                   <div className="text-sm font-bold text-foreground">₹{plan.price}</div>
                 </div>
               ))}
+            </div>
+          ) : service.sizeParameters?.enabled && (service.sizeParameters?.options?.length ?? 0) > 0 ? (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-2">Size / Quantity tiers:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {service.sizeParameters.options.map((opt, i) => (
+                  <div key={i} className="px-2.5 py-1.5 bg-green-50 border border-green-200 rounded-lg text-center">
+                    <div className="text-xs font-medium text-green-700">{opt.label}</div>
+                    <div className="text-xs font-bold text-green-800">₹{opt.price.toLocaleString('en-IN')}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             <div className="p-3 bg-muted rounded-lg">
@@ -1753,7 +1770,7 @@ const AdminServices = () => {
                       <div className="space-y-2">
                         <div className="grid grid-cols-12 gap-2 px-1">
                           <span className="col-span-4 text-xs text-muted-foreground font-medium">Label</span>
-                          <span className="col-span-6 text-xs text-muted-foreground font-medium">Price (₹/month)</span>
+                          <span className="col-span-6 text-xs text-muted-foreground font-medium">Price (₹)</span>
                           <span className="col-span-2" />
                         </div>
                         {(formData.sizeParameters?.options || []).map((opt, index) => (
