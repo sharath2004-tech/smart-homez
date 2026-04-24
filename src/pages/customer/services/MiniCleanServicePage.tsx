@@ -65,6 +65,7 @@ const MiniCleanServicePage = () => {
   const [booking, setBooking] = useState(false);
 
   const [quantity, setQuantity] = useState(1);
+  const [selectedTierValue, setSelectedTierValue] = useState<string | null>(null);
   const [bookingDate, setBookingDate] = useState("");
   const [startTime, setStartTime] = useState("09:00");
   const [specialInstructions, setSpecialInstructions] = useState("");
@@ -97,6 +98,10 @@ const MiniCleanServicePage = () => {
         setService(svcData.service);
         setProfile(profileData.user || profileData);
 
+        // Pre-select first tier if tiers exist
+        const firstTier = svcData.service?.sizeParameters?.options?.[0];
+        if (firstTier) setSelectedTierValue(firstTier.value || firstTier.label);
+
         // Build time slots from admin business hours
         const open = slotsData.openTime || "08:00";
         const close = slotsData.closeTime || "18:00";
@@ -123,7 +128,15 @@ const MiniCleanServicePage = () => {
   }, [id, navigate]);
 
   const meta = service ? getMeta(service.name, service.tags) : null;
-  const totalAmount = (service?.price ?? 0) * quantity;
+
+  const tierOptions = service?.sizeParameters?.enabled ? (service.sizeParameters?.options ?? []) : [];
+  const hasTiers = tierOptions.length > 0;
+  const selectedTier = hasTiers
+    ? tierOptions.find(o => (o.value || o.label) === selectedTierValue) ?? tierOptions[0]
+    : null;
+  const totalAmount = hasTiers
+    ? (selectedTier?.price ?? 0)
+    : (service?.price ?? 0) * quantity;
 
   const handleBook = async () => {
     if (isOutOfRegion) {
@@ -158,8 +171,9 @@ const MiniCleanServicePage = () => {
         totalAmount,
         bookingType: "adhoc",
         serviceDetails: {
-          quantity,
+          quantity: hasTiers ? 1 : quantity,
           unit: meta?.unit,
+          ...(hasTiers && selectedTier ? { package: selectedTier.label } : {}),
         },
         preferences: { specialInstructions },
         location: {
@@ -171,7 +185,9 @@ const MiniCleanServicePage = () => {
           zipCode: resolvedLocation.zipCode || "",
           coordinates: [resolvedLocation.longitude, resolvedLocation.latitude],
         },
-        notes: `${service.name} × ${quantity}. ${specialInstructions}`,
+        notes: hasTiers && selectedTier
+          ? `${service.name} — ${selectedTier.label}. ${specialInstructions}`
+          : `${service.name} × ${quantity}. ${specialInstructions}`,
       } as Record<string, unknown>);
       toast.success(`${service.name} booked! We'll confirm shortly 🎉`, { duration: 5000 });
       navigate("/customer/bookings");
@@ -233,7 +249,13 @@ const MiniCleanServicePage = () => {
                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock className="w-3.5 h-3.5" /> {service.duration} min / {meta.unitLabel.toLowerCase()}
                 </span>
-                <span className="text-xs font-bold text-blue-700">₹{service.price.toLocaleString('en-IN')} / {meta.unitLabel.toLowerCase()}</span>
+                {hasTiers ? (
+                  <span className="text-xs font-bold text-blue-700">
+                    from ₹{Math.min(...tierOptions.map(o => o.price)).toLocaleString('en-IN')}
+                  </span>
+                ) : (
+                  <span className="text-xs font-bold text-blue-700">₹{service.price.toLocaleString('en-IN')} / {meta.unitLabel.toLowerCase()}</span>
+                )}
               </div>
             </div>
           </div>
@@ -263,30 +285,63 @@ const MiniCleanServicePage = () => {
           </motion.div>
         )}
 
-        {/* Quantity — only shown when admin explicitly enables sizeParameters */}
+        {/* Quantity / Tier selector */}
         {service.sizeParameters?.enabled && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            <h3 className="font-semibold text-foreground mb-2">
-              How many {meta.unitLabel.toLowerCase()}s?
-            </h3>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                className="w-10 h-10 rounded-xl border-2 border-border flex items-center justify-center hover:border-primary transition-colors"
-              >
-                <Minus className="w-4 h-4" />
-              </button>
-              <span className="text-2xl font-bold text-foreground w-8 text-center">{quantity}</span>
-              <button
-                onClick={() => setQuantity((q) => Math.min(10, q + 1))}
-                className="w-10 h-10 rounded-xl border-2 border-border flex items-center justify-center hover:border-primary transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-              <span className="text-sm text-muted-foreground ml-1">
-                {quantity} × ₹{service.price.toLocaleString('en-IN')} = <span className="font-bold text-foreground">₹{totalAmount.toLocaleString('en-IN')}</span>
-              </span>
-            </div>
+            {hasTiers ? (
+              /* Labeled tier cards (e.g. 3 seats → ₹499, 4 seats → ₹649) */
+              <>
+                <h3 className="font-semibold text-foreground mb-3">Select {meta.unitLabel}</h3>
+                <div className="grid grid-cols-1 gap-2">
+                  {tierOptions.map((tier) => {
+                    const tierKey = tier.value || tier.label;
+                    const isSelected = (selectedTierValue ?? (tierOptions[0].value || tierOptions[0].label)) === tierKey;
+                    return (
+                      <button
+                        key={tierKey}
+                        type="button"
+                        onClick={() => setSelectedTierValue(tierKey)}
+                        className={`flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all text-left ${
+                          isSelected
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border bg-card hover:border-primary/40'
+                        }`}
+                      >
+                        <span className="font-medium text-foreground">{tier.label}</span>
+                        <span className={`font-bold text-sm ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}>
+                          ₹{tier.price.toLocaleString('en-IN')}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              /* Plain quantity counter when no labeled tiers */
+              <>
+                <h3 className="font-semibold text-foreground mb-2">
+                  How many {meta.unitLabel.toLowerCase()}s?
+                </h3>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                    className="w-10 h-10 rounded-xl border-2 border-border flex items-center justify-center hover:border-primary transition-colors"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <span className="text-2xl font-bold text-foreground w-8 text-center">{quantity}</span>
+                  <button
+                    onClick={() => setQuantity((q) => Math.min(10, q + 1))}
+                    className="w-10 h-10 rounded-xl border-2 border-border flex items-center justify-center hover:border-primary transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                  <span className="text-sm text-muted-foreground ml-1">
+                    {quantity} × ₹{service.price.toLocaleString('en-IN')} = <span className="font-bold text-foreground">₹{totalAmount.toLocaleString('en-IN')}</span>
+                  </span>
+                </div>
+              </>
+            )}
           </motion.div>
         )}
 
