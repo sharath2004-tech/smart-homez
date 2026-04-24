@@ -3,8 +3,41 @@ import { body, validationResult } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth.js';
 import Service from '../models/Service.js';
 import { checkServiceAvailability } from '../utils/geolocation.js';
+import multer from 'multer';
+import { uploadToCloudinary } from '../middleware/cloudinary.js';
+
+// Multer instance for service images (memory storage → Cloudinary)
+const uploadServiceImage = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  fileFilter: (req, file, cb) => {
+    if (/^image\/(jpeg|png|webp)$/.test(file.mimetype)) return cb(null, true);
+    cb(new Error('Only JPEG, PNG, or WEBP images are allowed'));
+  },
+}).single('image');
 
 const router = express.Router();
+
+// @route   POST /api/services/upload-image
+// @desc    Upload a service image to Cloudinary and return the URL
+// @access  Private/Admin
+router.post('/upload-image', authenticate, authorize('admin', 'super_admin'), (req, res) => {
+  uploadServiceImage(req, res, async (err) => {
+    if (err) {
+      return res.status(400).json({ error: { message: err.message, status: 400 } });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: { message: 'No image file provided', status: 400 } });
+    }
+    try {
+      const url = await uploadToCloudinary(req.file.buffer, 'smart-homez/service-images');
+      return res.json({ url });
+    } catch (uploadErr) {
+      console.error('Service image upload error:', uploadErr);
+      return res.status(500).json({ error: { message: 'Image upload failed', status: 500 } });
+    }
+  });
+});
 
 router.get('/categories', async (req, res) => {
   try {

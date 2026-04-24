@@ -601,6 +601,20 @@ export const servicesAPI = {
 
   getCategories: async () => {
     return apiCall('/services/categories');
+  },
+
+  uploadImage: async (file: File): Promise<{ url: string }> => {
+    const formData = new FormData();
+    formData.append('image', file);
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/services/upload-image`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error?.message || 'Image upload failed');
+    return data;
   }
 };
 

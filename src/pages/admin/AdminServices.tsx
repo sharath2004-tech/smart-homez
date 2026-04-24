@@ -1230,20 +1230,56 @@ const AdminServices = () => {
                   </div>
                 </div>
 
-                {/* Service Image URL */}
+                {/* Service Image */}
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
-                    Service Image URL
+                    Service Image
                     <span className="ml-1 text-xs font-normal text-muted-foreground">thumbnail shown on service cards (optional)</span>
                   </label>
+
+                  {/* File upload button */}
+                  <div className="flex items-center gap-3 mb-2">
+                    <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-muted text-sm hover:bg-muted/80 transition-colors">
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="sr-only"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          // local preview immediately
+                          const localUrl = URL.createObjectURL(file);
+                          setFormData(prev => ({ ...prev, image: localUrl, _imageUploading: true as unknown as string }));
+                          try {
+                            const { url } = await servicesAPI.uploadImage(file);
+                            setFormData(prev => ({ ...prev, image: url, _imageUploading: false as unknown as string }));
+                            toast.success('Image uploaded');
+                          } catch (err: unknown) {
+                            setFormData(prev => ({ ...prev, image: '', _imageUploading: false as unknown as string }));
+                            toast.error((err as Error).message || 'Image upload failed');
+                          } finally {
+                            URL.revokeObjectURL(localUrl);
+                          }
+                        }}
+                      />
+                      📁 Upload from device
+                    </label>
+                    {(formData as Record<string, unknown>)._imageUploading && (
+                      <span className="text-xs text-muted-foreground animate-pulse">Uploading…</span>
+                    )}
+                  </div>
+
+                  {/* OR paste URL */}
                   <input
                     type="url"
-                    value={formData.image || ''}
+                    value={formData.image?.startsWith('blob:') ? '' : (formData.image || '')}
                     onChange={(e) => setFormData({ ...formData, image: e.target.value })}
                     className="input-clean"
-                    placeholder="https://..."
+                    placeholder="Or paste an image URL (https://...)"
                   />
-                  {formData.image && (
+
+                  {/* Preview */}
+                  {formData.image && !formData.image.startsWith('blob:') && (
                     <div className="mt-2 flex items-center gap-3">
                       <img
                         src={formData.image}
@@ -1251,7 +1287,16 @@ const AdminServices = () => {
                         className="w-14 h-14 rounded-xl object-cover border border-border"
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                       />
-                      <p className="text-xs text-muted-foreground">Preview</p>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Preview</p>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, image: '' })}
+                          className="text-xs text-destructive hover:underline mt-0.5"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
