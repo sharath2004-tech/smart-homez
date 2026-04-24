@@ -81,6 +81,21 @@ const WHATSAPP_TEMPLATES = {
     }),
   },
 
+  // Sent to the WORKER when they are assigned to a booking
+  WORKER_JOB_ASSIGNED: {
+    msg91Name: process.env.MSG91_WA_TPL_WORKER_JOB_ASSIGNED || 'worker_job_assigned',
+    language: 'en',
+    // body: {{1}}=serviceName {{2}}=date {{3}}=time {{4}}=customerName {{5}}=customerPhone {{6}}=address
+    buildComponents: ({ serviceName, date, time, customerName, customerPhone, address }) => ({
+      body_1: { type: 'text', value: String(serviceName || 'Cleaning Service') },
+      body_2: { type: 'text', value: String(date || '') },
+      body_3: { type: 'text', value: String(time || '') },
+      body_4: { type: 'text', value: String(customerName || 'Customer') },
+      body_5: { type: 'text', value: String(customerPhone || 'N/A') },
+      body_6: { type: 'text', value: String(address || 'Address not provided') },
+    }),
+  },
+
   WORKER_REASSIGNMENT: {
     msg91Name: process.env.MSG91_WA_TPL_WORKER_REASSIGNMENT || 'worker_reassignment',
     language: 'en',
@@ -340,6 +355,7 @@ const NOTIFICATION_TYPE_TO_TEMPLATE = {
   'cancellation': 'BOOKING_CANCELLED',
   'booking-rescheduled': 'BOOKING_RESCHEDULED',
   'worker-assigned': 'WORKER_ASSIGNED',
+  'worker-job-assigned': 'WORKER_JOB_ASSIGNED',
   'worker-reassignment': 'WORKER_REASSIGNMENT',
   'worker-enroute': 'WORKER_ENROUTE',
   'schedule-change': 'SCHEDULE_CHANGE',

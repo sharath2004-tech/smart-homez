@@ -288,6 +288,14 @@ export const NOTIFICATION_TEMPLATES = {
     title: '👤 Worker Assigned',
     message: `${data.workerName} has been assigned to your booking.`,
     priority: 'medium'
+  }),
+
+  // Sent to the WORKER — not the customer
+  WORKER_JOB_ASSIGNED: (data) => ({
+    type: 'worker-job-assigned',
+    title: '📋 New Job Assigned',
+    message: `You have been assigned a new ${data.serviceName} booking on ${data.date} at ${data.time}. Customer: ${data.customerName || 'N/A'} | 📞 ${data.customerPhone || 'N/A'} | 📍 ${data.address || 'Address not provided'}`,
+    priority: 'high'
   })
 };
 

@@ -2388,17 +2388,22 @@ router.post('/',
         }
 
         if (assignedWorkerId) {
+          const customerAddr = booking.location
+            ? [booking.location.address, booking.location.area, booking.location.city].filter(Boolean).join(', ')
+            : 'Address not provided';
           notificationService.sendTemplatedNotification(
             assignedWorkerId,
-            'WORKER_ASSIGNED',
+            'WORKER_JOB_ASSIGNED',
             {
               bookingId: booking._id,
-              workerName: populatedBooking?.worker?.name || 'Worker',
               serviceName: svcName,
               date: bookingDateStr,
               time: booking.startTime || '',
+              customerName: populatedBooking?.customer?.name || 'Customer',
+              customerPhone: populatedBooking?.customer?.phone || 'N/A',
+              address: customerAddr,
             }
-          ).catch(err => console.error('Worker assigned notification error:', err.message));
+          ).catch(err => console.error('Worker job-assigned notification error:', err.message));
         }
       }
 
@@ -3024,15 +3029,20 @@ router.put('/:id/reschedule', authenticate, async (req, res) => {
         }
 
         // Notify new worker about assignment
+        const rescheduleAddr = booking.location
+          ? [booking.location.address, booking.location.area, booking.location.city].filter(Boolean).join(', ')
+          : 'Address not provided';
         await notificationService.sendTemplatedNotification(
           newWorkerInfo._id,
-          'WORKER_ASSIGNED',
+          'WORKER_JOB_ASSIGNED',
           {
             bookingId: booking._id,
-            workerName: newWorkerInfo.name,
             serviceName: booking.service?.name ?? 'Move In / Move Out Cleaning',
             date: formatDate(newScheduledDate),
-            time: formatTime(newScheduledDate)
+            time: formatTime(newScheduledDate),
+            customerName: booking.customer?.name || 'Customer',
+            customerPhone: booking.customer?.phone || 'N/A',
+            address: rescheduleAddr,
           }
         );
       } else if (oldWorker) {
