@@ -301,7 +301,6 @@ const MiniCleanServicePage = () => {
           {[
             { icon: '✅', text: 'Verified Professionals' },
             { icon: '💰', text: 'Transparent Pricing' },
-            { icon: '🔄', text: 'Re-do if Unhappy' },
           ].map((item) => (
             <div key={item.text} className="flex items-center gap-1.5">
               <span className="text-sm">{item.icon}</span>
