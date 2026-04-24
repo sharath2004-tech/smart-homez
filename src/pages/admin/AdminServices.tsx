@@ -105,6 +105,9 @@ interface Service {
   serviceCategory?: string;
   displayOrder?: number;
   allowBreakRequests?: boolean;
+  highlight?: string;
+  perUnitLabel?: string;
+  image?: string;
 }
 
 interface UserProfile {
@@ -605,6 +608,9 @@ const AdminServices = () => {
       serviceCategory: service.serviceCategory ?? 'other',
       displayOrder: service.displayOrder ?? 0,
       allowBreakRequests: service.allowBreakRequests === true,
+      highlight: service.highlight || '',
+      perUnitLabel: service.perUnitLabel || '',
+      image: service.image || '',
     });
     setEditingId(service._id!);
     setShowForm(true);
@@ -655,6 +661,9 @@ const AdminServices = () => {
       serviceCategory: 'other',
       displayOrder: 0,
       allowBreakRequests: false,
+      highlight: '',
+      perUnitLabel: '',
+      image: '',
     });
   };
 
@@ -1187,6 +1196,64 @@ const AdminServices = () => {
                     rows={3}
                     required
                   />
+                </div>
+
+                {/* Highlight + Per-Unit Label */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Key Highlight
+                      <span className="ml-1 text-xs font-normal text-muted-foreground">shown on card below name (optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.highlight || ''}
+                      onChange={(e) => setFormData({ ...formData, highlight: e.target.value })}
+                      className="input-clean"
+                      maxLength={120}
+                      placeholder="e.g. Scrub machine used for tiles"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Per-Unit Label
+                      <span className="ml-1 text-xs font-normal text-muted-foreground">shown beside price (optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.perUnitLabel || ''}
+                      onChange={(e) => setFormData({ ...formData, perUnitLabel: e.target.value })}
+                      className="input-clean"
+                      maxLength={40}
+                      placeholder="e.g. per bathroom, per seat"
+                    />
+                  </div>
+                </div>
+
+                {/* Service Image URL */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Service Image URL
+                    <span className="ml-1 text-xs font-normal text-muted-foreground">thumbnail shown on service cards (optional)</span>
+                  </label>
+                  <input
+                    type="url"
+                    value={formData.image || ''}
+                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                    className="input-clean"
+                    placeholder="https://..."
+                  />
+                  {formData.image && (
+                    <div className="mt-2 flex items-center gap-3">
+                      <img
+                        src={formData.image}
+                        alt="Preview"
+                        className="w-14 h-14 rounded-xl object-cover border border-border"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                      <p className="text-xs text-muted-foreground">Preview</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Service Type — full dropdown, admin picks manually */}

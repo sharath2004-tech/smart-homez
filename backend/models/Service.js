@@ -210,6 +210,18 @@ const serviceSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  // Short 1-line customer-facing feature text shown on service cards (e.g. "Scrub machine used")
+  highlight: {
+    type: String,
+    default: null,
+    maxlength: 120
+  },
+  // Per-unit label shown alongside price (e.g. "per bathroom", "per seat")
+  perUnitLabel: {
+    type: String,
+    default: null,
+    maxlength: 40
+  },
   isActive: {
     type: Boolean,
     default: true

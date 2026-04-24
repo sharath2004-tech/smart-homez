@@ -197,17 +197,36 @@ router.get('/worker/:workerId/trends', authenticate, async (req, res) => {
 
 /**
  * GET /api/reviews/public
- * Returns recent high-rating reviews with comments for the landing page.
+ * Returns recent reviews for the landing page or a specific service page.
  * No authentication required.
+ * Query params:
+ *   serviceId  — optional; when provided, returns reviews for that service (all ratings)
+ *   limit      — optional; max number of reviews to return (default 12)
  */
 router.get('/public', async (req, res) => {
   try {
-    const reviews = await Review.find({
-      overallRating: { $gte: 4 },
-      comment: { $exists: true, $ne: '' }
-    })
+    const { serviceId, limit = 12 } = req.query;
+    const maxLimit = Math.min(parseInt(limit) || 12, 50);
+
+    let query = {};
+
+    if (serviceId) {
+      // Fetch booking IDs for the given service, then find matching reviews
+      const bookingIds = await Booking.find({ service: serviceId }).select('_id').lean();
+      if (bookingIds.length === 0) {
+        return res.json({ success: true, reviews: [] });
+      }
+      query.booking = { $in: bookingIds.map(b => b._id) };
+      // For service detail pages include all ratings (to show honest distribution)
+    } else {
+      // Landing page: only show positive reviews with comments
+      query.overallRating = { $gte: 4 };
+      query.comment = { $exists: true, $ne: '' };
+    }
+
+    const reviews = await Review.find(query)
       .sort({ createdAt: -1 })
-      .limit(12)
+      .limit(maxLimit)
       .populate('customer', 'name isAnonymous')
       .lean();
 

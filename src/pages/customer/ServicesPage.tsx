@@ -23,6 +23,15 @@ interface Service {
     workersCount: number;
     reason: string;
   };
+  sizeParameters?: {
+    enabled: boolean;
+    options?: Array<{ value: string; label: string; price: number }>;
+  };
+  image?: string | null;
+  rating?: number;
+  reviewCount?: number;
+  highlight?: string;
+  serviceCategory?: string;
 }
 
 const SERVICE_CATEGORIES = [
@@ -66,6 +75,7 @@ const ServicesPage = () => {
   const [showLocationSelector, setShowLocationSelector] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   const [requestingServiceId, setRequestingServiceId] = useState<string | null>(null);
+  const [subCategoryFilter, setSubCategoryFilter] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProfile();
@@ -207,9 +217,28 @@ const ServicesPage = () => {
     if (service.serviceType && HIDDEN_ROOT_SERVICE_TYPES.has(service.serviceType)) {
       return false;
     }
-
     return matchesCategory(service);
   });
+
+  const SUB_CATEGORY_LABELS: Record<string, { label: string; icon: string }> = {
+    spot_cleaning:         { label: 'Spot Clean',    icon: '🧹' },
+    kitchen_services:     { label: 'Kitchen',       icon: '🍳' },
+    bathroom_services:    { label: 'Bathroom',      icon: '🛀' },
+    furniture_services:   { label: 'Furniture',     icon: '🛋️' },
+    hvac_services:        { label: 'HVAC / AC',     icon: '❄️' },
+    deep_cleaning:        { label: 'Deep Clean',    icon: '🏠' },
+    instant_services:     { label: 'Instant',       icon: '⚡' },
+    subscription_services:{ label: 'Subscription',  icon: '📅' },
+    other:                { label: 'Other',         icon: '📦' },
+  };
+
+  const availableSubCategories = [...new Set(
+    displayedServices.map(s => s.serviceCategory).filter(Boolean) as string[]
+  )];
+
+  const filteredDisplayedServices = subCategoryFilter
+    ? displayedServices.filter(s => s.serviceCategory === subCategoryFilter)
+    : displayedServices;
 
   const getCategoryEmoji = (category: string, name: string) => {
     if (name.toLowerCase().includes('insta')) return '⚡';
@@ -393,6 +422,21 @@ const ServicesPage = () => {
             </div>
           </motion.div>
 
+          {/* Our Promise Trust Bar */}
+          <div className="flex items-center justify-center gap-3 sm:gap-6 flex-wrap py-2.5 px-3 rounded-xl bg-muted/40 border border-border">
+            {[
+              { icon: '✅', text: 'Verified Professionals' },
+              { icon: '📅', text: 'Hassle-Free Booking' },
+              { icon: '💰', text: 'Transparent Pricing' },
+              { icon: '🔄', text: 'Re-do if Unhappy' },
+            ].map((item) => (
+              <div key={item.text} className="flex items-center gap-1.5">
+                <span className="text-sm">{item.icon}</span>
+                <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">{item.text}</span>
+              </div>
+            ))}
+          </div>
+
           {/* Search */}
           <motion.div
             className="flex gap-3"
@@ -442,19 +486,63 @@ const ServicesPage = () => {
               <p className="text-sm text-muted-foreground mt-1">{t('customer.services.noServicesDesc')}</p>
             </motion.div>
           ) : (
+            <>
+              {/* Sub-category filter tabs */}
+              {availableSubCategories.length > 1 && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none -mx-1 px-1">
+                  <button
+                    onClick={() => setSubCategoryFilter(null)}
+                    className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                      !subCategoryFilter
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    }`}
+                  >
+                    All ({displayedServices.length})
+                  </button>
+                  {availableSubCategories.map(cat => {
+                    const meta = SUB_CATEGORY_LABELS[cat] || { label: cat, icon: '📦' };
+                    const count = displayedServices.filter(s => s.serviceCategory === cat).length;
+                    return (
+                      <button
+                        key={cat}
+                        onClick={() => setSubCategoryFilter(subCategoryFilter === cat ? null : cat)}
+                        className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                          subCategoryFilter === cat
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        }`}
+                      >
+                        <span>{meta.icon}</span>
+                        {meta.label} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {filteredDisplayedServices.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="font-medium text-foreground">No services in this category</p>
+                  <button onClick={() => setSubCategoryFilter(null)} className="text-xs text-primary mt-2 hover:underline">Show all</button>
+                </div>
+              ) : (
             <div className="grid gap-4 sm:grid-cols-2">
-              {displayedServices.map((service) => (
+              {filteredDisplayedServices.map((service) => (
                 <div 
                   key={service._id} 
                   className="card-elevated-hover p-5 group"
                 >
                   <div className="flex items-start gap-4">
                     <motion.div 
-                      className="w-14 h-14 bg-accent rounded-2xl flex items-center justify-center text-3xl shrink-0"
-                      whileHover={{ scale: 1.15, rotate: 5 }}
+                      className="w-14 h-14 bg-accent rounded-2xl flex items-center justify-center text-3xl shrink-0 overflow-hidden"
+                      whileHover={{ scale: 1.15, rotate: service.image ? 0 : 5 }}
                       transition={{ type: "spring", stiffness: 300 }}
                     >
-                      {getCategoryEmoji(service.category, service.name)}
+                      {service.image
+                        ? <img src={service.image} alt={service.name} className="w-full h-full object-cover rounded-2xl" />
+                        : getCategoryEmoji(service.category, service.name)
+                      }
                     </motion.div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
@@ -465,7 +553,16 @@ const ServicesPage = () => {
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{service.description}</p>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{service.highlight || service.description}</p>
+                      {service.rating && service.rating > 0 ? (
+                        <div className="flex items-center gap-1 mt-1.5">
+                          <span className="text-yellow-500 text-xs leading-none">★</span>
+                          <span className="text-xs font-semibold text-foreground">{service.rating.toFixed(1)}</span>
+                          {service.reviewCount && service.reviewCount > 0 ? (
+                            <span className="text-xs text-muted-foreground">({service.reviewCount.toLocaleString('en-IN')} reviews)</span>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 
@@ -495,6 +592,13 @@ const ServicesPage = () => {
                               <span className="text-sm font-bold text-green-700">From ₹{service.price.toLocaleString('en-IN')}<span className="text-xs font-normal text-muted-foreground">/mo</span></span>
                               <span className="text-xs font-semibold bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">20% off</span>
                             </div>
+                          </div>
+                        ) : service.sizeParameters?.enabled && (service.sizeParameters?.options?.length ?? 0) > 0 ? (
+                          <div>
+                            <div className="text-xs text-muted-foreground">Starts at</div>
+                            <span className="text-sm font-bold text-green-700">
+                              ₹{Math.min(...(service.sizeParameters!.options!.map(o => o.price))).toLocaleString('en-IN')}
+                            </span>
                           </div>
                         ) : (
                           <div>
@@ -551,6 +655,8 @@ const ServicesPage = () => {
                 </div>
               ))}
             </div>
+              )}
+            </>
           )}
         </div>
       </AppLayout>
