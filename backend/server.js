@@ -296,6 +296,21 @@ app.listen(PORT, async () => {
   // Initialize dashboard preferences
   console.log('🎨 Initializing dashboard preferences...');
   await initializeDashboardPreferences();
+
+  // Self-ping every 10 minutes to keep Render free tier awake
+  const RENDER_URL = process.env.RENDER_EXTERNAL_URL;
+  if (RENDER_URL) {
+    const PING_INTERVAL = 10 * 60 * 1000; // 10 minutes in ms
+    setInterval(async () => {
+      try {
+        const response = await fetch(`${RENDER_URL}/api/health`);
+        console.log(`🏓 Keep-alive ping: ${response.status} at ${new Date().toISOString()}`);
+      } catch (err) {
+        console.error('❌ Keep-alive ping failed:', err.message);
+      }
+    }, PING_INTERVAL);
+    console.log(`🏓 Keep-alive self-ping enabled (every 10 min) → ${RENDER_URL}/api/health`);
+  }
 });
 
 export default app;
