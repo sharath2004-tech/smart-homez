@@ -3,7 +3,7 @@ import ServiceLocationCard from "@/components/ServiceLocationCard";
 import { useServiceBookingAvailability } from "@/hooks/useServiceBookingAvailability";
 import { authAPI, bookingsAPI, servicesAPI } from "@/lib/api";
 import { motion } from "framer-motion";
-import { Calendar, ChevronLeft, Clock, Minus, Plus, Zap } from "lucide-react";
+import { Calendar, CheckCircle, ChevronLeft, Clock, MapPin, Minus, Plus, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -76,6 +76,7 @@ const MiniCleanServicePage = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
+  const [step, setStep] = useState<1 | 2>(1);
   const [serviceReviews, setServiceReviews] = useState<ServiceReview[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
 
@@ -333,6 +334,21 @@ const MiniCleanServicePage = () => {
           </div>
         </motion.div>
 
+        {/* Step indicator */}
+        <div className="flex items-center gap-2">
+          {[1, 2].map((s) => (
+            <div key={s} className="flex items-center gap-2">
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                step >= s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+              }`}>{s}</div>
+              {s < 2 && <div className={`h-0.5 w-10 rounded transition-all ${step > s ? 'bg-primary' : 'bg-muted'}`} />}
+            </div>
+          ))}
+          <span className="ml-2 text-xs text-muted-foreground font-medium">
+            {step === 1 ? 'Select & Schedule' : 'Review & Confirm'}
+          </span>
+        </div>
+
         {/* Service hero card */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -392,6 +408,9 @@ const MiniCleanServicePage = () => {
           availabilityReason={availability?.reason}
           resolvedLocation={resolvedLocation}
         />
+
+        {/* ── STEP 1 content ── */}
+        {step === 1 && (<>
 
         {/* What's included — from admin-configured service dos */}
         {service.dos && service.dos.length > 0 && (
@@ -492,7 +511,7 @@ const MiniCleanServicePage = () => {
                 </div>
               ) : showAvailabilityCounts ? (
                 <>
-                  <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-2 gap-2">
                     {timeSlots.length === 0 ? (
                       <p className="col-span-2 text-xs text-muted-foreground py-2">No slots available for this date.</p>
                     ) : (
@@ -577,6 +596,85 @@ const MiniCleanServicePage = () => {
               <p key={r} className="text-xs text-amber-700">• {r}</p>
             ))}
           </div>
+        )}
+
+        </>) /* end step 1 */}
+
+        {/* ── STEP 2: Review & Confirm ── */}
+        {step === 2 && (
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+            <h2 className="font-semibold font-heading text-foreground">Review your booking</h2>
+
+            {/* Service summary */}
+            <div className="card-elevated p-4 rounded-2xl space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-2xl shrink-0">{meta.icon}</div>
+                <div className="flex-1">
+                  <p className="font-semibold text-foreground">{service.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {hasTiers && selectedTier ? selectedTier.label : `${quantity} ${meta.unitLabel.toLowerCase()}${quantity > 1 ? 's' : ''}`}
+                    {' · '}{bookingDate ? new Date(bookingDate + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }) : '—'}
+                    {' · '}{formatSlotTime(startTime)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Location */}
+              {resolvedLocation ? (
+                <div className="flex items-start gap-2 text-xs text-muted-foreground border-t pt-3">
+                  <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span>{[resolvedLocation.apartmentName, resolvedLocation.area, resolvedLocation.city].filter(Boolean).join(', ') || resolvedLocation.address || 'Selected location'}</span>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2 text-xs text-amber-700 border-t pt-3">
+                  <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span>No location set — please pin your service location before confirming.</span>
+                </div>
+              )}
+            </div>
+
+            {/* Price breakdown */}
+            <div className="card-elevated p-4 rounded-2xl space-y-2">
+              <p className="text-sm font-semibold text-foreground">Price Breakdown</p>
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>{hasTiers && selectedTier ? selectedTier.label : `${quantity} × ₹${service.price.toLocaleString('en-IN')}`}</span>
+                <span className="font-semibold text-foreground">₹{totalAmount.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between font-bold text-foreground border-t pt-2 text-base">
+                <span>Total</span>
+                <span className="text-primary">₹{totalAmount.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+
+            {/* Special instructions preview */}
+            {specialInstructions && (
+              <div className="p-3 rounded-xl bg-muted/40 border border-border">
+                <p className="text-xs font-medium text-foreground mb-1">📝 Special Instructions</p>
+                <p className="text-xs text-muted-foreground">{specialInstructions}</p>
+              </div>
+            )}
+
+            {/* Confirmation checklist */}
+            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 space-y-1.5">
+              {[
+                'Verified & background-checked professional',
+                'Transparent pricing — no hidden charges',
+                'Free cancellation before service starts',
+              ].map((item) => (
+                <div key={item} className="flex items-center gap-2">
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span className="text-xs text-emerald-800">{item}</span>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setStep(1)}
+              className="w-full py-2.5 rounded-xl border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors"
+            >
+              ← Edit Booking
+            </button>
+          </motion.div>
         )}
 
         {/* Customer Reviews Section */}
@@ -677,25 +775,31 @@ const MiniCleanServicePage = () => {
               <p className="text-xs text-muted-foreground">Total</p>
               <p className="text-xl font-bold text-foreground">₹{totalAmount.toLocaleString('en-IN')}</p>
             </div>
-            <button
-              onClick={handleBook}
-              disabled={booking || requestingService || checkingAvailability || (!isOutOfRegion && !canBookService)}
-              className={`flex-1 py-3.5 rounded-2xl font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-60 ${
-                isOutOfRegion
-                  ? 'bg-amber-100 text-amber-900 hover:bg-amber-200'
-                  : 'bg-primary hover:bg-primary/90 text-primary-foreground'
-              }`}
-            >
-              {booking || requestingService ? (
-                <motion.div
-                  className={`w-4 h-4 border-2 border-t-transparent rounded-full ${isOutOfRegion ? 'border-amber-900' : 'border-primary-foreground'}`}
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                />
-              ) : (
-                <><Zap className="w-4 h-4" /> {isOutOfRegion ? 'Request Service' : !hasResolvedLocation ? 'Set Location First' : checkingAvailability ? 'Checking region...' : 'Book Now'}</>
-              )}
-            </button>
+            {step === 1 ? (
+              <button
+                onClick={() => {
+                  if (!bookingDate) { toast.error('Please select a date'); return; }
+                  setStep(2);
+                }}
+                className="flex-1 py-3.5 rounded-2xl font-semibold bg-primary hover:bg-primary/90 text-primary-foreground transition-colors flex items-center justify-center gap-2"
+              >
+                Review Booking →
+              </button>
+            ) : (
+              <button
+                onClick={handleBook}
+                disabled={booking || requestingService || checkingAvailability || (!isOutOfRegion && !canBookService)}
+                className={`flex-1 py-3.5 rounded-2xl font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-60 ${
+                  isOutOfRegion ? 'bg-amber-100 text-amber-900 hover:bg-amber-200' : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                }`}
+              >
+                {booking || requestingService ? (
+                  <motion.div className={`w-4 h-4 border-2 border-t-transparent rounded-full ${isOutOfRegion ? 'border-amber-900' : 'border-primary-foreground'}`} animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} />
+                ) : (
+                  <><Zap className="w-4 h-4" /> {isOutOfRegion ? 'Request Service' : !hasResolvedLocation ? 'Set Location First' : checkingAvailability ? 'Checking...' : 'Confirm & Book'}</>
+                )}
+              </button>
+            )}
           </div>
         </motion.div>
 
