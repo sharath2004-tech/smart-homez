@@ -108,6 +108,7 @@ interface Service {
   highlight?: string;
   perUnitLabel?: string;
   image?: string;
+  slotSelectionType?: 'worker_availability' | 'standard_slots';
 }
 
 interface UserProfile {
@@ -356,6 +357,7 @@ const AdminServices = () => {
     workerSearchRadiusKm: 10,
     serviceCategory: 'other',
     displayOrder: 0,
+    slotSelectionType: 'worker_availability',
   });
   const isSuperAdmin = profile?.role === 'super_admin';
   const deepCleaningConfigPath = isSuperAdmin ? '/super-admin/deep-cleaning-config' : '/admin/deep-cleaning-config';
@@ -611,6 +613,7 @@ const AdminServices = () => {
       highlight: service.highlight || '',
       perUnitLabel: service.perUnitLabel || '',
       image: service.image || '',
+      slotSelectionType: service.slotSelectionType || 'worker_availability',
     });
     setEditingId(service._id!);
     setShowForm(true);
@@ -664,6 +667,7 @@ const AdminServices = () => {
       highlight: '',
       perUnitLabel: '',
       image: '',
+      slotSelectionType: 'worker_availability',
     });
   };
 
@@ -1377,6 +1381,21 @@ const AdminServices = () => {
                     <optgroup label="📦 Other">
                       <option value="other">Other / Custom</option>
                     </optgroup>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Slot Selection Display
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">controls how time slots appear to customers</span>
+                  </label>
+                  <select
+                    value={formData.slotSelectionType || 'worker_availability'}
+                    onChange={(e) => setFormData({ ...formData, slotSelectionType: e.target.value as Service['slotSelectionType'] })}
+                    className="input-clean"
+                  >
+                    <option value="worker_availability">Worker availability (show available workers)</option>
+                    <option value="standard_slots">Standard slots (no worker counts)</option>
                   </select>
                 </div>
 

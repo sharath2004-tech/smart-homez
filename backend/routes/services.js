@@ -257,7 +257,8 @@ router.post('/',
         workerSearchRadiusKm, allowBreakRequests,
         suggestedServices, dos, donts,
         displayOrder, serviceCategory,
-        timeBasedPricing
+        timeBasedPricing,
+        slotSelectionType
       } = req.body;
 
       const servicePayload = {
@@ -273,7 +274,8 @@ router.post('/',
         workerSearchRadiusKm, allowBreakRequests,
         suggestedServices, dos, donts,
         displayOrder, serviceCategory,
-        timeBasedPricing
+        timeBasedPricing,
+        slotSelectionType
       };
 
       // Admins cannot create services directly — their request goes to super admin for approval
@@ -453,7 +455,8 @@ const handleServiceUpdate = async (req, res) => {
       // Service capabilities
       suggestedServices, dos, donts,
       isQuoteService,
-      displayOrder, serviceCategory
+      displayOrder, serviceCategory,
+      slotSelectionType
     } = req.body;
 
     // Admins cannot directly edit pricing — they must submit a price change request
@@ -535,6 +538,7 @@ const handleServiceUpdate = async (req, res) => {
     if ('donts' in req.body) updateData.donts = donts;
     if ('displayOrder' in req.body) updateData.displayOrder = displayOrder;
     if ('serviceCategory' in req.body) updateData.serviceCategory = serviceCategory;
+    if ('slotSelectionType' in req.body) updateData.slotSelectionType = slotSelectionType;
 
     const service = await Service.findByIdAndUpdate(
       req.params.id,

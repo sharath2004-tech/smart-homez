@@ -505,6 +505,13 @@ const serviceSchema = new mongoose.Schema({
       extraCharge: Number
     }
   },
+
+  // Slot selection display mode for customer booking UI
+  slotSelectionType: {
+    type: String,
+    enum: ['worker_availability', 'standard_slots'],
+    default: 'worker_availability'
+  },
   
   // Cancellation policy
   cancellationPolicy: {

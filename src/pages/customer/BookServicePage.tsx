@@ -45,6 +45,7 @@ interface Service {
     surchargeValue: number;
     label: string;
   };
+  slotSelectionType?: 'worker_availability' | 'standard_slots';
 }
 
 interface Worker {
@@ -140,6 +141,7 @@ const BookServicePage = () => {
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [autoRenewal, setAutoRenewal] = useState(true);
   const [allowPause, setAllowPause] = useState(true);
+  const slotDisplayMode = service?.slotSelectionType || 'worker_availability';
 
   // Phone verification modal state
   const [showPhoneVerifyModal, setShowPhoneVerifyModal] = useState(false);
@@ -811,7 +813,10 @@ const BookServicePage = () => {
       );
     }
     // Auto-assign: slot is unavailable if all workers are busy
-    return totalWorkersCount > 0 && getAvailableWorkersForSlot(time) === 0;
+    if (slotDisplayMode === 'worker_availability') {
+      return totalWorkersCount > 0 && getAvailableWorkersForSlot(time) === 0;
+    }
+    return false;
   };
 
   if (loading) {
@@ -846,6 +851,7 @@ const BookServicePage = () => {
 
   // Check if subscription plans are available
   const hasSubscriptionPlans = subscriptionPlans.length > 0;
+  const showAvailabilityCounts = slotDisplayMode === 'worker_availability';
 
   return (
     <AppLayout userType="customer" userName={profile?.name || "Guest"}>
@@ -1060,7 +1066,7 @@ const BookServicePage = () => {
                   </label>
 
                   {/* Slot availability summary */}
-                  {selectedDate && !loadingSlots && availableSlots.length > 0 && (
+                  {showAvailabilityCounts && selectedDate && !loadingSlots && availableSlots.length > 0 && (
                     (() => {
                       const openCount = availableSlots.filter(t => !isSlotUnavailable(t)).length;
                       return (
@@ -1111,7 +1117,7 @@ const BookServicePage = () => {
                       getSlotsForPeriod(selectedPeriod).map((time) => {
                         const unavailable = isSlotUnavailable(time);
                         const isPast = isSlotInPast(time);
-                        const available = !unavailable ? getAvailableWorkersForSlot(time) : 0;
+                        const available = showAvailabilityCounts && !unavailable ? getAvailableWorkersForSlot(time) : 0;
                         const isSelected = selectedExactTime === time;
                         return (
                           <button
@@ -1135,13 +1141,15 @@ const BookServicePage = () => {
                             <span className={`text-xs font-medium mt-0.5 ${
                               unavailable
                                 ? 'text-muted-foreground'
-                                : available > 0
+                                : showAvailabilityCounts && available > 0
                                 ? 'text-primary'
                                 : 'text-muted-foreground'
                             }`}>
                               {unavailable
                                 ? (isPast ? t('bookService.past') : t('bookService.full'))
-                                  : `${available} ${t('bookService.available')}`}
+                                : showAvailabilityCounts
+                                ? `${available} ${t('bookService.available')}`
+                                : t('bookService.available')}
                             </span>
                           </button>
                         );
@@ -1172,7 +1180,7 @@ const BookServicePage = () => {
                   )}
                   
                   {/* Warning when no workers available at location */}
-                  {selectedDate && !loadingSlots && totalWorkersCount === 0 && (
+                  {showAvailabilityCounts && selectedDate && !loadingSlots && totalWorkersCount === 0 && (
                     <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
                       <div className="flex items-start gap-2">
                         <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
