@@ -1,4 +1,4 @@
-﻿import AppLayout from "@/components/AppLayout";
+import AppLayout from "@/components/AppLayout";
 import ServiceLocationCard from "@/components/ServiceLocationCard";
 import { useServiceBookingAvailability } from "@/hooks/useServiceBookingAvailability";
 import { authAPI, bookingsAPI, servicesAPI, settingsAPI } from "@/lib/api";
@@ -755,26 +755,31 @@ const InstaServicePage = () => {
                           key={t}
                           onClick={() => !fullyBooked && setStartTime(t)}
                           disabled={fullyBooked}
-                          className={`py-2 px-1 rounded-xl border-2 text-xs font-semibold transition-all flex flex-col items-center gap-0.5 ${
+                          className={`py-3 px-1 rounded-xl border transition-all flex flex-col items-center gap-1 ${
                             fullyBooked
-                              ? "border-muted bg-muted/40 text-muted-foreground cursor-not-allowed opacity-50"
+                              ? "border-border/40 bg-muted/20 cursor-not-allowed opacity-40"
                               : startTime === t
-                              ? "border-primary bg-primary/10 text-primary"
-                              : "border-border hover:border-primary/40 text-foreground"
+                              ? "border-primary bg-primary/8 shadow-sm ring-1 ring-primary/25"
+                              : "border-border bg-card hover:border-primary/50"
                           }`}
                         >
-                          <span>{fmt12(t)}</span>
-                          {free !== null && (
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none ${
-                              fullyBooked
-                                ? "bg-muted text-muted-foreground"
-                                : limited
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-green-100 text-green-700"
-                            }`}>
-                                {fullyBooked ? "Full" : `${free} available`}
-                            </span>
-                          )}
+                            <span className={`text-sm font-bold leading-tight tracking-tight ${
+                              fullyBooked ? "text-muted-foreground/60" : startTime === t ? "text-primary" : "text-foreground"
+                            }`}>{fmt12(t)}</span>
+                            {free !== null && (
+                              <span className={`flex items-center gap-1 text-[10px] font-medium leading-none ${
+                                fullyBooked
+                                  ? "text-muted-foreground/50"
+                                  : limited
+                                  ? "text-amber-600 dark:text-amber-400"
+                                  : "text-emerald-600 dark:text-emerald-400"
+                              }`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${
+                                  fullyBooked ? "bg-muted-foreground/30" : limited ? "bg-amber-500" : "bg-emerald-500"
+                                }`} />
+                                {fullyBooked ? "Full" : limited ? "1 available" : `${free} available`}
+                              </span>
+                            )}
                         </button>
                       );
                     })}

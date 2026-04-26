@@ -501,29 +501,35 @@ const MiniCleanServicePage = () => {
                         const isFull = availableWorkers <= 0;
                         const isSelected = startTime === t;
 
+                        const isLow = availableWorkers === 1;
                         return (
                           <button
                             key={t}
                             type="button"
                             onClick={() => !isFull && setStartTime(t)}
                             disabled={isFull}
-                            className={`py-2 px-1 rounded-xl border-2 text-xs font-semibold transition-all flex flex-col items-center gap-0.5 ${
+                            className={`py-3 px-1 rounded-xl border transition-all flex flex-col items-center gap-1 ${
                               isFull
-                                ? 'border-muted bg-muted/40 text-muted-foreground cursor-not-allowed opacity-50'
+                                ? 'border-border/40 bg-muted/20 text-muted-foreground cursor-not-allowed opacity-40'
                                 : isSelected
-                                ? 'border-primary bg-primary/10 text-primary'
-                                : 'border-border hover:border-primary/40 text-foreground'
+                                ? 'border-primary bg-primary/8 shadow-sm ring-1 ring-primary/25'
+                                : 'border-border bg-card hover:border-primary/50 hover:bg-primary/3'
                             }`}
                           >
-                            <span>{formatSlotTime(t)}</span>
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none ${
+                            <span className={`text-sm font-bold leading-tight tracking-tight ${
+                              isFull ? 'text-muted-foreground/60' : isSelected ? 'text-primary' : 'text-foreground'
+                            }`}>{formatSlotTime(t)}</span>
+                            <span className={`flex items-center gap-1 text-[10px] font-medium leading-none ${
                               isFull
-                                ? 'bg-muted text-muted-foreground'
-                                : availableWorkers === 1
-                                ? 'bg-amber-100 text-amber-700'
-                                : 'bg-green-100 text-green-700'
+                                ? 'text-muted-foreground/50'
+                                : isLow
+                                ? 'text-amber-600 dark:text-amber-400'
+                                : 'text-emerald-600 dark:text-emerald-400'
                             }`}>
-                              {isFull ? 'Full' : `${availableWorkers} available`}
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                isFull ? 'bg-muted-foreground/30' : isLow ? 'bg-amber-500' : 'bg-emerald-500'
+                              }`} />
+                              {isFull ? 'Full' : isLow ? '1 available' : `${availableWorkers} available`}
                             </span>
                           </button>
                         );
