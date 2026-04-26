@@ -1108,45 +1108,67 @@ const BookServicePage = () => {
                   </div>
 
                   {/* 15-min slot grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-64 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 max-h-72 overflow-y-auto pr-1">
                     {!selectedDate ? (
-                      <p className="col-span-4 text-sm text-muted-foreground py-4 text-center">{t('bookService.selectDateFirst')}</p>
+                      <p className="col-span-4 text-sm text-muted-foreground py-6 text-center">{t('bookService.selectDateFirst')}</p>
                     ) : loadingSlots ? (
-                      <p className="col-span-4 text-sm text-muted-foreground py-4 text-center">{t('bookService.loadingSlots')}</p>
+                      <p className="col-span-4 text-sm text-muted-foreground py-6 text-center">{t('bookService.loadingSlots')}</p>
                     ) : (
                       getSlotsForPeriod(selectedPeriod).map((time) => {
                         const unavailable = isSlotUnavailable(time);
                         const isPast = isSlotInPast(time);
                         const available = showAvailabilityCounts && !unavailable ? getAvailableWorkersForSlot(time) : 0;
                         const isSelected = selectedExactTime === time;
+                        const isLow = available === 1;
                         return (
                           <button
                             key={time}
                             type="button"
                             disabled={unavailable}
                             onClick={() => !unavailable && setSelectedExactTime(time)}
-                            className={`relative flex flex-col items-center justify-center py-4 px-2 rounded-xl border-2 transition-all duration-200 ${
+                            className={`flex flex-col items-center justify-center gap-1 py-3 px-2 rounded-xl border transition-all duration-150 ${
                               unavailable
-                                ? 'border-border/50 bg-muted/30 cursor-not-allowed opacity-50'
+                                ? 'border-border/40 bg-muted/20 cursor-not-allowed opacity-40'
                                 : isSelected
-                                ? 'border-primary bg-primary/10 shadow-md ring-2 ring-primary/20'
-                                : 'border-border bg-card hover:border-primary/40 hover:shadow-sm'
+                                ? 'border-primary bg-primary/8 shadow-sm ring-1 ring-primary/25'
+                                : 'border-border bg-card hover:border-primary/50 hover:bg-primary/3'
                             }`}
                           >
-                            <span className={`text-sm font-semibold leading-tight ${
-                              unavailable ? 'text-muted-foreground' : 'text-foreground'
+                            <span className={`text-sm font-bold leading-tight tracking-tight ${
+                              unavailable ? 'text-muted-foreground/60' : isSelected ? 'text-primary' : 'text-foreground'
                             }`}>
                               {formatSlotTime(time)}
                             </span>
-                            {!unavailable && available > 0 && (
-                              <span className="absolute top-2 right-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
-                                {available} {t('bookService.available')}
+                            {showAvailabilityCounts && (
+                              <span className={`flex items-center gap-1 text-[10px] font-medium leading-none ${
+                                unavailable
+                                  ? 'text-muted-foreground/50'
+                                  : isLow
+                                  ? 'text-amber-600 dark:text-amber-400'
+                                  : available > 1
+                                  ? 'text-emerald-600 dark:text-emerald-400'
+                                  : 'text-muted-foreground/50'
+                              }`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${
+                                  unavailable
+                                    ? 'bg-muted-foreground/30'
+                                    : isLow
+                                    ? 'bg-amber-500'
+                                    : available > 1
+                                    ? 'bg-emerald-500'
+                                    : 'bg-muted-foreground/30'
+                                }`} />
+                                {unavailable
+                                  ? (isPast ? t('bookService.past') : t('bookService.full'))
+                                  : isLow
+                                  ? `1 ${t('bookService.available')}`
+                                  : available > 1
+                                  ? `${available} ${t('bookService.available')}`
+                                  : ''}
                               </span>
                             )}
-                            {unavailable && (
-                              <span className={`text-xs font-medium mt-1 ${
-                                'text-muted-foreground'
-                              }`}>
+                            {!showAvailabilityCounts && unavailable && (
+                              <span className="text-[10px] text-muted-foreground/50">
                                 {isPast ? t('bookService.past') : t('bookService.full')}
                               </span>
                             )}
@@ -1156,10 +1178,26 @@ const BookServicePage = () => {
                     )}
                   </div>
 
+                  {/* Legend */}
+                  {showAvailabilityCounts && selectedDate && !loadingSlots && (
+                    <div className="flex items-center gap-4 mt-3">
+                      <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Available
+                      </span>
+                      <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> 1 left
+                      </span>
+                      <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" /> Full
+                      </span>
+                    </div>
+                  )}
+
                   {selectedExactTime && (
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      Selected: <span className="font-semibold text-foreground">{formatSlotTime(selectedExactTime)}</span>
-                    </p>
+                    <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                      <span className="text-xs font-semibold text-primary">{formatSlotTime(selectedExactTime)} selected</span>
+                    </div>
                   )}
 
                   {/* Peak-hours surcharge notice */}
