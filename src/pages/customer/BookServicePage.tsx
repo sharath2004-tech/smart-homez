@@ -1108,7 +1108,7 @@ const BookServicePage = () => {
                   </div>
 
                   {/* 15-min slot grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 max-h-72 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                     {!selectedDate ? (
                       <p className="col-span-4 text-sm text-muted-foreground py-6 text-center">{t('bookService.selectDateFirst')}</p>
                     ) : loadingSlots ? (
@@ -1131,7 +1131,7 @@ const BookServicePage = () => {
                                 ? 'border-border/40 bg-muted/20 cursor-not-allowed opacity-40'
                                 : isSelected
                                 ? 'border-primary bg-primary/8 shadow-sm ring-1 ring-primary/25'
-                                : 'border-border bg-card hover:border-primary/50 hover:bg-primary/3'
+                                : 'border-border bg-card hover:border-primary/50'
                             }`}
                           >
                             <span className={`text-sm font-bold leading-tight tracking-tight ${

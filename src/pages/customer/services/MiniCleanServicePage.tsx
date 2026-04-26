@@ -492,7 +492,7 @@ const MiniCleanServicePage = () => {
           <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2">
             <Calendar className="w-4 h-4 text-primary" /> Schedule
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-4">
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Date</label>
               <input
@@ -504,14 +504,16 @@ const MiniCleanServicePage = () => {
               />
             </div>
             <div>
-              <label className="block text-xs text-muted-foreground mb-1">Time</label>
+              <label className="block text-sm font-medium text-foreground mb-2 flex items-center gap-1">
+                <Clock className="w-4 h-4" /> Available Time Slots
+              </label>
               {loadingSlots ? (
                 <div className="w-full rounded-xl border border-input bg-card px-3 py-2.5 text-sm text-muted-foreground">
                   Loading time slots...
                 </div>
               ) : showAvailabilityCounts ? (
                 <>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     {timeSlots.length === 0 ? (
                       <p className="col-span-2 text-xs text-muted-foreground py-2">No slots available for this date.</p>
                     ) : (
@@ -529,10 +531,10 @@ const MiniCleanServicePage = () => {
                             disabled={isFull}
                             className={`py-3 px-1 rounded-xl border transition-all flex flex-col items-center gap-1 ${
                               isFull
-                                ? 'border-border/40 bg-muted/20 text-muted-foreground cursor-not-allowed opacity-40'
+                                ? 'border-border/40 bg-muted/20 cursor-not-allowed opacity-40'
                                 : isSelected
                                 ? 'border-primary bg-primary/8 shadow-sm ring-1 ring-primary/25'
-                                : 'border-border bg-card hover:border-primary/50 hover:bg-primary/3'
+                                : 'border-border bg-card hover:border-primary/50'
                             }`}
                           >
                             <span className={`text-sm font-bold leading-tight tracking-tight ${
