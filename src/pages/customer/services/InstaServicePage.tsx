@@ -35,6 +35,7 @@ interface Service {
   price: number;
   originalPrice?: number;
   duration: number;
+  slotSelectionType?: 'worker_availability' | 'standard_slots';
   addons?: Array<{
     name: string;
     price: number;
@@ -185,6 +186,8 @@ const InstaServicePage = () => {
     male: workerCounts.male,
   } as const), [workerCounts.female, workerCounts.male, workerCounts.total]);
   const activeWorkers = genderCounts[genderPref];
+  const slotDisplayMode = service?.slotSelectionType || 'worker_availability';
+  const showAvailabilityCounts = slotDisplayMode === 'worker_availability';
 
   const availableSlots = (() => {
     const today = new Date().toISOString().split("T")[0];
@@ -739,7 +742,7 @@ const InstaServicePage = () => {
                 <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-sm text-destructive text-center">
                   No slots left today. Switch to "Schedule" to pick a future date.
                 </div>
-              ) : (
+              ) : showAvailabilityCounts ? (
                 <>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     {availableSlots.map((t) => {
@@ -784,6 +787,16 @@ const InstaServicePage = () => {
                     </div>
                   )}
                 </>
+              ) : (
+                <select
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="w-full rounded-xl border border-input bg-card px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                >
+                  {availableSlots.map((t) => (
+                    <option key={t} value={t}>{fmt12(t)}</option>
+                  ))}
+                </select>
               )}
             </div>
 

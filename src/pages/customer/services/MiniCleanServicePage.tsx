@@ -14,6 +14,7 @@ interface Service {
   description: string;
   price: number;
   duration: number;
+  slotSelectionType?: 'worker_availability' | 'standard_slots';
   tags?: string[];
   requirements?: string[];
   dos?: string[];
@@ -84,6 +85,9 @@ const MiniCleanServicePage = () => {
   const [startTime, setStartTime] = useState("09:00");
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
+  const [bookedRanges, setBookedRanges] = useState<Array<{ workerId: string | null; startTime: string; endTime: string }>>([]);
+  const [totalWorkersCount, setTotalWorkersCount] = useState(0);
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   const {
     availability,
@@ -104,10 +108,9 @@ const MiniCleanServicePage = () => {
 
     const fetchData = async () => {
       try {
-        const [svcData, profileData, slotsData] = await Promise.all([
+        const [svcData, profileData] = await Promise.all([
           servicesAPI.getById(id!),
           authAPI.getProfile(),
-          bookingsAPI.getBookedSlots(tomorrowStr, null),
         ]);
         setService(svcData.service);
         setProfile(profileData.user || profileData);
@@ -116,28 +119,16 @@ const MiniCleanServicePage = () => {
         const firstTier = svcData.service?.sizeParameters?.options?.[0];
         if (firstTier) setSelectedTierValue(firstTier.value || firstTier.label);
 
-        // Build time slots from admin business hours
-        const open = slotsData.openTime || "08:00";
-        const close = slotsData.closeTime || "18:00";
-        const step = slotsData.slotDurationMinutes || 60;
-        const slots: string[] = [];
-        const [oh, om] = open.split(":").map(Number);
-        const [ch, cm] = close.split(":").map(Number);
-        let cur = oh * 60 + om;
-        const end = ch * 60 + cm;
-        while (cur < end) {
-          slots.push(`${String(Math.floor(cur / 60)).padStart(2, "0")}:${String(cur % 60).padStart(2, "0")}`);
-          cur += step;
-        }
-        setTimeSlots(slots);
-        if (slots.length > 0) setStartTime(slots[0]);
-
         // Fetch public reviews for this service
         try {
           setReviewsLoading(true);
-          const { apiCall } = await import('@/lib/api');
-          const reviewData = await apiCall(`/reviews/public?serviceId=${id}&limit=8`);
-          setServiceReviews(reviewData?.reviews || []);
+          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/reviews/public?serviceId=${id}&limit=8`);
+          if (response.ok) {
+            const reviewData = await response.json();
+            setServiceReviews(reviewData?.reviews || []);
+          } else {
+            setServiceReviews([]);
+          }
         } catch {
           // reviews are non-critical
         } finally {
@@ -153,6 +144,52 @@ const MiniCleanServicePage = () => {
     if (id) fetchData();
   }, [id, navigate]);
 
+  useEffect(() => {
+    const fetchSlots = async () => {
+      if (!bookingDate) return;
+      try {
+        setLoadingSlots(true);
+        const location = resolvedLocation
+          ? { lng: resolvedLocation.longitude, lat: resolvedLocation.latitude }
+          : null;
+
+        const data = await bookingsAPI.getBookedSlots(
+          bookingDate,
+          location,
+          service?._id ? { service: service._id } : undefined
+        );
+
+        setBookedRanges(data.bookedRanges || []);
+        setTotalWorkersCount(data.totalWorkers || 0);
+
+        const open = data.openTime || "08:00";
+        const close = data.closeTime || "18:00";
+        const step = data.slotDurationMinutes || 60;
+        const slots: string[] = [];
+        const [oh, om] = open.split(":").map(Number);
+        const [ch, cm] = close.split(":").map(Number);
+        let cur = oh * 60 + om;
+        const end = ch * 60 + cm;
+        while (cur < end) {
+          slots.push(`${String(Math.floor(cur / 60)).padStart(2, "0")}:${String(cur % 60).padStart(2, "0")}`);
+          cur += step;
+        }
+        setTimeSlots(slots);
+        if (slots.length > 0) {
+          setStartTime(prev => (slots.includes(prev) ? prev : slots[0]));
+        }
+      } catch {
+        setBookedRanges([]);
+        setTotalWorkersCount(0);
+        setTimeSlots([]);
+      } finally {
+        setLoadingSlots(false);
+      }
+    };
+
+    fetchSlots();
+  }, [bookingDate, resolvedLocation, service?._id]);
+
   const meta = service ? getMeta(service.name, service.tags) : null;
 
   const tierOptions = service?.sizeParameters?.enabled ? (service.sizeParameters?.options ?? []) : [];
@@ -163,6 +200,44 @@ const MiniCleanServicePage = () => {
   const totalAmount = hasTiers
     ? (selectedTier?.price ?? 0)
     : (service?.price ?? 0) * quantity;
+  const slotDisplayMode = service?.slotSelectionType || 'worker_availability';
+  const showAvailabilityCounts = slotDisplayMode === 'worker_availability';
+
+  const getSlotDurationMinutes = () => (
+    selectedTier?.duration
+    ?? service?.duration
+    ?? 60
+  );
+
+  const toMinutes = (time: string) => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+
+  const formatSlotTime = (time: string) => {
+    const [hours, minutes] = time.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const h12 = hours % 12 || 12;
+    return `${h12}:${String(minutes).padStart(2, '0')} ${period}`;
+  };
+
+  const getAvailableWorkersForSlot = (time: string) => {
+    if (totalWorkersCount <= 0) return 0;
+    const slotStart = toMinutes(time);
+    const slotEnd = slotStart + getSlotDurationMinutes();
+    const busyWorkerIds = new Set<string>();
+
+    for (const range of bookedRanges) {
+      if (!range.workerId) continue;
+      const rangeStart = toMinutes(range.startTime);
+      const rangeEnd = toMinutes(range.endTime);
+      if (slotStart < rangeEnd && slotEnd > rangeStart) {
+        busyWorkerIds.add(range.workerId);
+      }
+    }
+
+    return Math.max(0, totalWorkersCount - busyWorkerIds.size);
+  };
 
   const handleBook = async () => {
     if (isOutOfRegion) {
@@ -411,15 +486,67 @@ const MiniCleanServicePage = () => {
             </div>
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Time</label>
-              <select
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="w-full rounded-xl border border-input bg-card px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-              >
-                {timeSlots.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
+              {loadingSlots ? (
+                <div className="w-full rounded-xl border border-input bg-card px-3 py-2.5 text-sm text-muted-foreground">
+                  Loading time slots...
+                </div>
+              ) : showAvailabilityCounts ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                    {timeSlots.length === 0 ? (
+                      <p className="col-span-2 text-xs text-muted-foreground py-2">No slots available for this date.</p>
+                    ) : (
+                      timeSlots.map((t) => {
+                        const availableWorkers = getAvailableWorkersForSlot(t);
+                        const isFull = availableWorkers <= 0;
+                        const isSelected = startTime === t;
+
+                        return (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => !isFull && setStartTime(t)}
+                            disabled={isFull}
+                            className={`py-2 px-1 rounded-xl border-2 text-xs font-semibold transition-all flex flex-col items-center gap-0.5 ${
+                              isFull
+                                ? 'border-muted bg-muted/40 text-muted-foreground cursor-not-allowed opacity-50'
+                                : isSelected
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border hover:border-primary/40 text-foreground'
+                            }`}
+                          >
+                            <span>{formatSlotTime(t)}</span>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none ${
+                              isFull
+                                ? 'bg-muted text-muted-foreground'
+                                : availableWorkers === 1
+                                ? 'bg-amber-100 text-amber-700'
+                                : 'bg-green-100 text-green-700'
+                            }`}>
+                              {isFull ? 'Full' : `${availableWorkers} available`}
+                            </span>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                  <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Available</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> 1 left</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-muted-foreground inline-block" /> Full</span>
+                  </div>
+                </>
+              ) : (
+                <select
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="w-full rounded-xl border border-input bg-card px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                >
+                  {timeSlots.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
         </motion.div>
