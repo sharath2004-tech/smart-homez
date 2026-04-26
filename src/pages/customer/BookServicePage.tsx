@@ -1108,7 +1108,7 @@ const BookServicePage = () => {
                   </div>
 
                   {/* 15-min slot grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-64 overflow-y-auto pr-1">
                     {!selectedDate ? (
                       <p className="col-span-4 text-sm text-muted-foreground py-4 text-center">{t('bookService.selectDateFirst')}</p>
                     ) : loadingSlots ? (
@@ -1125,32 +1125,31 @@ const BookServicePage = () => {
                             type="button"
                             disabled={unavailable}
                             onClick={() => !unavailable && setSelectedExactTime(time)}
-                            className={`flex flex-col items-center py-3 px-1 rounded-2xl border text-center transition-all ${
+                            className={`relative flex flex-col items-center justify-center py-4 px-2 rounded-xl border-2 transition-all duration-200 ${
                               unavailable
-                                ? 'border-border bg-muted/40 opacity-40 cursor-not-allowed'
+                                ? 'border-border/50 bg-muted/30 cursor-not-allowed opacity-50'
                                 : isSelected
-                                ? 'bg-muted border-muted-foreground/40 shadow-inner'
-                                : 'border-border hover:border-primary/60 hover:bg-primary/5'
+                                ? 'border-primary bg-primary/10 shadow-md ring-2 ring-primary/20'
+                                : 'border-border bg-card hover:border-primary/40 hover:shadow-sm'
                             }`}
                           >
-                            <span className={`text-sm font-bold leading-tight ${
-                              unavailable ? 'text-muted-foreground line-through' : 'text-foreground'
+                            <span className={`text-sm font-semibold leading-tight ${
+                              unavailable ? 'text-muted-foreground' : 'text-foreground'
                             }`}>
                               {formatSlotTime(time)}
                             </span>
-                            <span className={`text-xs font-medium mt-0.5 ${
-                              unavailable
-                                ? 'text-muted-foreground'
-                                : showAvailabilityCounts && available > 0
-                                ? 'text-primary'
-                                : 'text-muted-foreground'
-                            }`}>
-                              {unavailable
-                                ? (isPast ? t('bookService.past') : t('bookService.full'))
-                                : showAvailabilityCounts
-                                ? `${available} ${t('bookService.available')}`
-                                : t('bookService.available')}
-                            </span>
+                            {!unavailable && available > 0 && (
+                              <span className="absolute top-2 right-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
+                                {available} {t('bookService.available')}
+                              </span>
+                            )}
+                            {unavailable && (
+                              <span className={`text-xs font-medium mt-1 ${
+                                'text-muted-foreground'
+                              }`}>
+                                {isPast ? t('bookService.past') : t('bookService.full')}
+                              </span>
+                            )}
                           </button>
                         );
                       })
