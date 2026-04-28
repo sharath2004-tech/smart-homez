@@ -75,7 +75,8 @@ const defaultAllowedOrigins = [
   'https://smart-homez.vercel.app',
   'https://*.vercel.app',
   'https://healthyhomez.shop',
-  'https://www.healthyhomez.shop'
+  'https://www.healthyhomez.shop',
+  'https://*.healthyhomez.shop'
 ];
 
 const configuredOrigins = process.env.ALLOWED_ORIGINS
@@ -102,6 +103,9 @@ console.log('🔒 CORS Allowed Origins:', allowedOrigins);
 function isOriginAllowed(origin) {
   // Always allow localhost/127.0.0.1 on any port for local development against remote API
   if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+
+  // Allow any HealthyHomez subdomain in production
+  if (/^https?:\/\/([a-z0-9-]+\.)*healthyhomez\.shop$/.test(origin)) return true;
 
   // Check exact matches
   if (allowedOrigins.includes(origin)) return true;
