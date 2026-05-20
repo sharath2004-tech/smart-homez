@@ -441,7 +441,7 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
       />
 
       {/* Main Content */}
-      <div className="flex-1 md:ml-64 flex flex-col">
+      <div className="flex-1 md:ml-64 flex flex-col min-w-0 overflow-x-hidden">
         {/* Header */}
         <AppHeader
           userType={userType}
@@ -457,7 +457,7 @@ const AppLayout = ({ children, userType = "customer", userName, userImage }: App
         />
 
         {/* Page Content - This is the only part that re-renders */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden">
           <div
             key={location.pathname}
             className="page-enter-wrapper"
