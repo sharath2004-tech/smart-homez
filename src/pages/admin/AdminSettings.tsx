@@ -314,7 +314,7 @@ const AdminSettings = () => {
 
   return (
     <AppLayout userType={role} userName={name}>
-      <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6">
+      <div className="max-w-6xl mx-auto px-4 py-6 sm:px-6">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">Application Settings</h1>

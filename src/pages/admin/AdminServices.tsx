@@ -858,9 +858,9 @@ const AdminServices = () => {
 
   return (
     <AppLayout userType={isSuperAdmin ? 'super_admin' : 'admin'} userName={profile?.name || 'Admin'}>
-      <div className="space-y-6 pb-20 md:pb-0">
+      <div className="space-y-6 px-4 py-6 sm:px-6 pb-20 md:pb-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold font-heading text-foreground">Services Management</h1>
             <p className="text-sm text-muted-foreground mt-1">

@@ -872,7 +872,7 @@ const AdminWorkers = () => {
 
   return (
     <AppLayout userType={role} userName={name}>
-      <div className="max-w-5xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 animate-fade-in">
+      <div className="max-w-5xl mx-auto px-4 py-6 sm:px-6 space-y-6 animate-fade-in">
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold font-heading text-foreground">Workers</h1>

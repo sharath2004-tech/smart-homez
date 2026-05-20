@@ -758,7 +758,7 @@ const AdminLocations = () => {
 
   return (
     <AppLayout userType={isSuperAdmin ? 'super_admin' : 'admin'} userName={profile?.name || "Admin"}>
-      <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 animate-fade-in">
+      <div className="max-w-6xl mx-auto px-4 py-6 sm:px-6 space-y-6 animate-fade-in">
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold font-heading text-foreground">

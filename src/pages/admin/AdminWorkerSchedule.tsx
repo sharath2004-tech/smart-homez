@@ -392,7 +392,7 @@ const AdminWorkerSchedule = () => {
 
   return (
     <AppLayout userType={profile?.role === 'super_admin' ? 'super_admin' : 'admin'} userName={profile?.name || "Admin"}>
-      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+      <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6">
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2 flex-wrap gap-3">

@@ -966,7 +966,7 @@ const AdminBookings = () => {
 
   return (
     <AppLayout userType={role} userName={name}>
-      <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 animate-fade-in">
+      <div className="max-w-6xl mx-auto px-4 py-6 sm:px-6 space-y-6 animate-fade-in">
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold font-heading text-foreground">

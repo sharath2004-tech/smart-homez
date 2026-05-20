@@ -601,9 +601,9 @@ const AdminExpenses = () => {
 
   return (
     <AppLayout userType={role} userName={name}>
-      <div className="space-y-6 p-6 max-w-7xl mx-auto">
+      <div className="space-y-6 px-4 py-6 sm:px-6 max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-start">
+        <div className="flex flex-wrap justify-between items-start gap-3">
           <div>
             <h1 className="text-3xl font-bold text-foreground flex items-center gap-3 mb-2">
               <IndianRupee className="h-9 w-9 text-primary" />
@@ -937,7 +937,7 @@ const AdminExpenses = () => {
         {/* Total Profit Section - Only visible to super_admin */}
         {role === 'super_admin' && (
         <div className="card-elevated p-6 border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-accent/5">
-          <div className="flex justify-between items-start mb-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
             <div>
               <h2 className="text-2xl font-bold text-foreground flex items-center gap-3 mb-2">
                 <TrendingUp className="h-7 w-7 text-primary" />
@@ -950,14 +950,14 @@ const AdminExpenses = () => {
                 Scope: {selectedLocationLabel}
               </p>
             </div>
-            <div className="flex gap-3 items-center">
-              <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex gap-3 items-center w-full sm:w-auto">
+              <div className="flex flex-col gap-2 w-full sm:w-auto">
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1">Location</label>
                   <select
                     value={selectedLocationId}
                     onChange={(e) => setSelectedLocationId(e.target.value)}
-                    className="input-clean text-sm py-1 px-2 min-w-[220px]"
+                    className="input-clean text-sm py-1 px-2 w-full sm:min-w-[220px]"
                   >
                     <option value="all">All locations</option>
                     {locations.map((location) => (

@@ -212,7 +212,7 @@ const AdminSubscriptionTracker = () => {
 
   return (
     <AppLayout userType={role as "admin" | "super_admin"} userName={name}>
-      <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
+      <div className="px-4 py-6 sm:px-6 max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>

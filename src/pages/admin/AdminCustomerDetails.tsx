@@ -194,7 +194,7 @@ const AdminCustomerDetails = () => {
 
   return (
     <AppLayout userType={role} userName={name}>
-      <div className="p-6 space-y-6">
+      <div className="px-4 py-6 sm:px-6 max-w-5xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>

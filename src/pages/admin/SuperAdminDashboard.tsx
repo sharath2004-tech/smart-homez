@@ -463,7 +463,7 @@ const SuperAdminDashboard = () => {
 
   return (
     <AppLayout userType="super_admin" userName={name}>
-      <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 space-y-6 md:space-y-6 animate-fade-in pb-20 md:pb-0">
+      <div className="max-w-6xl mx-auto px-4 py-6 sm:px-6 space-y-6 animate-fade-in pb-20 md:pb-0">
 
         {/* ── Header bar ── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">

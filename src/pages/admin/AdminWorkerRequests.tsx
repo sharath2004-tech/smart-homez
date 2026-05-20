@@ -167,7 +167,7 @@ const AdminWorkerRequests = () => {
 
   return (
     <AppLayout userType={role} userName={name}>
-      <div className="p-6 max-w-5xl mx-auto">
+      <div className="px-4 py-6 sm:px-6 max-w-5xl mx-auto">
         <div className="mb-6">
           <h1 className="text-2xl font-bold font-heading text-foreground">Worker Approval Requests</h1>
           <p className="text-muted-foreground mt-1">Review and approve new worker applications</p>

@@ -317,7 +317,7 @@ const AdminDashboardPreferences = () => {
 
   return (
     <AppLayout userType={role} userName={name}>
-      <div className="container mx-auto p-6 max-w-4xl">
+      <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6">
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <div className="bg-primary/10 p-2 rounded-lg">
