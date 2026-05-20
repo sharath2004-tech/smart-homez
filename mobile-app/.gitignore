@@ -1,0 +1,16 @@
+node_modules/
+
+# Android build artifacts
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+
+# iOS build artifacts
+ios/.build/
+ios/build/
+ios/DerivedData/
+ios/Pods/
+
+# Build artifacts
+*.log

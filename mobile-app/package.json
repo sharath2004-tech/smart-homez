@@ -1,0 +1,33 @@
+{
+  "name": "healthy-homez-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Capacitor mobile shell for Healthy Homez",
+  "scripts": {
+    "sync": "cap sync",
+    "sync:android": "cap sync android",
+    "sync:ios": "cap sync ios",
+    "android": "cap open android",
+    "ios": "cap open ios",
+    "run:android": "cap run android",
+    "run:ios": "cap run ios",
+    "build-and-sync": "cd .. && npm run build:mobile && cd mobile-app && cap sync",
+    "live": "cap run android --livereload --external"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/app": "^6.0.2",
+    "@capacitor/camera": "^6.0.2",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/geolocation": "^6.0.1",
+    "@capacitor/haptics": "^6.0.2",
+    "@capacitor/ios": "^6.2.0",
+    "@capacitor/keyboard": "^6.0.3",
+    "@capacitor/push-notifications": "^6.0.2",
+    "@capacitor/splash-screen": "^6.0.2",
+    "@capacitor/status-bar": "^6.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0"
+  }
+}

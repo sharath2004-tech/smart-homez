@@ -140,6 +140,23 @@
   }
 }
 
+@layer base {
+  /* Capacitor / PWA safe area insets (notch, status bar, home indicator) */
+  :root {
+    --sat: env(safe-area-inset-top, 0px);
+    --sar: env(safe-area-inset-right, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+  }
+
+  body {
+    padding-top: var(--sat);
+    padding-right: var(--sar);
+    padding-bottom: var(--sab);
+    padding-left: var(--sal);
+  }
+}
+
 @layer components {
   .btn-brand {
     @apply bg-primary text-primary-foreground font-semibold rounded-xl px-6 py-3 transition-all duration-200 hover:opacity-90 active:scale-95;
