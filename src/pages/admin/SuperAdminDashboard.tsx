@@ -670,10 +670,10 @@ const SuperAdminDashboard = () => {
                               <td className="px-4 py-3 min-w-[200px]">
                                 <div className="flex flex-col gap-1.5">
                                   {day.breaks.map((br, bi) => (
-                                    <div key={bi} className="inline-flex items-center gap-1.5 bg-orange-50 border border-orange-200 text-orange-700 text-xs rounded-lg px-3 py-1.5 whitespace-nowrap w-fit max-w-full">
+                                    <div key={bi} className="flex items-center gap-1.5 bg-orange-50 border border-orange-200 text-orange-700 text-xs rounded-lg px-3 py-1.5 w-full min-w-0">
                                       <span className="font-medium shrink-0">{formatDisplayTime(br.start)}–{formatDisplayTime(br.end)}</span>
                                       {br.label && <span className="text-orange-500 shrink-0">·</span>}
-                                      {br.label && <span className="truncate">{br.label}</span>}
+                                      {br.label && <span className="truncate flex-1 min-w-0">{br.label}</span>}
                                       <button
                                         onClick={() => removeBreak(idx, bi)}
                                         className="ml-auto shrink-0 hover:text-red-600 transition-colors"
