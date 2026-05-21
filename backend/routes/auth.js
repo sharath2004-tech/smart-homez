@@ -1747,13 +1747,17 @@ const MSG91_WIDGET_BASE = 'https://control.msg91.com/api/v5/widget';
 router.post('/mobile/send-otp', async (req, res) => {
   const { identifier } = req.body;
   if (!identifier) return res.status(400).json({ error: { message: 'identifier is required' } });
+  const widgetId = process.env.MSG91_WIDGET_ID;
+  const tokenAuth = process.env.MSG91_TOKEN_AUTH;
+  console.log('[mobile/send-otp] widgetId set:', !!widgetId, '| tokenAuth set:', !!tokenAuth, '| identifier:', identifier);
   try {
     const r = await fetch(`${MSG91_WIDGET_BASE}/sendOTP`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'tokenAuth': process.env.MSG91_TOKEN_AUTH },
-      body: JSON.stringify({ widgetId: process.env.MSG91_WIDGET_ID, identifier }),
+      headers: { 'Content-Type': 'application/json', 'tokenAuth': tokenAuth },
+      body: JSON.stringify({ widgetId, identifier }),
     });
     const data = await r.json();
+    console.log('[mobile/send-otp] MSG91 status:', r.status, '| response:', JSON.stringify(data));
     if (!r.ok || data.type === 'error') return res.status(400).json({ error: { message: data.message || 'Failed to send OTP' } });
     res.json({ success: true, reqId: data.message ?? data.reqId });
   } catch (err) {
