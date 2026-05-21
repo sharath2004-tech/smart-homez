@@ -1741,7 +1741,7 @@ router.post('/reset-password-widget',
 // Proxies widget API calls server-side so origin/CORS is never an issue.
 // Requires env vars: MSG91_WIDGET_ID, MSG91_TOKEN_AUTH
 
-const MSG91_WIDGET_BASE = 'https://control.msg91.com/api/v5/widget';
+const MSG91_WIDGET_BASE = 'https://api.msg91.com/api/v5/widget';
 
 // POST /api/auth/mobile/send-otp  { identifier: "91XXXXXXXXXX" }
 router.post('/mobile/send-otp', async (req, res) => {
@@ -1758,7 +1758,9 @@ router.post('/mobile/send-otp', async (req, res) => {
     });
     const data = await r.json();
     console.log('[mobile/send-otp] MSG91 status:', r.status, '| response:', JSON.stringify(data));
-    if (!r.ok || data.type === 'error') return res.status(400).json({ error: { message: data.message || 'Failed to send OTP' } });
+    if (!r.ok || data.hasError || data.status === 'fail' || data.type === 'error') {
+      return res.status(400).json({ error: { message: data.message || data.errors || 'Failed to send OTP' } });
+    }
     res.json({ success: true, reqId: data.message ?? data.reqId });
   } catch (err) {
     console.error('mobile/send-otp error:', err.message);
@@ -1779,7 +1781,10 @@ router.post('/mobile/retry-otp', async (req, res) => {
       body: JSON.stringify(body),
     });
     const data = await r.json();
-    if (!r.ok || data.type === 'error') return res.status(400).json({ error: { message: data.message || 'Failed to retry OTP' } });
+    console.log('[mobile/retry-otp] MSG91 status:', r.status, '| response:', JSON.stringify(data));
+    if (!r.ok || data.hasError || data.status === 'fail' || data.type === 'error') {
+      return res.status(400).json({ error: { message: data.message || data.errors || 'Failed to retry OTP' } });
+    }
     res.json({ success: true });
   } catch (err) {
     console.error('mobile/retry-otp error:', err.message);
@@ -1798,7 +1803,10 @@ router.post('/mobile/verify-otp', async (req, res) => {
       body: JSON.stringify({ reqId, otp }),
     });
     const data = await r.json();
-    if (!r.ok || data.type === 'error') return res.status(400).json({ error: { message: data.message || 'Invalid OTP' } });
+    console.log('[mobile/verify-otp] MSG91 status:', r.status, '| response:', JSON.stringify(data));
+    if (!r.ok || data.hasError || data.status === 'fail' || data.type === 'error') {
+      return res.status(400).json({ error: { message: data.message || data.errors || 'Invalid OTP' } });
+    }
     const token = data.message ?? data.token ?? data.access_token;
     if (!token) return res.status(400).json({ error: { message: 'OTP verified but no token returned' } });
     res.json({ success: true, token });
