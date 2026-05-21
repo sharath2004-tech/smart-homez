@@ -11,8 +11,6 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
-const isNative = !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
-
 interface Service {
   _id: string;
   name: string;
@@ -641,11 +639,7 @@ const BookServicePage = () => {
     setPhoneVerifyLoading(true);
     setPhoneVerifyError('');
     try {
-      if (isNative) {
-        await authAPI.sendPhoneOTPVerify('+91' + digits);
-      } else {
-        await msg91Widget.sendOtp('91' + digits);
-      }
+      await msg91Widget.sendOtp('91' + digits);
       setPhoneVerifyOtpSent(true);
       startPhoneVerifyResendCountdown();
     } catch (err) {
@@ -663,13 +657,8 @@ const BookServicePage = () => {
     setPhoneVerifyLoading(true);
     setPhoneVerifyError('');
     try {
-      if (isNative) {
-        const digits = phoneVerifyNumber.replace(/\D/g, '').slice(-10);
-        await authAPI.confirmPhoneOTPVerify('+91' + digits, phoneVerifyOtp);
-      } else {
-        const widgetToken = await msg91Widget.verifyOtp(phoneVerifyOtp);
-        await authAPI.confirmPhoneWidgetToken(widgetToken);
-      }
+      const widgetToken = await msg91Widget.verifyOtp(phoneVerifyOtp);
+      await authAPI.confirmPhoneWidgetToken(widgetToken);
       // Mark locally so booking proceeds immediately
       setProfile(prev => prev ? { ...prev, phone: phoneVerifyNumber, isPhoneVerified: true } : prev);
       setShowPhoneVerifyModal(false);

@@ -11,8 +11,6 @@ import MaidServicePage from "./services/MaidServicePage";
 import MiniCleanServicePage from "./services/MiniCleanServicePage";
 import PlumbingServicePage from "./services/PlumbingServicePage";
 
-const isNative = !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
-
 const MINI_SERVICE_TYPES = new Set([
   'deep_cleaning_kitchen',
   'deep_cleaning_bathroom',
@@ -79,11 +77,7 @@ const ServiceRouter = () => {
     if (digits.length !== 10) { setPhoneVerifyError('Enter a valid 10-digit mobile number'); return; }
     setPhoneVerifyLoading(true); setPhoneVerifyError('');
     try {
-      if (isNative) {
-        await authAPI.sendPhoneOTPVerify('+91' + digits);
-      } else {
-        await msg91Widget.sendOtp('91' + digits);
-      }
+      await msg91Widget.sendOtp('91' + digits);
       setPhoneVerifyOtpSent(true);
       startResendCountdown();
     } catch (err) {
@@ -95,13 +89,8 @@ const ServiceRouter = () => {
     if (phoneVerifyOtp.length !== 6) { setPhoneVerifyError('Enter the 6-digit OTP'); return; }
     setPhoneVerifyLoading(true); setPhoneVerifyError('');
     try {
-      if (isNative) {
-        const digits = phoneVerifyNumber.replace(/\D/g, '').slice(-10);
-        await authAPI.confirmPhoneOTPVerify('+91' + digits, phoneVerifyOtp);
-      } else {
-        const token = await msg91Widget.verifyOtp(phoneVerifyOtp);
-        await authAPI.confirmPhoneWidgetToken(token);
-      }
+      const token = await msg91Widget.verifyOtp(phoneVerifyOtp);
+      await authAPI.confirmPhoneWidgetToken(token);
       setIsPhoneVerified(true);
       toast.success('Phone verified! You can now view and book this service.');
     } catch (err) {
@@ -286,7 +275,7 @@ const ServiceRouter = () => {
                   onClick={async () => {
                     if (phoneVerifyResendCountdown > 0) return;
                     setPhoneVerifyOtp(''); setPhoneVerifyError(''); setPhoneVerifyLoading(true);
-                    try { if (isNative) { const d = phoneVerifyNumber.replace(/\D/g,'').slice(-10); await authAPI.sendPhoneOTPVerify('+91'+d); } else { await msg91Widget.retryOtp(null); } startResendCountdown(); }
+                    try { await msg91Widget.retryOtp(null); startResendCountdown(); }
                     catch (err) { setPhoneVerifyError(err instanceof Error ? err.message : 'Failed to resend OTP.'); }
                     finally { setPhoneVerifyLoading(false); }
                   }}
