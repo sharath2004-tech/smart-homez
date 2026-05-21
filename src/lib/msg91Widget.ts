@@ -40,9 +40,64 @@ declare global {
 }
 
 let initPromise: Promise<void> | null = null;
+let nativeReqId: string | null = null;
 
-type Msg91Response = { message?: string; token?: string; access_token?: string };
+type Msg91Response = { message?: string; token?: string; access_token?: string; type?: string };
 type Msg91Error = { message?: string };
+
+const MSG91_WIDGET_API = 'https://control.msg91.com/api/v5/widget';
+
+function isNativePlatform(): boolean {
+  return !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })
+    .Capacitor?.isNativePlatform?.();
+}
+
+async function nativeSendOtp(identifier: string): Promise<void> {
+  const res = await fetch(`${MSG91_WIDGET_API}/sendOTP`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      identifier,
+      widgetId: import.meta.env.VITE_MSG91_WIDGET_ID,
+      tokenAuth: import.meta.env.VITE_MSG91_TOKEN_AUTH,
+    }),
+  });
+  const data: Msg91Response = await res.json();
+  if (!res.ok || data.type === 'error') throw new Error(data.message || 'Failed to send OTP');
+  nativeReqId = data.message ?? null;
+}
+
+async function nativeRetryOtp(channel: string | null): Promise<void> {
+  const body: Record<string, unknown> = {
+    reqId: nativeReqId,
+    tokenAuth: import.meta.env.VITE_MSG91_TOKEN_AUTH,
+  };
+  if (channel) body.retryChannel = Number(channel);
+  const res = await fetch(`${MSG91_WIDGET_API}/retryOTP`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data: Msg91Response = await res.json();
+  if (!res.ok || data.type === 'error') throw new Error(data.message || 'Failed to retry OTP');
+}
+
+async function nativeVerifyOtp(otp: string): Promise<string> {
+  const res = await fetch(`${MSG91_WIDGET_API}/verifyOTP`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      reqId: nativeReqId,
+      otp,
+      tokenAuth: import.meta.env.VITE_MSG91_TOKEN_AUTH,
+    }),
+  });
+  const data: Msg91Response = await res.json();
+  if (!res.ok || data.type === 'error') throw new Error(data.message || 'Invalid OTP. Please try again.');
+  const token = data.message ?? data.token ?? data.access_token ?? String(data ?? '');
+  if (!token) throw new Error('OTP verified but no token returned. Please try again.');
+  return token;
+}
 
 function extractError(err: unknown): Error {
   return new Error((err as Msg91Error)?.message || 'OTP operation failed. Please try again.');
@@ -85,6 +140,7 @@ function init(): Promise<void> {
  * @param phone - Must include country code without "+": e.g. "919876543210"
  */
 export function sendOtp(phone: string): Promise<void> {
+  if (isNativePlatform()) return nativeSendOtp(phone);
   return init().then(
     () =>
       new Promise((resolve, reject) => {
@@ -102,6 +158,7 @@ export function sendOtp(phone: string): Promise<void> {
  * @param channel - null = widget default, '11' = SMS, '4' = Voice, '12' = WhatsApp, '3' = Email
  */
 export function retryOtp(channel: string | null = null): Promise<void> {
+  if (isNativePlatform()) return nativeRetryOtp(channel);
   return new Promise((resolve, reject) => {
     window.retryOtp(
       channel,
@@ -117,6 +174,7 @@ export function retryOtp(channel: string | null = null): Promise<void> {
  * verification before issuing a platform JWT.
  */
 export function verifyOtp(otp: string): Promise<string> {
+  if (isNativePlatform()) return nativeVerifyOtp(otp);
   return new Promise((resolve, reject) => {
     window.verifyOtp(
       otp,

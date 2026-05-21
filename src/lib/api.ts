@@ -488,6 +488,14 @@ export const authAPI = {
     });
   },
 
+  // REST API — verify OTP and reset password directly (used on native/mobile)
+  resetPasswordPhone: async (phone: string, otp: string, newPassword: string) => {
+    return apiCall('/auth/reset-password-phone', {
+      method: 'POST',
+      body: JSON.stringify({ phone, otp, newPassword })
+    });
+  },
+
   // Worker registration with file uploads (multipart/form-data)
   registerWorker: async (formData: FormData) => {
     const token = localStorage.getItem('token');

@@ -4,6 +4,8 @@ import { Link } from "react-router-dom";
 import { authAPI } from "../../lib/api";
 import * as msg91Widget from "../../lib/msg91Widget";
 
+const isNative = !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
+
 type Tab = "email" | "phone";
 type EmailStep = "sendOtp" | "resetPassword";
 type PhoneStep = "sendOtp" | "resetPassword";
@@ -80,7 +82,11 @@ const ForgotPasswordPage = () => {
     }
     setPhoneLoading(true);
     try {
-      await msg91Widget.sendOtp("91" + phone);
+      if (isNative) {
+        await authAPI.sendOTP("+91" + phone);
+      } else {
+        await msg91Widget.sendOtp("91" + phone);
+      }
       setPhoneStep("resetPassword");
     } catch (err) {
       setPhoneError(err instanceof Error ? err.message : "Failed to send OTP. Please try again.");
@@ -102,8 +108,12 @@ const ForgotPasswordPage = () => {
     }
     setPhoneLoading(true);
     try {
-      const widgetToken = await msg91Widget.verifyOtp(otp);
-      await authAPI.resetPasswordWidget(widgetToken, phone, newPassword);
+      if (isNative) {
+        await authAPI.resetPasswordPhone("+91" + phone, otp, newPassword);
+      } else {
+        const widgetToken = await msg91Widget.verifyOtp(otp);
+        await authAPI.resetPasswordWidget(widgetToken, phone, newPassword);
+      }
       setPhoneSuccess(true);
     } catch (err) {
       setPhoneError(err instanceof Error ? err.message : "Failed to reset password. Please check the OTP and try again.");

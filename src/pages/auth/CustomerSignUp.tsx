@@ -14,6 +14,8 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
+const isNative = !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
+
 
 type Step = "form" | "location" | "done";
 
@@ -100,7 +102,11 @@ const CustomerSignUp = () => {
     setOtpLoading(true);
     setError("");
     try {
-      await msg91Widget.sendOtp("91" + phoneDigits);
+      if (isNative) {
+        await authAPI.sendOTP("+91" + phoneDigits);
+      } else {
+        await msg91Widget.sendOtp("91" + phoneDigits);
+      }
       setOtpSent(true);
       startResendCountdown();
     } catch (err) {
@@ -115,7 +121,12 @@ const CustomerSignUp = () => {
     setOtpLoading(true);
     setError("");
     try {
-      await msg91Widget.verifyOtp(otpCode);
+      if (isNative) {
+        const phoneDigits = form.phone.replace(/\D/g, "").slice(-10);
+        await authAPI.checkOTP("+91" + phoneDigits, otpCode);
+      } else {
+        await msg91Widget.verifyOtp(otpCode);
+      }
       setStep("location");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Verification failed. Please try again.");
@@ -130,7 +141,12 @@ const CustomerSignUp = () => {
     setError("");
     setOtpLoading(true);
     try {
-      await msg91Widget.retryOtp(null);
+      if (isNative) {
+        const phoneDigits = form.phone.replace(/\D/g, "").slice(-10);
+        await authAPI.sendOTP("+91" + phoneDigits);
+      } else {
+        await msg91Widget.retryOtp(null);
+      }
       startResendCountdown();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to resend OTP.");

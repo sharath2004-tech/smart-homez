@@ -7,6 +7,8 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 
+const isNative = !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
+
 const LoginPage = () => {
   const { t } = useTranslation();
   const [tab, setTab] = useState<"customer" | "worker" | "admin">("customer");
@@ -107,7 +109,11 @@ const LoginPage = () => {
     setOtpLoading(true);
     setError("");
     try {
-      await msg91Widget.sendOtp("91" + digits);
+      if (isNative) {
+        await authAPI.sendOTP("+91" + digits);
+      } else {
+        await msg91Widget.sendOtp("91" + digits);
+      }
       setOtpSent(true);
       startResendCountdown();
     } catch (err) {
@@ -123,7 +129,12 @@ const LoginPage = () => {
     setError("");
     setOtpLoading(true);
     try {
-      await msg91Widget.retryOtp(null);
+      if (isNative) {
+        const digits = otpPhone.replace(/\D/g, "").slice(-10);
+        await authAPI.sendOTP("+91" + digits);
+      } else {
+        await msg91Widget.retryOtp(null);
+      }
       startResendCountdown();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to resend OTP.");
@@ -137,9 +148,14 @@ const LoginPage = () => {
     setOtpLoading(true);
     setError("");
     try {
-      const widgetToken = await msg91Widget.verifyOtp(otpCode);
       const digits = otpPhone.replace(/\D/g, "").slice(-10);
-      const response = await authAPI.verifyWidgetToken(widgetToken, digits, tab);
+      let response;
+      if (isNative) {
+        response = await authAPI.verifyOTP("+91" + digits, otpCode, tab);
+      } else {
+        const widgetToken = await msg91Widget.verifyOtp(otpCode);
+        response = await authAPI.verifyWidgetToken(widgetToken, digits, tab);
+      }
       localStorage.removeItem("userLocation");
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
