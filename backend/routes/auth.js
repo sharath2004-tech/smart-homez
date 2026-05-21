@@ -1737,4 +1737,72 @@ router.post('/reset-password-widget',
   },
 );
 
+// ─── MSG91 Widget OTP proxy (used by native Capacitor app) ───────────────────
+// Proxies widget API calls server-side so origin/CORS is never an issue.
+// Requires env vars: MSG91_WIDGET_ID, MSG91_TOKEN_AUTH
+
+const MSG91_WIDGET_BASE = 'https://control.msg91.com/api/v5/widget';
+
+// POST /api/auth/mobile/send-otp  { identifier: "91XXXXXXXXXX" }
+router.post('/mobile/send-otp', async (req, res) => {
+  const { identifier } = req.body;
+  if (!identifier) return res.status(400).json({ error: { message: 'identifier is required' } });
+  try {
+    const r = await fetch(`${MSG91_WIDGET_BASE}/sendOTP`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'tokenAuth': process.env.MSG91_TOKEN_AUTH },
+      body: JSON.stringify({ widgetId: process.env.MSG91_WIDGET_ID, identifier }),
+    });
+    const data = await r.json();
+    if (!r.ok || data.type === 'error') return res.status(400).json({ error: { message: data.message || 'Failed to send OTP' } });
+    res.json({ success: true, reqId: data.message ?? data.reqId });
+  } catch (err) {
+    console.error('mobile/send-otp error:', err.message);
+    res.status(500).json({ error: { message: 'Failed to send OTP. Please try again.' } });
+  }
+});
+
+// POST /api/auth/mobile/retry-otp  { reqId, retryChannel? }
+router.post('/mobile/retry-otp', async (req, res) => {
+  const { reqId, retryChannel } = req.body;
+  if (!reqId) return res.status(400).json({ error: { message: 'reqId is required' } });
+  try {
+    const body = { reqId, tokenAuth: process.env.MSG91_TOKEN_AUTH };
+    if (retryChannel) body.retryChannel = retryChannel;
+    const r = await fetch(`${MSG91_WIDGET_BASE}/retryOTP`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    if (!r.ok || data.type === 'error') return res.status(400).json({ error: { message: data.message || 'Failed to retry OTP' } });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('mobile/retry-otp error:', err.message);
+    res.status(500).json({ error: { message: 'Failed to retry OTP. Please try again.' } });
+  }
+});
+
+// POST /api/auth/mobile/verify-otp  { reqId, otp }  → returns { token }
+router.post('/mobile/verify-otp', async (req, res) => {
+  const { reqId, otp } = req.body;
+  if (!reqId || !otp) return res.status(400).json({ error: { message: 'reqId and otp are required' } });
+  try {
+    const r = await fetch(`${MSG91_WIDGET_BASE}/verifyOTP`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'tokenAuth': process.env.MSG91_TOKEN_AUTH },
+      body: JSON.stringify({ reqId, otp }),
+    });
+    const data = await r.json();
+    if (!r.ok || data.type === 'error') return res.status(400).json({ error: { message: data.message || 'Invalid OTP' } });
+    const token = data.message ?? data.token ?? data.access_token;
+    if (!token) return res.status(400).json({ error: { message: 'OTP verified but no token returned' } });
+    res.json({ success: true, token });
+  } catch (err) {
+    console.error('mobile/verify-otp error:', err.message);
+    res.status(500).json({ error: { message: 'Verification failed. Please try again.' } });
+  }
+});
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default router;

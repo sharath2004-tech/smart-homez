@@ -45,56 +45,39 @@ let nativeReqId: string | null = null;
 type Msg91Response = { message?: string; token?: string; access_token?: string; type?: string };
 type Msg91Error = { message?: string };
 
-const MSG91_WIDGET_API = 'https://control.msg91.com/api/v5/widget';
-
 function isNativePlatform(): boolean {
   return !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })
     .Capacitor?.isNativePlatform?.();
 }
 
-async function nativeSendOtp(identifier: string): Promise<void> {
-  const res = await fetch(`${MSG91_WIDGET_API}/sendOTP`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      identifier,
-      widgetId: import.meta.env.VITE_MSG91_WIDGET_ID,
-      tokenAuth: import.meta.env.VITE_MSG91_TOKEN_AUTH,
-    }),
-  });
-  const data: Msg91Response = await res.json();
-  if (!res.ok || data.type === 'error') throw new Error(data.message || 'Failed to send OTP');
-  nativeReqId = data.message ?? null;
-}
+// Backend proxy base — routes native OTP through backend to avoid CORS/origin issues with MSG91
+const API_BASE = (import.meta.env.VITE_API_URL as string) || 'http://localhost:5000/api';
 
-async function nativeRetryOtp(channel: string | null): Promise<void> {
-  const body: Record<string, unknown> = {
-    reqId: nativeReqId,
-    tokenAuth: import.meta.env.VITE_MSG91_TOKEN_AUTH,
-  };
-  if (channel) body.retryChannel = Number(channel);
-  const res = await fetch(`${MSG91_WIDGET_API}/retryOTP`, {
+async function proxyFetch(path: string, body: Record<string, unknown>): Promise<Msg91Response> {
+  const res = await fetch(`${API_BASE}/auth${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  const data: Msg91Response = await res.json();
-  if (!res.ok || data.type === 'error') throw new Error(data.message || 'Failed to retry OTP');
+  const data = await res.json() as Msg91Response & { error?: { message?: string } };
+  if (!res.ok || data.type === 'error') throw new Error(data.error?.message ?? data.message ?? 'OTP request failed');
+  return data;
+}
+
+async function nativeSendOtp(identifier: string): Promise<void> {
+  const data = await proxyFetch('/mobile/send-otp', { identifier });
+  nativeReqId = (data as unknown as { reqId?: string }).reqId ?? data.message ?? null;
+}
+
+async function nativeRetryOtp(channel: string | null): Promise<void> {
+  const body: Record<string, unknown> = { reqId: nativeReqId };
+  if (channel) body.retryChannel = Number(channel);
+  await proxyFetch('/mobile/retry-otp', body);
 }
 
 async function nativeVerifyOtp(otp: string): Promise<string> {
-  const res = await fetch(`${MSG91_WIDGET_API}/verifyOTP`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      reqId: nativeReqId,
-      otp,
-      tokenAuth: import.meta.env.VITE_MSG91_TOKEN_AUTH,
-    }),
-  });
-  const data: Msg91Response = await res.json();
-  if (!res.ok || data.type === 'error') throw new Error(data.message || 'Invalid OTP. Please try again.');
-  const token = data.message ?? data.token ?? data.access_token ?? String(data ?? '');
+  const data = await proxyFetch('/mobile/verify-otp', { reqId: nativeReqId, otp });
+  const token = (data as unknown as { token?: string }).token ?? data.message ?? data.access_token;
   if (!token) throw new Error('OTP verified but no token returned. Please try again.');
   return token;
 }
